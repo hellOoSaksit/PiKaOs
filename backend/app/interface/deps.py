@@ -1,6 +1,7 @@
 """Composition root — wires concrete adapters into application services per
 request. This is the only place the layers are assembled."""
 from collections.abc import Generator
+from urllib.parse import unquote
 
 from fastapi import Depends, Header
 from sqlalchemy.orm import Session
@@ -30,8 +31,9 @@ def get_db() -> Generator[Session, None, None]:
     yield from get_session()
 
 
-def actor_header(x_actor: str = Header(default="ผู้ใช้", alias="X-Actor")) -> str:
-    return x_actor
+def actor_header(x_actor: str = Header(default="%E0%B8%9C%E0%B8%B9%E0%B9%89%E0%B9%83%E0%B8%8A%E0%B9%89", alias="X-Actor")) -> str:
+    # client percent-encodes the actor name (headers are Latin-1 only)
+    return unquote(x_actor)
 
 
 def get_vocab_service(db: Session = Depends(get_db)) -> VocabService:
