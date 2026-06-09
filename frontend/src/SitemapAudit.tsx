@@ -67,6 +67,7 @@ export function SitemapAudit({ lang, can, actor }: { lang: Lang; can?: (p: strin
   const [smErr, setSmErr] = useState<string | null>(null);
   const [smQuery, setSmQuery] = useState("");
   const [smOpen, setSmOpen] = useState<Record<string, boolean>>({});
+  const [smOnlyMatched, setSmOnlyMatched] = useState(false);
   const loadSitemapFor = async (u: string) => {
     if (!u.trim()) return;
     setSmBusy(true);
@@ -87,40 +88,68 @@ export function SitemapAudit({ lang, can, actor }: { lang: Lang; can?: (p: strin
     if (segs.length && /^[a-z]{2}$/i.test(segs[0])) segs.shift(); // drop locale
     return segs[0] || "/";
   };
+  // normalize a path for cross-locale comparison (drop /th /en + trailing slash)
+  const normPath = (p: string) => {
+    const segs = p.split("/").filter(Boolean);
+    if (segs.length && /^[a-z]{2}$/i.test(segs[0])) segs.shift();
+    return "/" + segs.join("/").toLowerCase();
+  };
   const renderSitemap = () => {
     if (smBusy) return <Panel><div className="sm-loading"><span className="typing-bubble"><span /><span /><span /></span> {t("sitemap.loading")}</div></Panel>;
     if (smErr) return <div className="sm-readonly mono">⚠️ {smErr}</div>;
     if (!smTree.length) return <Empty icon="🗂️" title={t("sitemap.empty.title")} sub={t("sitemap.empty.sub")} />;
+
+    // map each scanned page that matched a vocab term → its canon + status
+    const matched: Record<string, { canon: string; status: string }> = {};
+    if (result) {
+      for (const i of result.items) {
+        const s = statusOf(i);
+        if (s !== "missing" && i.evPath) matched[normPath(i.evPath)] = { canon: i.canon, status: s };
+      }
+    }
+    const matchOf = (e: SitemapEntry) => matched[normPath(e.path)];
+
     const q = smQuery.trim().toLowerCase();
-    const filtered = q ? smTree.filter((e) => (e.path + " " + e.slug).toLowerCase().includes(q)) : smTree;
+    let filtered = q ? smTree.filter((e) => (e.path + " " + e.slug).toLowerCase().includes(q)) : smTree;
+    if (smOnlyMatched) filtered = filtered.filter(matchOf);
+    const matchTotal = smTree.filter(matchOf).length;
     const groups: Record<string, SitemapEntry[]> = {};
     for (const e of filtered) (groups[smSection(e.path)] ||= []).push(e);
     const sections = Object.keys(groups).sort();
     return (
       <>
         <div className="sm-thbar">
-          <input className="bf-input" style={{ flex: "0 0 260px" }} placeholder={t("sitemap.search")} value={smQuery} onChange={(e) => setSmQuery(e.target.value)} />
-          <span className="mono muted" style={{ fontSize: 12.5 }}>{t("sitemap.count", { n: filtered.length, s: sections.length })}</span>
+          <input className="bf-input" style={{ flex: "0 0 240px" }} placeholder={t("sitemap.search")} value={smQuery} onChange={(e) => setSmQuery(e.target.value)} />
+          <label className="sm-aicheck" style={{ margin: 0 }}>
+            <input type="checkbox" checked={smOnlyMatched} onChange={(e) => setSmOnlyMatched(e.target.checked)} />
+            <span>{t("sitemap.onlyMatched")} <span className="mono faint">({matchTotal})</span></span>
+          </label>
+          <span className="mono muted" style={{ fontSize: 12.5, marginLeft: "auto" }}>{t("sitemap.count", { n: filtered.length, s: sections.length })}</span>
         </div>
         <div className="sm-smtree">
           {sections.map((sec) => {
             const items = groups[sec];
-            const open = q ? true : !!smOpen[sec];
+            const hits = items.filter(matchOf).length;
+            const open = q || smOnlyMatched ? true : !!smOpen[sec];
             return (
               <div className="sm-smgroup" key={sec}>
                 <button className="sm-smhead" onClick={() => setSmOpen((o) => ({ ...o, [sec]: !o[sec] }))}>
                   <span className="sm-smtoggle">{open ? "▾" : "▸"}</span>
                   <span className="sm-smname mono">/{sec}</span>
+                  {hits > 0 && <span className="sm-smhit">✓ {hits}</span>}
                   <span className="sm-smcount">{items.length}</span>
                 </button>
                 {open && (
                   <div className="sm-smlist">
-                    {items.slice(0, 500).map((e) => (
-                      <a key={e.path} className="sm-smrow" href={e.loc} target="_blank" rel="noopener noreferrer" title={e.loc}>
-                        <span className="sm-smpath mono">{e.path}</span>
-                        <span className="sm-smslug">{e.slug}</span>
-                      </a>
-                    ))}
+                    {items.slice(0, 500).map((e) => {
+                      const m = matchOf(e);
+                      return (
+                        <a key={e.path} className={`sm-smrow ${m ? "matched " + m.status : ""}`} href={e.loc} target="_blank" rel="noopener noreferrer" title={e.loc}>
+                          <span className="sm-smpath mono">{e.path}</span>
+                          {m ? <span className={`sm-smmatch ${m.status}`}>✓ {m.canon}</span> : <span className="sm-smslug">{e.slug}</span>}
+                        </a>
+                      );
+                    })}
                     {items.length > 500 && <div className="muted" style={{ fontSize: 11, padding: "4px 8px" }}>+{items.length - 500}…</div>}
                   </div>
                 )}

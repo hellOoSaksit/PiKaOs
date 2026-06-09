@@ -32,6 +32,7 @@
   "sitemap.load": "Fetch sitemap",
   "sitemap.loading": "Fetching sitemap.xml…",
   "sitemap.search": "search path / slug…",
+  "sitemap.onlyMatched": "matched only",
   "sitemap.count": "{n} URLs · {s} sections",
   "sitemap.needUrl": "Enter the site URL first",
   "sitemap.notFound": "No sitemap.xml found for this site",

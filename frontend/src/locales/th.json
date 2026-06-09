@@ -32,6 +32,7 @@
   "sitemap.load": "ดึง sitemap",
   "sitemap.loading": "กำลังดึง sitemap.xml…",
   "sitemap.search": "ค้นหา path / slug…",
+  "sitemap.onlyMatched": "เฉพาะที่จับคู่ได้",
   "sitemap.count": "{n} URL · {s} หมวด",
   "sitemap.needUrl": "ใส่ URL ของเว็บก่อน",
   "sitemap.notFound": "ไม่พบ sitemap.xml ของเว็บนี้",
