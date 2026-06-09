@@ -68,6 +68,8 @@
   "scan.aiCheck": "🤖 Use AI assist",
   "scan.bypass": "🚫 Skip popups while fetching",
   "scan.bypassHint": "(cookie · modal · paywall)",
+  "scan.deep": "🔎 Deep scan (content)",
+  "scan.deepHint": "(h2/h3 + all links · includes news — default is nav only)",
   "scan.try": "try",
   "scan.threshold": "⚙️ Pass threshold (confidence ≥)",
   "scan.bandHint": "{lo}–{hi}% = unclear · below {lo}% = missing",

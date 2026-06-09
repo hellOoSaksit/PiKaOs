@@ -19,6 +19,7 @@ interface Settings {
   apiUrl?: string;
   apiKey?: string;
   bypassPopup?: boolean;
+  deep?: boolean;
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -219,7 +220,7 @@ export function SitemapAudit({ lang, can, actor }: { lang: Lang; can?: (p: strin
     setResult(null);
     setErr(null);
     try {
-      const r = await api.scan({ url: target, category: cat, passThreshold: passTh, bypassPopup: settings.bypassPopup !== false });
+      const r = await api.scan({ url: target, category: cat, passThreshold: passTh, bypassPopup: settings.bypassPopup !== false, deep: !!settings.deep });
       setResult(r);
     } catch (e) {
       setErr(String((e as Error).message));
@@ -473,6 +474,10 @@ export function SitemapAudit({ lang, can, actor }: { lang: Lang; can?: (p: strin
           <label className="sm-aicheck">
             <input type="checkbox" checked={settings.bypassPopup !== false} onChange={(e) => setSetting("bypassPopup", e.target.checked)} />
             <span>{t("scan.bypass")} <span className="mono faint">{t("scan.bypassHint")}</span></span>
+          </label>
+          <label className="sm-aicheck">
+            <input type="checkbox" checked={!!settings.deep} onChange={(e) => setSetting("deep", e.target.checked)} />
+            <span>{t("scan.deep")} <span className="mono faint">{t("scan.deepHint")}</span></span>
           </label>
           <div className="sm-examples">
             <span className="mono faint">{t("scan.try")}:</span>

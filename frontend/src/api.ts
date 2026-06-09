@@ -49,7 +49,7 @@ export const api = {
     req<Term>(`/sitemap/terms/${id}/aliases/${encodeURIComponent(text)}`, { method: "DELETE" }, actor),
 
   // scan
-  scan: (body: { url: string; category: string; passThreshold: number; bypassPopup: boolean }) =>
+  scan: (body: { url: string; category: string; passThreshold: number; bypassPopup: boolean; deep: boolean }) =>
     req<ScanResult>("/sitemap/scan", { method: "POST", body: JSON.stringify(body) }),
 
   // train
