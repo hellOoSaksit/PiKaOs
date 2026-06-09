@@ -38,6 +38,7 @@ class TermORM(Base):
     category_key: Mapped[str] = mapped_column(ForeignKey("categories.key", ondelete="CASCADE"), index=True)
     canon: Mapped[str] = mapped_column(String(200))
     th: Mapped[str] = mapped_column(String(300))
+    section: Mapped[str | None] = mapped_column(String(120), nullable=True)  # menu group from the IR sitemap
     is_base: Mapped[bool] = mapped_column(Boolean, default=False)
     confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

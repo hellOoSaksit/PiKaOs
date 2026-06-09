@@ -25,6 +25,7 @@ class TermOut(_Out):
     category: str = Field(validation_alias="category_key", serialization_alias="category")
     confirmed: bool
     is_base: bool = Field(serialization_alias="isBase")
+    section: str | None = None
     aliases: list[str] = []
 
 

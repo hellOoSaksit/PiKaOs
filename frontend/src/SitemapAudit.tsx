@@ -542,24 +542,38 @@ export function SitemapAudit({ lang, can, actor }: { lang: Lang; can?: (p: strin
           {!readOnly && <div className="mono faint" style={{ fontSize: 11, margin: "-4px 0 8px" }}>{t("map.hint")}</div>}
           <div className="sm-map">
             {terms.length === 0 && <div className="muted" style={{ fontSize: 13, padding: "10px 2px" }}>{t("map.empty")}</div>}
-            {terms.map((term) => (
-              <div key={term.key} className="sm-maprow">
-                <div className="sm-mapkey">
-                  <div className="sm-mapcanon mono">{term.canon}{!readOnly && <button className="sm-edit" onClick={() => editCanon(term.key, term.canon)}>✎</button>}</div>
-                  <div className="sm-mapth">{term.th}{!readOnly && <button className="sm-edit" onClick={() => editTerm(term.key, term.th)}>✎</button>}</div>
-                  <span className="sm-item-cat mono">{term.category}</span>
-                </div>
-                <span className="sm-arrow">→</span>
-                <div className="sm-mapvars">
-                  {term.aliases.length === 0 && <span className="muted" style={{ fontSize: 12 }}>{t("map.noAlias")}</span>}
-                  {term.aliases.map((a) => (
-                    <span key={a} className="sm-var">{a}{!readOnly && <><button onClick={() => editAlias(term.key, a)}>✎</button><button onClick={() => removeAlias(term.key, a)}>✕</button></>}</span>
+            {(() => {
+              const order: string[] = [];
+              const groups: Record<string, Term[]> = {};
+              for (const tm of terms) {
+                const s = tm.section || "—";
+                if (!groups[s]) { groups[s] = []; order.push(s); }
+                groups[s].push(tm);
+              }
+              return order.map((sec) => (
+                <div key={sec} className="sm-mapsec">
+                  <div className="sm-mapsec-head mono">{sec}<span>{groups[sec].length}</span></div>
+                  {groups[sec].map((term) => (
+                    <div key={term.key} className="sm-maprow">
+                      <div className="sm-mapkey">
+                        <div className="sm-mapcanon mono">{term.canon}{!readOnly && <button className="sm-edit" onClick={() => editCanon(term.key, term.canon)}>✎</button>}</div>
+                        <div className="sm-mapth">{term.th}{!readOnly && <button className="sm-edit" onClick={() => editTerm(term.key, term.th)}>✎</button>}</div>
+                        <span className="sm-item-cat mono">{term.category}</span>
+                      </div>
+                      <span className="sm-arrow">→</span>
+                      <div className="sm-mapvars">
+                        {term.aliases.length === 0 && <span className="muted" style={{ fontSize: 12 }}>{t("map.noAlias")}</span>}
+                        {term.aliases.map((a) => (
+                          <span key={a} className="sm-var">{a}{!readOnly && <><button onClick={() => editAlias(term.key, a)}>✎</button><button onClick={() => removeAlias(term.key, a)}>✕</button></>}</span>
+                        ))}
+                        {!readOnly && <button className="sm-var add" onClick={() => addAlias(term.key)}>＋</button>}
+                      </div>
+                      {!readOnly && <button className="sm-maprow-del" onClick={() => removeTerm(term.key, term.canon)}>🗑</button>}
+                    </div>
                   ))}
-                  {!readOnly && <button className="sm-var add" onClick={() => addAlias(term.key)}>＋</button>}
                 </div>
-                {!readOnly && <button className="sm-maprow-del" onClick={() => removeTerm(term.key, term.canon)}>🗑</button>}
-              </div>
-            ))}
+              ));
+            })()}
           </div>
         </>
       ) : (

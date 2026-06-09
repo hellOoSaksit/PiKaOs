@@ -18,6 +18,7 @@ def _to_term(o: TermORM) -> Term:
     return Term(
         id=o.id, category_key=o.category_key, canon=o.canon, th=o.th,
         is_base=o.is_base, confirmed=o.confirmed, aliases=[a.text for a in o.aliases],
+        section=o.section,
     )
 
 
