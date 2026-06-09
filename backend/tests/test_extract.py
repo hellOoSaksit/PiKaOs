@@ -1,0 +1,40 @@
+"""Nav-focused vs deep extraction."""
+from app.infrastructure.crawler import extract_terms
+
+# A page whose nav holds the real sections and whose <main> holds news articles.
+HTML = """
+<html><head><title>SCB</title></head><body>
+  <header><nav>
+    <a href="/about">About Us</a>
+    <a href="/cg">Corporate Governance</a>
+    <a href="/sustainability">Sustainability</a>
+    <a href="/csr">CSR</a>
+    <a href="/news">News</a>
+  </nav></header>
+  <main>
+    <h1>Welcome</h1>
+    <h2>SCB launches new mobile app</h2>
+    <h2>Q3 profit rises 12%</h2>
+    <a href="/news/123">SCB launches new mobile app</a>
+  </main>
+</body></html>
+"""
+
+
+def _texts(terms):
+    return {t.text for t in terms}
+
+
+def test_nav_only_excludes_article_headings():
+    texts = _texts(extract_terms("https://scb.co.th", HTML, bypass_popup=True, deep=False))
+    assert "Corporate Governance" in texts
+    assert "Sustainability" in texts and "CSR" in texts and "News" in texts
+    # news/article content must NOT leak in
+    assert "SCB launches new mobile app" not in texts
+    assert "Q3 profit rises 12%" not in texts
+
+
+def test_deep_includes_content_headings():
+    texts = _texts(extract_terms("https://scb.co.th", HTML, bypass_popup=True, deep=True))
+    assert "SCB launches new mobile app" in texts
+    assert "Q3 profit rises 12%" in texts

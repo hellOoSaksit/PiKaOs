@@ -9,7 +9,7 @@ class _Base:
     def __init__(self, result=None, error=None):
         self._result, self._error = result, error
 
-    def fetch_and_extract(self, url, bypass_popup):
+    def fetch_and_extract(self, url, bypass_popup, deep=False):
         if self._error:
             raise self._error
         return self._result

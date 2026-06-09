@@ -68,6 +68,8 @@
   "scan.aiCheck": "🤖 ใช้ AI ช่วยตรวจ",
   "scan.bypass": "🚫 ข้าม Popup ตอนดึงข้อมูล",
   "scan.bypassHint": "(cookie · modal · paywall)",
+  "scan.deep": "🔎 ค้นลึกถึงเนื้อหา",
+  "scan.deepHint": "(h2/h3 + ลิงก์ทั้งหมด · รวมหัวข้อข่าว — ปกติค้นแค่เมนู)",
   "scan.try": "ลองตัวอย่าง",
   "scan.threshold": "⚙️ เกณฑ์ผ่าน (ความมั่นใจ ≥)",
   "scan.bandHint": "{lo}–{hi}% = ไม่ชัด · ต่ำกว่า {lo}% = ขาด",

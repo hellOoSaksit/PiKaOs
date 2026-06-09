@@ -16,7 +16,7 @@ class ScanService:
         self.matcher = matcher
         self.unclear_band = unclear_band
 
-    def scan(self, url: str, category: str, pass_threshold: int, bypass_popup: bool) -> ScanReport:
+    def scan(self, url: str, category: str, pass_threshold: int, bypass_popup: bool, deep: bool = False) -> ScanReport:
         if self.repo.get_category(category) is None:
             raise ServiceError(f"category '{category}' not found", 404)
 
@@ -25,7 +25,7 @@ class ScanService:
             raise ServiceError("category has no vocabulary terms")
 
         try:
-            crawled = self.crawler.fetch_and_extract(url, bypass_popup)
+            crawled = self.crawler.fetch_and_extract(url, bypass_popup, deep)
         except CrawlError as e:
             raise ServiceError(f"fetch failed: {e}", 502) from e
 

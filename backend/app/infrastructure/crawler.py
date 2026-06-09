@@ -82,8 +82,26 @@ def _try_sitemap(base_url: str) -> list[PageTerm]:
     return out
 
 
-def extract_terms(final_url: str, html_text: str, bypass_popup: bool) -> list[PageTerm]:
-    """Extract candidate page terms from HTML (works for fetched or rendered HTML)."""
+# navigation regions — the site's top-level sections (header/nav/menu/footer),
+# NOT main-content headings or article links.
+_NAV_XPATH = (
+    "//header//a | //nav//a | //*[@role='navigation']//a"
+    " | //*[contains(@class,'menu')]//a | //*[contains(@class,'nav')]//a"
+    " | //*[contains(@class,'navbar')]//a | //footer//a"
+)
+
+
+def extract_terms(final_url: str, html_text: str, bypass_popup: bool, deep: bool = False) -> list[PageTerm]:
+    """Extract candidate page terms from HTML.
+
+    Default (nav-focused): the page title/h1 plus the navigation menu items —
+    the site's top-level sections (About Us, Corporate Governance, …). This is
+    what you match a sitemap vocabulary against.
+
+    `deep=True` additionally pulls content headings (h2/h3), breadcrumbs and all
+    anchors — useful to reach deep pages, but it also drags in article/news
+    titles, so it's opt-in.
+    """
     doc = lxml_html.fromstring(html_text)
     if bypass_popup:
         for el in doc.xpath("//*[@class or @id or @role]"):
@@ -105,16 +123,22 @@ def extract_terms(final_url: str, html_text: str, bypass_popup: bool) -> list[Pa
         seen.add(norm)
         terms.append(PageTerm(ttext, tag, path))
 
+    # page identity
     for t in doc.xpath("//title/text()"):
         push(t, "<title>", "/")
-    for level in ("h1", "h2", "h3"):
-        for el in doc.xpath(f"//{level}"):
-            push(el.text_content(), f"<{level}>", "/")
-    for a in doc.xpath("//nav//a | //*[contains(@class,'menu')]//a | //*[contains(@class,'nav')]//a | //footer//a"):
+    for el in doc.xpath("//h1"):
+        push(el.text_content(), "<h1>", "/")
+
+    # primary: navigation menu items
+    for a in doc.xpath(_NAV_XPATH):
         push(a.text_content(), "<nav>", _path_of(a.get("href", ""), final_url))
-    for a in doc.xpath("//*[contains(@class,'breadcrumb')]//a | //*[contains(@class,'breadcrumb')]//span"):
-        push(a.text_content(), "breadcrumb", _path_of(a.get("href", ""), final_url))
-    if len(terms) < 20:
+
+    if deep:
+        for level in ("h2", "h3"):
+            for el in doc.xpath(f"//{level}"):
+                push(el.text_content(), f"<{level}>", "/")
+        for a in doc.xpath("//*[contains(@class,'breadcrumb')]//a | //*[contains(@class,'breadcrumb')]//span"):
+            push(a.text_content(), "breadcrumb", _path_of(a.get("href", ""), final_url))
         for a in doc.xpath("//a[@href]"):
             push(a.text_content(), "link", _path_of(a.get("href", ""), final_url))
             if len(terms) >= settings.crawl_max_terms:
@@ -127,6 +151,6 @@ def extract_terms(final_url: str, html_text: str, bypass_popup: bool) -> list[Pa
 class LxmlCrawler:
     """Static HTTP + lxml crawler (no JS execution)."""
 
-    def fetch_and_extract(self, url: str, bypass_popup: bool) -> CrawlResult:
+    def fetch_and_extract(self, url: str, bypass_popup: bool, deep: bool = False) -> CrawlResult:
         final_url, html_text = fetch(url)
-        return CrawlResult(final_url, extract_terms(final_url, html_text, bypass_popup), rendered=False)
+        return CrawlResult(final_url, extract_terms(final_url, html_text, bypass_popup, deep), rendered=False)

@@ -96,4 +96,5 @@ class ScanRequest(BaseModel):
     category: str
     pass_threshold: int = Field(default=70, alias="passThreshold")
     bypass_popup: bool = Field(default=True, alias="bypassPopup")
+    deep: bool = False  # widen beyond the nav menu (h2/h3 + all links)
     model_config = ConfigDict(populate_by_name=True)

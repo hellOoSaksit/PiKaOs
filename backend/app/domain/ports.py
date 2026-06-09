@@ -46,8 +46,9 @@ class LogRepository(Protocol):
 
 
 class Crawler(Protocol):
-    def fetch_and_extract(self, url: str, bypass_popup: bool) -> CrawlResult:
-        """Return a CrawlResult. Raise CrawlError on fetch failure."""
+    def fetch_and_extract(self, url: str, bypass_popup: bool, deep: bool = False) -> CrawlResult:
+        """Return a CrawlResult. `deep` widens extraction beyond the nav menu.
+        Raise CrawlError on fetch failure."""
         ...
 
 
