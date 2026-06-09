@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     # nav-focused mode: keep only shallow section links (top-level IA), dropping
     # deep article/person/sub-page links that mega-menus dump into the markup.
     crawl_nav_max_depth: int = 2
+    # try this site locale first (match the English canon terms); "" disables
+    crawl_prefer_lang: str = "en"
 
     # Matching
     default_pass_threshold: int = 70  # confidence >= => "complete"

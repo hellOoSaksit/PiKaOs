@@ -28,7 +28,7 @@ class FallbackCrawler:
             fetch_error = e  # plain fetch blocked/failed — a browser may still work
 
         if settings.crawl_render_enabled:
-            rendered = self.renderer.render(cr.normalize_url(url))
+            rendered = self.renderer.render(cr.candidate_urls(url)[0])  # EN-preferred
             if rendered is not None:
                 final_url, html = rendered
                 terms = cr.extract_terms(final_url, html, bypass_popup, deep)
