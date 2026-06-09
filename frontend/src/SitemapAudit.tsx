@@ -3,10 +3,11 @@
    (GuildOS/screens-sitemap.jsx). The mock `run()` / localStorage
    override maps are replaced by real calls to the FastAPI backend
    (lxml crawl + rapidfuzz match + Postgres-backed vocabulary).
-   Visual structure / classNames are kept identical to the prototype.
+   All UI strings come from src/locales/<lang>.json via makeT().
    ============================================================ */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
+import { makeT, type Lang } from "./i18n";
 import type { Category, LogEntry, ScanItem, ScanResult, Term, TrainFile } from "./types";
 import { Btn, Empty, PageHead, Panel } from "./ui";
 
@@ -31,8 +32,16 @@ const DEFAULT_SETTINGS: Settings = {
 const UNCLEAR = 18;
 export const VERSION_LABEL = "0.1 · Sitemap · Beta";
 
-export function SitemapAudit({ lang, can, actor }: { lang: "th" | "en"; can?: (p: string) => boolean; actor?: string }) {
-  const T = (en: string, th: string) => (lang === "en" ? en : th);
+const PIPE: [string, string][] = [
+  ["🗺️", "pipe.vocab"],
+  ["🧩", "pipe.format"],
+  ["🌐", "pipe.fetch"],
+  ["⚖️", "pipe.compare"],
+  ["📑", "pipe.report"],
+];
+
+export function SitemapAudit({ lang, can, actor }: { lang: Lang; can?: (p: string) => boolean; actor?: string }) {
+  const t = makeT(lang);
   const canEdit = !can || can("codex.manage");
   const me = actor || "ผู้ใช้";
 
@@ -119,37 +128,37 @@ export function SitemapAudit({ lang, can, actor }: { lang: "th" | "en"; can?: (p
 
   // ---- vocab edits ----
   const addTerm = async () => {
-    const canon = window.prompt("เพิ่มคำหลัก (หัวข้อ) — เช่น Share Price");
+    const canon = window.prompt(t("prompt.addTerm"));
     if (!canon || !canon.trim()) return;
-    const th = window.prompt("คำอธิบาย/ภาษาไทย — เช่น ราคาหลักทรัพย์") || canon;
+    const th = window.prompt(t("prompt.addTermTh")) || canon;
     await api.addTerm(cat, { canon: canon.trim(), th: th.trim() }, me);
     refreshVocab();
   };
   const editCanon = async (id: string, cur: string) => {
-    const n = window.prompt("แก้คำหลัก (หัวข้อ)", cur);
+    const n = window.prompt(t("prompt.editCanon"), cur);
     if (!n || n === cur) return;
     await api.updateTerm(id, { canon: n.trim() }, me);
     refreshVocab();
   };
   const editTerm = async (id: string, cur: string) => {
-    const n = window.prompt("แก้คำอธิบาย/ไทย", cur);
+    const n = window.prompt(t("prompt.editTerm"), cur);
     if (!n || n === cur) return;
     await api.updateTerm(id, { th: n.trim() }, me);
     refreshVocab();
   };
   const removeTerm = async (id: string, canon: string) => {
-    if (!window.confirm(`ลบคำหลัก “${canon}”?`)) return;
+    if (!window.confirm(t("prompt.removeTerm", { canon }))) return;
     await api.deleteTerm(id, me);
     refreshVocab();
   };
   const addAlias = async (id: string) => {
-    const n = window.prompt("เพิ่มคำที่ map — เช่น งบดุล");
+    const n = window.prompt(t("prompt.addAlias"));
     if (!n || !n.trim()) return;
     await api.addAlias(id, n.trim(), me);
     refreshVocab();
   };
   const editAlias = async (id: string, a: string) => {
-    const n = window.prompt("แก้คำ map", a);
+    const n = window.prompt(t("prompt.editAlias"), a);
     if (!n || n === a) return;
     await api.removeAlias(id, a, me);
     await api.addAlias(id, n.trim(), me);
@@ -173,7 +182,7 @@ export function SitemapAudit({ lang, can, actor }: { lang: "th" | "en"; can?: (p
   };
   const toggleFrom = (k: string) => setNewCatFrom((f) => (f.includes(k) ? f.filter((x) => x !== k) : [...f, k]));
   const deleteCat = async (k: string) => {
-    if (!window.confirm(`ลบหมวด “${k}”? คำศัพท์ในหมวดนี้จะหายไปด้วย`)) return;
+    if (!window.confirm(t("prompt.deleteCat", { cat: k }))) return;
     try {
       await api.deleteCategory(k, me);
     } catch (e) {
@@ -227,7 +236,7 @@ export function SitemapAudit({ lang, can, actor }: { lang: "th" | "en"; can?: (p
   const missing = result ? result.items.filter((i) => statusOf(i) === "missing") : [];
   const score = result && result.items.length ? Math.round((complete.length / result.items.length) * 100) : 0;
   const grade =
-    score >= 80 ? { t: T("Strong", "ครบถ้วน"), c: "ok" } : score >= 55 ? { t: T("Partial", "บางส่วน"), c: "warn" } : { t: T("Low", "ขาดมาก"), c: "bad" };
+    score >= 80 ? { t: t("grade.strong"), c: "ok" } : score >= 55 ? { t: t("grade.partial"), c: "warn" } : { t: t("grade.low"), c: "bad" };
 
   const evHref = (i: ScanItem) => {
     let b = (result ? result.url : "").replace(/\/+$/, "");
@@ -283,49 +292,41 @@ export function SitemapAudit({ lang, can, actor }: { lang: "th" | "en"; can?: (p
 
   return (
     <div className="content-pad fade-in">
-      <PageHead
-        kicker={T("Tools · Sitemap Match", "เครื่องมือ · จับคู่ไซต์แมพ")}
-        title={T("Sitemap Match", "ตรวจไซต์แมพ")}
-        tag={`v${VERSION_LABEL}`}
-        desc={T(
-          "Match our sitemap vocabulary against terms on a web page — even when the wording differs but means the same.",
-          "นำคำศัพท์ของไซต์แมพมาจับคู่กับคำบนหน้าเว็บ — ถึงเขียนต่างกันก็รู้ว่าคืออันเดียวกัน"
-        )}
-      />
+      <PageHead kicker={t("head.kicker")} title={t("head.title")} tag={`v${VERSION_LABEL}`} desc={t("head.desc")} />
 
       <div className="sm-pipe">
-        {([["🗺️", "ข้อมูลไซต์แมพ", "คำศัพท์ของเรา"], ["🧩", "แปลงคำศัพท์", "จัดรูปแบบ"], ["🌐", "ดึงข้อมูล", "จากหน้าเว็บ"], ["⚖️", "เทียบ", "หาที่ขาด"], ["📑", "สรุปผล", "รายงาน"]] as const).map((s) => (
-          <div className="sm-pstage" key={s[1]}>
-            <div className="sm-pico">{s[0]}</div>
-            <div className="sm-pt">{s[1]}</div>
-            <div className="sm-pd">{s[2]}</div>
+        {PIPE.map(([ic, k]) => (
+          <div className="sm-pstage" key={k}>
+            <div className="sm-pico">{ic}</div>
+            <div className="sm-pt">{t(`${k}.t`)}</div>
+            <div className="sm-pd">{t(`${k}.d`)}</div>
           </div>
         ))}
       </div>
 
       {/* categories */}
-      <div className="sm-section-h mono">① หมวดหมู่</div>
+      <div className="sm-section-h mono">{t("cats.section")}</div>
       <div className="sm-cats">
         {cats.map((c) => (
           <button key={c.key} className={`sm-cat ${cat === c.key ? "on" : ""}`} onClick={() => setCat(c.key)}>
             {c.label}
-            {c.from.length > 0 ? " · รวม" : ""}
+            {c.from.length > 0 ? t("cats.combined") : ""}
           </button>
         ))}
-        {canEdit && <button className="sm-cat add" onClick={() => setAddingCat((v) => !v)}>＋ เพิ่มหมวด</button>}
-        {cat && canEdit && <button className="sm-cat del" onClick={() => deleteCat(cat)}>🗑 ลบหมวด “{cat}”</button>}
+        {canEdit && <button className="sm-cat add" onClick={() => setAddingCat((v) => !v)}>{t("cats.add")}</button>}
+        {cat && canEdit && <button className="sm-cat del" onClick={() => deleteCat(cat)}>{t("cats.delete", { cat })}</button>}
       </div>
       {addingCat && (
         <div className="sm-addcat">
           <div className="sm-addcat-row">
-            <input className="bf-input" style={{ maxWidth: 220 }} value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder="ชื่อหมวด เช่น ESG, CGR" />
-            <Btn kind="gold" sm onClick={createCat} style={{ opacity: newCatName.trim() ? 1 : 0.5, pointerEvents: newCatName.trim() ? "auto" : "none" }}>สร้างหมวด</Btn>
-            <Btn kind="ghost" sm onClick={() => { setAddingCat(false); setNewCatName(""); setNewCatFrom([]); }}>ยกเลิก</Btn>
+            <input className="bf-input" style={{ maxWidth: 220 }} value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder={t("addcat.namePh")} />
+            <Btn kind="gold" sm onClick={createCat} style={{ opacity: newCatName.trim() ? 1 : 0.5, pointerEvents: newCatName.trim() ? "auto" : "none" }}>{t("addcat.create")}</Btn>
+            <Btn kind="ghost" sm onClick={() => { setAddingCat(false); setNewCatName(""); setNewCatFrom([]); }}>{t("common.cancel")}</Btn>
           </div>
           <div className="sm-addcat-from">
-            <span className="mono muted" style={{ fontSize: 12 }}>map รวมจากหมวด:</span>
+            <span className="mono muted" style={{ fontSize: 12 }}>{t("addcat.from")}</span>
             <select className="bf-input" style={{ maxWidth: 240 }} value="" onChange={(e) => { if (e.target.value) { toggleFrom(e.target.value); e.target.value = ""; } }}>
-              <option value="">＋ เลือกหมวดต้นทาง…</option>
+              <option value="">{t("addcat.pickSource")}</option>
               {cats.filter((c) => c.from.length === 0 && !newCatFrom.includes(c.key)).map((c) => (
                 <option key={c.key} value={c.key}>{c.label}</option>
               ))}
@@ -333,26 +334,26 @@ export function SitemapAudit({ lang, can, actor }: { lang: "th" | "en"; can?: (p
             {newCatFrom.map((k) => (
               <span key={k} className="sm-fromchip on">{k}<button onClick={() => toggleFrom(k)}>✕</button></span>
             ))}
-            {newCatFrom.length === 0 && <span className="mono faint" style={{ fontSize: 11 }}>เว้นว่าง = หมวดใหม่เปล่า</span>}
+            {newCatFrom.length === 0 && <span className="mono faint" style={{ fontSize: 11 }}>{t("addcat.emptyHint")}</span>}
           </div>
         </div>
       )}
 
       <div className="sm-subtabs">
-        <button className={`sm-subtab ${tab === "url" ? "on" : ""}`} onClick={() => setTab("url")}>🔍 จับคู่ URL</button>
-        <button className={`sm-subtab ${tab === "map" ? "on" : ""}`} onClick={() => setTab("map")}>🗺️ Map คำศัพท์</button>
-        <button className={`sm-subtab ${tab === "log" ? "on" : ""}`} onClick={() => setTab("log")}>📜 Log</button>
-        {canEdit && <button className={`sm-subtab ${tab === "settings" ? "on" : ""}`} onClick={() => setTab("settings")}>⚙️ ตั้งค่า</button>}
+        <button className={`sm-subtab ${tab === "url" ? "on" : ""}`} onClick={() => setTab("url")}>{t("tab.url")}</button>
+        <button className={`sm-subtab ${tab === "map" ? "on" : ""}`} onClick={() => setTab("map")}>{t("tab.map")}</button>
+        <button className={`sm-subtab ${tab === "log" ? "on" : ""}`} onClick={() => setTab("log")}>{t("tab.log")}</button>
+        {canEdit && <button className={`sm-subtab ${tab === "settings" ? "on" : ""}`} onClick={() => setTab("settings")}>{t("tab.settings")}</button>}
       </div>
 
       {tab === "log" ? (
         <div className="sm-logwrap">
           <div className="sm-section-h mono" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            📜 บันทึกการแก้ไข (Log)
-            {canEdit && log.length > 0 && <button className="sm-jsonbtn" style={{ marginLeft: "auto" }} onClick={async () => { await api.clearLog(); loadLog(); }}>ล้าง Log</button>}
+            {t("log.title")}
+            {canEdit && log.length > 0 && <button className="sm-jsonbtn" style={{ marginLeft: "auto" }} onClick={async () => { await api.clearLog(); loadLog(); }}>{t("log.clear")}</button>}
           </div>
           {log.length === 0 ? (
-            <Empty icon="📜" title="ยังไม่มีบันทึก" sub="การเพิ่ม/แก้/ลบ ศัพท์ · Excel · หมวด จะถูกบันทึกที่นี่พร้อมชื่อผู้ทำและเวลา" />
+            <Empty icon="📜" title={t("log.empty.title")} sub={t("log.empty.sub")} />
           ) : (
             <div className="sm-log">
               {log.map((l) => (
@@ -360,7 +361,7 @@ export function SitemapAudit({ lang, can, actor }: { lang: "th" | "en"; can?: (p
                   <span className="sm-log-act">{l.action}</span>
                   <span className="sm-log-detail">{l.detail}</span>
                   <span className="sm-log-actor mono">👤 {l.actor}</span>
-                  <span className="sm-log-time mono">{new Date(l.ts).toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                  <span className="sm-log-time mono">{new Date(l.ts).toLocaleString(lang === "en" ? "en-US" : "th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
                 </div>
               ))}
             </div>
@@ -369,61 +370,61 @@ export function SitemapAudit({ lang, can, actor }: { lang: "th" | "en"; can?: (p
       ) : tab === "settings" && canEdit ? (
         <div className="sm-settings">
           <div className="sm-set-row">
-            <label className="sm-set-label">🤖 โมเดล AI</label>
+            <label className="sm-set-label">{t("settings.model")}</label>
             <select className="bf-input" value={settings.model} onChange={(e) => setSetting("model", e.target.value)}>
               {["Qwen 3.6 32B", "GLM 5.1", "Llama 3.3 70B", "ไม่ใช้ AI (rule-based)"].map((m) => <option key={m}>{m}</option>)}
             </select>
-            <span className="sm-set-hint">โมเดลที่ใช้ช่วยจับคู่/วิเคราะห์คำ</span>
+            <span className="sm-set-hint">{t("settings.model.hint")}</span>
           </div>
           <div className="sm-set-row">
-            <label className="sm-set-label">🔌 API Mode</label>
+            <label className="sm-set-label">{t("settings.apiMode")}</label>
             <select className="bf-input" value={settings.apiMode} onChange={(e) => setSetting("apiMode", e.target.value)}>
               {["Local · Ollama (dev)", "Local · vLLM (prod)", "Cloud API", "MCP"].map((m) => <option key={m}>{m}</option>)}
             </select>
-            <span className="sm-set-hint">ช่องทางเรียกใช้โมเดล</span>
+            <span className="sm-set-hint">{t("settings.apiMode.hint")}</span>
           </div>
           <div className="sm-set-row">
-            <label className="sm-set-label">🌐 API Endpoint</label>
+            <label className="sm-set-label">{t("settings.endpoint")}</label>
             <input className="bf-input" style={{ maxWidth: 300 }} value={settings.apiUrl || ""} onChange={(e) => setSetting("apiUrl", e.target.value)} placeholder="http://localhost:11434/v1" />
-            <span className="sm-set-hint">ที่อยู่ API ของโมเดล</span>
+            <span className="sm-set-hint">{t("settings.endpoint.hint")}</span>
           </div>
           <div className="sm-set-row">
-            <label className="sm-set-label">⚙️ เครื่องมือจับคู่</label>
+            <label className="sm-set-label">{t("settings.engine")}</label>
             <select className="bf-input" value={settings.engine} onChange={(e) => setSetting("engine", e.target.value)}>
               {["rapidfuzz (fuzzy)", "AI semantic", "exact match"].map((m) => <option key={m}>{m}</option>)}
             </select>
-            <span className="sm-set-hint">วิธีเทียบคำบนหน้าเว็บกับ sitemap</span>
+            <span className="sm-set-hint">{t("settings.engine.hint")}</span>
           </div>
           <label className="sm-set-toggle">
             <input type="checkbox" checked={settings.useAi} onChange={(e) => setSetting("useAi", e.target.checked)} />
-            <span>ใช้ AI ช่วยตัดสินคำที่ “ไม่ชัด” (ต้องตั้งค่าโมเดล + API ให้พร้อม)</span>
+            <span>{t("settings.useAi")}</span>
           </label>
           <label className="sm-set-toggle">
             <input type="checkbox" checked={settings.bypassPopup !== false} onChange={(e) => setSetting("bypassPopup", e.target.checked)} />
-            <span>🚫 ข้าม Popup อัตโนมัติ ตอนดึงข้อมูล (Cookie consent · Modal/Overlay · Paywall · Newsletter)</span>
+            <span>{t("settings.bypass")}</span>
           </label>
-          <div className="sm-set-note mono">bypassPopup ส่งให้ backend ใช้ตอน crawl จริง · ค่าอื่นเตรียมไว้สำหรับต่อ AI</div>
+          <div className="sm-set-note mono">{t("settings.note")}</div>
         </div>
       ) : tab === "map" ? (
         <>
           <div className="sm-train">
             <div className="sm-train-head">
-              <span className="mono muted" style={{ fontSize: 12.5 }}>📊 {train.length} ไฟล์เทรน · {terms.length} คำหลัก · หมวด {cat}</span>
-              <button className="sm-jsonbtn" onClick={() => setShowJson((v) => !v)}>🧾 {showJson ? "ซ่อน JSON" : "ดู JSON"}</button>
-              <a className="sm-jsonbtn" href="/api/sitemap/train/template" download title="ดาวน์โหลดไฟล์ตัวอย่างสำหรับเทรน">⬇ เทมเพลต</a>
-              {terms.length > 0 && <a className="sm-jsonbtn" href={`/api/sitemap/train/export/${encodeURIComponent(cat)}`} download title="ส่งออกคำศัพท์หมวดนี้เป็น Excel">⬇ Export</a>}
-              {!readOnly && <button className="sm-up" onClick={() => fileRef.current?.click()}>⬆ อัปโหลด Excel</button>}
+              <span className="mono muted" style={{ fontSize: 12.5 }}>{t("train.summary", { files: train.length, terms: terms.length, cat })}</span>
+              <button className="sm-jsonbtn" onClick={() => setShowJson((v) => !v)}>{showJson ? t("train.hideJson") : t("train.viewJson")}</button>
+              <a className="sm-jsonbtn" href="/api/sitemap/train/template" download title={t("train.template.title")}>{t("train.template")}</a>
+              {terms.length > 0 && <a className="sm-jsonbtn" href={`/api/sitemap/train/export/${encodeURIComponent(cat)}`} download title={t("train.export.title")}>{t("train.export")}</a>}
+              {!readOnly && <button className="sm-up" onClick={() => fileRef.current?.click()}>{t("train.upload")}</button>}
               <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" multiple style={{ display: "none" }} onChange={addTrain} />
             </div>
-            {readOnly && isDerived && <div className="sm-readonly mono">🔗 หมวดนี้รวมคำจาก <b>{curCat!.from.join(" + ")}</b> โดยอัตโนมัติ — เพิ่ม/แก้คำได้ที่หมวดต้นทาง</div>}
+            {readOnly && isDerived && <div className="sm-readonly mono">{t("train.readonly", { sources: curCat!.from.join(" + ") })}</div>}
             {showJson && <pre className="sm-json">{catJson}</pre>}
             {train.length > 0 && (
               <div className="sm-train-list">
-                {train.map((t) => (
-                  <div key={t.id} className="sm-tr">
+                {train.map((tr) => (
+                  <div key={tr.id} className="sm-tr">
                     <span className="sm-tr-ic">📊</span>
-                    <div className="sm-tr-body"><div className="sm-tr-name mono">{t.name}</div><div className="sm-tr-meta">{t.rows} แถว · หมวด {t.category}</div></div>
-                    <button className="sm-tr-x" onClick={() => removeTrain(t.id)} title="ลบ">✕</button>
+                    <div className="sm-tr-body"><div className="sm-tr-name mono">{tr.name}</div><div className="sm-tr-meta">{t("train.rows", { rows: tr.rows, cat: tr.category })}</div></div>
+                    <button className="sm-tr-x" onClick={() => removeTrain(tr.id)} title={t("common.cancel")}>✕</button>
                   </div>
                 ))}
               </div>
@@ -431,28 +432,28 @@ export function SitemapAudit({ lang, can, actor }: { lang: "th" | "en"; can?: (p
           </div>
 
           <div className="sm-section-h mono" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            🗺️ Map คำหลัก → คำที่เขียนต่างกัน (alias)
-            {!readOnly && <button className="sm-jsonbtn" style={{ marginLeft: "auto" }} onClick={addTerm}>＋ เพิ่มคำหลัก</button>}
+            {t("map.title")}
+            {!readOnly && <button className="sm-jsonbtn" style={{ marginLeft: "auto" }} onClick={addTerm}>{t("map.addTerm")}</button>}
           </div>
-          {!readOnly && <div className="mono faint" style={{ fontSize: 11, margin: "-4px 0 8px" }}>ไม่ต้องมี Excel — เพิ่ม/ลบ/แก้คำได้เอง บันทึกลง DB ให้ AI ใช้ตรวจได้ทันที</div>}
+          {!readOnly && <div className="mono faint" style={{ fontSize: 11, margin: "-4px 0 8px" }}>{t("map.hint")}</div>}
           <div className="sm-map">
-            {terms.length === 0 && <div className="muted" style={{ fontSize: 13, padding: "10px 2px" }}>ยังไม่มีคำหลัก — กด “＋ เพิ่มคำหลัก” หรืออัปโหลด Excel</div>}
-            {terms.map((t) => (
-              <div key={t.key} className="sm-maprow">
+            {terms.length === 0 && <div className="muted" style={{ fontSize: 13, padding: "10px 2px" }}>{t("map.empty")}</div>}
+            {terms.map((term) => (
+              <div key={term.key} className="sm-maprow">
                 <div className="sm-mapkey">
-                  <div className="sm-mapcanon mono">{t.canon}{!readOnly && <button className="sm-edit" onClick={() => editCanon(t.key, t.canon)} title="แก้คำหลัก">✎</button>}</div>
-                  <div className="sm-mapth">{t.th}{!readOnly && <button className="sm-edit" onClick={() => editTerm(t.key, t.th)} title="แก้คำอธิบาย">✎</button>}</div>
-                  <span className="sm-item-cat mono">{t.category}</span>
+                  <div className="sm-mapcanon mono">{term.canon}{!readOnly && <button className="sm-edit" onClick={() => editCanon(term.key, term.canon)}>✎</button>}</div>
+                  <div className="sm-mapth">{term.th}{!readOnly && <button className="sm-edit" onClick={() => editTerm(term.key, term.th)}>✎</button>}</div>
+                  <span className="sm-item-cat mono">{term.category}</span>
                 </div>
                 <span className="sm-arrow">→</span>
                 <div className="sm-mapvars">
-                  {t.aliases.length === 0 && <span className="muted" style={{ fontSize: 12 }}>ยังไม่มีคำ map</span>}
-                  {t.aliases.map((a) => (
-                    <span key={a} className="sm-var">{a}{!readOnly && <><button onClick={() => editAlias(t.key, a)} title="แก้">✎</button><button onClick={() => removeAlias(t.key, a)} title="ลบ">✕</button></>}</span>
+                  {term.aliases.length === 0 && <span className="muted" style={{ fontSize: 12 }}>{t("map.noAlias")}</span>}
+                  {term.aliases.map((a) => (
+                    <span key={a} className="sm-var">{a}{!readOnly && <><button onClick={() => editAlias(term.key, a)}>✎</button><button onClick={() => removeAlias(term.key, a)}>✕</button></>}</span>
                   ))}
-                  {!readOnly && <button className="sm-var add" onClick={() => addAlias(t.key)} title="เพิ่มคำที่ map กับคำหลักนี้">＋</button>}
+                  {!readOnly && <button className="sm-var add" onClick={() => addAlias(term.key)}>＋</button>}
                 </div>
-                {!readOnly && <button className="sm-maprow-del" onClick={() => removeTerm(t.key, t.canon)} title="ลบคำหลักนี้">🗑</button>}
+                {!readOnly && <button className="sm-maprow-del" onClick={() => removeTerm(term.key, term.canon)}>🗑</button>}
               </div>
             ))}
           </div>
@@ -461,95 +462,95 @@ export function SitemapAudit({ lang, can, actor }: { lang: "th" | "en"; can?: (p
         <>
           <div className="sm-bar">
             <span className="sm-ic">🔗</span>
-            <input value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => e.key === "Enter" && run()} placeholder="https://company.listed.co.th" />
+            <input value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => e.key === "Enter" && run()} placeholder={t("scan.urlPh")} />
             {url && <button className="sm-clear" onClick={() => setUrl("")}>✕</button>}
-            <Btn kind="gold" icon="🔍" onClick={() => run()}>{T("Match", "ตรวจเทียบ")}</Btn>
+            <Btn kind="gold" icon="🔍" onClick={() => run()}>{t("scan.match")}</Btn>
           </div>
           <label className="sm-aicheck">
             <input type="checkbox" checked={settings.useAi} onChange={(e) => setSetting("useAi", e.target.checked)} />
-            <span>🤖 ใช้ AI ช่วยตรวจ <span className="mono faint">({settings.model} · {settings.apiMode})</span></span>
+            <span>{t("scan.aiCheck")} <span className="mono faint">({settings.model} · {settings.apiMode})</span></span>
           </label>
           <label className="sm-aicheck">
             <input type="checkbox" checked={settings.bypassPopup !== false} onChange={(e) => setSetting("bypassPopup", e.target.checked)} />
-            <span>🚫 ข้าม Popup ตอนดึงข้อมูล <span className="mono faint">(cookie · modal · paywall)</span></span>
+            <span>{t("scan.bypass")} <span className="mono faint">{t("scan.bypassHint")}</span></span>
           </label>
           <div className="sm-examples">
-            <span className="mono faint">{T("try", "ลองตัวอย่าง")}:</span>
+            <span className="mono faint">{t("scan.try")}:</span>
             {["www.set.or.th", "www.scb.co.th", "www.cpall.co.th"].map((e) => (
               <button key={e} className="sm-chip" onClick={() => { setUrl("https://" + e); run("https://" + e); }}>{e}</button>
             ))}
           </div>
           <div className="sm-thbar">
-            <span className="mono muted" style={{ fontSize: 12.5 }}>⚙️ เกณฑ์ผ่าน (ความมั่นใจ ≥)</span>
+            <span className="mono muted" style={{ fontSize: 12.5 }}>{t("scan.threshold")}</span>
             <input type="range" min={50} max={95} step={5} value={passTh} onChange={(e) => setPassTh(+e.target.value)} />
             <span className="sm-thval mono">{passTh}%</span>
-            <span className="mono faint" style={{ fontSize: 11 }}>{passTh - 18}–{passTh}% = ไม่ชัด · ต่ำกว่า {passTh - 18}% = ขาด</span>
+            <span className="mono faint" style={{ fontSize: 11 }}>{t("scan.bandHint", { lo: passTh - 18, hi: passTh })}</span>
           </div>
 
-          {busy && <Panel><div className="sm-loading"><span className="typing-bubble"><span /><span /><span /></span> {T("Fetching & comparing…", "กำลังดึงข้อมูล & เทียบ…")}</div></Panel>}
+          {busy && <Panel><div className="sm-loading"><span className="typing-bubble"><span /><span /><span /></span> {t("scan.loading")}</div></Panel>}
           {err && !busy && <div className="sm-readonly mono" style={{ borderColor: "var(--crimson)", color: "var(--crimson)" }}>⚠️ {err}</div>}
-          {!busy && !result && !err && <Empty icon="🗺️" title={T("No scan yet", "ยังไม่ได้ตรวจ")} sub={T("Pick a category, then enter a URL to match", "เลือกหมวด แล้วใส่ URL เพื่อจับคู่")} />}
+          {!busy && !result && !err && <Empty icon="🗺️" title={t("scan.noscan.title")} sub={t("scan.noscan.sub")} />}
 
           {!busy && result && (
             <>
               <div className="sm-summary">
                 <div className={`sm-score ${grade.c}`}>
                   <div className="sm-score-num">{score}<span>%</span></div>
-                  <div className="sm-score-lbl mono">{T("matched", "จับคู่ได้")}</div>
+                  <div className="sm-score-lbl mono">{t("summary.matched")}</div>
                 </div>
                 <div className="sm-sumdetail">
-                  <div className="sm-target mono">🌐 {result.url} · {T("category", "หมวด")} {result.cat} · 🔎 {result.pageTermsFound} คำบนหน้า</div>
+                  <div className="sm-target mono">{t("summary.target", { url: result.url, cat: result.cat, n: result.pageTermsFound })}</div>
                   <div className="sm-track"><div className={`sm-fill ${grade.c}`} style={{ width: score + "%" }} /></div>
                   <div className="sm-counts">
                     <span className={`sm-grade ${grade.c}`}>{grade.t}</span>
-                    <span className="sm-cnt ok">✅ {complete.length} ครบ</span>
-                    <span className="sm-cnt unclear">◐ {unclear.length} ไม่ชัด</span>
-                    <span className="sm-cnt miss">⚠️ {missing.length} ขาด</span>
-                    <span className="mono faint" style={{ fontSize: 11 }}>เกณฑ์ ≥ {passTh}%</span>
+                    <span className="sm-cnt ok">{t("count.complete", { n: complete.length })}</span>
+                    <span className="sm-cnt unclear">{t("count.unclear", { n: unclear.length })}</span>
+                    <span className="sm-cnt miss">{t("count.missing", { n: missing.length })}</span>
+                    <span className="mono faint" style={{ fontSize: 11 }}>{t("summary.threshold", { th: passTh })}</span>
                   </div>
                 </div>
               </div>
 
               <div className="sm-section-h mono" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                ④ Report — สรุปผลการเทียบ
-                <button className="sm-jsonbtn" style={{ marginLeft: "auto" }} onClick={downloadReport}>⬇ ดาวน์โหลด Report (JSON)</button>
+                {t("report.title")}
+                <button className="sm-jsonbtn" style={{ marginLeft: "auto" }} onClick={downloadReport}>{t("report.download")}</button>
               </div>
               <div className="sm-cols sm-cols3">
                 <div className="sm-col">
-                  <div className="sm-col-head ok">✅ ครบ <span>{complete.length}</span></div>
-                  {complete.length === 0 ? <div className="muted" style={{ fontSize: 12.5, padding: "8px 2px" }}>—</div> : complete.map((i) => (
+                  <div className="sm-col-head ok">{t("col.complete")} <span>{complete.length}</span></div>
+                  {complete.length === 0 ? <div className="muted" style={{ fontSize: 12.5, padding: "8px 2px" }}>{t("common.dash")}</div> : complete.map((i) => (
                     <div key={i.key} className="sm-item ok">
                       <span className="sm-item-mark">✓</span>
                       <div className="sm-item-body">
                         <div className="sm-match-row"><span className="sm-page">“{i.pageTerm}”</span><span className="sm-arrow">→</span><span className="sm-canon mono">{i.canon}</span></div>
-                        <div className="sm-item-desc">{i.th}{i.alias && <span className="sm-aliastag">≈ คำต่าง</span>}</div>
-                        <a className="sm-evid mono sm-evlink" href={evHref(i)} target="_blank" rel="noopener noreferrer">🔎 พบใน {i.evTag} · {i.evPath} ↗</a>
+                        <div className="sm-item-desc">{i.th}{i.alias && <span className="sm-aliastag">{t("item.aliasTag")}</span>}</div>
+                        <a className="sm-evid mono sm-evlink" href={evHref(i)} target="_blank" rel="noopener noreferrer">{t("item.foundIn", { tag: i.evTag, path: i.evPath })}</a>
                       </div>
                       <span className="sm-conf mono">{i.conf}%</span>
                     </div>
                   ))}
                 </div>
                 <div className="sm-col">
-                  <div className="sm-col-head unclear">◐ ไม่ชัด <span>{unclear.length}</span></div>
-                  {unclear.length === 0 ? <div className="muted" style={{ fontSize: 12.5, padding: "8px 2px" }}>—</div> : unclear.map((i) => (
+                  <div className="sm-col-head unclear">{t("col.unclear")} <span>{unclear.length}</span></div>
+                  {unclear.length === 0 ? <div className="muted" style={{ fontSize: 12.5, padding: "8px 2px" }}>{t("common.dash")}</div> : unclear.map((i) => (
                     <div key={i.key} className="sm-item unclear">
                       <span className="sm-item-mark">?</span>
                       <div className="sm-item-body">
                         <div className="sm-match-row"><span className="sm-page">“{i.pageTerm}”</span><span className="sm-arrow">→</span><span className="sm-canon mono">{i.canon}</span></div>
-                        <div className="sm-item-desc">ความมั่นใจต่ำ — ควรตรวจซ้ำ</div>
-                        <a className="sm-evid mono sm-evlink" href={evHref(i)} target="_blank" rel="noopener noreferrer">🔎 อาจอยู่ใน {i.evTag} · {i.evPath} ↗</a>
-                        {canEdit && <button className="sm-addvocab" onClick={() => confirmUnclear(i)}>＋ เพิ่มศัพท์</button>}
+                        <div className="sm-item-desc">{t("item.unclearDesc")}</div>
+                        <a className="sm-evid mono sm-evlink" href={evHref(i)} target="_blank" rel="noopener noreferrer">{t("item.maybeIn", { tag: i.evTag, path: i.evPath })}</a>
+                        {canEdit && <button className="sm-addvocab" onClick={() => confirmUnclear(i)}>{t("item.addVocab")}</button>}
                       </div>
                       <span className="sm-conf mono warn">{i.conf}%</span>
                     </div>
                   ))}
                 </div>
                 <div className="sm-col">
-                  <div className="sm-col-head miss">⚠️ ขาด <span>{missing.length}</span></div>
-                  {missing.length === 0 ? <div className="sm-allgood">🎉 ไม่มีคำที่ขาด!</div> : missing.map((i) => (
+                  <div className="sm-col-head miss">{t("col.missing")} <span>{missing.length}</span></div>
+                  {missing.length === 0 ? <div className="sm-allgood">{t("item.allgood")}</div> : missing.map((i) => (
                     <div key={i.key} className="sm-item miss">
                       <span className="sm-item-mark">!</span>
-                      <div className="sm-item-body"><div className="sm-item-name mono">{i.canon}</div><div className="sm-item-desc">{i.th} — ไม่พบบนหน้าเว็บ</div></div>
+                      <div className="sm-item-body"><div className="sm-item-name mono">{i.canon}</div><div className="sm-item-desc">{t("item.notFound", { th: i.th })}</div></div>
                       <span className="sm-item-cat mono">{i.category}</span>
                     </div>
                   ))}
@@ -563,28 +564,28 @@ export function SitemapAudit({ lang, can, actor }: { lang: "th" | "en"; can?: (p
       {addVocab && (
         <div className="uim-overlay" onClick={() => setAddVocab(null)}>
           <div className="uim ornate" onClick={(e) => e.stopPropagation()} style={{ width: 430 }}>
-            <div className="uim-title">＋ เพิ่มศัพท์</div>
+            <div className="uim-title">{t("modal.title")}</div>
             <div className="bf">
-              <label className="bf-label">ศัพท์หลัก (หัวข้อ) — พิมพ์เพื่อค้นหา</label>
+              <label className="bf-label">{t("modal.headLabel")}</label>
               {(() => {
-                const sel = terms.find((t) => t.key === addVocab.key);
+                const sel = terms.find((x) => x.key === addVocab.key);
                 const q = addVocab.q;
-                const shown = terms.filter((t) => q == null || q === "" || (t.canon + " " + t.th).toLowerCase().includes(String(q).toLowerCase()));
+                const shown = terms.filter((x) => q == null || q === "" || (x.canon + " " + x.th).toLowerCase().includes(String(q).toLowerCase()));
                 return (
                   <div className="sm-combo">
                     <input
                       className="bf-input"
                       value={q != null ? q : sel ? sel.canon + " · " + sel.th : ""}
-                      placeholder="พิมพ์เพื่อค้นหาศัพท์หลัก…"
+                      placeholder={t("modal.headPh")}
                       onChange={(e) => setAddVocab({ ...addVocab, q: e.target.value, open: true })}
                       onFocus={() => setAddVocab({ ...addVocab, q: "", open: true })}
                     />
                     {addVocab.open && (
                       <div className="sm-combo-list">
-                        {shown.length === 0 && <div className="sm-combo-empty">ไม่พบศัพท์หลักที่ตรง</div>}
-                        {shown.map((t) => (
-                          <button key={t.key} type="button" className={t.key === addVocab.key ? "on" : ""} onClick={() => setAddVocab({ ...addVocab, key: t.key, q: null, open: false })}>
-                            {t.canon} · {t.th}
+                        {shown.length === 0 && <div className="sm-combo-empty">{t("modal.comboEmpty")}</div>}
+                        {shown.map((x) => (
+                          <button key={x.key} type="button" className={x.key === addVocab.key ? "on" : ""} onClick={() => setAddVocab({ ...addVocab, key: x.key, q: null, open: false })}>
+                            {x.canon} · {x.th}
                           </button>
                         ))}
                       </div>
@@ -594,12 +595,12 @@ export function SitemapAudit({ lang, can, actor }: { lang: "th" | "en"; can?: (p
               })()}
             </div>
             <div className="bf">
-              <label className="bf-label">ศัพท์รอง (คำที่เจอ / คำใหม่)</label>
-              <input className="bf-input" value={addVocab.alias} onChange={(e) => setAddVocab({ ...addVocab, alias: e.target.value })} placeholder="เช่น งบดุล" autoFocus />
+              <label className="bf-label">{t("modal.subLabel")}</label>
+              <input className="bf-input" value={addVocab.alias} onChange={(e) => setAddVocab({ ...addVocab, alias: e.target.value })} placeholder={t("modal.subPh")} autoFocus />
             </div>
             <div className="uim-actions">
-              <button className="uim-btn ghost" onClick={() => setAddVocab(null)}>ยกเลิก</button>
-              <button className="uim-btn primary" onClick={submitVocab} disabled={!String(addVocab.alias || "").trim()}>ยืนยัน</button>
+              <button className="uim-btn ghost" onClick={() => setAddVocab(null)}>{t("common.cancel")}</button>
+              <button className="uim-btn primary" onClick={submitVocab} disabled={!String(addVocab.alias || "").trim()}>{t("modal.confirm")}</button>
             </div>
           </div>
         </div>
