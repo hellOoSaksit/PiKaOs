@@ -1,82 +1,120 @@
-# GuildOS — Phase 0 · Beta-Sitemap
+# PiKaOs · ตรวจไซต์แมพ (Sitemap Match)
+
+> **เช็กว่าเว็บไซต์มี “ข้อมูลที่ต้องมี” ครบไหม — แม้จะเขียนคนละคำก็รู้ว่าคืออันเดียวกัน**
 
 **Version 0.1 · Sitemap · Beta**
 
-A vertical slice of the GuildOS **"Sitemap Match" (ตรวจไซต์แมพ)** feature: train a
-terminology vocabulary per category (IR / WD / IR+WD…), crawl a URL, and match the
-page's terms to our canonical sitemap terms — even when the wording differs but the
-meaning is the same. Produces a 3-state report (ครบ / ไม่ชัด / ขาด) with evidence links.
+---
 
-> `_design_extract/ai-company/` is the AI-design handoff bundle and is **UI reference
-> only — never edited**. Spec: `project/SITEMAP.md` + `project/SYSTEM_DESIGN.md`.
+## ปัญหาที่แก้
 
-## Stack
+เวลาต้องตรวจเว็บไซต์บริษัทจดทะเบียน (เช่น หน้านักลงทุนสัมพันธ์ IR / ข้อมูลเปิดเผยบนเว็บ WD)
+ว่า “มีหัวข้อที่กำหนดครบไหม” มันเสียเวลามาก เพราะแต่ละเว็บ **เรียกชื่อหัวข้อไม่เหมือนกัน** —
+บางเว็บใช้ “งบการเงิน” บางเว็บใช้ “ผลประกอบการ” หรือ “Financial Statements” ทั้งที่หมายถึงสิ่งเดียวกัน
 
-| Layer | Tech | Version |
-|---|---|---|
-| Runtime | Python | 3.14 |
-| Backend | **FastAPI** (Starlette · Uvicorn) | 0.136 |
-| ORM / migrations | **SQLAlchemy** · Alembic | 2.0.50 · 1.18 |
-| DB | **PostgreSQL** (pgvector image) | 16 |
-| DB driver | psycopg | 3.3 |
-| Validation | Pydantic · pydantic-settings | 2.13 |
-| Crawl | **lxml** (+ httpx) | 6.1 |
-| Match | **rapidfuzz** (`token_set_ratio`) | 3.14 |
-| Excel | **openpyxl** / CSV | 3.1 |
-| Frontend | **React** · **Vite** · **TypeScript** | 19 · 8 · 6 |
-| Build plugin | @vitejs/plugin-react | 6 |
+**PiKaOs** ทำงานนี้ให้อัตโนมัติ: ใส่ URL เข้าไป ระบบจะไปอ่านหน้าเว็บ แล้วจับคู่คำบนหน้าเว็บ
+กับ “คำมาตรฐาน” ที่เราเทรนไว้ — ถึงเขียนต่างกันก็แมตช์ได้ แล้วสรุปออกมาว่าอะไร **ครบ / ไม่ชัด / ขาด**
 
-Exact pins: backend → `backend/requirements.txt`; frontend → `frontend/package.json`.
+---
 
-## Run it (Windows · one click)
+## ทำอะไรได้บ้าง
+
+- 🗺️ **เทรนคำศัพท์เป็นหมวด** — IR (นักลงทุนสัมพันธ์), WD (ข้อมูลเปิดเผย), IR+WD รวม หรือสร้างหมวดใหม่เองได้
+- 📊 **อัปโหลด Excel** เพื่อเพิ่มคำศัพท์ทีละชุด (หรือพิมพ์เพิ่ม/แก้เองในตารางก็ได้ ไม่ต้องมี Excel)
+- 🔗 **ใส่ URL แล้วตรวจ** — ระบบไปอ่านเมนู หัวข้อ ลิงก์ และ sitemap.xml ของเว็บนั้น
+- ⚖️ **จับคู่แบบเข้าใจคำพ้อง** — “ราคาหุ้น” ≈ “ราคาหลักทรัพย์” ≈ “Share Price”
+- 📑 **รายงาน 3 สถานะ** — ✅ ครบ · ◐ ไม่ชัด · ⚠️ ขาด พร้อมเปอร์เซ็นต์ความมั่นใจ และลิงก์ไปยังจุดที่เจอบนเว็บ
+- 🎚️ **ปรับเกณฑ์ผ่านได้** — เลื่อนสไลเดอร์เพื่อกำหนดว่าต้องมั่นใจกี่ % ถึงนับว่า “ครบ”
+- 👤 **มี Log** บันทึกทุกการแก้ไขคำศัพท์ พร้อมชื่อคนทำและเวลา
+- ⬇️ **ดาวน์โหลดรายงาน** เป็นไฟล์ JSON เก็บไว้/ส่งต่อได้
+
+---
+
+## ใช้งานยังไง (3 ขั้น)
+
+1. **เลือกหมวด** (เช่น IR) แล้วดู/แก้คำศัพท์ในแท็บ “Map คำศัพท์” หรืออัปโหลด Excel
+2. ไปแท็บ **“จับคู่ URL”** ใส่ลิงก์เว็บที่อยากตรวจ → กด **ตรวจเทียบ**
+3. อ่านผลในคอลัมน์ **ครบ / ไม่ชัด / ขาด** — กดที่แต่ละรายการเพื่อดูว่าเจอตรงไหนบนเว็บ
+
+> รายการที่ “ไม่ชัด” กดปุ่ม **＋ เพิ่มศัพท์** เพื่อสอนระบบว่าคำนี้คือหัวข้อไหน ครั้งต่อไปจะแมตช์ได้เลย
+
+---
+
+## เริ่มใช้ (Windows · คลิกเดียว)
+
+ต้องมี **Docker Desktop**, **Python 3.12+**, **Node.js 20+** ติดตั้งไว้ก่อน
 
 ```bat
-setup.bat   :: first time only — venv + pip install + npm install + .env
-run.bat     :: starts Postgres, then opens API + Web as Windows Terminal tabs
-stop.bat    :: stops the Postgres container
+setup.bat   :: ครั้งแรกครั้งเดียว — ติดตั้งทุกอย่างให้อัตโนมัติ
+run.bat     :: เปิดระบบ (ฐานข้อมูล + API + หน้าเว็บ เป็นแท็บใน Windows Terminal)
+stop.bat    :: ปิดฐานข้อมูล
 ```
 
-`run.bat` opens **two tabs** in one Windows Terminal window (API · Web). If Windows
-Terminal isn't installed it falls back to two separate console windows. Requires
-Docker Desktop running.
+เปิดเสร็จเข้าใช้งานที่ 👉 **http://localhost:5173**
 
-## Run it (manual)
+<details>
+<summary>เริ่มแบบ manual (ทุก OS)</summary>
 
 ```bash
-# 1. Postgres (pgvector image, ready for later RAG phases)
+# 1) ฐานข้อมูล
 docker compose up -d postgres
 
-# 2. Backend
+# 2) Backend (API)
 cd backend
-python -m venv .venv && . .venv/Scripts/activate    # Windows: .venv\Scripts\Activate.ps1
+python -m venv .venv && . .venv/Scripts/activate      # mac/linux: source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-uvicorn app.main:app --reload --port 8000           # http://localhost:8000/docs
+uvicorn app.main:app --reload --port 8000             # เอกสาร API: http://localhost:8000/docs
 
-# 3. Frontend
+# 3) Frontend (หน้าเว็บ)
 cd ../frontend
 npm install
-npm run dev                                          # http://localhost:5173
+npm run dev                                           # http://localhost:5173
+```
+</details>
+
+---
+
+## เบื้องหลังทำงานยังไง
+
+```
+คำศัพท์ของเรา → จัดรูปแบบ → ไปอ่านหน้าเว็บ → เทียบทีละคำ → สรุปผล
+   (vocab)                     (lxml)        (rapidfuzz)    (รายงาน)
 ```
 
-Backend seeds the base IR/WD vocabulary + the IR+WD combined category on first run.
-`GET /health/db` proves the DB connection (Phase 0 DoD).
+ระบบดึงข้อความจริงจากหน้าเว็บด้วย **lxml** (เมนู หัวข้อ ลิงก์ sitemap.xml — และข้าม popup cookie/โฆษณาให้)
+แล้วใช้ **rapidfuzz** เทียบความคล้ายของคำ ได้คะแนนความมั่นใจ 0–99% ต่อหัวข้อ →
+จัดเป็น ครบ/ไม่ชัด/ขาด ตามเกณฑ์ที่ตั้งไว้
 
-## Tests
+---
 
-```bash
-cd backend && pytest          # matcher + excel parser (no DB needed)
-```
+## เทคโนโลยี
 
-## API (prefix `/sitemap`)
+| ส่วน | ใช้ |
+|---|---|
+| หน้าเว็บ | React 19 · Vite 8 · TypeScript 6 |
+| API | Python · FastAPI |
+| ฐานข้อมูล | PostgreSQL 16 (SQLAlchemy · Alembic) |
+| อ่านเว็บ | lxml + httpx |
+| จับคู่คำ | rapidfuzz |
+| อ่าน Excel | openpyxl |
 
-| Method | Path | Purpose |
-|---|---|---|
-| GET/POST/DELETE | `/categories` `/categories/{key}` | category CRUD (base = hide; combined = read-only) |
-| GET | `/vocab/{cat}` | effective terms (unions sources for derived categories) |
-| POST | `/vocab/{cat}/terms` · PATCH/DELETE `/terms/{id}` | term edits |
-| POST/DELETE | `/terms/{id}/aliases` `/terms/{id}/aliases/{text}` | alias edits |
-| POST | `/scan` | **crawl + match** → 3-state report |
-| GET/POST/DELETE | `/train` | Excel/CSV upload → merge into vocab |
-| GET/DELETE | `/log` | audit log |
-| GET | `/health/db` | health (root level) |
+เวอร์ชันที่ล็อกไว้: backend → `backend/requirements.txt` · frontend → `frontend/package.json`
+
+---
+
+## สถานะโครงการ
+
+นี่คือ **Phase 0 (Beta)** — เป็นชิ้นแรกที่ใช้งานได้จริงครบวงจร (เทรน → ตรวจ → รายงาน)
+ของแพลตฟอร์ม GuildOS/PiKaOs ที่ใหญ่กว่า ส่วนที่กำลังวางแผนต่อ:
+
+- 🤖 ใช้ AI (embedding/LLM) ช่วยตัดสินคำที่ “ไม่ชัด”
+- 🌐 รองรับเว็บที่เป็น JavaScript หนักๆ (headless render)
+- 📁 เทมเพลต Excel สำเร็จรูปสำหรับเทรน
+
+---
+
+## หมายเหตุนักพัฒนา
+
+- โฟลเดอร์ `_design_extract/ai-company/` เป็น **แบบ UI อ้างอิงเท่านั้น** ไม่ใช่โค้ดจริง (ไม่ถูก commit)
+- รายละเอียดสเปกฟีเจอร์อยู่ใน `_design_extract/ai-company/project/SITEMAP.md`
