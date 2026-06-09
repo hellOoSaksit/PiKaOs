@@ -1,0 +1,118 @@
+{
+  "category": { "key": "IR", "label": "IR · นักลงทุนสัมพันธ์" },
+  "note": "Standard Investor Relations website sitemap (from 2025_IR-Sitemap.pdf). Each leaf section is a checklist term; sections preserve the menu hierarchy.",
+  "sections": [
+    {
+      "name": "IR Home",
+      "terms": [
+        { "canon": "Stock Price", "th": "ราคาหลักทรัพย์", "aliases": ["ราคาหุ้น", "stock price", "ราคาย้อนหลัง"] },
+        { "canon": "Financial Highlights", "th": "ข้อมูลทางการเงินที่สำคัญ", "aliases": ["financial highlights", "จุดเด่นทางการเงิน", "ไฮไลท์ทางการเงิน"] },
+        { "canon": "Latest Documents", "th": "เอกสารล่าสุด", "aliases": ["latest documents", "เอกสารใหม่"] }
+      ]
+    },
+    {
+      "name": "Corporate Info",
+      "terms": [
+        { "canon": "Business Overview", "th": "ภาพรวมธุรกิจ", "aliases": ["business overview", "overview", "who we are", "เกี่ยวกับเรา", "ภาพรวมบริษัท"] },
+        { "canon": "Vision Mission & Core Value", "th": "วิสัยทัศน์ พันธกิจ และค่านิยม", "aliases": ["vision", "mission", "core value", "วิสัยทัศน์", "พันธกิจ", "vision mission"] },
+        { "canon": "Milestone", "th": "เหตุการณ์สำคัญ", "aliases": ["milestone", "ความเป็นมา", "history", "จากวันวานถึงวันนี้"] },
+        { "canon": "Business Structure", "th": "โครงสร้างธุรกิจ", "aliases": ["business structure", "group structure", "โครงสร้างกลุ่มธุรกิจ"] },
+        { "canon": "Organization Structure", "th": "โครงสร้างองค์กร", "aliases": ["organization structure", "ผังองค์กร"] },
+        { "canon": "Message from Chairman", "th": "สารจากประธานกรรมการ", "aliases": ["message from chairman", "สารประธานกรรมการ"] },
+        { "canon": "Message from CEO", "th": "สารจากประธานเจ้าหน้าที่บริหาร", "aliases": ["message from chief executive officer", "message from ceo", "สารจากซีอีโอ"] },
+        { "canon": "Board of Directors", "th": "คณะกรรมการบริษัท", "aliases": ["board of directors", "leadership", "กรรมการ", "คณะกรรมการ"] },
+        { "canon": "Management Team", "th": "คณะผู้บริหาร", "aliases": ["management team", "ผู้บริหาร", "senior management", "executives", "ผู้บริหารระดับสูง"] },
+        { "canon": "Audit Committee", "th": "คณะกรรมการตรวจสอบ", "aliases": ["audit committee", "กรรมการตรวจสอบ"] },
+        { "canon": "Risk Management Committee", "th": "คณะกรรมการบริหารความเสี่ยง", "aliases": ["risk management committee"] },
+        { "canon": "Nomination & Remuneration Committee", "th": "คณะกรรมการสรรหาและกำหนดค่าตอบแทน", "aliases": ["nomination and remuneration committee", "สรรหาและกำหนดค่าตอบแทน"] },
+        { "canon": "Executive Committee", "th": "คณะกรรมการบริหาร", "aliases": ["executive committee"] },
+        { "canon": "Hall of Fame", "th": "เกียรติประวัติและรางวัล", "aliases": ["hall of fame", "awards", "รางวัล", "รางวัลแห่งความสำเร็จ"] }
+      ]
+    },
+    {
+      "name": "Financial Results & Downloads",
+      "terms": [
+        { "canon": "Financial Statements", "th": "งบการเงิน", "aliases": ["financial statements", "งบดุล", "งบกำไรขาดทุน", "ผลประกอบการ"] },
+        { "canon": "MD&A", "th": "คำอธิบายและการวิเคราะห์ของฝ่ายจัดการ", "aliases": ["md&a", "mda", "management discussion and analysis"] },
+        { "canon": "Presentations & Webcasts", "th": "เอกสารนำเสนอและเว็บแคสต์", "aliases": ["presentations", "webcasts", "เอกสารนำเสนอ", "presentation"] },
+        { "canon": "Factsheet", "th": "ข้อมูลสรุปบริษัท", "aliases": ["factsheet", "fact sheet", "ข้อมูลโดยสรุป"] },
+        { "canon": "Company Snapshot", "th": "ภาพรวมบริษัทโดยสังเขป", "aliases": ["company snapshot", "สรุปบริษัท"] },
+        { "canon": "Form 56-1 One Report", "th": "แบบ 56-1 One Report / รายงานประจำปี", "aliases": ["56-1 one report", "one report", "annual report", "รายงานประจำปี", "แบบ 56-1"] },
+        { "canon": "Resource Center", "th": "ศูนย์รวมเอกสารดาวน์โหลด", "aliases": ["resource center", "downloads", "ดาวน์โหลดเอกสาร"] }
+      ]
+    },
+    {
+      "name": "Stock & Debenture",
+      "terms": [
+        { "canon": "Historical Price", "th": "ราคาหลักทรัพย์ย้อนหลัง", "aliases": ["historical price", "ราคาย้อนหลัง"] },
+        { "canon": "Investment Calculator", "th": "เครื่องคำนวณการลงทุน", "aliases": ["investment calculator", "คำนวณการลงทุน"] },
+        { "canon": "Debenture Price", "th": "ราคาหุ้นกู้", "aliases": ["debenture price", "debenture info", "หุ้นกู้"] },
+        { "canon": "Credit Ratings", "th": "อันดับความน่าเชื่อถือ", "aliases": ["credit ratings", "อันดับเครดิต", "เครดิตเรตติ้ง"] }
+      ]
+    },
+    {
+      "name": "Shareholder",
+      "terms": [
+        { "canon": "Major Shareholders", "th": "ผู้ถือหุ้นรายใหญ่", "aliases": ["major shareholders", "shareholder structure", "โครงสร้างผู้ถือหุ้น"] },
+        { "canon": "Dividend Policy & Payment", "th": "นโยบายและการจ่ายเงินปันผล", "aliases": ["dividend policy", "dividend", "นโยบายปันผล", "เงินปันผล", "การจ่ายปันผล"] },
+        { "canon": "Shareholders' Meeting", "th": "การประชุมผู้ถือหุ้น", "aliases": ["shareholders meeting", "agm", "การประชุมสามัญผู้ถือหุ้น"] },
+        { "canon": "Invitation to Shareholder Meetings", "th": "หนังสือเชิญประชุมผู้ถือหุ้น", "aliases": ["invitation to shareholder meetings", "หนังสือเชิญประชุม"] },
+        { "canon": "Minutes of Shareholder Meetings", "th": "รายงานการประชุมผู้ถือหุ้น", "aliases": ["minutes of shareholder meetings", "รายงานการประชุม"] },
+        { "canon": "Proposal of Meeting Agenda & Nomination", "th": "การเสนอวาระและเสนอชื่อกรรมการล่วงหน้า", "aliases": ["proposal of meeting agenda", "nomination of director candidate", "เสนอวาระการประชุม"] },
+        { "canon": "Right of Shareholders", "th": "สิทธิของผู้ถือหุ้น", "aliases": ["right of shareholders", "สิทธิผู้ถือหุ้น"] }
+      ]
+    },
+    {
+      "name": "Governance",
+      "terms": [
+        { "canon": "Corporate Governance Policy", "th": "นโยบายการกำกับดูแลกิจการ", "aliases": ["corporate governance policy", "corporate governance", "การกำกับดูแลกิจการ", "cg", "บรรษัทภิบาล"] },
+        { "canon": "Anti-Corruption Policy", "th": "นโยบายต่อต้านการทุจริต", "aliases": ["anti-corruption policy", "anti corruption", "ต่อต้านทุจริต", "cac", "คอร์รัปชัน"] },
+        { "canon": "Risk Management Policy", "th": "นโยบายบริหารความเสี่ยง", "aliases": ["risk management policy", "บริหารความเสี่ยง"] },
+        { "canon": "Sustainable Development Policy", "th": "นโยบายการพัฒนาอย่างยั่งยืน", "aliases": ["sustainable development policy", "การพัฒนาที่ยั่งยืน"] },
+        { "canon": "Business Ethics & Code of Conduct", "th": "จริยธรรมธุรกิจและจรรยาบรรณ", "aliases": ["business ethics", "code of conduct", "code of conducts", "จรรยาบรรณ", "จริยธรรมธุรกิจ"] },
+        { "canon": "Article of Association", "th": "ข้อบังคับบริษัท", "aliases": ["article of association", "ข้อบังคับบริษัท"] },
+        { "canon": "Memorandum of Association", "th": "หนังสือบริคณห์สนธิ", "aliases": ["memorandum of association", "บริคณห์สนธิ"] },
+        { "canon": "Corporate Affidavit", "th": "หนังสือรับรองบริษัท", "aliases": ["corporate affidavit", "หนังสือรับรอง"] },
+        { "canon": "Charter of Board of Directors", "th": "กฎบัตรคณะกรรมการบริษัทและคณะกรรมการชุดย่อย", "aliases": ["charter of board of directors", "charter", "กฎบัตร"] },
+        { "canon": "Whistleblowing", "th": "การแจ้งเบาะแสและการรับเรื่องร้องเรียน", "aliases": ["whistleblowing", "แจ้งเบาะแส", "รับเรื่องร้องเรียน"] }
+      ]
+    },
+    {
+      "name": "Sustainability",
+      "terms": [
+        { "canon": "Sustainability Overview", "th": "ภาพรวมความยั่งยืน", "aliases": ["sustainability overview", "sustainability", "ความยั่งยืน", "esg"] },
+        { "canon": "Environmental", "th": "สิ่งแวดล้อม", "aliases": ["environmental", "environment", "สิ่งแวดล้อม"] },
+        { "canon": "Social", "th": "สังคม", "aliases": ["social", "ด้านสังคม"] },
+        { "canon": "Sustainability Report", "th": "รายงานความยั่งยืน", "aliases": ["sustainability report", "รายงานความยั่งยืน", "รายงาน esg"] },
+        { "canon": "ESG Activities", "th": "กิจกรรมด้านความยั่งยืน", "aliases": ["esg activities", "กิจกรรมความยั่งยืน"] }
+      ]
+    },
+    {
+      "name": "News & Events",
+      "terms": [
+        { "canon": "SET Announcements", "th": "ข่าวแจ้งตลาดหลักทรัพย์", "aliases": ["set announcements", "ข่าวแจ้งตลาด", "แจ้งข่าว set"] },
+        { "canon": "IR Press Releases", "th": "ข่าวประชาสัมพันธ์นักลงทุน", "aliases": ["ir press releases", "press release", "ข่าวประชาสัมพันธ์"] },
+        { "canon": "Electronic Advertisement", "th": "โฆษณาอิเล็กทรอนิกส์", "aliases": ["electronic advertisement", "e-advertisement"] },
+        { "canon": "Online News Clippings", "th": "ข่าวจากสื่อ", "aliases": ["online news clippings", "news clipping", "ข่าวตัด"] },
+        { "canon": "Event Calendar", "th": "ปฏิทินกิจกรรมนักลงทุน", "aliases": ["event calendar", "ปฏิทินกิจกรรม", "ปฏิทินนักลงทุน"] }
+      ]
+    },
+    {
+      "name": "Analyst Coverage",
+      "terms": [
+        { "canon": "Analyst Contacts", "th": "รายชื่อนักวิเคราะห์", "aliases": ["analyst contacts", "นักวิเคราะห์"] },
+        { "canon": "Analyst Reports", "th": "บทวิเคราะห์หลักทรัพย์", "aliases": ["analyst reports", "บทวิเคราะห์"] }
+      ]
+    },
+    {
+      "name": "Connect with Us",
+      "terms": [
+        { "canon": "IR Contact", "th": "ติดต่อนักลงทุนสัมพันธ์", "aliases": ["ir contact", "investor contact", "ติดต่อ ir", "ติดต่อนักลงทุนสัมพันธ์"] },
+        { "canon": "Email Alerts", "th": "รับข่าวสารทางอีเมล", "aliases": ["email alerts", "สมัครรับข่าวสาร", "รับข่าวทางอีเมล"] },
+        { "canon": "FAQ", "th": "คำถามที่พบบ่อย", "aliases": ["faq", "frequently asked questions", "คำถามที่พบบ่อย"] },
+        { "canon": "IR Code of Conduct", "th": "จรรยาบรรณนักลงทุนสัมพันธ์", "aliases": ["ir code of conduct", "จรรยาบรรณ ir"] },
+        { "canon": "Prospectus / Filing", "th": "หนังสือชี้ชวน", "aliases": ["prospectus", "filing", "หนังสือชี้ชวน"] }
+      ]
+    }
+  ]
+}
