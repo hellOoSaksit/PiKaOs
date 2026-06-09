@@ -52,7 +52,7 @@ export function SitemapAudit({ lang, can, actor }: { lang: "th" | "en"; can?: (p
 
   const [settings, setSettings] = useState<Settings>(() => {
     try {
-      const s = JSON.parse(localStorage.getItem("guildos.sitemap.settings") || "null");
+      const s = JSON.parse(localStorage.getItem("pikaos.sitemap.settings") || "null");
       if (s) return s;
     } catch {
       /* ignore */
@@ -63,7 +63,7 @@ export function SitemapAudit({ lang, can, actor }: { lang: "th" | "en"; can?: (p
     const nx = { ...settings, [k]: v };
     setSettings(nx);
     try {
-      localStorage.setItem("guildos.sitemap.settings", JSON.stringify(nx));
+      localStorage.setItem("pikaos.sitemap.settings", JSON.stringify(nx));
     } catch {
       /* ignore */
     }

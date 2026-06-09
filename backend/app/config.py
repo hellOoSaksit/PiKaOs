@@ -8,11 +8,11 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # Postgres connection (sync driver — psycopg3)
-    database_url: str = "postgresql+psycopg://guildos:guildos@localhost:5432/guildos"
+    database_url: str = "postgresql+psycopg://pikaos:pikaos@localhost:5433/pikaos"
 
     # Crawl behaviour
     crawl_timeout: float = 12.0
-    crawl_user_agent: str = "GuildOS-SitemapBot/0.1 (+https://guildos.local)"
+    crawl_user_agent: str = "PiKaOs-SitemapBot/0.1 (+https://pikaos.local)"
     crawl_max_terms: int = 600  # cap candidate page-terms extracted per scan
 
     # Matching

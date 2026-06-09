@@ -1,4 +1,4 @@
-"""FastAPI app entrypoint for the GuildOS Sitemap Match service."""
+"""FastAPI app entrypoint for the PiKaOs Sitemap Match service."""
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="GuildOS · Sitemap Match (Beta)", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="PiKaOs · Sitemap Match (Beta)", version="0.1.0", lifespan=lifespan)
 
 # Single source of truth for the human-facing version label.
 VERSION_LABEL = "0.1 · Sitemap · Beta"
@@ -52,4 +52,4 @@ def health_db():
 
 @app.get("/", tags=["health"])
 def root():
-    return {"service": "guildos-sitemap", "version": app.version, "label": VERSION_LABEL, "docs": "/docs"}
+    return {"service": "pikaos-sitemap", "version": app.version, "label": VERSION_LABEL, "docs": "/docs"}
