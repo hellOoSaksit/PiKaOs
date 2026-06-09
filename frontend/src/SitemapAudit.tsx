@@ -529,7 +529,7 @@ export function SitemapAudit({ lang, can, actor }: { lang: Lang; can?: (p: strin
                       <div className="sm-item-body">
                         <div className="sm-match-row"><span className="sm-page">“{i.pageTerm}”</span><span className="sm-arrow">→</span><span className="sm-canon mono">{i.canon}</span></div>
                         <div className="sm-item-desc">{i.th}{i.alias && <span className="sm-aliastag">{t("item.aliasTag")}</span>}</div>
-                        <a className="sm-evid mono sm-evlink" href={evHref(i)} target="_blank" rel="noopener noreferrer">{t("item.foundIn", { tag: i.evTag, path: i.evPath })}</a>
+                        <a className="sm-apipath mono sm-evlink" href={evHref(i)} target="_blank" rel="noopener noreferrer" title={evHref(i)}>🔗 {i.evPath}<span className="sm-evtag"> · {i.evTag} ↗</span></a>
                       </div>
                       <span className="sm-conf mono">{i.conf}%</span>
                     </div>
@@ -543,7 +543,7 @@ export function SitemapAudit({ lang, can, actor }: { lang: Lang; can?: (p: strin
                       <div className="sm-item-body">
                         <div className="sm-match-row"><span className="sm-page">“{i.pageTerm}”</span><span className="sm-arrow">→</span><span className="sm-canon mono">{i.canon}</span></div>
                         <div className="sm-item-desc">{t("item.unclearDesc")}</div>
-                        <a className="sm-evid mono sm-evlink" href={evHref(i)} target="_blank" rel="noopener noreferrer">{t("item.maybeIn", { tag: i.evTag, path: i.evPath })}</a>
+                        <a className="sm-apipath mono sm-evlink" href={evHref(i)} target="_blank" rel="noopener noreferrer" title={evHref(i)}>🔗 {i.evPath}<span className="sm-evtag"> · {i.evTag} ↗</span></a>
                         {canEdit && <button className="sm-addvocab" onClick={() => confirmUnclear(i)}>{t("item.addVocab")}</button>}
                       </div>
                       <span className="sm-conf mono warn">{i.conf}%</span>
