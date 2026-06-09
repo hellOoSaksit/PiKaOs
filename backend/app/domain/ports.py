@@ -8,7 +8,16 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from .entities import Category, CrawlResult, LogEntry, MatchItem, PageTerm, ParsedTerm, Term
+from .entities import (
+    Category,
+    CrawlResult,
+    LogEntry,
+    MatchItem,
+    PageTerm,
+    ParsedTerm,
+    SitemapEntry,
+    Term,
+)
 
 
 class VocabRepository(Protocol):
@@ -54,6 +63,13 @@ class Crawler(Protocol):
 
 class Matcher(Protocol):
     def match(self, vocab: list[Term], page_terms: list[PageTerm]) -> list[MatchItem]: ...
+
+
+class SitemapReader(Protocol):
+    def read(self, url: str) -> list[SitemapEntry]:
+        """Fetch and flatten a site's sitemap.xml (following a sitemap index and
+        robots.txt). Returns [] if no sitemap is found."""
+        ...
 
 
 class ExcelGateway(Protocol):

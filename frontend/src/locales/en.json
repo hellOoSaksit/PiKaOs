@@ -26,7 +26,20 @@
 
   "tab.url": "🔍 Match URL",
   "tab.map": "🗺️ Vocabulary",
+  "tab.sitemap": "🗂️ Sitemap",
   "tab.log": "📜 Log",
+
+  "sitemap.load": "Fetch sitemap",
+  "sitemap.loading": "Fetching sitemap.xml…",
+  "sitemap.search": "search path / slug…",
+  "sitemap.count": "{n} URLs · {s} sections",
+  "sitemap.needUrl": "Enter the site URL first",
+  "sitemap.notFound": "No sitemap.xml found for this site",
+  "sitemap.empty.title": "No sitemap loaded",
+  "sitemap.empty.sub": "No sitemap.xml found — try the URL again",
+  "view.report": "📑 Match report",
+  "view.sitemap": "🗂️ Site sitemap",
+
   "tab.settings": "⚙️ Settings",
 
   "log.title": "📜 Change log",

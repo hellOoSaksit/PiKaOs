@@ -42,6 +42,19 @@ export interface ScanResult {
   rendered: boolean;
 }
 
+export interface SitemapEntry {
+  loc: string;
+  path: string;
+  slug: string;
+  depth: number;
+}
+
+export interface SitemapTree {
+  found: boolean;
+  count: number;
+  entries: SitemapEntry[];
+}
+
 export interface TrainFile {
   id: string;
   name: string;

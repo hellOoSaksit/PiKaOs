@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..application.log_service import LogService
 from ..application.scan_service import ScanService
+from ..application.sitemap_service import SitemapService
 from ..application.train_service import TrainService
 from ..application.vocab_service import VocabService
 from ..config import get_settings
@@ -18,6 +19,7 @@ from ..infrastructure.fallback_crawler import FallbackCrawler
 from ..infrastructure.matcher import RapidfuzzMatcher
 from ..infrastructure.renderer import PlaywrightRenderer
 from ..infrastructure.repositories import SqlLogRepository, SqlTrainRepository, SqlVocabRepository
+from ..infrastructure.sitemap import HttpxSitemapReader
 
 settings = get_settings()
 
@@ -25,6 +27,7 @@ settings = get_settings()
 _crawler = FallbackCrawler(LxmlCrawler(), PlaywrightRenderer())
 _matcher = RapidfuzzMatcher()
 _excel = OpenpyxlExcel()
+_sitemap = HttpxSitemapReader()
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -50,3 +53,7 @@ def get_train_service(db: Session = Depends(get_db)) -> TrainService:
 
 def get_log_service(db: Session = Depends(get_db)) -> LogService:
     return LogService(SqlLogRepository(db))
+
+
+def get_sitemap_service() -> SitemapService:
+    return SitemapService(_sitemap)

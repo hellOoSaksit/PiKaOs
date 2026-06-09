@@ -19,9 +19,11 @@ class Settings(BaseSettings):
     crawl_render_enabled: bool = True
     crawl_min_terms: int = 8       # below this, trigger the headless fallback
     crawl_render_timeout: float = 20.0
-    # nav-focused mode: keep only shallow section links (top-level IA), dropping
-    # deep article/person/sub-page links that mega-menus dump into the markup.
-    crawl_nav_max_depth: int = 2
+    # nav-focused mode: keep section links up to this path depth (the locale
+    # segment /th or /en is NOT counted). 3 keeps e.g.
+    # /th/about-us/csr/quality-of-life-and-community-development while still
+    # dropping deeper article/person links.
+    crawl_nav_max_depth: int = 3
     # try this site locale first (match the English canon terms); "" disables
     crawl_prefer_lang: str = "en"
 
