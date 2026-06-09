@@ -86,6 +86,10 @@ npm run dev                                           # http://localhost:5173
 แล้วใช้ **rapidfuzz** เทียบความคล้ายของคำ ได้คะแนนความมั่นใจ 0–99% ต่อหัวข้อ →
 จัดเป็น ครบ/ไม่ชัด/ขาด ตามเกณฑ์ที่ตั้งไว้
 
+เว็บที่เป็น **JavaScript หนักๆ** (เนื้อหา render ฝั่ง client) ที่ lxml ดึงได้น้อย ระบบจะ
+**fallback ไป render ด้วย headless Chromium (Playwright)** อัตโนมัติแล้วดึงซ้ำ — ผลลัพธ์จะมี
+ป้าย “⚡ headless render” กำกับ (ปรับเกณฑ์/ปิดได้ที่ `CRAWL_MIN_TERMS` / `CRAWL_RENDER_ENABLED`)
+
 ---
 
 ## เทคโนโลยี

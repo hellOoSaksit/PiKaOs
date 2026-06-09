@@ -84,6 +84,13 @@ class MatchItem:
 
 
 @dataclass
+class CrawlResult:
+    final_url: str
+    page_terms: list[PageTerm]
+    rendered: bool = False  # True if a headless browser render was used
+
+
+@dataclass
 class ScanReport:
     url: str
     category: str
@@ -92,3 +99,4 @@ class ScanReport:
     score: int
     items: list[MatchItem]
     page_terms_found: int
+    rendered: bool = False  # headless fallback was triggered for this scan

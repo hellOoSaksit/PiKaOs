@@ -18,6 +18,8 @@ if not exist ".venv\Scripts\python.exe" (
 call .venv\Scripts\activate.bat
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt || goto :fail
+echo [PiKaOs] Installing Chromium for the headless crawl fallback...
+python -m playwright install chromium || echo [PiKaOs] WARNING: chromium install failed (headless fallback will be skipped)
 if not exist ".env" (
   echo [PiKaOs] Creating backend\.env from .env.example
   copy /y ".env.example" ".env" >nul

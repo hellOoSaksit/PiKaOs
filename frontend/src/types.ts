@@ -39,6 +39,7 @@ export interface ScanResult {
   score: number;
   items: ScanItem[];
   pageTermsFound: number;
+  rendered: boolean;
 }
 
 export interface TrainFile {

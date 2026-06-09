@@ -13,13 +13,15 @@ from ..config import get_settings
 from ..infrastructure.crawler import LxmlCrawler
 from ..infrastructure.db import get_session
 from ..infrastructure.excel import OpenpyxlExcel
+from ..infrastructure.fallback_crawler import FallbackCrawler
 from ..infrastructure.matcher import RapidfuzzMatcher
+from ..infrastructure.renderer import PlaywrightRenderer
 from ..infrastructure.repositories import SqlLogRepository, SqlTrainRepository, SqlVocabRepository
 
 settings = get_settings()
 
 # stateless adapters can be shared across requests
-_crawler = LxmlCrawler()
+_crawler = FallbackCrawler(LxmlCrawler(), PlaywrightRenderer())
 _matcher = RapidfuzzMatcher()
 _excel = OpenpyxlExcel()
 

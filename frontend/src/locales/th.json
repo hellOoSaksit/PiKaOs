@@ -78,6 +78,7 @@
   "summary.matched": "จับคู่ได้",
   "summary.target": "🌐 {url} · หมวด {cat} · 🔎 {n} คำบนหน้า",
   "summary.threshold": "เกณฑ์ ≥ {th}%",
+  "summary.rendered": "⚡ headless render",
   "grade.strong": "ครบถ้วน",
   "grade.partial": "บางส่วน",
   "grade.low": "ขาดมาก",

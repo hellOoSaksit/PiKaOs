@@ -25,21 +25,22 @@ class ScanService:
             raise ServiceError("category has no vocabulary terms")
 
         try:
-            final_url, page_terms = self.crawler.fetch_and_extract(url, bypass_popup)
+            crawled = self.crawler.fetch_and_extract(url, bypass_popup)
         except CrawlError as e:
             raise ServiceError(f"fetch failed: {e}", 502) from e
 
         confirmed = {t.id for t in vocab if t.confirmed}
-        items = self.matcher.match(vocab, page_terms)
+        items = self.matcher.match(vocab, crawled.page_terms)
         for it in items:
             it.status = classify(it.conf, it.key in confirmed, pass_threshold, self.unclear_band)
 
         return ScanReport(
-            url=final_url,
+            url=crawled.final_url,
             category=category,
             scanned_at=datetime.now(timezone.utc),
             pass_threshold=pass_threshold,
             score=score([it.status for it in items]),
             items=items,
-            page_terms_found=len(page_terms),
+            page_terms_found=len(crawled.page_terms),
+            rendered=crawled.rendered,
         )

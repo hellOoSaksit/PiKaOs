@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from .entities import Category, LogEntry, MatchItem, PageTerm, ParsedTerm, Term
+from .entities import Category, CrawlResult, LogEntry, MatchItem, PageTerm, ParsedTerm, Term
 
 
 class VocabRepository(Protocol):
@@ -46,8 +46,8 @@ class LogRepository(Protocol):
 
 
 class Crawler(Protocol):
-    def fetch_and_extract(self, url: str, bypass_popup: bool) -> tuple[str, list[PageTerm]]:
-        """Return (final_url, page_terms). Raise CrawlError on fetch failure."""
+    def fetch_and_extract(self, url: str, bypass_popup: bool) -> CrawlResult:
+        """Return a CrawlResult. Raise CrawlError on fetch failure."""
         ...
 
 

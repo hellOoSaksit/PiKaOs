@@ -49,6 +49,7 @@ class ScanResultOut(_Out):
     score: int
     items: list[ScanItemOut]
     pageTermsFound: int = Field(validation_alias="page_terms_found")
+    rendered: bool = False
 
 
 class TrainOut(_Out):

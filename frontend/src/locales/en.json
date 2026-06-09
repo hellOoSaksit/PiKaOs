@@ -78,6 +78,7 @@
   "summary.matched": "matched",
   "summary.target": "🌐 {url} · category {cat} · 🔎 {n} page terms",
   "summary.threshold": "threshold ≥ {th}%",
+  "summary.rendered": "⚡ headless render",
   "grade.strong": "Strong",
   "grade.partial": "Partial",
   "grade.low": "Low",

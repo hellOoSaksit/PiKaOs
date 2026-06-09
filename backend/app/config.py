@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     crawl_user_agent: str = "PiKaOs-SitemapBot/0.1 (+https://pikaos.local)"
     crawl_max_terms: int = 600  # cap candidate page-terms extracted per scan
 
+    # Headless fallback: render with Chromium when the static lxml pass is thin
+    crawl_render_enabled: bool = True
+    crawl_min_terms: int = 8       # below this, trigger the headless fallback
+    crawl_render_timeout: float = 20.0
+
     # Matching
     default_pass_threshold: int = 70  # confidence >= => "complete"
     unclear_band: int = 18            # [pass-band, pass) => "unclear"

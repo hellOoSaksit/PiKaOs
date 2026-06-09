@@ -499,7 +499,7 @@ export function SitemapAudit({ lang, can, actor }: { lang: Lang; can?: (p: strin
                   <div className="sm-score-lbl mono">{t("summary.matched")}</div>
                 </div>
                 <div className="sm-sumdetail">
-                  <div className="sm-target mono">{t("summary.target", { url: result.url, cat: result.cat, n: result.pageTermsFound })}</div>
+                  <div className="sm-target mono">{t("summary.target", { url: result.url, cat: result.cat, n: result.pageTermsFound })}{result.rendered && <span className="sm-aliastag" style={{ marginLeft: 8 }}>{t("summary.rendered")}</span>}</div>
                   <div className="sm-track"><div className={`sm-fill ${grade.c}`} style={{ width: score + "%" }} /></div>
                   <div className="sm-counts">
                     <span className={`sm-grade ${grade.c}`}>{grade.t}</span>
