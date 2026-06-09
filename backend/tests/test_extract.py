@@ -5,11 +5,12 @@ from app.infrastructure.crawler import extract_terms
 HTML = """
 <html><head><title>SCB</title></head><body>
   <header><nav>
-    <a href="/about">About Us</a>
-    <a href="/cg">Corporate Governance</a>
-    <a href="/sustainability">Sustainability</a>
-    <a href="/csr">CSR</a>
-    <a href="/news">News</a>
+    <a href="/th/about-us">About Us</a>
+    <a href="/th/about-us/corporate-governance">Corporate Governance</a>
+    <a href="/th/about-us/sustainability">Sustainability</a>
+    <a href="/th/about-us/csr">CSR</a>
+    <a href="/th/about-us/news">News</a>
+    <a href="/th/about-us/news/mar-2568/some-article">Deep news article in mega-menu</a>
   </nav></header>
   <main>
     <h1>Welcome</h1>
@@ -32,6 +33,8 @@ def test_nav_only_excludes_article_headings():
     # news/article content must NOT leak in
     assert "SCB launches new mobile app" not in texts
     assert "Q3 profit rises 12%" not in texts
+    # deep article link dumped into the mega-menu is filtered by path depth
+    assert "Deep news article in mega-menu" not in texts
 
 
 def test_deep_includes_content_headings():

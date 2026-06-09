@@ -35,6 +35,15 @@ def _path_of(href: str, base: str) -> str:
         return "/"
 
 
+def _path_depth(path: str) -> int:
+    """Number of path segments, ignoring a leading 2-letter locale (/th, /en).
+    `/th/about-us` -> 1, `/th/about-us/news/mar-2568/x` -> 4."""
+    segs = [s for s in (path or "").split("/") if s]
+    if segs and len(segs[0]) == 2 and segs[0].isalpha():
+        segs = segs[1:]
+    return len(segs)
+
+
 def _looks_like_popup(el) -> bool:
     attrs = " ".join(filter(None, [el.get("class", ""), el.get("id", ""), el.get("role", "")])).lower()
     return any(h in attrs for h in _POPUP_HINTS)
@@ -129,9 +138,14 @@ def extract_terms(final_url: str, html_text: str, bypass_popup: bool, deep: bool
     for el in doc.xpath("//h1"):
         push(el.text_content(), "<h1>", "/")
 
-    # primary: navigation menu items
+    # primary: navigation menu items. Mega-menus dump the whole site tree into
+    # the markup, so in nav mode keep only shallow section paths (top-level IA);
+    # deep links (news articles, individual people, sub-pages) are dropped.
     for a in doc.xpath(_NAV_XPATH):
-        push(a.text_content(), "<nav>", _path_of(a.get("href", ""), final_url))
+        path = _path_of(a.get("href", ""), final_url)
+        if not deep and _path_depth(path) > settings.crawl_nav_max_depth:
+            continue
+        push(a.text_content(), "<nav>", path)
 
     if deep:
         for level in ("h2", "h3"):
@@ -144,7 +158,12 @@ def extract_terms(final_url: str, html_text: str, bypass_popup: bool, deep: bool
             if len(terms) >= settings.crawl_max_terms:
                 break
 
-    terms.extend(_try_sitemap(final_url))
+    sitemap_terms = _try_sitemap(final_url)
+    if not deep:  # sitemap.xml also lists every article — keep only shallow IA
+        sitemap_terms = [pt for pt in sitemap_terms if _path_depth(pt.ev_path) <= settings.crawl_nav_max_depth]
+    for pt in sitemap_terms:
+        push(pt.text, pt.ev_tag, pt.ev_path)
+
     return terms[: settings.crawl_max_terms]
 
 

@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     crawl_render_enabled: bool = True
     crawl_min_terms: int = 8       # below this, trigger the headless fallback
     crawl_render_timeout: float = 20.0
+    # nav-focused mode: keep only shallow section links (top-level IA), dropping
+    # deep article/person/sub-page links that mega-menus dump into the markup.
+    crawl_nav_max_depth: int = 2
 
     # Matching
     default_pass_threshold: int = 70  # confidence >= => "complete"
