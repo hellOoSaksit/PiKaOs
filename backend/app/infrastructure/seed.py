@@ -23,10 +23,14 @@ SM_VOCAB = {
     ],
     "WD": [
         ("Vision & Mission", "วิสัยทัศน์และพันธกิจ", ["วิสัยทัศน์", "vision"]),
-        ("Board of Directors", "คณะกรรมการบริษัท", ["กรรมการ", "board of directors"]),
+        ("Company History", "จากวันวานถึงวันนี้", ["ประวัติบริษัท", "ความเป็นมา", "history", "from our early days until today"]),
+        ("Board of Directors", "คณะกรรมการบริษัท", ["กรรมการ", "คณะกรรมการธนาคาร", "board of directors", "board of director"]),
+        ("Executive Management", "ผู้บริหารระดับสูง", ["คณะผู้บริหาร", "senior executive officers", "senior management", "executives"]),
+        ("Business Strategy", "กลยุทธ์องค์กร", ["กลยุทธ์ธนาคาร", "strategy", "strategic plan"]),
         ("Corporate Governance", "การกำกับดูแลกิจการ", ["CG", "บรรษัทภิบาล"]),
         ("Nomination Policy", "นโยบายสรรหากรรมการ", ["การสรรหา", "nomination"]),
         ("Anti-Corruption", "นโยบายต่อต้านทุจริต", ["CAC", "คอร์รัปชัน"]),
+        ("Awards & Recognition", "รางวัลแห่งความสำเร็จ", ["รางวัล", "awards", "awards and ranking", "awards rankings"]),
         ("Sustainability", "ความยั่งยืน", ["ESG", "รายงานความยั่งยืน"]),
     ],
 }

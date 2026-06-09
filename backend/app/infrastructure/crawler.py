@@ -6,7 +6,7 @@ reuse the exact same extraction over browser-rendered HTML.
 from __future__ import annotations
 
 import re
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, urlunparse
 
 import httpx
 from lxml import html as lxml_html
@@ -56,19 +56,71 @@ def normalize_url(url: str) -> str:
     return url
 
 
+_LOCALES = {"th", "en", "zh", "ja", "ko"}
+
+
+def candidate_urls(url: str, prefer: str | None = None) -> list[str]:
+    """Ordered URLs to try, preferred locale first. For a path-based locale
+    (/th/… → /en/…) or a bare host (→ host/en/), the preferred-locale variant
+    comes first, then the original as fallback."""
+    prefer = (prefer if prefer is not None else settings.crawl_prefer_lang or "").lower()
+    base = normalize_url(url)
+    if not prefer:
+        return [base]
+    p = urlparse(base)
+    segs = p.path.split("/")
+    out: list[str] = []
+    for i, s in enumerate(segs):
+        if s.lower() in _LOCALES:  # path-based locale → swap it
+            if s.lower() != prefer:
+                swapped = segs.copy()
+                swapped[i] = prefer
+                out.append(urlunparse(p._replace(path="/".join(swapped))))
+            break
+    else:  # no locale segment; for a bare root try /<prefer>/ first
+        if p.path in ("", "/"):
+            out.append(urlunparse(p._replace(path=f"/{prefer}/")))
+    out.append(base)
+    seen: set[str] = set()
+    return [u for u in out if not (u in seen or seen.add(u))]
+
+
+_404_URL = re.compile(r"/(404|not-found|page-not-found|error)(\.\w+|/|$)", re.I)
+_404_TITLE = re.compile(r"\b404\b|not[ -]?found|page not found|ไม่พบหน้า|ไม่พบ", re.I)
+
+
+def _looks_404(final_url: str, html: str) -> bool:
+    """Detect soft-404s (a 'not found' page served with HTTP 200) so an EN
+    variant that doesn't really exist falls back to the original locale."""
+    if _404_URL.search(final_url):
+        return True
+    m = re.search(r"<title[^>]*>(.*?)</title>", html, re.I | re.S)
+    return bool(m and _404_TITLE.search(m.group(1)))
+
+
 def fetch(url: str) -> tuple[str, str]:
-    """Plain HTTP fetch. Returns (final_url, html). Raises CrawlError."""
-    url = normalize_url(url)
-    headers = {"User-Agent": settings.crawl_user_agent, "Accept-Language": "th,en;q=0.8"}
-    try:
-        with httpx.Client(follow_redirects=True, timeout=settings.crawl_timeout, headers=headers) as c:
-            r = c.get(url)
-            r.raise_for_status()
+    """Fetch HTML, preferring the configured locale (EN) and falling back to the
+    original URL (incl. on soft-404). Returns (final_url, html)."""
+    headers = {"User-Agent": settings.crawl_user_agent, "Accept-Language": "en-US,en;q=0.9,th;q=0.8"}
+    cands = candidate_urls(url)
+    last: CrawlError | None = None
+    with httpx.Client(follow_redirects=True, timeout=settings.crawl_timeout, headers=headers) as c:
+        for idx, cand in enumerate(cands):
+            try:
+                r = c.get(cand)
+                r.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                last = CrawlError(f"HTTP {e.response.status_code}", e.response.status_code)
+                continue
+            except httpx.HTTPError as e:
+                last = CrawlError(type(e).__name__)
+                continue
+            # reject a soft-404 EN variant only if a fallback candidate remains
+            if idx < len(cands) - 1 and _looks_404(str(r.url), r.text):
+                last = CrawlError("soft 404")
+                continue
             return str(r.url), r.text
-    except httpx.HTTPStatusError as e:
-        raise CrawlError(f"HTTP {e.response.status_code}", e.response.status_code) from e
-    except httpx.HTTPError as e:
-        raise CrawlError(type(e).__name__) from e
+    raise last or CrawlError("fetch failed")
 
 
 def _try_sitemap(base_url: str) -> list[PageTerm]:
