@@ -91,6 +91,14 @@ class CrawlResult:
 
 
 @dataclass
+class SitemapEntry:
+    loc: str    # full URL from sitemap.xml
+    path: str   # URL path
+    slug: str   # readable slug of the last segment
+    depth: int  # path depth (locale prefix ignored)
+
+
+@dataclass
 class ScanReport:
     url: str
     category: str

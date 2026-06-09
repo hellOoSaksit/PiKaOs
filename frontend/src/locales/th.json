@@ -26,7 +26,20 @@
 
   "tab.url": "🔍 จับคู่ URL",
   "tab.map": "🗺️ Map คำศัพท์",
+  "tab.sitemap": "🗂️ Sitemap",
   "tab.log": "📜 Log",
+
+  "sitemap.load": "ดึง sitemap",
+  "sitemap.loading": "กำลังดึง sitemap.xml…",
+  "sitemap.search": "ค้นหา path / slug…",
+  "sitemap.count": "{n} URL · {s} หมวด",
+  "sitemap.needUrl": "ใส่ URL ของเว็บก่อน",
+  "sitemap.notFound": "ไม่พบ sitemap.xml ของเว็บนี้",
+  "sitemap.empty.title": "ยังไม่ได้ดึง sitemap",
+  "sitemap.empty.sub": "ยังไม่พบ sitemap.xml — ลองตรวจ URL อีกครั้ง",
+  "view.report": "📑 สรุปผลการเทียบ",
+  "view.sitemap": "🗂️ Sitemap ของเว็บ",
+
   "tab.settings": "⚙️ ตั้งค่า",
 
   "log.title": "📜 บันทึกการแก้ไข (Log)",

@@ -1,4 +1,4 @@
-import type { Category, LogEntry, ScanResult, Term, TrainFile } from "./types";
+import type { Category, LogEntry, ScanResult, SitemapTree, Term, TrainFile } from "./types";
 
 const BASE = "/api";
 
@@ -51,6 +51,9 @@ export const api = {
   // scan
   scan: (body: { url: string; category: string; passThreshold: number; bypassPopup: boolean; deep: boolean }) =>
     req<ScanResult>("/sitemap/scan", { method: "POST", body: JSON.stringify(body) }),
+
+  // sitemap.xml tree
+  sitemapTree: (url: string) => req<SitemapTree>(`/sitemap/tree?url=${encodeURIComponent(url)}`),
 
   // train
   train: (cat: string) => req<TrainFile[]>(`/sitemap/train?category=${encodeURIComponent(cat)}`),

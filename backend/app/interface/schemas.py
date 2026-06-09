@@ -52,6 +52,19 @@ class ScanResultOut(_Out):
     rendered: bool = False
 
 
+class SitemapEntryOut(_Out):
+    loc: str
+    path: str
+    slug: str
+    depth: int
+
+
+class SitemapTreeOut(BaseModel):
+    found: bool
+    count: int
+    entries: list[SitemapEntryOut]
+
+
 class TrainOut(_Out):
     id: str
     name: str

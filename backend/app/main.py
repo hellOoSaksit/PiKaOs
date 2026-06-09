@@ -18,7 +18,7 @@ from .config import get_settings
 from .infrastructure import orm  # noqa: F401 — register tables on Base.metadata
 from .infrastructure.db import Base, SessionLocal, engine
 from .infrastructure.seed import seed
-from .interface.routers import categories, logs, scan, train, vocab
+from .interface.routers import categories, logs, scan, sitemap_tree, train, vocab
 
 settings = get_settings()
 VERSION_LABEL = "0.1 · Sitemap · Beta"
@@ -49,7 +49,7 @@ async def _service_error(_: Request, exc: ServiceError):
     return JSONResponse(status_code=exc.status, content={"detail": exc.message})
 
 
-for r in (categories.router, vocab.router, train.router, scan.router, logs.router):
+for r in (categories.router, vocab.router, train.router, scan.router, logs.router, sitemap_tree.router):
     app.include_router(r)
 
 

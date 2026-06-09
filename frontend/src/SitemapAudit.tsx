@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import { makeT, type Lang } from "./i18n";
-import type { Category, LogEntry, ScanItem, ScanResult, Term, TrainFile } from "./types";
+import type { Category, LogEntry, ScanItem, ScanResult, SitemapEntry, Term, TrainFile } from "./types";
 import { Btn, Empty, PageHead, Panel } from "./ui";
 
 interface Settings {
@@ -59,6 +59,78 @@ export function SitemapAudit({ lang, can, actor }: { lang: Lang; can?: (p: strin
   const [showJson, setShowJson] = useState(false);
   const [tab, setTab] = useState<"url" | "map" | "log" | "settings">("url");
   const [passTh, setPassTh] = useState(70);
+
+  // sub-view within the Match-URL tab: the match report or the site's sitemap
+  const [urlView, setUrlView] = useState<"report" | "sitemap">("report");
+  const [smTree, setSmTree] = useState<SitemapEntry[]>([]);
+  const [smBusy, setSmBusy] = useState(false);
+  const [smErr, setSmErr] = useState<string | null>(null);
+  const [smQuery, setSmQuery] = useState("");
+  const [smOpen, setSmOpen] = useState<Record<string, boolean>>({});
+  const loadSitemapFor = async (u: string) => {
+    if (!u.trim()) return;
+    setSmBusy(true);
+    setSmErr(null);
+    setSmTree([]);
+    try {
+      const r = await api.sitemapTree(u.trim());
+      setSmTree(r.entries);
+      if (!r.found) setSmErr(t("sitemap.notFound"));
+    } catch (e) {
+      setSmErr(String((e as Error).message));
+    } finally {
+      setSmBusy(false);
+    }
+  };
+  const smSection = (path: string) => {
+    const segs = path.split("/").filter(Boolean);
+    if (segs.length && /^[a-z]{2}$/i.test(segs[0])) segs.shift(); // drop locale
+    return segs[0] || "/";
+  };
+  const renderSitemap = () => {
+    if (smBusy) return <Panel><div className="sm-loading"><span className="typing-bubble"><span /><span /><span /></span> {t("sitemap.loading")}</div></Panel>;
+    if (smErr) return <div className="sm-readonly mono">⚠️ {smErr}</div>;
+    if (!smTree.length) return <Empty icon="🗂️" title={t("sitemap.empty.title")} sub={t("sitemap.empty.sub")} />;
+    const q = smQuery.trim().toLowerCase();
+    const filtered = q ? smTree.filter((e) => (e.path + " " + e.slug).toLowerCase().includes(q)) : smTree;
+    const groups: Record<string, SitemapEntry[]> = {};
+    for (const e of filtered) (groups[smSection(e.path)] ||= []).push(e);
+    const sections = Object.keys(groups).sort();
+    return (
+      <>
+        <div className="sm-thbar">
+          <input className="bf-input" style={{ flex: "0 0 260px" }} placeholder={t("sitemap.search")} value={smQuery} onChange={(e) => setSmQuery(e.target.value)} />
+          <span className="mono muted" style={{ fontSize: 12.5 }}>{t("sitemap.count", { n: filtered.length, s: sections.length })}</span>
+        </div>
+        <div className="sm-smtree">
+          {sections.map((sec) => {
+            const items = groups[sec];
+            const open = q ? true : !!smOpen[sec];
+            return (
+              <div className="sm-smgroup" key={sec}>
+                <button className="sm-smhead" onClick={() => setSmOpen((o) => ({ ...o, [sec]: !o[sec] }))}>
+                  <span className="sm-smtoggle">{open ? "▾" : "▸"}</span>
+                  <span className="sm-smname mono">/{sec}</span>
+                  <span className="sm-smcount">{items.length}</span>
+                </button>
+                {open && (
+                  <div className="sm-smlist">
+                    {items.slice(0, 500).map((e) => (
+                      <a key={e.path} className="sm-smrow" href={e.loc} target="_blank" rel="noopener noreferrer" title={e.loc}>
+                        <span className="sm-smpath mono">{e.path}</span>
+                        <span className="sm-smslug">{e.slug}</span>
+                      </a>
+                    ))}
+                    {items.length > 500 && <div className="muted" style={{ fontSize: 11, padding: "4px 8px" }}>+{items.length - 500}…</div>}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </>
+    );
+  };
 
   const [settings, setSettings] = useState<Settings>(() => {
     try {
@@ -222,6 +294,8 @@ export function SitemapAudit({ lang, can, actor }: { lang: Lang; can?: (p: strin
     try {
       const r = await api.scan({ url: target, category: cat, passThreshold: passTh, bypassPopup: settings.bypassPopup !== false, deep: !!settings.deep });
       setResult(r);
+      setUrlView("report");
+      loadSitemapFor(r.url); // fetch the site's sitemap for the Sitemap sub-view
     } catch (e) {
       setErr(String((e as Error).message));
     } finally {
@@ -498,6 +572,12 @@ export function SitemapAudit({ lang, can, actor }: { lang: Lang; can?: (p: strin
 
           {!busy && result && (
             <>
+              <div className="sm-subtabs" style={{ marginTop: 8 }}>
+                <button className={`sm-subtab ${urlView === "report" ? "on" : ""}`} onClick={() => setUrlView("report")}>{t("view.report")}</button>
+                <button className={`sm-subtab ${urlView === "sitemap" ? "on" : ""}`} onClick={() => setUrlView("sitemap")}>{t("view.sitemap")}{smTree.length > 0 ? ` (${smTree.length})` : ""}</button>
+              </div>
+              {urlView === "sitemap" ? renderSitemap() : (
+            <>
               <div className="sm-summary">
                 <div className={`sm-score ${grade.c}`}>
                   <div className="sm-score-num">{score}<span>%</span></div>
@@ -561,6 +641,8 @@ export function SitemapAudit({ lang, can, actor }: { lang: Lang; can?: (p: strin
                   ))}
                 </div>
               </div>
+            </>
+              )}
             </>
           )}
         </>
