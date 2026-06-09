@@ -1,0 +1,29 @@
+# ---- secrets / env ----
+.env
+backend/.env
+*.local
+
+# ---- python ----
+backend/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# ---- node / vite ----
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ---- logs / runtime ----
+*.log
+backend/uvicorn*.log
+
+# ---- design handoff bundle (UI reference only, not source) ----
+_design_extract/
+
+# ---- editor / os ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

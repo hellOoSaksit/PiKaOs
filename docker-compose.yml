@@ -1,0 +1,21 @@
+# Phase 0 infra. pgvector image so future RAG phases can add embeddings without
+# swapping the DB. Only Postgres is needed for the Sitemap Beta.
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: guildos
+      POSTGRES_PASSWORD: guildos
+      POSTGRES_DB: guildos
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U guildos"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
