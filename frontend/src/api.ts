@@ -6,7 +6,9 @@ async function req<T>(path: string, opts: RequestInit = {}, actor = "ผู้�
   const res = await fetch(BASE + path, {
     ...opts,
     headers: {
-      "X-Actor": actor,
+      // HTTP headers are ISO-8859-1 only; percent-encode so non-Latin
+      // actor names (e.g. Thai "ผู้ใช้") don't break fetch. Server decodes.
+      "X-Actor": encodeURIComponent(actor),
       ...(opts.body && !(opts.body instanceof FormData) ? { "Content-Type": "application/json" } : {}),
       ...opts.headers,
     },
