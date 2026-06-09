@@ -1,5 +1,5 @@
 """Excel/CSV training parser tests."""
-from app.services.excel import parse
+from app.services.excel import ParsedTerm, build_export, build_template, parse
 
 
 def test_csv_with_headers():
@@ -9,6 +9,23 @@ def test_csv_with_headers():
     assert terms[0].canon == "Share Price"
     assert terms[0].aliases == ["ราคาหุ้น", "stock price"]
     assert terms[1].th == "เงินปันผล" and terms[1].aliases == []
+
+
+def test_template_is_parseable():
+    # the generated template must round-trip through parse() unchanged
+    terms, rows = parse("t.xlsx", build_template())
+    assert rows >= 2
+    canons = {t.canon for t in terms}
+    assert "Share Price" in canons and "Financial Statements" in canons
+    sp = next(t for t in terms if t.canon == "Share Price")
+    assert "stock price" in sp.aliases
+
+
+def test_export_round_trip():
+    src = [ParsedTerm("Dividend", "เงินปันผล", ["นโยบายปันผล", "dividend policy"])]
+    terms, _ = parse("e.xlsx", build_export("IR", src))
+    assert terms[0].canon == "Dividend"
+    assert terms[0].aliases == ["นโยบายปันผล", "dividend policy"]
 
 
 def test_csv_positional_fallback():

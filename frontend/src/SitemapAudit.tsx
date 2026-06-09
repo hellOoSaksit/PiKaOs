@@ -410,6 +410,8 @@ export function SitemapAudit({ lang, can, actor }: { lang: "th" | "en"; can?: (p
             <div className="sm-train-head">
               <span className="mono muted" style={{ fontSize: 12.5 }}>📊 {train.length} ไฟล์เทรน · {terms.length} คำหลัก · หมวด {cat}</span>
               <button className="sm-jsonbtn" onClick={() => setShowJson((v) => !v)}>🧾 {showJson ? "ซ่อน JSON" : "ดู JSON"}</button>
+              <a className="sm-jsonbtn" href="/api/sitemap/train/template" download title="ดาวน์โหลดไฟล์ตัวอย่างสำหรับเทรน">⬇ เทมเพลต</a>
+              {terms.length > 0 && <a className="sm-jsonbtn" href={`/api/sitemap/train/export/${encodeURIComponent(cat)}`} download title="ส่งออกคำศัพท์หมวดนี้เป็น Excel">⬇ Export</a>}
               {!readOnly && <button className="sm-up" onClick={() => fileRef.current?.click()}>⬆ อัปโหลด Excel</button>}
               <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" multiple style={{ display: "none" }} onChange={addTrain} />
             </div>

@@ -2,6 +2,7 @@
 category's vocabulary (new canons added, existing canons gain new aliases), and
 record the file's metadata."""
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -9,9 +10,40 @@ from ..db import get_db
 from ..models import Alias, Category, Term, TrainFile
 from ..schemas import TrainOut
 from ..services import excel
+from ..services.excel import ParsedTerm
+from ..vocab_resolve import resolve_terms
 from .logs import write_log
 
 router = APIRouter(prefix="/sitemap/train", tags=["train"])
+
+_XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def _xlsx_response(data: bytes, filename: str) -> Response:
+    return Response(
+        content=data,
+        media_type=_XLSX_MEDIA,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/template")
+def download_template():
+    """A blank, ready-to-fill training template (canon / th / aliases)."""
+    return _xlsx_response(excel.build_template(), "pikaos-vocab-template.xlsx")
+
+
+@router.get("/export/{cat_key}")
+def export_vocab(cat_key: str, db: Session = Depends(get_db)):
+    """Export a category's effective vocabulary as an Excel file."""
+    if db.get(Category, cat_key) is None:
+        raise HTTPException(404, "category not found")
+    rows = [
+        ParsedTerm(canon=t.canon, th=t.th, aliases=[a.text for a in t.aliases])
+        for t in resolve_terms(db, cat_key)
+    ]
+    data = excel.build_export(cat_key, rows)
+    return _xlsx_response(data, f"pikaos-vocab-{cat_key}.xlsx")
 
 
 @router.get("", response_model=list[TrainOut])

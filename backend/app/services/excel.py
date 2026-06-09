@@ -14,7 +14,8 @@ import csv
 import io
 from dataclasses import dataclass, field
 
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font, PatternFill
 
 _CANON_KEYS = {"canon", "term", "head", "keyword", "คำหลัก", "หัวข้อ"}
 _TH_KEYS = {"th", "thai", "desc", "description", "คำอธิบาย", "ไทย", "ความหมาย"}
@@ -93,3 +94,52 @@ def parse(filename: str, data: bytes) -> tuple[list[ParsedTerm], int]:
             )
         )
     return terms, len(body)
+
+
+# ---- workbook generation (template + export) ----
+
+_HEADER = ["canon", "th", "aliases"]
+_HEADER_FILL = PatternFill("solid", fgColor="4361EE")  # PiKaOs indigo
+_HEADER_FONT = Font(bold=True, color="FFFFFF")
+_ALIAS_HINT = 'คั่นหลายคำด้วย "|" หรือ ","'
+
+
+def _build(rows: list[ParsedTerm], sheet_title: str, with_hint: bool) -> bytes:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = sheet_title[:31] or "vocab"
+
+    for col, name in enumerate(_HEADER, start=1):
+        c = ws.cell(row=1, column=col, value=name)
+        c.fill = _HEADER_FILL
+        c.font = _HEADER_FONT
+    ws.column_dimensions["A"].width = 28
+    ws.column_dimensions["B"].width = 34
+    ws.column_dimensions["C"].width = 46
+    ws.freeze_panes = "A2"
+
+    if with_hint:  # a comment-style hint row in column C header
+        ws.cell(row=1, column=4, value=_ALIAS_HINT).font = Font(italic=True, color="888888")
+
+    for r, t in enumerate(rows, start=2):
+        ws.cell(row=r, column=1, value=t.canon)
+        ws.cell(row=r, column=2, value=t.th)
+        ws.cell(row=r, column=3, value=" | ".join(t.aliases))
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def build_template() -> bytes:
+    """A ready-to-fill training template with a couple of example rows."""
+    sample = [
+        ParsedTerm("Share Price", "ราคาหลักทรัพย์", ["ราคาหุ้น", "stock price"]),
+        ParsedTerm("Financial Statements", "งบการเงิน", ["งบดุล", "ผลประกอบการ", "financials"]),
+    ]
+    return _build(sample, "template", with_hint=True)
+
+
+def build_export(sheet_title: str, terms: list[ParsedTerm]) -> bytes:
+    """Export an existing vocabulary to the same column shape `parse()` reads."""
+    return _build(terms, sheet_title, with_hint=False)
