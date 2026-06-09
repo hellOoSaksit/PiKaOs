@@ -26,15 +26,16 @@ def _texts(terms):
     return {t.text for t in terms}
 
 
-def test_nav_only_excludes_article_headings():
+def test_nav_only_matches_url_slugs():
+    # default mode derives terms from URL slugs (lowercase, de-hyphenated)
     texts = _texts(extract_terms("https://scb.co.th", HTML, bypass_popup=True, deep=False))
-    assert "Corporate Governance" in texts
-    assert "Sustainability" in texts and "CSR" in texts and "News" in texts
-    # news/article content must NOT leak in
+    assert "corporate governance" in texts
+    assert "sustainability" in texts and "csr" in texts and "news" in texts
+    # news/article content must NOT leak in (h2/links not used in slug mode)
     assert "SCB launches new mobile app" not in texts
     assert "Q3 profit rises 12%" not in texts
     # deep article link dumped into the mega-menu is filtered by path depth
-    assert "Deep news article in mega-menu" not in texts
+    assert "some article" not in texts
 
 
 def test_deep_includes_content_headings():

@@ -44,6 +44,32 @@ def _path_depth(path: str) -> int:
     return len(segs)
 
 
+_EXT = re.compile(r"\.(html?|php|aspx?|jsp)$", re.I)
+_HYPH = re.compile(r"[-_]+")
+
+
+def _strip_locale(path: str) -> list[str]:
+    segs = [s for s in (path or "").split("/") if s]
+    if segs and len(segs[0]) == 2 and segs[0].isalpha():
+        segs = segs[1:]
+    return segs
+
+
+def _slug_term(path: str) -> str:
+    """Turn a URL path into a readable term from its last segment.
+    `/en/about-us/corporate-governance` -> 'corporate governance'."""
+    segs = _strip_locale(path)
+    if not segs:
+        return ""
+    return _HYPH.sub(" ", _EXT.sub("", segs[-1])).strip()
+
+
+def _meaningful_slug(term: str) -> bool:
+    """Reject opaque slugs (ids, numbers, single chars) so we can fall back to
+    the link's visible text for those."""
+    return len(term) >= 2 and not re.fullmatch(r"[\d.\s]+", term)
+
+
 def _looks_like_popup(el) -> bool:
     attrs = " ".join(filter(None, [el.get("class", ""), el.get("id", ""), el.get("role", "")])).lower()
     return any(h in attrs for h in _POPUP_HINTS)
@@ -155,13 +181,17 @@ _NAV_XPATH = (
 def extract_terms(final_url: str, html_text: str, bypass_popup: bool, deep: bool = False) -> list[PageTerm]:
     """Extract candidate page terms from HTML.
 
-    Default (nav-focused): the page title/h1 plus the navigation menu items —
-    the site's top-level sections (About Us, Corporate Governance, …). This is
-    what you match a sitemap vocabulary against.
+    Default (URL-slug mode): the term for each section is derived from its URL
+    slug — `/en/about-us/corporate-governance` -> 'corporate governance' — taken
+    from the nav menu and sitemap.xml, kept to a shallow path depth (top-level
+    information architecture). Slugs are clean, language-stable identifiers that
+    match the English canon terms far better than noisy display text. The path
+    itself carries the section -> sub hierarchy (ev_path). Opaque slugs (ids)
+    fall back to the link's visible text.
 
-    `deep=True` additionally pulls content headings (h2/h3), breadcrumbs and all
-    anchors — useful to reach deep pages, but it also drags in article/news
-    titles, so it's opt-in.
+    `deep=True` switches to broad text extraction (nav text + h2/h3 + every
+    anchor) to reach deep pages — but it drags in article/news titles, so it's
+    opt-in.
     """
     doc = lxml_html.fromstring(html_text)
     if bypass_popup:
@@ -184,37 +214,38 @@ def extract_terms(final_url: str, html_text: str, bypass_popup: bool, deep: bool
         seen.add(norm)
         terms.append(PageTerm(ttext, tag, path))
 
-    # page identity
+    # page identity (the current page's own slug + title)
+    push(_slug_term(urlparse(final_url).path), "url", urlparse(final_url).path or "/")
     for t in doc.xpath("//title/text()"):
         push(t, "<title>", "/")
-    for el in doc.xpath("//h1"):
-        push(el.text_content(), "<h1>", "/")
-
-    # primary: navigation menu items. Mega-menus dump the whole site tree into
-    # the markup, so in nav mode keep only shallow section paths (top-level IA);
-    # deep links (news articles, individual people, sub-pages) are dropped.
-    for a in doc.xpath(_NAV_XPATH):
-        path = _path_of(a.get("href", ""), final_url)
-        if not deep and _path_depth(path) > settings.crawl_nav_max_depth:
-            continue
-        push(a.text_content(), "<nav>", path)
 
     if deep:
-        for level in ("h2", "h3"):
-            for el in doc.xpath(f"//{level}"):
-                push(el.text_content(), f"<{level}>", "/")
-        for a in doc.xpath("//*[contains(@class,'breadcrumb')]//a | //*[contains(@class,'breadcrumb')]//span"):
-            push(a.text_content(), "breadcrumb", _path_of(a.get("href", ""), final_url))
+        # broad text mode: nav text, content headings, all anchors
+        for el in doc.xpath("//h1 | //h2 | //h3"):
+            push(el.text_content(), "<" + el.tag + ">", "/")
         for a in doc.xpath("//a[@href]"):
             push(a.text_content(), "link", _path_of(a.get("href", ""), final_url))
             if len(terms) >= settings.crawl_max_terms:
                 break
+    else:
+        # URL-slug mode: term = slug of each section link (depth-limited),
+        # falling back to visible text only for opaque slugs.
+        for a in doc.xpath(_NAV_XPATH):
+            path = _path_of(a.get("href", ""), final_url)
+            if _path_depth(path) > settings.crawl_nav_max_depth:
+                continue
+            slug = _slug_term(path)
+            push(slug if _meaningful_slug(slug) else a.text_content(), "url", path)
 
-    sitemap_terms = _try_sitemap(final_url)
-    if not deep:  # sitemap.xml also lists every article — keep only shallow IA
-        sitemap_terms = [pt for pt in sitemap_terms if _path_depth(pt.ev_path) <= settings.crawl_nav_max_depth]
-    for pt in sitemap_terms:
-        push(pt.text, pt.ev_tag, pt.ev_path)
+    # sitemap.xml = the canonical URL tree; slug each entry (depth-limited)
+    for pt in _try_sitemap(final_url):
+        if not deep and _path_depth(pt.ev_path) > settings.crawl_nav_max_depth:
+            continue
+        slug = _slug_term(pt.ev_path)
+        if not deep:
+            push(slug if _meaningful_slug(slug) else pt.text, "url", pt.ev_path)
+        else:
+            push(pt.text, pt.ev_tag, pt.ev_path)
 
     return terms[: settings.crawl_max_terms]
 
