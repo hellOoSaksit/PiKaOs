@@ -118,3 +118,17 @@ npm run dev                                           # http://localhost:5173
 
 - โฟลเดอร์ `_design_extract/ai-company/` เป็น **แบบ UI อ้างอิงเท่านั้น** ไม่ใช่โค้ดจริง (ไม่ถูก commit)
 - รายละเอียดสเปกฟีเจอร์อยู่ใน `_design_extract/ai-company/project/SITEMAP.md`
+
+### โครงสร้าง backend (Clean Architecture)
+
+```
+backend/app/
+├─ domain/          entities · ports (interfaces) · policies — ไม่พึ่ง framework เลย
+├─ application/     use-case services (vocab · scan · train · log) พึ่งแค่ ports
+├─ infrastructure/  adapters: SQLAlchemy (orm/repositories) · lxml · rapidfuzz · openpyxl
+└─ interface/       HTTP edge: DTOs (schemas) · deps (composition root) · routers · main
+```
+
+ทิศทาง dependency ชี้เข้าด้านใน (interface → application → domain). โดเมนไม่รู้จัก
+FastAPI/SQLAlchemy/lxml เลย — สลับ DB หรือ matcher ได้โดยเขียน adapter ใหม่ใน `infrastructure/`
+แล้ว wire ที่ `interface/deps.py` ที่เดียว

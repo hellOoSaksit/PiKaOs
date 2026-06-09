@@ -1,12 +1,5 @@
-"""SQLAlchemy ORM models.
-
-The prototype stored vocabulary as a stack of localStorage override maps
-(terms / aliases / removed / thover / canonover / confirmed). Backed by a real
-DB we collapse all of that into plain rows: a Term row IS the canonical entry,
-its `id` is the stable key the UI uses for every edit, and edits are just
-UPDATE/DELETE. Derived categories (e.g. IR+WD) own no rows — the matcher unions
-their source categories at query time.
-"""
+"""SQLAlchemy ORM models (infrastructure). Mapped to/from domain entities by the
+repositories — the rest of the app never sees these classes."""
 import uuid
 from datetime import datetime, timezone
 
@@ -25,54 +18,45 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-class Category(Base):
+class CategoryORM(Base):
     __tablename__ = "categories"
 
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     label: Mapped[str] = mapped_column(String(160))
     is_base: Mapped[bool] = mapped_column(Boolean, default=False)
-    # non-empty => derived/combined category that unions these source keys (read-only)
     from_keys: Mapped[list] = mapped_column(JSON, default=list)
     hidden: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
-    terms: Mapped[list["Term"]] = relationship(
-        back_populates="category", cascade="all, delete-orphan"
-    )
+    terms: Mapped[list["TermORM"]] = relationship(back_populates="category", cascade="all, delete-orphan")
 
 
-class Term(Base):
+class TermORM(Base):
     __tablename__ = "terms"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
-    category_key: Mapped[str] = mapped_column(
-        ForeignKey("categories.key", ondelete="CASCADE"), index=True
-    )
-    canon: Mapped[str] = mapped_column(String(200))  # English head term (display)
-    th: Mapped[str] = mapped_column(String(300))     # Thai description
+    category_key: Mapped[str] = mapped_column(ForeignKey("categories.key", ondelete="CASCADE"), index=True)
+    canon: Mapped[str] = mapped_column(String(200))
+    th: Mapped[str] = mapped_column(String(300))
     is_base: Mapped[bool] = mapped_column(Boolean, default=False)
-    confirmed: Mapped[bool] = mapped_column(Boolean, default=False)  # human-promoted to "complete"
+    confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
-    category: Mapped[Category] = relationship(back_populates="terms")
-    aliases: Mapped[list["Alias"]] = relationship(
-        back_populates="term", cascade="all, delete-orphan"
-    )
+    category: Mapped[CategoryORM] = relationship(back_populates="terms")
+    aliases: Mapped[list["AliasORM"]] = relationship(back_populates="term", cascade="all, delete-orphan")
 
 
-class Alias(Base):
+class AliasORM(Base):
     __tablename__ = "aliases"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
-    term_id: Mapped[str] = mapped_column(
-        ForeignKey("terms.id", ondelete="CASCADE"), index=True
-    )
+    term_id: Mapped[str] = mapped_column(ForeignKey("terms.id", ondelete="CASCADE"), index=True)
     text: Mapped[str] = mapped_column(String(300))
 
-    term: Mapped[Term] = relationship(back_populates="aliases")
+    term: Mapped[TermORM] = relationship(back_populates="aliases")
 
 
-class TrainFile(Base):
+class TrainFileORM(Base):
     __tablename__ = "train_files"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
@@ -82,7 +66,7 @@ class TrainFile(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
-class LogEntry(Base):
+class LogEntryORM(Base):
     __tablename__ = "logs"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)

@@ -1,27 +1,30 @@
-"""Unit tests for the matcher + classifier (no DB / network needed)."""
-from app.services.crawler import PageTerm
-from app.services.matcher import VocabTerm, classify, match_terms
+"""Unit tests for the matcher adapter + classifier policy (no DB / network)."""
+from app.domain.entities import PageTerm, Term
+from app.domain.policies import classify
+from app.infrastructure.matcher import RapidfuzzMatcher
+
+matcher = RapidfuzzMatcher()
 
 
 def _vocab():
     return [
-        VocabTerm(key="t1", canon="Share Price", th="ราคาหลักทรัพย์",
-                  aliases=["ราคาหุ้น", "stock price"], category="IR"),
-        VocabTerm(key="t2", canon="Dividend", th="เงินปันผล",
-                  aliases=["นโยบายปันผล"], category="IR"),
+        Term(id="t1", category_key="IR", canon="Share Price", th="ราคาหลักทรัพย์",
+             is_base=True, confirmed=False, aliases=["ราคาหุ้น", "stock price"]),
+        Term(id="t2", category_key="IR", canon="Dividend", th="เงินปันผล",
+             is_base=True, confirmed=False, aliases=["นโยบายปันผล"]),
     ]
 
 
 def test_alias_match_scores_high():
     page = [PageTerm("ราคาหุ้นย้อนหลัง", "<nav>", "/investor")]
-    items = {m.key: m for m in match_terms(_vocab(), page)}
+    items = {m.key: m for m in matcher.match(_vocab(), page)}
     assert items["t1"].conf >= 80          # alias "ราคาหุ้น" fuzzily inside the page term
     assert items["t1"].alias is True       # matched via a non-th surface form
-    assert items["t2"].conf < items["t1"].conf  # dividend not on the page
+    assert items["t2"].conf < items["t1"].conf
 
 
 def test_empty_page_yields_zero_conf():
-    items = match_terms(_vocab(), [])
+    items = matcher.match(_vocab(), [])
     assert all(m.conf == 0 and m.page_term is None for m in items)
 
 

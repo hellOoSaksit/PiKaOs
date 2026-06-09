@@ -1,12 +1,11 @@
 """Seed the base IR / WD vocabulary and the derived IR+WD category.
 
-Mirrors `SM_VOCAB` and `SM_BASE_CATS` from the prototype
-(GuildOS/screens-sitemap.jsx) so the ported UI starts with identical data.
-"""
+Mirrors SM_VOCAB / SM_BASE_CATS from the prototype (GuildOS/screens-sitemap.jsx)
+so the ported UI starts with identical data."""
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import Alias, Category, Term
+from .orm import AliasORM, CategoryORM, TermORM
 
 SM_BASE_CATS = [
     ("IR", "IR · นักลงทุนสัมพันธ์"),
@@ -34,15 +33,13 @@ SM_VOCAB = {
 
 
 def seed(db: Session) -> None:
-    if db.scalar(select(Category).limit(1)) is not None:
+    if db.scalar(select(CategoryORM).limit(1)) is not None:
         return  # already seeded
-
     for key, label in SM_BASE_CATS:
-        db.add(Category(key=key, label=label, is_base=True, from_keys=[]))
+        db.add(CategoryORM(key=key, label=label, is_base=True, from_keys=[]))
         for canon, th, aliases in SM_VOCAB[key]:
-            term = Term(category_key=key, canon=canon, th=th, is_base=True)
-            term.aliases = [Alias(text=a) for a in aliases]
+            term = TermORM(category_key=key, canon=canon, th=th, is_base=True)
+            term.aliases = [AliasORM(text=a) for a in aliases]
             db.add(term)
-
-    db.add(Category(key="IRWD", label="IR + WD", is_base=False, from_keys=["IR", "WD"]))
+    db.add(CategoryORM(key="IRWD", label="IR + WD", is_base=False, from_keys=["IR", "WD"]))
     db.commit()
