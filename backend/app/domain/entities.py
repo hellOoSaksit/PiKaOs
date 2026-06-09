@@ -32,6 +32,7 @@ class Term:
     is_base: bool
     confirmed: bool
     aliases: list[str] = field(default_factory=list)
+    section: str | None = None  # menu group from the IR sitemap (display/grouping)
 
 
 @dataclass

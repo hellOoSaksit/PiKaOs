@@ -176,6 +176,9 @@ a { color: var(--gold-deep); }
 .sm-subtab:hover { color: var(--ink); }
 .sm-subtab.on { color: var(--gold-bright); border-bottom-color: var(--gold-deep); }
 .sm-map { display: flex; flex-direction: column; gap: 8px; }
+.sm-mapsec { display: flex; flex-direction: column; gap: 6px; }
+.sm-mapsec-head { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--gold-deep); background: var(--gold-glow); border-radius: var(--radius-sm); padding: 6px 12px; margin-top: 8px; }
+.sm-mapsec-head span { font-family: var(--font-mono); font-size: 11px; background: var(--bg-2); color: var(--ink-2); border-radius: 10px; padding: 0 8px; }
 .sm-maprow { display: flex; align-items: center; gap: 12px; background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 11px 14px; }
 .sm-mapkey { min-width: 200px; flex: 0 0 200px; display: flex; flex-direction: column; gap: 2px; }
 .sm-mapcanon { font-size: 13.5px; font-weight: 700; color: var(--gold-bright); }

@@ -13,6 +13,7 @@ export interface Term {
   category: string;
   confirmed: boolean;
   isBase: boolean;
+  section: string | null;
   aliases: string[];
 }
 
