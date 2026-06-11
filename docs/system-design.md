@@ -2,7 +2,7 @@
 
 > Living architecture document for **PiKaOs**, the Thai-first multi-agent "agent-ops"
 > workspace. This is the blueprint the code is built toward — read it with
-> [`README.md`](../README.md) (overview) and [`CLAUDE.md`](../CLAUDE.md) (dev rules).
+> [`README.md`](../README.md) (project overview).
 > Status tags: ✅ built · 🟡 designed (this doc) · ⚪ future.
 
 ---

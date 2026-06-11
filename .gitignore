@@ -7,8 +7,9 @@ dist-ssr
 # secrets / env
 .env
 
-# claude code local config / tooling
+# claude code local config / tooling (kept local, not published)
 .claude/
+CLAUDE.md
 
 # python / backend
 __pycache__/

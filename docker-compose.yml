@@ -1,5 +1,5 @@
 # PiKaOs backend infrastructure.
-# Frontend is NOT here — it runs via npm / start.bat (see CLAUDE.md §0).
+# Frontend is NOT here — it runs via npm / start.bat (see README.md).
 services:
   db:
     image: pgvector/pgvector:pg16

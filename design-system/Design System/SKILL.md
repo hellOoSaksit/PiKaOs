@@ -16,7 +16,7 @@ typography, iconography, content tone, component index). Then explore the other 
   `pikaos-kit.css` → `pikaos-core.css` → `pikaos-components.css`.
 - `cards/` — small specimen cards (colors, type, spacing, components).
 - `../styles.css` (parent `design-system/`) — `@import` entry that reaches every token + style
-  file. The running app lives in `Frontend/`; see the project `README.md` / `CLAUDE.md`.
+  file. The running app lives in `Frontend/`; see the project `README.md`.
 
 **How to use**
 - For visual artifacts (slides, mocks, throwaway prototypes): copy the `css/` files out, link them

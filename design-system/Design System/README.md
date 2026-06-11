@@ -140,7 +140,7 @@ Key classes shown in the specimen: `.btn` (`.btn-gold/.btn-ghost/.btn-danger`, `
 
 This guide ships inside the repo's `design-system/` folder, which holds every static
 design deliverable (the app itself is in `Frontend/` — see the project
-[`README.md`](../../README.md) and [`CLAUDE.md`](../../CLAUDE.md)).
+[`README.md`](../../README.md)).
 
 ```
 design-system/
