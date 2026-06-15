@@ -62,7 +62,11 @@
   FK `documents.owner_id` · boot asserts prod secrets · pin minio · passlib→argon2-cffi · CI.
 - ✅ **A7 SSRF guard เสร็จแล้ว (2026-06-15)** → [`net_guard.py`](../../Backend/app/services/net_guard.py) +
   [`tests/test_net_guard.py`](../../Backend/tests/test_net_guard.py) (38 passed locally; live-server auth test รันใน docker).
-  คงเหลือ DNS-rebinding (pin IP). ถัดไปแนะนำ **A1 (RBAC)** ปลดล็อก §2 ของ compare-hardening (authz+rate-limit).
+  คงเหลือ DNS-rebinding (pin IP).
+- ✅ **A4 boot asserts + minio pin เสร็จแล้ว (2026-06-15)** → `config.production_violations()` + `main.lifespan`
+  (prod + secret default → ตายตอนบูต) · [`tests/test_config.py`](../../Backend/tests/test_config.py) ·
+  `docker-compose.yml` pin minio by digest. คงค้างในเฟส A: **A1 RBAC** (ปลดล็อก §2 compare-hardening), A2 WS,
+  A3 FK, A5 passlib→argon2-cffi (เสี่ยง login), A6 CI.
 - **เฟส B**: engine core + arq + 2-phase resume + atomic quota + timeout.
 - ✅ **ตอบแล้ว (2026-06-12): multi-tenancy = องค์กรเดียว หลายแผนก** → `department_id` ทุก scopable table
   ตั้งแต่ migration แรก (design: [system-design §7.1](../architecture/system-design.md#71-department-scoping-)). เฟส B1 พร้อมเริ่มด้านนี้.

@@ -3,6 +3,11 @@ from __future__ import annotations
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Known insecure dev defaults that must never reach production (checked at boot — A4).
+_DEV_JWT_SECRETS = {"change-me-in-.env", "dev-secret-change-me"}
+_DEV_SEED_PASSWORDS = {"pikaos123"}
+_DEV_MINIO_SECRETS = {"pikaos-secret"}
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -73,6 +78,27 @@ class Settings(BaseSettings):
     @property
     def compare_allowlist(self) -> list[str]:
         return [h.strip().lower() for h in self.compare_url_allowlist.split(",") if h.strip()]
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.strip().lower() in ("production", "prod")
+
+    def production_violations(self) -> list[str]:
+        """Insecure settings that must be fixed before running in production.
+
+        Empty list = safe. Enforced at startup (main.lifespan) so a misconfigured
+        prod deploy fails fast and loudly instead of running with dev secrets (A4).
+        """
+        problems: list[str] = []
+        if self.jwt_secret in _DEV_JWT_SECRETS or len(self.jwt_secret) < 16:
+            problems.append("JWT_SECRET is a dev default / too short — set a strong unique secret")
+        if not self.cookie_secure:
+            problems.append("COOKIE_SECURE must be true behind HTTPS in production")
+        if self.seed_password in _DEV_SEED_PASSWORDS:
+            problems.append("SEED_PASSWORD is the dev default — change it")
+        if self.minio_secret_key in _DEV_MINIO_SECRETS:
+            problems.append("MINIO_SECRET_KEY is the dev default — change it")
+        return problems
 
 
 settings = Settings()

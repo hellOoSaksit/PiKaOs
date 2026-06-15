@@ -31,8 +31,10 @@
   (upfront 400 + event hook กัน redirect). คงเหลือ DNS-rebinding (pin IP). **ใช้ guard เดียวกันนี้ตอนทำ audit Discovery.**
 - **[P1]** compare/audit ยังไม่มี permission + ไม่มี rate-limit ต่อผู้ใช้ → รอ A1 (RBAC).
 - รายละเอียด + design การแก้ครบ → [compare-hardening.md](../features/compare-hardening.md).
-- **Stack hardening ค้าง**: `passlib` ไม่มีคนดูแล → ย้าย `argon2-cffi`; `minio:latest` ไม่ pin;
-  frontend ไม่มี lint/test/typecheck; ยังไม่มี CI — [tech-stack §3](../architecture/tech-stack.md).
+- **Stack hardening**: ✅ [2026-06-15] `minio` pin by digest แล้ว (docker-compose.yml) + ✅ A4 boot asserts
+  (prod ที่ใช้ secret default → ตายตอนบูต, `config.production_violations()` + main.lifespan).
+  คงค้าง: `passlib` → `argon2-cffi` (เสี่ยง hash เดิม verify ไม่ผ่าน — ทำตอนแตะ security.py พร้อม test login),
+  frontend lint/test/typecheck, CI — [tech-stack §3](../architecture/tech-stack.md).
 - รายการเต็ม + ลำดับแก้: [risk-mitigation.md](../architecture/risk-mitigation.md) (15 ข้อ) ·
   [improvement-plan.md](improvement-plan.md) (เฟส A–F).
 

@@ -12,6 +12,15 @@ from .routers import auth, compare, health, ws
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Fail fast if a production deploy still carries dev secrets / insecure cookies (A4).
+    if settings.is_production:
+        violations = settings.production_violations()
+        if violations:
+            raise RuntimeError(
+                "Refusing to start in production with insecure config:\n  - "
+                + "\n  - ".join(violations)
+            )
+
     # ensure the MinIO bucket exists on boot (best-effort)
     try:
         from . import storage

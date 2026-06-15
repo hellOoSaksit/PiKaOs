@@ -30,7 +30,10 @@ services:
       retries: 10
 
   minio:
-    image: minio/minio:latest
+    # Pinned by digest (was :latest) for reproducible/secure builds — A4 hardening.
+    # This is the exact image in use as of 2026-06-15; bump deliberately after testing
+    # a newer MinIO release (re-pin via: docker image inspect minio/minio --format '{{.RepoDigests}}').
+    image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-pikaos}
