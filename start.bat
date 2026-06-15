@@ -8,8 +8,8 @@ rem         - if not, start Docker Desktop and wait
 rem         - if it still won't come up, run fix-docker.bat and wait
 rem    2) bring up the backend infra (Postgres+pgvector, Redis, MinIO, API)
 rem         via `docker compose up -d --build`
-rem    3) open ONE Windows Terminal window with multiple TABS
-rem         Frontend - dev  |  Backend  |  Docker  |  Shell
+rem    3) open ONE Windows Terminal window with two color-coded TABS
+rem         Frontend - dev (indigo)  +  Backend (green)
 rem       (tabs, not several separate windows)
 rem
 rem  Requires Windows Terminal (wt.exe) - built into Windows 11.
@@ -20,10 +20,15 @@ set "DD=%ProgramFiles%\Docker\Docker\Docker Desktop.exe"
 set "DOCKER=%ProgramFiles%\Docker\Docker\resources\bin\docker.exe"
 if not exist "%DOCKER%" set "DOCKER=docker"
 
-title PiKaOs launcher
-echo ===========================================================
-echo  PiKaOs launcher
-echo ===========================================================
+title PiKaOS launcher
+color 0B
+echo.
+echo   ===========================================================
+echo.
+echo        .:::.   P i K a O S   .:::.
+echo        Agent-Ops Workspace launcher
+echo.
+echo   ===========================================================
 echo.
 
 rem ---- 1. Docker preflight -----------------------------------
@@ -83,11 +88,13 @@ where wt >nul 2>nul
 if errorlevel 1 goto :nowt
 
 rem  -w pikaos = reuse one named window (re-running adds tabs, not windows).
+rem  Two tabs only (no Docker / Shell). --tabColor gives each a brand color:
+rem    Frontend = indigo (#4361EE) · Backend = green (#12A150).
 rem  Tabs that target the repo root use "%ROOT%." - the trailing dot avoids a
 rem  backslash right before the closing quote, which wt would misread.
 rem  The Frontend tab calls Frontend\dev.bat (a real file) instead of an inline
 rem  command - wt mis-parses & and () inside cmd /k, which stopped the dev server.
-wt -w pikaos new-tab --title "Frontend - dev" -d "%ROOT%Frontend" cmd /k "%ROOT%Frontend\dev.bat" ; new-tab --title "Backend" -d "%ROOT%." cmd /k "docker compose logs -f backend" ; new-tab --title "Docker" -d "%ROOT%." cmd /k "docker compose ps" ; new-tab --title "Shell" -d "%ROOT%." cmd /k "echo PiKaOs shell - run git / npm here"
+wt -w pikaos new-tab --title "Frontend - dev" --tabColor "#4361EE" -d "%ROOT%Frontend" cmd /k "%ROOT%Frontend\dev.bat" ; new-tab --title "Backend" --tabColor "#12A150" -d "%ROOT%." cmd /k "docker compose logs -f backend"
 
 echo       Launched. You can close this window.
 timeout /t 3 >nul
