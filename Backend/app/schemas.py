@@ -37,6 +37,7 @@ class UserOut(BaseModel):
     used: int
     last_login: datetime | None = None
     created_at: datetime
+    permissions: list[str] = []  # server-resolved effective perms (set by /me + login)
 
 
 class LoginResult(BaseModel):

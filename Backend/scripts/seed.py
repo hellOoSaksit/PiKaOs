@@ -1,7 +1,11 @@
-"""Seed the users table to mirror Frontend/src/data/data-users.jsx.
+"""Seed users + RBAC to mirror Frontend/src/data/data-users.jsx.
 
-Idempotent: skips users that already exist (by username). All seeded users share
-the dev password from settings.seed_password (default "pikaos123").
+Idempotent: skips rows that already exist (users by username; roles/permissions by
+key; role_perms/user_perms by their composite key). All seeded users share the dev
+password from settings.seed_password (default "pikaos123").
+
+The frontend keys per-user overrides by a `u_<username>` slug; here we map them to the
+real user_id by username (server is the source of truth — risk-mitigation §2(ง)).
 """
 from __future__ import annotations
 
@@ -11,7 +15,7 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.db import SessionLocal
-from app.models import User
+from app.models import Permission, Role, RolePerm, User, UserPerm
 from app.security import hash_password
 
 SEED_USERS = [
@@ -23,19 +27,109 @@ SEED_USERS = [
     dict(username="dao",     display="ดาว ประเสริฐ",  email="dao@guildos.io",     role="member",  status="suspended", quota=100000, period="weekly",  used=99200,  avatar="🌙"),
 ]
 
+# --- RBAC seed (mirrors data-users.jsx) ---
+SEED_PERMISSIONS = [
+    ("agent.create", "Agents", "สร้าง Agent", "Create agents"),
+    ("agent.appearance", "Agents", "แก้รูปลักษณ์/คลาส Agent", "Edit appearance & class"),
+    ("character.manage", "Agents", "เพิ่ม/จัดการการ์ดตัวละคร", "Manage character cards"),
+    ("options.manage", "Agents", "เพิ่มตัวเลือก ตำแหน่ง/ทักษะ/เครื่องมือ", "Add roster options"),
+    ("rules.manage", "Agents", "แก้กฎหลัก (บังคับทุกตัว)", "Manage core rules"),
+    ("agent.config", "Agents", "แก้ตั้งค่าขั้นสูง (ตำแหน่ง/หน้าที่/โมเดล/API)", "Edit advanced config"),
+    ("profile.manage", "Agents", "สร้าง/จัดการโปรไฟล์ (Profile)", "Manage profiles"),
+    ("agent.edit.any", "Agents", "แก้ Agent ของผู้อื่น", "Edit any agent"),
+    ("agent.delete.any", "Agents", "ลบ Agent ของผู้อื่น", "Delete any agent"),
+    ("quest.run", "Work", "สั่งรันงาน/เควส", "Run quests"),
+    ("task.delete", "Work", "ลบงาน (Task)", "Delete tasks"),
+    ("codex.manage", "Knowledge", "จัดการคลังความรู้", "Manage codex"),
+    ("workflow.manage", "Workflows", "จัดการ workflow", "Manage workflows"),
+    ("room.build", "Room", "เปิดโหมดสร้างห้อง", "Open build mode"),
+    ("room.place", "Room", "วางของ/เฟอร์นิเจอร์", "Place items"),
+    ("room.move", "Room", "แก้ไขตำแหน่ง/รื้อของ", "Edit positions"),
+    ("room.reset", "Room", "รีเซตห้องเป็นค่าเริ่มต้น", "Reset room layout"),
+    ("room.create", "Room", "สร้างห้องใหม่", "Create rooms"),
+    ("room.template", "Room", "สร้าง/บันทึกเทมเพลตห้อง", "Create room templates"),
+    ("room.delete", "Room", "ลบห้อง", "Delete rooms"),
+    ("token.manage", "Admin", "ตั้งโควตาโทเคน", "Manage token quota"),
+    ("user.view.any", "Admin", "ดูข้อมูลสมาชิก", "View any user"),
+    ("user.manage", "Admin", "จัดการสมาชิก", "Manage users"),
+    ("role.manage", "Admin", "จัดการบทบาท/สิทธิ์", "Manage roles"),
+    ("audit.view", "Admin", "ดูบันทึกการตรวจสอบ", "View audit log"),
+]
+_PERM_KEYS = [p[0] for p in SEED_PERMISSIONS]
+
+SEED_ROLES = [
+    ("admin", "ผู้ดูแลระบบ", "Admin", "เข้าถึงและจัดการได้ทุกอย่าง", "magic", True),
+    ("manager", "ผู้จัดการ", "Manager", "ดูและจัดการงานของสมาชิก แต่ไม่จัดการบัญชี", "info", True),
+    ("member", "สมาชิก", "Member", "สร้างและจัดการของตัวเอง รันงานได้", "on", True),
+    ("viewer", "ผู้อ่าน", "Viewer", "ดูอย่างเดียว ไม่มีสิทธิ์แก้ไข", "idle", True),
+]
+
+SEED_ROLE_PERMS = {
+    "admin": list(_PERM_KEYS),
+    "manager": ["agent.create", "agent.edit.any", "agent.delete.any", "quest.run", "codex.manage",
+                "workflow.manage", "user.view.any", "audit.view", "room.build", "room.place",
+                "room.move", "room.reset", "room.create", "room.delete", "room.template",
+                "options.manage", "character.manage", "rules.manage", "agent.config", "task.delete"],
+    "member": ["agent.create", "quest.run", "codex.manage", "workflow.manage",
+               "room.build", "room.place", "room.move"],
+    "viewer": [],
+}
+
+# username -> {perm_key: allow(bool)}  (frontend "grant"/"deny" -> True/False)
+SEED_USER_PERMS = {
+    "kitt": {"audit.view": True},   # trusted member who can see the audit log
+    "ploy": {"quest.run": False},   # temporarily blocked from running quests
+}
+
 
 async def seed() -> None:
     password_hash = hash_password(settings.seed_password)
     async with SessionLocal() as db:
-        existing = set((await db.execute(select(User.username))).scalars().all())
-        added = 0
+        # --- users ---
+        existing_users = set((await db.execute(select(User.username))).scalars().all())
+        users_added = 0
         for u in SEED_USERS:
-            if u["username"] in existing:
+            if u["username"] not in existing_users:
+                db.add(User(password_hash=password_hash, **u))
+                users_added += 1
+
+        # --- permissions ---
+        existing_perms = set((await db.execute(select(Permission.key))).scalars().all())
+        for key, grp, th, en in SEED_PERMISSIONS:
+            if key not in existing_perms:
+                db.add(Permission(key=key, grp=grp, name_th=th, name_en=en))
+
+        # --- roles ---
+        existing_roles = set((await db.execute(select(Role.key))).scalars().all())
+        for key, th, en, desc, color, system in SEED_ROLES:
+            if key not in existing_roles:
+                db.add(Role(key=key, name_th=th, name_en=en, description=desc, color=color, system=system))
+
+        # --- role_perms ---
+        existing_rp = set((await db.execute(select(RolePerm.role_key, RolePerm.perm_key))).all())
+        for role_key, perm_keys in SEED_ROLE_PERMS.items():
+            for perm_key in perm_keys:
+                if (role_key, perm_key) not in existing_rp:
+                    db.add(RolePerm(role_key=role_key, perm_key=perm_key))
+
+        await db.commit()  # commit users first so we can resolve usernames -> ids
+
+        # --- user_perms (needs user ids) ---
+        username_to_id = dict((await db.execute(select(User.username, User.id))).all())
+        existing_up = set((await db.execute(select(UserPerm.user_id, UserPerm.perm_key))).all())
+        up_added = 0
+        for username, overrides in SEED_USER_PERMS.items():
+            uid = username_to_id.get(username)
+            if uid is None:
                 continue
-            db.add(User(password_hash=password_hash, **u))
-            added += 1
+            for perm_key, allow in overrides.items():
+                if (uid, perm_key) not in existing_up:
+                    db.add(UserPerm(user_id=uid, perm_key=perm_key, allow=allow))
+                    up_added += 1
         await db.commit()
-        print(f"[seed] users added: {added}, already present: {len(existing)}")
+
+        print(f"[seed] users +{users_added} (had {len(existing_users)}) · "
+              f"perms {len(_PERM_KEYS)} · roles {len(SEED_ROLES)} · user_perms +{up_added}")
 
 
 if __name__ == "__main__":

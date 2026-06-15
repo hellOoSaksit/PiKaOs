@@ -17,6 +17,10 @@
   ([tech-stack §4](../architecture/tech-stack.md)) · [compare.md §6](../features/compare.md).
 - **Room: data model แช่แข็ง** → `guildos.rooms.v2` (`floor[]`/`struct[]`/`objects[]`) + `FURN` keys/footprints/`draw3d`
   ห้ามเปลี่ยน · เพราะป้อน 2 renderer พร้อมกัน · [room-3d.md](../features/room-3d.md).
+- **[2026-06-15] RBAC = server-side, server เป็น source of truth** → effective = role_perms ∪ grant − deny
+  (deny ชนะ), admin = ทุก perm · **map ผู้ใช้ด้วย `username`** ไม่ใช่ email (`@guildos.io` ฝั่ง seed ทำให้ drift) ·
+  cache Redis `perms:<id>` TTL 60s → **ต้อง `rbac_service.invalidate()` เมื่อแก้ role/override** ·
+  **ทุก endpoint เขียนข้อมูลต่อจากนี้ประกาศ `Depends(require_perm("..."))`** (CLAUDE.md §2.2) · risk-mitigation §2.
 
 ## B. ความน่าเชื่อถือของ input (กฎที่ได้จากของจริง)
 
@@ -29,7 +33,8 @@
 
 - ✅ **[P0] SSRF — แก้แล้ว (2026-06-15, A7)** ใน [`net_guard.py`](../../Backend/app/services/net_guard.py)
   (upfront 400 + event hook กัน redirect). คงเหลือ DNS-rebinding (pin IP). **ใช้ guard เดียวกันนี้ตอนทำ audit Discovery.**
-- **[P1]** compare/audit ยังไม่มี permission + ไม่มี rate-limit ต่อผู้ใช้ → รอ A1 (RBAC).
+- **[P1]** compare/audit ยังไม่มี permission + ไม่มี rate-limit ต่อผู้ใช้ → A1 (RBAC) เสร็จแล้ว = **ปลดล็อก**:
+  ขั้นต่อไปใส่ `require_perm("compare.run")` ที่ 3 endpoint + rate-limit ผ่าน Redis (compare-hardening §2).
 - รายละเอียด + design การแก้ครบ → [compare-hardening.md](../features/compare-hardening.md).
 - **Stack hardening**: ✅ [2026-06-15] `minio` pin by digest แล้ว (docker-compose.yml) + ✅ A4 boot asserts
   (prod ที่ใช้ secret default → ตายตอนบูต, `config.production_violations()` + main.lifespan).

@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     refresh_ttl_seconds: int = 60 * 60 * 24 * 7  # 7 days
     refresh_cookie_name: str = "pikaos_refresh"
     cookie_secure: bool = False  # True behind HTTPS in production
+    perms_cache_ttl_seconds: int = 60  # effective-perms cache (perms:<user_id>) freshness
 
     # --- MinIO / S3 ---
     minio_endpoint: str = "minio:9000"

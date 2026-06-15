@@ -65,8 +65,12 @@
   คงเหลือ DNS-rebinding (pin IP).
 - ✅ **A4 boot asserts + minio pin เสร็จแล้ว (2026-06-15)** → `config.production_violations()` + `main.lifespan`
   (prod + secret default → ตายตอนบูต) · [`tests/test_config.py`](../../Backend/tests/test_config.py) ·
-  `docker-compose.yml` pin minio by digest. คงค้างในเฟส A: **A1 RBAC** (ปลดล็อก §2 compare-hardening), A2 WS,
-  A3 FK, A5 passlib→argon2-cffi (เสี่ยง login), A6 CI.
+  `docker-compose.yml` pin minio by digest.
+- ✅ **A1 RBAC server-side เสร็จแล้ว (2026-06-15)** → migration `0002_rbac` (4 ตาราง) · `repositories/rbac.py` ·
+  `services/rbac_service.py` (effective perms + Redis cache) · `deps.require_perm` · `/me`+login คืน `permissions[]` ·
+  seed RBAC ใน `scripts/seed.py` · [`tests/test_rbac.py`](../../Backend/tests/test_rbac.py) (8 passed, 51 รวมในเครื่อง).
+  **ต้อง restart backend container** ให้ migration+seed รัน. คงค้างเฟส A: A2 WS, A3 FK, A5 passlib→argon2 (เสี่ยง login), A6 CI.
+- **ถัดไปแนะนำ**: ผูก `require_perm("compare.run")` + rate-limit ที่ compare (compare-hardening §2 ปลดล็อกแล้ว) หรือ A3 FK (เล็ก).
 - **เฟส B**: engine core + arq + 2-phase resume + atomic quota + timeout.
 - ✅ **ตอบแล้ว (2026-06-12): multi-tenancy = องค์กรเดียว หลายแผนก** → `department_id` ทุก scopable table
   ตั้งแต่ migration แรก (design: [system-design §7.1](../architecture/system-design.md#71-department-scoping-)). เฟส B1 พร้อมเริ่มด้านนี้.

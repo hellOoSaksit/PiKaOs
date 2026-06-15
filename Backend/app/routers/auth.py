@@ -13,7 +13,7 @@ from ..db import get_db
 from ..deps import get_current_user
 from ..models import User
 from ..schemas import ForgotIn, LoginIn, LoginResult, TokenOut, UserOut
-from ..services import auth_service
+from ..services import auth_service, rbac_service
 from ..services.auth_service import InactiveAccount, InvalidCredentials, Session
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -34,11 +34,17 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
     )
 
 
-def _session_response(response: Response, session: Session) -> LoginResult:
+def _user_out(user: User, perms: set[str]) -> UserOut:
+    out = UserOut.model_validate(user)
+    out.permissions = sorted(perms)
+    return out
+
+
+def _session_response(response: Response, session: Session, perms: set[str]) -> LoginResult:
     _set_refresh_cookie(response, session.refresh_token)
     return LoginResult(
         token=TokenOut(accessToken=session.access_token, expiresIn=session.expires_in),
-        user=UserOut.model_validate(session.user),
+        user=_user_out(session.user, perms),
     )
 
 
@@ -50,7 +56,8 @@ async def login(body: LoginIn, response: Response, db: AsyncSession = Depends(ge
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
     except InactiveAccount:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Account is not active")
-    return _session_response(response, session)
+    perms = await rbac_service.get_effective_perms(db, session.user)
+    return _session_response(response, session, perms)
 
 
 @router.post("/refresh", response_model=LoginResult)
@@ -64,7 +71,8 @@ async def refresh(
     except InvalidCredentials:
         response.delete_cookie(settings.refresh_cookie_name, path=COOKIE_PATH)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
-    return _session_response(response, session)
+    perms = await rbac_service.get_effective_perms(db, session.user)
+    return _session_response(response, session, perms)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -80,8 +88,12 @@ async def logout(
 
 
 @router.get("/me", response_model=UserOut)
-async def me(user: User = Depends(get_current_user)) -> UserOut:
-    return UserOut.model_validate(user)
+async def me(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserOut:
+    perms = await rbac_service.get_effective_perms(db, user)
+    return _user_out(user, perms)
 
 
 @router.post("/forgot-password", status_code=status.HTTP_200_OK)

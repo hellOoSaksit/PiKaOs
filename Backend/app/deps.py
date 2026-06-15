@@ -12,6 +12,7 @@ from . import redis_client, security
 from .db import get_db
 from .models import User
 from .repositories import users as users_repo
+from .services import rbac_service
 
 bearer = HTTPBearer(auto_error=True)
 
@@ -56,6 +57,24 @@ def require_role(*roles: str):
     async def _checker(user: User = Depends(get_current_user)) -> User:
         if user.role not in roles:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Forbidden")
+        return user
+
+    return _checker
+
+
+def require_perm(perm: str):
+    """Dependency factory: require a single permission (server-side RBAC — A1).
+
+    Usage: `@router.post("/agents", dependencies=[Depends(require_perm("agent.create"))])`.
+    Returns the user so a route can also accept it as `user = Depends(require_perm(...))`.
+    """
+
+    async def _checker(
+        user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db),
+    ) -> User:
+        if perm not in await rbac_service.get_effective_perms(db, user):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, f"missing permission: {perm}")
         return user
 
     return _checker
