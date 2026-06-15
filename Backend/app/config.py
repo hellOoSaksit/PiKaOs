@@ -32,6 +32,26 @@ class Settings(BaseSettings):
     minio_secure: bool = False
     minio_bucket: str = "pikaos"
 
+    # --- UAT vs Production sitemap comparison ---
+    # Per-request HTTP timeout when probing URLs. Kept modest so a few slow/dead
+    # hosts can't push total runtime past the dev-proxy timeout (Frontend/vite.config.js).
+    compare_timeout_seconds: float = 10.0
+    # By default the WHOLE sitemap is probed in parallel (all elements at once).
+    # This is the hard safety ceiling on simultaneous URL probes; a request may ask
+    # for fewer via `concurrency`, but never more than this.
+    compare_max_concurrency: int = 200
+    compare_max_urls: int = 2000            # safety cap on URLs pulled from a sitemap
+    # --- deep mode (fetch full HTML + compare body/title/meta/images/links) ---
+    compare_deep_limit: int = 100           # default # of pages to deep-compare
+    compare_deep_max_limit: int = 500       # hard ceiling on deep pages
+    compare_deep_concurrency: int = 8       # pages deep-compared in parallel (each = many sub-requests)
+    compare_deep_img_cap: int = 15          # max images probed per page
+    compare_deep_link_cap: int = 20         # max internal links probed per page
+    compare_body_sim_threshold: float = 0.98  # below this = body content differs
+    compare_deep_text_chars: int = 2000     # body text returned per side for the client-side diff
+    # --- proxy render (show pages that block iframe embedding via same-origin srcdoc) ---
+    compare_render_max_chars: int = 1_500_000  # cap on proxied HTML returned to the client
+
     # --- CORS (frontend dev origin) ---
     cors_origins: str = "http://localhost:5173"
 
