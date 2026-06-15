@@ -12,6 +12,7 @@ from ..deps import get_current_user
 from ..models import User
 from ..schemas import CompareIn, CompareOut, DeepBatchIn, DeepBatchOut, RenderIn, RenderOut
 from ..services import compare_service
+from ..services.net_guard import BlockedURLError
 from ..services.sitemap import SitemapError
 
 router = APIRouter(prefix="/api/compare", tags=["compare"])
@@ -25,6 +26,8 @@ async def compare_sites(
     """Compare a UAT site against Production by Production-sitemap URL coverage."""
     try:
         return await compare_service.compare(body)
+    except BlockedURLError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Blocked URL: {exc}")
     except SitemapError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Sitemap error: {exc}")
 
@@ -45,4 +48,7 @@ async def compare_render(
 ) -> RenderOut:
     """Proxy a page's HTML so the client can preview a site that blocks iframe
     embedding (X-Frame-Options / CSP) inside a same-origin sandboxed srcdoc."""
-    return await compare_service.render_page(str(body.url))
+    try:
+        return await compare_service.render_page(str(body.url))
+    except BlockedURLError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Blocked URL: {exc}")

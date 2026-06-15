@@ -52,6 +52,14 @@ class Settings(BaseSettings):
     # --- proxy render (show pages that block iframe embedding via same-origin srcdoc) ---
     compare_render_max_chars: int = 1_500_000  # cap on proxied HTML returned to the client
 
+    # --- SSRF guard (compare/audit fetch user-supplied URLs — the only outbound path) ---
+    # Reject URLs that resolve to private/loopback/link-local/reserved IPs. Keep ON in
+    # any shared/prod environment; turn off only for a trusted internal-only deployment.
+    compare_ssrf_block_private: bool = True
+    # Optional comma-separated host allowlist (exact host or ".suffix" match). Empty = any
+    # public host. Set this to lock compare to known domains.
+    compare_url_allowlist: str = ""
+
     # --- CORS (frontend dev origin) ---
     cors_origins: str = "http://localhost:5173"
 
@@ -61,6 +69,10 @@ class Settings(BaseSettings):
     @property
     def cors_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def compare_allowlist(self) -> list[str]:
+        return [h.strip().lower() for h in self.compare_url_allowlist.split(",") if h.strip()]
 
 
 settings = Settings()

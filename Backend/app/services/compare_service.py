@@ -22,14 +22,32 @@ import httpx
 from ..config import settings
 from ..schemas import CompareIn, CompareOut, CompareSummary, DeepBatchIn, DeepResult, RenderOut, UrlCheck
 from .content import fetch_page
+from .net_guard import BlockedURLError, assert_public_url, guarded_event_hooks
 from .sitemap import SitemapError, fetch_sitemap_urls
 
-__all__ = ["compare", "deep_batch", "render_page", "SitemapError", "swap_origin", "default_sitemap_url"]
+__all__ = [
+    "compare", "deep_batch", "render_page", "SitemapError", "BlockedURLError",
+    "swap_origin", "default_sitemap_url",
+]
 
 _HEAD_RE = re.compile(r"<head[^>]*>", re.IGNORECASE)
 
 # browser-ish UA — some CDNs 403 the default httpx agent
 _HEADERS = {"User-Agent": "PiKaOs-SiteCompare/1.0 (+https://pikaos.local)"}
+
+
+def _make_client(*, follow_redirects: bool, limits: httpx.Limits | None = None) -> httpx.AsyncClient:
+    """Build an httpx client for the compare path with the SSRF guard attached
+    (the guard fires on every request incl. redirects — see net_guard)."""
+    kwargs = dict(
+        headers=_HEADERS,
+        timeout=httpx.Timeout(settings.compare_timeout_seconds),
+        follow_redirects=follow_redirects,
+        event_hooks=guarded_event_hooks(),
+    )
+    if limits is not None:  # else httpx uses its default Limits (as render_page did before)
+        kwargs["limits"] = limits
+    return httpx.AsyncClient(**kwargs)
 
 
 def _origin(url: str) -> tuple[str, str]:
@@ -158,9 +176,9 @@ async def render_page(url: str, *, _client: httpx.AsyncClient | None = None) -> 
     is exactly what the deep comparison is about.
     """
     own_client = _client is None
-    client = _client or httpx.AsyncClient(
-        headers=_HEADERS, timeout=httpx.Timeout(settings.compare_timeout_seconds), follow_redirects=True
-    )
+    if own_client:
+        assert_public_url(str(url))  # hard-reject internal targets up front (router → 400)
+    client = _client or _make_client(follow_redirects=True)
     try:
         try:
             resp = await client.get(str(url), follow_redirects=True)
@@ -190,11 +208,9 @@ async def deep_batch(payload: DeepBatchIn, *, _client: httpx.AsyncClient | None 
     single request runs long enough to hit the dev-proxy timeout."""
     ceiling = settings.compare_max_concurrency
     own_client = _client is None
-    client = _client or httpx.AsyncClient(
-        headers=_HEADERS,
-        timeout=httpx.Timeout(settings.compare_timeout_seconds),
-        limits=httpx.Limits(max_connections=ceiling * 2 + 10, max_keepalive_connections=ceiling),
+    client = _client or _make_client(
         follow_redirects=False,
+        limits=httpx.Limits(max_connections=ceiling * 2 + 10, max_keepalive_connections=ceiling),
     )
     sem = asyncio.Semaphore(max(1, min(len(payload.pairs), settings.compare_deep_concurrency)))
 
@@ -221,15 +237,20 @@ async def compare(payload: CompareIn, *, _client: httpx.AsyncClient | None = Non
     max_urls = payload.maxUrls or settings.compare_max_urls
     uat_scheme, uat_netloc = _origin(uat_base)
 
+    own_client = _client is None
+    if own_client:
+        # hard-reject internal targets in user-supplied bases/sitemaps up front (router → 400);
+        # the per-request guard hook still covers redirects + URLs pulled from the sitemap.
+        assert_public_url(prod_base)
+        assert_public_url(uat_base)
+        assert_public_url(sitemap_url)
+        if payload.uatSitemapUrl:
+            assert_public_url(str(payload.uatSitemapUrl))
+
     # Connection pool is sized to the hard ceiling (each URL probes prod + uat).
     ceiling = settings.compare_max_concurrency
-    timeout = httpx.Timeout(settings.compare_timeout_seconds)
     limits = httpx.Limits(max_connections=ceiling * 2 + 10, max_keepalive_connections=ceiling)
-
-    own_client = _client is None
-    client = _client or httpx.AsyncClient(
-        headers=_HEADERS, timeout=timeout, limits=limits, follow_redirects=False
-    )
+    client = _client or _make_client(follow_redirects=False, limits=limits)
     try:
         prod_urls = await fetch_sitemap_urls(client, sitemap_url, max_urls=max_urls)
 

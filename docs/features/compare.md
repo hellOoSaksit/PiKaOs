@@ -10,7 +10,7 @@ frontend **Compare Content** screen (nav id `compare`, Workspace group). Only wo
 the backend up (real network calls).
 
 Files:
-- Backend: [`routers/compare.py`](../../Backend/app/routers/compare.py) → [`services/compare_service.py`](../../Backend/app/services/compare_service.py) · [`services/sitemap.py`](../../Backend/app/services/sitemap.py) · [`services/content.py`](../../Backend/app/services/content.py)
+- Backend: [`routers/compare.py`](../../Backend/app/routers/compare.py) → [`services/compare_service.py`](../../Backend/app/services/compare_service.py) · [`services/sitemap.py`](../../Backend/app/services/sitemap.py) · [`services/content.py`](../../Backend/app/services/content.py) · [`services/net_guard.py`](../../Backend/app/services/net_guard.py) (SSRF guard — see [compare-hardening.md](compare-hardening.md))
 - Schemas: [`schemas.py`](../../Backend/app/schemas.py) (`CompareIn`/`CompareOut`/`UrlCheck`/`DeepResult`/`DeepPair`/`DeepBatchIn`/`DeepBatchOut`)
 - Settings: [`config.py`](../../Backend/app/config.py) (`compare_*`) · Tests: [`tests/test_compare.py`](../../Backend/tests/test_compare.py)
 - Frontend: [`screens-compare.jsx`](../../Frontend/src/screens/screens-compare.jsx) · [`lib/api.js`](../../Frontend/src/lib/api.js) (`compareSites`/`compareDeep`)

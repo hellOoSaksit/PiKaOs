@@ -27,9 +27,9 @@
 
 ## C. ความเสี่ยงที่รู้แล้ว ยังไม่แก้ (อย่าลืม ก่อนขึ้น prod)
 
-- **[P0] SSRF** — compare/audit รับ URL ผู้ใช้; `/api/compare/render` คืน HTML เต็ม ชี้ internal host ได้
-  (minio/cloud metadata). แผนแก้ = เฟส A7 SSRF guard (block private/loopback/redirect) ร่วมกัน.
-- **[P1]** compare/audit ยังไม่มี permission + ไม่มี rate-limit ต่อผู้ใช้.
+- ✅ **[P0] SSRF — แก้แล้ว (2026-06-15, A7)** ใน [`net_guard.py`](../../Backend/app/services/net_guard.py)
+  (upfront 400 + event hook กัน redirect). คงเหลือ DNS-rebinding (pin IP). **ใช้ guard เดียวกันนี้ตอนทำ audit Discovery.**
+- **[P1]** compare/audit ยังไม่มี permission + ไม่มี rate-limit ต่อผู้ใช้ → รอ A1 (RBAC).
 - รายละเอียด + design การแก้ครบ → [compare-hardening.md](../features/compare-hardening.md).
 - **Stack hardening ค้าง**: `passlib` ไม่มีคนดูแล → ย้าย `argon2-cffi`; `minio:latest` ไม่ pin;
   frontend ไม่มี lint/test/typecheck; ยังไม่มี CI — [tech-stack §3](../architecture/tech-stack.md).

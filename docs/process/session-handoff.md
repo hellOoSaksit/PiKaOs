@@ -59,8 +59,10 @@
 
 ### ความเสี่ยง "ออกแบบแล้ว ยังไม่ลงโค้ด" (ลำดับใน improvement-plan)
 - **เฟส A (เริ่มได้ทันที)**: RBAC server-side · WS refactor (token ออกจาก URL + per-quest authz) ·
-  FK `documents.owner_id` · boot asserts prod secrets · pin minio · passlib→argon2-cffi · CI ·
-  **A7 SSRF guard** (compare/audit รับ URL ผู้ใช้ → block private/loopback IP + redirect).
+  FK `documents.owner_id` · boot asserts prod secrets · pin minio · passlib→argon2-cffi · CI.
+- ✅ **A7 SSRF guard เสร็จแล้ว (2026-06-15)** → [`net_guard.py`](../../Backend/app/services/net_guard.py) +
+  [`tests/test_net_guard.py`](../../Backend/tests/test_net_guard.py) (38 passed locally; live-server auth test รันใน docker).
+  คงเหลือ DNS-rebinding (pin IP). ถัดไปแนะนำ **A1 (RBAC)** ปลดล็อก §2 ของ compare-hardening (authz+rate-limit).
 - **เฟส B**: engine core + arq + 2-phase resume + atomic quota + timeout.
 - ✅ **ตอบแล้ว (2026-06-12): multi-tenancy = องค์กรเดียว หลายแผนก** → `department_id` ทุก scopable table
   ตั้งแต่ migration แรก (design: [system-design §7.1](../architecture/system-design.md#71-department-scoping-)). เฟส B1 พร้อมเริ่มด้านนี้.

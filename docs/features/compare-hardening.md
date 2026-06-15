@@ -13,7 +13,13 @@
 `prodBase`/`uatBase`/`sitemapUrl` ที่ผู้ใช้ส่งมา (`_probe`, `render_page`, `fetch_page`,
 `fetch_sitemap_urls`) โดยไม่ตรวจ host.
 
-## 1. [P0] SSRF — server ยิงไปยัง host ภายในได้
+## 1. [P0] SSRF — server ยิงไปยัง host ภายในได้ — ✅ แก้แล้ว (A7)
+
+> **[2026-06-15] Implemented** ใน [`services/net_guard.py`](../../Backend/app/services/net_guard.py):
+> upfront `assert_public_url()` (router → HTTP 400) + httpx request event hook ที่ fire ทุก request
+> รวม redirect (`guarded_event_hooks()`), toggle `compare_ssrf_block_private` + allowlist `compare_url_allowlist`.
+> Test: [`tests/test_net_guard.py`](../../Backend/tests/test_net_guard.py) (network-free). คงเหลือ: **DNS-rebinding**
+> (resolve→pin IP) ยังไม่ทำ — ดู note ใน `assert_public_url`. รายละเอียด design เดิมด้านล่าง.
 
 ### Observation
 - `swap_origin()` / `compare()` รับ `uatBase`, `prodBase`, `sitemapUrl` เป็น netloc อะไรก็ได้ →
@@ -57,5 +63,8 @@
 
 ## ลำดับการทำ
 
-A7 (SSRF) **ก่อนเปิดให้ผู้ใช้ภายนอก** — ทำได้ทันที ไม่พึ่ง RBAC. §2 รอ A1 (RBAC) + ใช้ Redis ที่มีอยู่.
-§3 ทำเมื่อเจอเว็บจริงที่ติดปัญหา. อ้างอิงลำดับรวม: [improvement-plan.md เฟส A](../process/improvement-plan.md).
+- ✅ **A7 (SSRF)** — เสร็จ 2026-06-15 (§1). คงเหลือ: DNS-rebinding pin-IP.
+- ⬜ **§2 (authz + rate-limit)** — รอ A1 (RBAC) แล้วผูก `require_perm("compare.run")` + rate-limit ผ่าน Redis ที่มีอยู่.
+- ⬜ **§3 (robustness)** — ทำเมื่อเจอเว็บจริงที่ติดปัญหา.
+
+อ้างอิงลำดับรวม: [improvement-plan.md เฟส A](../process/improvement-plan.md).
