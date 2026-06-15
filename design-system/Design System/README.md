@@ -38,10 +38,12 @@ color — do not introduce new hues for emphasis.
 `--ruby`. All states are rendered as tinted chips via `color-mix` (≈12% bg / ≈40% border), not
 solid fills.
 
-**Corners & elevation.** Radii `--radius-sm 6px` · `--radius 9px` · `--radius-lg 14px`.
-Three-step shadow ladder: `--shadow-raised` (chips/tiles) → `--shadow-panel` (cards) →
-`--shadow-pop` (modals/menus). Shadows are soft and low-contrast; in light theme they're barely
-there.
+**Corners & elevation — puffy 2.5D.** Radii `--radius-sm 10px` · `--radius 16px` ·
+`--radius-lg 22px` — generous and round ("นุ่มฟู"). Four-step shadow ladder:
+`--shadow-puff` (soft-clay chips/badges/tags: inner top highlight + tiny drop) →
+`--shadow-raised` (tiles) → `--shadow-panel` (cards) → `--shadow-pop` (modals/menus).
+Light-theme shadows are soft and slightly **indigo-tinted** (never harsh grey); dark theme stays
+black-based.
 
 **Motion — "physical buttons."** This is the signature feel. Buttons carry a solid 3D base
 shadow (`0 3px 0 var(--gold-deep)`), lift `-1px` on hover, and **sink + shrink** on press
@@ -58,25 +60,32 @@ fades for interaction — use the spring.
 at `34px 40px`, max-width ~`1500px`. Cards are `--radius-lg`, 1px `--line` border,
 `--shadow-panel`, white body with `16px` padding.
 
-**Backgrounds.** Flat token colors — no gradients on surfaces, no imagery, no texture
-(`--paper-texture: none`). The only gradients are the button fills (`--gold-grad`) and the 3D
-letter shadow stack.
+**Backgrounds.** Bright cool token colors — no imagery, no texture (`--paper-texture: none`).
+Cards/tiles carry a **faint top-light gradient** (`--panel-grad` / `--raised-grad`: white →
+barely-blue) so surfaces read softly raised; anything stronger than "barely there" is off-brand.
+Other gradients remain limited to button fills (`--gold-grad`) and the 3D letter shadow stack.
 
 ---
 
 ## 3. Typography
 
-Three families, loaded from Google Fonts:
+Four families, loaded from Google Fonts:
 
 | Role | Family | Use |
 |---|---|---|
 | Display / brand | **Mitr** (700) | 3D cartoon letters, hero/brand only |
-| UI (everything) | **IBM Plex Sans Thai** (300–700) | headings, body, labels — Thai-first |
+| **EN-special + display numbers** | **Baloo 2** (500–800) | headings/buttons (Latin glyphs) + big numbers (stat tiles, counters) — round & friendly |
+| UI body (Thai-first) | **IBM Plex Sans Thai** (300–700) | body, labels, inputs — and the Thai glyphs of every heading |
 | Mono / meta | **JetBrains Mono** (400–600) | kickers, code, IDs, tabular numbers |
 
+**The per-script trick (intentional):** `--font-display` / `--font-head` / `--font-num` put
+`"Baloo 2"` first with IBM Plex Sans Thai as fallback — Baloo has **no Thai coverage**, so English
+renders puffy Baloo while Thai automatically stays Plex. Never add a Thai-covering font ahead of
+Plex in these chains. `--font-body` stays pure Plex for reading comfort.
+
 Helpers (from `styles.css`): `.display` (700, +.04em), `.kicker` (mono, uppercase, +.2em,
-10.5px), `.mono` (tabular-nums), `.thai-serif`. Both languages share the same families — never
-swap a different face for Thai vs English. Body copy is 14px / line-height 1.65.
+10.5px), `.mono` (tabular-nums — code/IDs/logs), `.num` (Baloo display numbers — stats/counters,
+**not** for tabular data), `.thai-serif`. Body copy is 14px / line-height 1.65.
 
 ---
 

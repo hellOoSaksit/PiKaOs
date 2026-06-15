@@ -9,14 +9,14 @@
    :root = pro (light). [data-theme="pro-dark"] = night. No other themes.
    =========================================================== */
 :root {
-  /* --- PRO (light, default): clean SaaS, cool neutrals, one confident accent --- */
-  --bg-0: #eceef2;
-  --bg-1: #f4f6f8;
+  /* --- PRO (light, default): clean SaaS, bright cool neutrals, one confident accent --- */
+  --bg-0: #eaedf5;
+  --bg-1: #f5f7fb;
   --bg-2: #ffffff;
-  --bg-3: #f3f5f7;
-  --bg-4: #e8ebef;
-  --line: #e3e7ec;
-  --line-soft: #eef1f4;
+  --bg-3: #f3f6fb;
+  --bg-4: #e8edf6;
+  --line: #e1e7f1;
+  --line-soft: #edf1f8;
 
   --ink: #111726;
   --ink-2: #3e4654;
@@ -40,20 +40,24 @@
 
   --letter-face: #ffffff;    /* 3D cartoon letter fill */
 
-  --panel-grad: #ffffff;
-  --raised-grad: #ffffff;
+  /* soft top-light: cards catch a faint light from above (puffy 2.5D) */
+  --panel-grad: linear-gradient(180deg, #ffffff 0%, #fdfdff 100%);
+  --raised-grad: linear-gradient(180deg, #ffffff 0%, #fafbff 100%);
   --gold-grad: linear-gradient(180deg, #5168f0 0%, #4361ee 100%);
   --gold-grad-hover: linear-gradient(180deg, #5f74f2 0%, #4f6bef 100%);
 
   --paper-texture: none;
 
-  --shadow-panel: 0 1px 2px rgba(17,24,39,0.05), 0 10px 26px -18px rgba(17,24,39,0.16);
-  --shadow-raised: 0 1px 2px rgba(17,24,39,0.07);
-  --shadow-pop: 0 22px 50px -18px rgba(17,24,39,0.24);
+  /* shadows: soft, slightly indigo-tinted — "fluffy" depth, never harsh */
+  --shadow-panel: 0 2px 4px rgba(49,65,160,0.05), 0 14px 32px -16px rgba(49,65,160,0.16);
+  --shadow-raised: 0 1px 2px rgba(49,65,160,0.06), 0 4px 10px -5px rgba(49,65,160,0.10);
+  --shadow-pop: 0 24px 56px -16px rgba(49,65,160,0.26);
+  /* soft-clay: inner top highlight + tiny drop — for chips/badges/tags */
+  --shadow-puff: inset 0 1px 0 rgba(255,255,255,0.70), 0 2px 5px -2px rgba(49,65,160,0.14);
 
-  --radius: 9px;
-  --radius-lg: 14px;
-  --radius-sm: 6px;
+  --radius: 16px;
+  --radius-lg: 22px;
+  --radius-sm: 10px;
 
   --sidebar-w: 256px;
   --rail-w: 360px;
@@ -62,13 +66,17 @@
   --spring: cubic-bezier(.34,1.9,.6,1);        /* release overshoot */
   --spring-soft: cubic-bezier(.34,1.4,.64,1);  /* gentle */
 
-  /* type: Mitr for 3D display letters, IBM Plex Sans Thai for everything, JetBrains mono for kickers */
+  /* type: Mitr = 3D display letters · Baloo 2 = special EN + display numbers (Thai
+     glyphs fall back to Plex automatically — Baloo has no Thai coverage, by design) ·
+     IBM Plex Sans Thai = body · JetBrains = mono/meta/tabular */
   --font-toon: "Mitr", "IBM Plex Sans Thai", system-ui, sans-serif;
-  --font-display: "IBM Plex Sans Thai", "Noto Sans Thai", system-ui, sans-serif;
+  --font-display: "Baloo 2", "IBM Plex Sans Thai", "Noto Sans Thai", system-ui, sans-serif;
   --font-hero: "Mitr", "IBM Plex Sans Thai", system-ui, sans-serif;
-  --font-head: "IBM Plex Sans Thai", "Noto Sans Thai", system-ui, sans-serif;
+  --font-head: "Baloo 2", "IBM Plex Sans Thai", "Noto Sans Thai", system-ui, sans-serif;
   --font-body: "IBM Plex Sans Thai", "Noto Sans Thai", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  /* display numbers (stat tiles, meters, countdowns) — round & friendly */
+  --font-num: "Baloo 2", "IBM Plex Sans Thai", system-ui, sans-serif;
 }
 
 /* PRO-DARK (night) — clean dark SaaS */
@@ -79,14 +87,15 @@
   --gold: #6076f6; --gold-bright: #8194f9; --gold-deep: #4d63ec; --gold-glow: rgba(96,118,246,0.34);
   --bronze: #8b93a1; --crimson: #f0524f; --crimson-deep: #d23f3c; --emerald: #2bbd6b; --amber: #eda22b; --sapphire: #5b94f7; --amethyst: #9a7cf5; --ruby: #f0588f;
   --letter-face: #eef1ff;
-  --panel-grad: #171a21;
-  --raised-grad: #1d2129;
+  --panel-grad: linear-gradient(180deg, #191d25 0%, #171a21 100%);
+  --raised-grad: linear-gradient(180deg, #20242d 0%, #1d2129 100%);
   --gold-grad: linear-gradient(180deg, #6076f6 0%, #4f64ec 100%);
   --gold-grad-hover: linear-gradient(180deg, #7286f8 0%, #5d72f0 100%);
   --paper-texture: none;
   --shadow-panel: 0 1px 2px rgba(0,0,0,0.3), 0 14px 34px -20px rgba(0,0,0,0.65);
   --shadow-raised: 0 1px 2px rgba(0,0,0,0.45);
   --shadow-pop: 0 24px 56px -20px rgba(0,0,0,0.72);
+  --shadow-puff: inset 0 1px 0 rgba(255,255,255,0.05), 0 2px 6px -2px rgba(0,0,0,0.50);
 }
 /* modern dark: indigo primary buttons take white text */
 [data-theme="pro-dark"] .btn-gold { color: #ffffff !important; text-shadow: none; }
@@ -215,6 +224,8 @@ body {
   color: var(--ink-3);
 }
 .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+/* display numbers — Baloo 2, round & friendly (stats, counters; NOT code/IDs — those stay .mono) */
+.num { font-family: var(--font-num); font-weight: 700; }
 .thai-serif { font-family: var(--font-head); }
 
 /* ============================================================
@@ -320,6 +331,7 @@ body {
   margin-left: auto; font-family: var(--font-mono); font-size: 10px;
   color: var(--ink); background: var(--bg-4); border: 1px solid var(--line);
   padding: 1px 6px; border-radius: 20px; line-height: 1.6;
+  box-shadow: var(--shadow-puff);
 }
 .nav-item .ni-tag.alert { color: #fff; background: var(--crimson-deep); border-color: var(--crimson); }
 
@@ -399,7 +411,7 @@ body {
 /* Buttons — cartoon "physical button": 3D base shadow, sink on press, springy release */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  font-family: var(--font-body); font-weight: 700; font-size: 14px;
+  font-family: var(--font-display); font-weight: 700; font-size: 14px;
   padding: 10px 18px; border-radius: var(--radius);
   cursor: pointer; border: 1px solid transparent; white-space: nowrap;
   transition: transform .25s var(--spring), box-shadow .25s var(--spring), background .14s, border-color .14s, filter .14s;
@@ -408,23 +420,23 @@ body {
 .btn:active { transition-duration: .05s; }
 .btn-gold {
   background: var(--gold-grad); color: #fff; border: none;
-  box-shadow: 0 3px 0 var(--gold-deep);
+  box-shadow: 0 4px 0 var(--gold-deep);
   text-shadow: none;
 }
-.btn-gold:hover { background: var(--gold-grad-hover); transform: translateY(-1px); box-shadow: 0 4px 0 var(--gold-deep); }
-.btn-gold:active { transform: translateY(3px) scale(.985); box-shadow: 0 0 0 var(--gold-deep); }
+.btn-gold:hover { background: var(--gold-grad-hover); transform: translateY(-1px); box-shadow: 0 5px 0 var(--gold-deep); }
+.btn-gold:active { transform: translateY(4px) scale(.985); box-shadow: 0 0 0 var(--gold-deep); }
 .btn-ghost {
   background: var(--bg-2); color: var(--ink); border: 1px solid var(--line);
-  box-shadow: 0 2px 0 var(--line);
+  box-shadow: 0 3px 0 var(--line);
 }
-.btn-ghost:hover { background: var(--bg-3); transform: translateY(-1px); box-shadow: 0 3px 0 var(--line); }
-.btn-ghost:active { transform: translateY(2px) scale(.985); box-shadow: 0 0 0 var(--line); }
+.btn-ghost:hover { background: var(--bg-3); transform: translateY(-1px); box-shadow: 0 4px 0 var(--line); }
+.btn-ghost:active { transform: translateY(3px) scale(.985); box-shadow: 0 0 0 var(--line); }
 .btn-danger {
   background: var(--crimson); color: #fff; border: none;
-  box-shadow: 0 3px 0 var(--crimson-deep);
+  box-shadow: 0 4px 0 var(--crimson-deep);
 }
-.btn-danger:hover { transform: translateY(-1px); box-shadow: 0 4px 0 var(--crimson-deep); filter: brightness(1.04); }
-.btn-danger:active { transform: translateY(3px) scale(.985); box-shadow: 0 0 0 var(--crimson-deep); }
+.btn-danger:hover { transform: translateY(-1px); box-shadow: 0 5px 0 var(--crimson-deep); filter: brightness(1.04); }
+.btn-danger:active { transform: translateY(4px) scale(.985); box-shadow: 0 0 0 var(--crimson-deep); }
 .btn[disabled], .btn:disabled { opacity: .55; pointer-events: none; box-shadow: none; transform: none; }
 .btn-sm { padding: 7px 14px; font-size: 12.5px; font-weight: 600; border-radius: var(--radius-sm); }
 .btn-icon { padding: 8px 10px; }
@@ -449,8 +461,9 @@ body {
 .badge {
   display: inline-flex; align-items: center; gap: 5px;
   font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .03em;
-  padding: 2px 9px; border-radius: 20px; line-height: 1.7;
+  padding: 3px 10px; border-radius: 20px; line-height: 1.7;
   border: 1px solid var(--line); color: var(--ink-2); background: var(--bg-3);
+  box-shadow: var(--shadow-puff);
 }
 .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .badge.on { color: var(--emerald); border-color: color-mix(in srgb,var(--emerald) 40%,transparent); background: color-mix(in srgb,var(--emerald) 12%,transparent); }
@@ -460,8 +473,8 @@ body {
 .badge.info { color: var(--sapphire); border-color: color-mix(in srgb,var(--sapphire) 40%,transparent); background: color-mix(in srgb,var(--sapphire) 12%,transparent); }
 .badge.magic { color: var(--amethyst); border-color: color-mix(in srgb,var(--amethyst) 40%,transparent); background: color-mix(in srgb,var(--amethyst) 12%,transparent); }
 
-/* Meter / bar — kit progress: flat token fills, no colored glow */
-.meter { height: 8px; border-radius: 999px; background: var(--bg-4); overflow: hidden; }
+/* Meter / bar — kit progress: flat token fills, no colored glow; puffy inset track */
+.meter { height: 10px; border-radius: 999px; background: var(--bg-4); overflow: hidden; box-shadow: inset 0 1px 2px rgba(17,24,39,0.08); }
 .meter > i { display: block; height: 100%; border-radius: 999px; transition: width .5s var(--spring-soft); }
 .meter.mana > i { background: var(--sapphire); }
 .meter.xp > i { background: linear-gradient(90deg, var(--gold), var(--gold-bright)); }
@@ -501,7 +514,7 @@ body {
   padding: 14px 16px; box-shadow: var(--shadow-raised);
 }
 .stat-tile .st-label { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .08em; color: var(--ink-3); text-transform: uppercase; }
-.stat-tile .st-value { font-family: var(--font-display); font-weight: 700; font-size: 26px; color: var(--ink); margin-top: 4px; display: flex; align-items: baseline; gap: 7px; }
+.stat-tile .st-value { font-family: var(--font-num); font-weight: 700; font-size: 27px; color: var(--ink); margin-top: 4px; display: flex; align-items: baseline; gap: 7px; }
 .stat-tile .st-value .unit { font-size: 12px; color: var(--ink-3); font-family: var(--font-mono); }
 .stat-tile .st-delta { font-family: var(--font-mono); font-size: 11px; margin-top: 6px; }
 .st-delta.up { color: var(--emerald); }
