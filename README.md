@@ -98,7 +98,7 @@ PiKaOs/
 ├── ⚙️ Backend/         FastAPI (auth · API · WebSocket)
 ├── 🐳 docker-compose.yml   Postgres+pgvector · Redis · MinIO · backend
 ├── 🎀 design-system/   ดีไซน์ซิสเทม + พรีวิว + สไลด์ System Design
-├── 📚 docs/            เอกสารสถาปัตยกรรม (system-design.md)
+├── 📚 docs/            เอกสารโปรเจกต์ (ดู docs/README.md)
 └── 🚀 start.bat        ปุ่มเริ่มเล่น (ดับเบิลคลิก!)
 ```
 
@@ -109,7 +109,7 @@ PiKaOs/
 - ✅ **ระบบ Login เสร็จครบ** — auth จริงบน Postgres, โครงสร้างหลังบ้านพร้อม, เทสต์ผ่าน
 - 🟡 **กำลังจะทำต่อ** — เครื่องยนต์รัน Agent (HERMES orchestration), เชื่อมโมเดล, เครื่องมือ + RAG
 
-อยากเห็นภาพใหญ่ทั้งหมด? 👉 อ่าน [**System Design**](docs/system-design.md) (มีไดอะแกรม + ER เต็ม)
+อยากเห็นภาพใหญ่ทั้งหมด? 👉 อ่าน [**System Design**](docs/architecture/system-design.md) (มีไดอะแกรม + ER เต็ม)
 หรือเปิดสไลด์ [`design-system/System Design Presentation.html`](design-system/System%20Design%20Presentation.html) 🖥️✨
 
 ---

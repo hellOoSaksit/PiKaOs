@@ -1,0 +1,1523 @@
+{
+  "template": "ir-website-standard",
+  "name": "IR Website Content Checklist (TIPAK example)",
+  "source": "20250327-TIPAK-IR-Checklist(TIPAK's IR Website).csv",
+  "note": "topic_th lost in source CSV (non-Unicode export) — re-export as UTF-8 to refill",
+  "sections": [
+    "IR Home",
+    "Corporate Information",
+    "Financial Info",
+    "Stock Info",
+    "Shareholder Info",
+    "Corporate Governance",
+    "Investor Resources",
+    "IR News",
+    "Information Inquiry"
+  ],
+  "items": [
+    {
+      "id": null,
+      "section": "IR Home",
+      "topic_en": "3-5 Highlight Banners / VDO Banners",
+      "topic_th": null,
+      "content_type": "Image / VDO",
+      "module": "Premium Content",
+      "phase": "Pre-IPO",
+      "kind": "static",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "3-5",
+          "highlight",
+          "banners",
+          "vdo",
+          "banners"
+        ],
+        "title_keywords": [
+          "3-5 Highlight Banners / VDO Banners"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "IR Home",
+      "topic_en": "Investment Highlights",
+      "topic_th": null,
+      "content_type": "Text + Image",
+      "module": "Premium Content",
+      "phase": "Pre-IPO",
+      "kind": "static",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "investment",
+          "highlights"
+        ],
+        "title_keywords": [
+          "Investment Highlights"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "IR Home",
+      "topic_en": "Financial Highlights",
+      "topic_th": null,
+      "content_type": "Text + Image",
+      "module": "Premium Content",
+      "phase": "Pre-IPO",
+      "kind": "static",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "financial",
+          "highlights"
+        ],
+        "title_keywords": [
+          "Financial Highlights"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "IR Home",
+      "topic_en": "Stock Performance",
+      "topic_th": null,
+      "content_type": "API",
+      "module": "Widget",
+      "phase": "Post-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "stock",
+          "performance"
+        ],
+        "title_keywords": [
+          "Stock Performance"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "IR Home",
+      "topic_en": "SET Announcements",
+      "topic_th": null,
+      "content_type": "API",
+      "module": "News Module",
+      "phase": "Post-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "set",
+          "announcements"
+        ],
+        "title_keywords": [
+          "SET Announcements"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "IR Home",
+      "topic_en": "IR Calendar",
+      "topic_th": null,
+      "content_type": "API + Table",
+      "module": "Premium Content",
+      "phase": "Post-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "ir",
+          "calendar"
+        ],
+        "title_keywords": [
+          "IR Calendar"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "IR Home",
+      "topic_en": "Prospectus",
+      "topic_th": null,
+      "content_type": "Link out to SEC",
+      "module": "Link Out",
+      "phase": "Pre-IPO",
+      "kind": "link_out",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "prospectus"
+        ],
+        "title_keywords": [
+          "Prospectus"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "IR Home",
+      "topic_en": "Financial Statements",
+      "topic_th": null,
+      "content_type": "PDF File",
+      "module": "Download Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "financial",
+          "statements"
+        ],
+        "title_keywords": [
+          "Financial Statements"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "IR Home",
+      "topic_en": "MD&A",
+      "topic_th": null,
+      "content_type": "PDF File",
+      "module": "Download Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "md"
+        ],
+        "title_keywords": [
+          "MD&A"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "IR Home",
+      "topic_en": "Presentation",
+      "topic_th": null,
+      "content_type": "VDO + Pdf File",
+      "module": "Webcast & Presentation",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "presentation"
+        ],
+        "title_keywords": [
+          "Presentation"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "IR Home",
+      "topic_en": "IR Contact",
+      "topic_th": null,
+      "content_type": "Text + Image",
+      "module": "Premium Content",
+      "phase": "Pre-IPO",
+      "kind": "static",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "ir",
+          "contact"
+        ],
+        "title_keywords": [
+          "IR Contact"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "IR Home",
+      "topic_en": "News Subscription",
+      "topic_th": null,
+      "content_type": "Text + Image",
+      "module": "Premium Content",
+      "phase": "Pre-IPO",
+      "kind": "static",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "news",
+          "subscription"
+        ],
+        "title_keywords": [
+          "News Subscription"
+        ]
+      }
+    },
+    {
+      "id": "2.1",
+      "section": "Corporate Information",
+      "topic_en": "General Information",
+      "topic_th": null,
+      "content_type": "Text + Image",
+      "module": "Premium Content",
+      "phase": "Pre-IPO",
+      "kind": "static",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "general",
+          "information"
+        ],
+        "title_keywords": [
+          "General Information"
+        ]
+      }
+    },
+    {
+      "id": "2.2",
+      "section": "Corporate Information",
+      "topic_en": "Investment Highlights",
+      "topic_th": null,
+      "content_type": "Text + Image",
+      "module": "Premium Content",
+      "phase": "Pre-IPO",
+      "kind": "static",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "investment",
+          "highlights"
+        ],
+        "title_keywords": [
+          "Investment Highlights"
+        ]
+      }
+    },
+    {
+      "id": "2.3",
+      "section": "Corporate Information",
+      "topic_en": "Message from Chairman & CEO",
+      "topic_th": null,
+      "content_type": "Text + Image",
+      "module": "Premium Content",
+      "phase": "Post-IPO",
+      "kind": "static",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "message",
+          "from",
+          "chairman",
+          "ceo"
+        ],
+        "title_keywords": [
+          "Message from Chairman & CEO"
+        ]
+      }
+    },
+    {
+      "id": "2.4",
+      "section": "Corporate Information",
+      "topic_en": "Organization Chart",
+      "topic_th": null,
+      "content_type": "Text + Image",
+      "module": "Premium Content",
+      "phase": "Pre-IPO",
+      "kind": "static",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "organization",
+          "chart"
+        ],
+        "title_keywords": [
+          "Organization Chart"
+        ]
+      }
+    },
+    {
+      "id": "2.5.1",
+      "section": "Corporate Information",
+      "topic_en": "Board of Directors",
+      "topic_th": null,
+      "content_type": "Text +Image",
+      "module": "Board Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "board",
+          "directors"
+        ],
+        "title_keywords": [
+          "Board of Directors"
+        ]
+      }
+    },
+    {
+      "id": "2.5.2",
+      "section": "Corporate Information",
+      "topic_en": "Audit Committee",
+      "topic_th": null,
+      "content_type": "Text +Image",
+      "module": "Board Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "audit",
+          "committee"
+        ],
+        "title_keywords": [
+          "Audit Committee"
+        ]
+      }
+    },
+    {
+      "id": "2.5.3",
+      "section": "Corporate Information",
+      "topic_en": "Nomination and Remuneration Committee",
+      "topic_th": null,
+      "content_type": "Text +Image",
+      "module": "Board Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "nomination",
+          "remuneration",
+          "committee"
+        ],
+        "title_keywords": [
+          "Nomination and Remuneration Committee"
+        ]
+      }
+    },
+    {
+      "id": "2.5.4",
+      "section": "Corporate Information",
+      "topic_en": "Corporate Governance and Sustainability Committee",
+      "topic_th": null,
+      "content_type": "Text +Image",
+      "module": "Board Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "corporate",
+          "governance",
+          "sustainability",
+          "committee"
+        ],
+        "title_keywords": [
+          "Corporate Governance and Sustainability Committee"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Corporate Information",
+      "topic_en": "Risk Management Committee",
+      "topic_th": null,
+      "content_type": "Text +Image",
+      "module": "Board Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "hidden",
+      "match": {
+        "slug_keywords": [
+          "risk",
+          "management",
+          "committee"
+        ],
+        "title_keywords": [
+          "Risk Management Committee"
+        ]
+      }
+    },
+    {
+      "id": "2.5.5",
+      "section": "Corporate Information",
+      "topic_en": "Executive Commitee",
+      "topic_th": null,
+      "content_type": "Text +Image",
+      "module": "Board Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "executive",
+          "commitee"
+        ],
+        "title_keywords": [
+          "Executive Commitee"
+        ]
+      }
+    },
+    {
+      "id": "2.5.6",
+      "section": "Corporate Information",
+      "topic_en": "Management Team",
+      "topic_th": null,
+      "content_type": "Text +Image",
+      "module": "Board Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "management",
+          "team"
+        ],
+        "title_keywords": [
+          "Management Team"
+        ]
+      }
+    },
+    {
+      "id": "2.6",
+      "section": "Corporate Information",
+      "topic_en": "Awards and Achievement",
+      "topic_th": null,
+      "content_type": "Text + Image",
+      "module": "Premium Content",
+      "phase": "Pre-IPO",
+      "kind": "static",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "awards",
+          "achievement"
+        ],
+        "title_keywords": [
+          "Awards and Achievement"
+        ]
+      }
+    },
+    {
+      "id": "3.1",
+      "section": "Financial Info",
+      "topic_en": "Financial Highlights",
+      "topic_th": null,
+      "content_type": "Text + Chart",
+      "module": "Widget",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "financial",
+          "highlights"
+        ],
+        "title_keywords": [
+          "Financial Highlights"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Financial Info",
+      "topic_en": "Financial Statements",
+      "topic_th": null,
+      "content_type": "PDF File",
+      "module": "Download Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "financial",
+          "statements"
+        ],
+        "title_keywords": [
+          "Financial Statements"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Financial Info",
+      "topic_en": "Management Discussion and Analysis (MD&A)",
+      "topic_th": null,
+      "content_type": "PDF File",
+      "module": "Download Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "management",
+          "discussion",
+          "analysis",
+          "md"
+        ],
+        "title_keywords": [
+          "Management Discussion and Analysis (MD&A)"
+        ]
+      }
+    },
+    {
+      "id": "3.3",
+      "section": "Financial Info",
+      "topic_en": "Company Factsheet",
+      "topic_th": null,
+      "content_type": "PDF File",
+      "module": "Download Module",
+      "phase": "Post-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "company",
+          "factsheet"
+        ],
+        "title_keywords": [
+          "Company Factsheet"
+        ]
+      }
+    },
+    {
+      "id": "4.1",
+      "section": "Stock Info",
+      "topic_en": "Stock Quote",
+      "topic_th": null,
+      "content_type": "API",
+      "module": "widget",
+      "phase": "Post-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "stock",
+          "quote"
+        ],
+        "title_keywords": [
+          "Stock Quote"
+        ]
+      }
+    },
+    {
+      "id": "4.2",
+      "section": "Stock Info",
+      "topic_en": "Historical Price",
+      "topic_th": null,
+      "content_type": "API",
+      "module": "widget",
+      "phase": "Post-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "historical",
+          "price"
+        ],
+        "title_keywords": [
+          "Historical Price"
+        ]
+      }
+    },
+    {
+      "id": "4.3",
+      "section": "Stock Info",
+      "topic_en": "Investment Calculator",
+      "topic_th": null,
+      "content_type": "API",
+      "module": "widget",
+      "phase": "Post-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "investment",
+          "calculator"
+        ],
+        "title_keywords": [
+          "Investment Calculator"
+        ]
+      }
+    },
+    {
+      "id": "4.4",
+      "section": "Stock Info",
+      "topic_en": "Analyst Report",
+      "topic_th": null,
+      "content_type": "Text + PDF File",
+      "module": "Premium Content",
+      "phase": "Post-IPO",
+      "kind": "static",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "analyst",
+          "report"
+        ],
+        "title_keywords": [
+          "Analyst Report"
+        ]
+      }
+    },
+    {
+      "id": "5.1",
+      "section": "Shareholder Info",
+      "topic_en": "Major Shareholders",
+      "topic_th": null,
+      "content_type": "Text + Chart",
+      "module": "Premium Content",
+      "phase": "Pre-IPO",
+      "kind": "static",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "major",
+          "shareholders"
+        ],
+        "title_keywords": [
+          "Major Shareholders"
+        ]
+      }
+    },
+    {
+      "id": "5.2",
+      "section": "Shareholder Info",
+      "topic_en": "Dividend Policy and Payment",
+      "topic_th": null,
+      "content_type": "Text + Table",
+      "module": "Premium Content",
+      "phase": "Pre-IPO",
+      "kind": "static",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "dividend",
+          "policy",
+          "payment"
+        ],
+        "title_keywords": [
+          "Dividend Policy and Payment"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Shareholder Info",
+      "topic_en": "Minutes of Shareholders' Meeting",
+      "topic_th": null,
+      "content_type": "Text + PDF file",
+      "module": "Shareholder Module",
+      "phase": "Post-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "minutes",
+          "shareholders",
+          "meeting"
+        ],
+        "title_keywords": [
+          "Minutes of Shareholders' Meeting"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Shareholder Info",
+      "topic_en": "Video Recording of Shareholders' Meeting",
+      "topic_th": null,
+      "content_type": "Link to VDO",
+      "module": "Shareholder Module",
+      "phase": "Post-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "video",
+          "recording",
+          "shareholders",
+          "meeting"
+        ],
+        "title_keywords": [
+          "Video Recording of Shareholders' Meeting"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Shareholder Info",
+      "topic_en": "Invitation to Shareholders' Meeting",
+      "topic_th": null,
+      "content_type": "Text + PDF file",
+      "module": "Shareholder Module",
+      "phase": "Post-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "invitation",
+          "shareholders",
+          "meeting"
+        ],
+        "title_keywords": [
+          "Invitation to Shareholders' Meeting"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Shareholder Info",
+      "topic_en": "Proposal of Meeting Agenda & Nomination of Director Candidate",
+      "topic_th": null,
+      "content_type": "Text + PDF file",
+      "module": "Shareholder Module",
+      "phase": "Post-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "proposal",
+          "meeting",
+          "agenda",
+          "nomination",
+          "director",
+          "candidate"
+        ],
+        "title_keywords": [
+          "Proposal of Meeting Agenda & Nomination of Director Candidate"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Shareholder Info",
+      "topic_en": "Online Submitting Annual General Shareholders' Questions Form",
+      "topic_th": null,
+      "content_type": "Text + Link out",
+      "module": "Shareholder Module",
+      "phase": "Post-IPO",
+      "kind": "link_out",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "online",
+          "submitting",
+          "annual",
+          "general",
+          "shareholders",
+          "questions",
+          "form"
+        ],
+        "title_keywords": [
+          "Online Submitting Annual General Shareholders' Questions Form"
+        ]
+      }
+    },
+    {
+      "id": "5.4",
+      "section": "Shareholder Info",
+      "topic_en": "IR Calendar",
+      "topic_th": null,
+      "content_type": "API  + Table",
+      "module": "Premium Content",
+      "phase": "Post-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "ir",
+          "calendar"
+        ],
+        "title_keywords": [
+          "IR Calendar"
+        ]
+      }
+    },
+    {
+      "id": "5.5",
+      "section": "Shareholder Info",
+      "topic_en": "Rights of Shareholders",
+      "topic_th": null,
+      "content_type": "Text + Table",
+      "module": "Premium Content",
+      "phase": "Pre-IPO",
+      "kind": "static",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "rights",
+          "shareholders"
+        ],
+        "title_keywords": [
+          "Rights of Shareholders"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Corporate Governance",
+      "topic_en": "Corporate Governance Policy",
+      "topic_th": null,
+      "content_type": "PDF file",
+      "module": "Download  Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "corporate",
+          "governance",
+          "policy"
+        ],
+        "title_keywords": [
+          "Corporate Governance Policy"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Corporate Governance",
+      "topic_en": "Code of Conduct",
+      "topic_th": null,
+      "content_type": "PDF file",
+      "module": "Download  Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "code",
+          "conduct"
+        ],
+        "title_keywords": [
+          "Code of Conduct"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Corporate Governance",
+      "topic_en": "Anti-Fraud and Corruption Policy",
+      "topic_th": null,
+      "content_type": "PDF file",
+      "module": "Download  Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "anti-fraud",
+          "corruption",
+          "policy"
+        ],
+        "title_keywords": [
+          "Anti-Fraud and Corruption Policy"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Corporate Governance",
+      "topic_en": "Sustainable Development Policy",
+      "topic_th": null,
+      "content_type": "PDF file",
+      "module": "Download  Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "sustainable",
+          "development",
+          "policy"
+        ],
+        "title_keywords": [
+          "Sustainable Development Policy"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Corporate Governance",
+      "topic_en": "Social and Environmental Responsibilities Policy",
+      "topic_th": null,
+      "content_type": "PDF file",
+      "module": "Download  Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "social",
+          "environmental",
+          "responsibilities",
+          "policy"
+        ],
+        "title_keywords": [
+          "Social and Environmental Responsibilities Policy"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Corporate Governance",
+      "topic_en": "Social and Environmental Responsibilities Policy : Carbon Footprint",
+      "topic_th": null,
+      "content_type": "PDF file",
+      "module": "Download  Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "social",
+          "environmental",
+          "responsibilities",
+          "policy",
+          "carbon",
+          "footprint"
+        ],
+        "title_keywords": [
+          "Social and Environmental Responsibilities Policy : Carbon Footprint"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Corporate Governance",
+      "topic_en": "Articles of Associations",
+      "topic_th": null,
+      "content_type": "PDF file",
+      "module": "Download  Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "articles",
+          "associations"
+        ],
+        "title_keywords": [
+          "Articles of Associations"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Corporate Governance",
+      "topic_en": "Memorandum of Association",
+      "topic_th": null,
+      "content_type": "PDF file",
+      "module": "Download  Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "memorandum",
+          "association"
+        ],
+        "title_keywords": [
+          "Memorandum of Association"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Corporate Governance",
+      "topic_en": "Company Affidavit",
+      "topic_th": null,
+      "content_type": "PDF file",
+      "module": "Download  Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "company",
+          "affidavit"
+        ],
+        "title_keywords": [
+          "Company Affidavit"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Corporate Governance",
+      "topic_en": "Board of Directors Charter",
+      "topic_th": null,
+      "content_type": "Text +Image",
+      "module": "Board Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "board",
+          "directors",
+          "charter"
+        ],
+        "title_keywords": [
+          "Board of Directors Charter"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Corporate Governance",
+      "topic_en": "Audit Committee Charter",
+      "topic_th": null,
+      "content_type": "Text +Image",
+      "module": "Board Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "audit",
+          "committee",
+          "charter"
+        ],
+        "title_keywords": [
+          "Audit Committee Charter"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Corporate Governance",
+      "topic_en": "Nomination and Remuneration Committee Charter",
+      "topic_th": null,
+      "content_type": "Text +Image",
+      "module": "Board Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "nomination",
+          "remuneration",
+          "committee",
+          "charter"
+        ],
+        "title_keywords": [
+          "Nomination and Remuneration Committee Charter"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Corporate Governance",
+      "topic_en": "Corporate Governance and Sustainability Committee Charter",
+      "topic_th": null,
+      "content_type": "Text +Image",
+      "module": "Board Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "corporate",
+          "governance",
+          "sustainability",
+          "committee",
+          "charter"
+        ],
+        "title_keywords": [
+          "Corporate Governance and Sustainability Committee Charter"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Corporate Governance",
+      "topic_en": "Risk Management Committee",
+      "topic_th": null,
+      "content_type": "Text +Image",
+      "module": "Board Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "risk",
+          "management",
+          "committee"
+        ],
+        "title_keywords": [
+          "Risk Management Committee"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Corporate Governance",
+      "topic_en": "Executive Commitee Charter",
+      "topic_th": null,
+      "content_type": "Text +Image",
+      "module": "Board Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "executive",
+          "commitee",
+          "charter"
+        ],
+        "title_keywords": [
+          "Executive Commitee Charter"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Corporate Governance",
+      "topic_en": "Whistleblower Policy",
+      "topic_th": null,
+      "content_type": "PDF file",
+      "module": "Download  Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "whistleblower",
+          "policy"
+        ],
+        "title_keywords": [
+          "Whistleblower Policy"
+        ]
+      }
+    },
+    {
+      "id": null,
+      "section": "Corporate Governance",
+      "topic_en": "Whistleblowing Form",
+      "topic_th": null,
+      "content_type": "Text +  Form",
+      "module": "Form Module",
+      "phase": "Pre-IPO",
+      "kind": "form",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "whistleblowing",
+          "form"
+        ],
+        "title_keywords": [
+          "Whistleblowing Form"
+        ]
+      }
+    },
+    {
+      "id": "6.6",
+      "section": "Corporate Governance",
+      "topic_en": "Code of Conduct for Investor Relations",
+      "topic_th": null,
+      "content_type": "Text",
+      "module": "Premium Content",
+      "phase": "Pre-IPO",
+      "kind": "static",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "code",
+          "conduct",
+          "investor",
+          "relations"
+        ],
+        "title_keywords": [
+          "Code of Conduct for Investor Relations"
+        ]
+      }
+    },
+    {
+      "id": "7.1",
+      "section": "Investor Resources",
+      "topic_en": "Prospectus",
+      "topic_th": null,
+      "content_type": "Link out to SEC",
+      "module": "Link Out",
+      "phase": "Pre-IPO",
+      "kind": "link_out",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "prospectus"
+        ],
+        "title_keywords": [
+          "Prospectus"
+        ]
+      }
+    },
+    {
+      "id": "7.2",
+      "section": "Investor Resources",
+      "topic_en": "Form 56-1 One Report",
+      "topic_th": null,
+      "content_type": "PDF File",
+      "module": "Download Module",
+      "phase": "Post-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "form",
+          "56-1",
+          "one",
+          "report"
+        ],
+        "title_keywords": [
+          "Form 56-1 One Report"
+        ]
+      }
+    },
+    {
+      "id": "7.3",
+      "section": "Investor Resources",
+      "topic_en": "Sustainability Report",
+      "topic_th": null,
+      "content_type": "PDF File",
+      "module": "Download Module",
+      "phase": "Post-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "sustainability",
+          "report"
+        ],
+        "title_keywords": [
+          "Sustainability Report"
+        ]
+      }
+    },
+    {
+      "id": "7.4",
+      "section": "Investor Resources",
+      "topic_en": "Presentations & Webcasts",
+      "topic_th": null,
+      "content_type": "VDO + Pdf File",
+      "module": "Webcast & Presentation",
+      "phase": "Post-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "presentations",
+          "webcasts"
+        ],
+        "title_keywords": [
+          "Presentations & Webcasts"
+        ]
+      }
+    },
+    {
+      "id": "7.5",
+      "section": "Investor Resources",
+      "topic_en": "Company Snapshot",
+      "topic_th": null,
+      "content_type": "PDF File",
+      "module": "Download Module",
+      "phase": "Post-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "company",
+          "snapshot"
+        ],
+        "title_keywords": [
+          "Company Snapshot"
+        ]
+      }
+    },
+    {
+      "id": "7.6",
+      "section": "Investor Resources",
+      "topic_en": "Download Center",
+      "topic_th": null,
+      "content_type": "PDF File",
+      "module": "Download Module",
+      "phase": "Post-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "download",
+          "center"
+        ],
+        "title_keywords": [
+          "Download Center"
+        ]
+      }
+    },
+    {
+      "id": "8.1",
+      "section": "IR News",
+      "topic_en": "SET Announcements",
+      "topic_th": null,
+      "content_type": "API",
+      "module": "News Module",
+      "phase": "Post-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "set",
+          "announcements"
+        ],
+        "title_keywords": [
+          "SET Announcements"
+        ]
+      }
+    },
+    {
+      "id": "8.2",
+      "section": "IR News",
+      "topic_en": "Electronic Advertisements",
+      "topic_th": null,
+      "content_type": "PDF File",
+      "module": "News Module",
+      "phase": "Post-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "electronic",
+          "advertisements"
+        ],
+        "title_keywords": [
+          "Electronic Advertisements"
+        ]
+      }
+    },
+    {
+      "id": "8.3",
+      "section": "IR News",
+      "topic_en": "Online News Clippings",
+      "topic_th": null,
+      "content_type": "PDF File",
+      "module": "News Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "online",
+          "news",
+          "clippings"
+        ],
+        "title_keywords": [
+          "Online News Clippings"
+        ]
+      }
+    },
+    {
+      "id": "8.4",
+      "section": "IR News",
+      "topic_en": "IR Press Releases",
+      "topic_th": null,
+      "content_type": "Text + PDF File",
+      "module": "News Module",
+      "phase": "Pre-IPO",
+      "kind": "dynamic",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "ir",
+          "press",
+          "releases"
+        ],
+        "title_keywords": [
+          "IR Press Releases"
+        ]
+      }
+    },
+    {
+      "id": "9.1",
+      "section": "Information Inquiry",
+      "topic_en": "IR Contact",
+      "topic_th": null,
+      "content_type": "Text + Form",
+      "module": "Form Module",
+      "phase": "Pre-IPO",
+      "kind": "form",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "ir",
+          "contact"
+        ],
+        "title_keywords": [
+          "IR Contact"
+        ]
+      }
+    },
+    {
+      "id": "9.2",
+      "section": "Information Inquiry",
+      "topic_en": "Analyst Contact",
+      "topic_th": null,
+      "content_type": "Text",
+      "module": "Premium Content",
+      "phase": "Post-IPO",
+      "kind": "static",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "analyst",
+          "contact"
+        ],
+        "title_keywords": [
+          "Analyst Contact"
+        ]
+      }
+    },
+    {
+      "id": "9.3",
+      "section": "Information Inquiry",
+      "topic_en": "Email Alerts",
+      "topic_th": null,
+      "content_type": "Form",
+      "module": "Form Module",
+      "phase": "Pre-IPO",
+      "kind": "form",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "email",
+          "alerts"
+        ],
+        "title_keywords": [
+          "Email Alerts"
+        ]
+      }
+    },
+    {
+      "id": "9.4",
+      "section": "Information Inquiry",
+      "topic_en": "FAQ",
+      "topic_th": null,
+      "content_type": "Text",
+      "module": "Premium Content",
+      "phase": "Pre-IPO",
+      "kind": "static",
+      "expected": "present",
+      "match": {
+        "slug_keywords": [
+          "faq"
+        ],
+        "title_keywords": [
+          "FAQ"
+        ]
+      }
+    }
+  ]
+}
