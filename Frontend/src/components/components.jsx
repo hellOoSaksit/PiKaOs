@@ -1,7 +1,6 @@
 /* PiKaOs — ES module (migrated from PiKaOs/components.jsx). */
 import React from 'react';
 import { byId, statusTh } from '../data/data.jsx';
-import { PixelSprite } from '../lib/sprites.jsx';
 import { CharacterSprite } from '../screens/screens-world.jsx';
 
 /* ============================================================
@@ -14,7 +13,8 @@ function Avatar({ a, size = "", showRing = true }) {
   const cls = ["avatar", "portrait", size, showRing ? a.status : ""].filter(Boolean).join(" ");
   return (
     <div className={cls} style={{ "--av": a.color }} title={a.name}>
-      <PixelSprite char={a} h={h} style={{ position: "absolute", bottom: size === "sm" ? 1 : 2, left: "50%", transform: "translateX(-50%)" }} />
+      <CharacterSprite charId={a.characterId} seed={a.id || a.name} walking={false} h={h}
+        style={{ position: "absolute", bottom: size === "sm" ? 1 : 2, left: "50%", transform: "translateX(-50%)" }} />
       {showRing && <span className="a-ring" />}
     </div>
   );

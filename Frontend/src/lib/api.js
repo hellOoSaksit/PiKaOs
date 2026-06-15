@@ -104,3 +104,20 @@ export async function restore() {
 export async function forgotPassword(usernameOrEmail) {
   return raw("/auth/forgot-password", { method: "POST", auth: false, body: { usernameOrEmail } });
 }
+
+// --- UAT vs Production compare API ---
+// POST /api/compare → coverage of Production's sitemap URLs against UAT.
+export async function compareSites(body) {
+  return raw("/compare", { method: "POST", body });
+}
+
+// POST /api/compare/deep → deep-compare one small batch of page pairs (client streams sets).
+export async function compareDeep(body) {
+  return raw("/compare/deep", { method: "POST", body });
+}
+
+// POST /api/compare/render → proxy a page's HTML (with injected <base>) so a site
+// that blocks iframe embedding can still be previewed via a same-origin srcdoc.
+export async function compareRender(body) {
+  return raw("/compare/render", { method: "POST", body });
+}

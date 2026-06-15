@@ -1,13 +1,13 @@
 /* PiKaOs — ES module (migrated from PiKaOs/screens-builder.jsx). */
 import React from 'react';
 const { useState, useRef } = React;
-import { addCharacter, addOption, addProfile, loadCharacters, loadCoreRules, loadOptions, loadProfiles, processCharacterSheets, profileNameExists, removeCharacter, removeOption, removeProfile, saveCoreRules } from '../lib/characters.jsx';
+import { addCharacter, addOption, addProfile, loadCharacters, loadCoreRules, loadOptions, loadProfiles, loadSkillDocs, processCharacterSheets, profileNameExists, removeCharacter, removeOption, removeProfile, saveCoreRules } from '../lib/characters.jsx';
 import { Btn, StatusBadge } from '../components/components.jsx';
 import { Select } from '../components/ui/Dropdown.jsx';
 import { idx } from '../lib/room-store.jsx';
 import { Workflows } from './screens-workflows.jsx';
 import { CharacterSprite, DOC_SEED, DocEditor, RichBody } from './screens-world.jsx';
-import { CLASS_OPTS, COLOR_OPTS, PixelSprite } from '../lib/sprites.jsx';
+import { CLASS_OPTS, COLOR_OPTS } from '../lib/sprites.jsx';
 import { MODEL_OPTS, STATUS_OPTS, makeCharacter } from '../lib/store.jsx';
 
 /* ============================================================
@@ -90,7 +90,7 @@ function ClassPicker({ value, onChange, locked }) {
     <div className={`class-pick ${locked ? "is-locked" : ""}`}>
       {CLASS_OPTS.map(o => (
         <button key={o.key} type="button" disabled={locked} className={`class-opt ${value === o.key ? "on" : ""}`} onClick={() => !locked && onChange(o.key)}>
-          <PixelSprite char={{ classKey: o.key, color: "#c7a14a", name: o.key }} h={40} style={{ position: "static", transform: "none" }} />
+          <CharacterSprite charId="ceo" seed={"class-" + o.key} walking={false} h={44} style={{ position: "static" }} />
           <span className="class-th">{o.th}</span>
           <span className="class-en mono">{o.en}</span>
         </button>
@@ -184,66 +184,28 @@ function OptionMulti({ kind, values, onChange, canAdd }) {
   );
 }
 
-/* ---- skill picker: each skill carries a required SKILL.md ---- */
-function SkillField({ skills, docs, onChange, canAdd }) {
-  const [opts, setOpts] = useState(() => (loadOptions().skills || []));
-  const [adding, setAdding] = useState(false);
-  const [managing, setManaging] = useState(false);
-  const [editing, setEditing] = useState(null);   // original skill name while editing
-  const [name, setName] = useState(""); const [md, setMd] = useState(""); const [viewing, setViewing] = useState(null);
-  const toggle = (o) => { const has = skills.includes(o); onChange(has ? skills.filter(x => x !== o) : [...skills, o], docs); };
-  const startEdit = (o) => { setEditing(o); setName(o); setMd(docs[o] || ""); setAdding(true); setViewing(null); };
-  const del = async (o) => {
-    const ok = window.uiConfirm
-      ? await window.uiConfirm({ title: bt("bld.skill.delTitle"), message: bt("bld.skill.delMsg", { name: o }), danger: true, confirmText: bt("bld.skill.delConfirm") })
-      : window.confirm(bt("bld.skill.delConfirmQ", { name: o }));
-    if (!ok) return;
-    setOpts(removeOption("skills", o).skills || []);
-    const nd = { ...docs }; delete nd[o];
-    onChange(skills.filter(x => x !== o), nd);
-    if (viewing === o) setViewing(null);
-  };
-  const save = () => {
-    const n = name.trim(); if (!n || !md.trim()) return;
-    let nd = { ...docs };
-    let next = skills;
-    if (editing && editing !== n) { removeOption("skills", editing); delete nd[editing]; next = skills.map(x => (x === editing ? n : x)); }
-    addOption("skills", n); setOpts(loadOptions().skills);
-    nd[n] = md.trim();
-    if (!editing && !next.includes(n)) next = [...next, n];
-    onChange(next, nd);
-    setName(""); setMd(""); setAdding(false); setEditing(null);
-  };
-  const cancel = () => { setAdding(false); setEditing(null); setName(""); setMd(""); };
+/* ---- skill picker: SELECT-only. Skills (and their SKILL.md) are defined
+   centrally in the Tools Manager — this field just toggles which ones apply. ---- */
+function SkillField({ skills, docs, onChange, canManage }) {
+  const opts = loadOptions().skills || [];
+  const gdocs = loadSkillDocs();                 // global SKILL.md per skill name
+  const [viewing, setViewing] = useState(null);
+  const toggle = (o) => onChange(skills.includes(o) ? skills.filter(x => x !== o) : [...skills, o], docs);
   return (
     <div className="opt-multi">
       <div className="opt-chips">
-        {opts.map(o => managing
-          ? <span key={o} className={`opt-chip manage ${skills.includes(o) ? "on" : ""}`}>
-              {o}{docs[o] ? " 📄" : ""}
-              <button type="button" className="chip-act" title={bt("bld.skill.editTitle")} onClick={() => startEdit(o)}>✎</button>
-              <button type="button" className="chip-act danger" title={bt("bld.skill.del")} onClick={() => del(o)}>✕</button>
-            </span>
-          : <button type="button" key={o} className={`opt-chip ${skills.includes(o) ? "on" : ""}`} onClick={() => toggle(o)} onDoubleClick={() => setViewing(viewing === o ? null : o)} title={docs[o] ? bt("bld.skill.hasMd") : ""}>{o}{docs[o] ? " 📄" : ""}</button>)}
+        {opts.map(o => (
+          <button type="button" key={o} className={`opt-chip ${skills.includes(o) ? "on" : ""}`}
+            onClick={() => toggle(o)} onDoubleClick={() => setViewing(viewing === o ? null : o)}
+            title={gdocs[o] ? bt("bld.skill.hasMd") : ""}>{o}{gdocs[o] ? " 📄" : ""}</button>
+        ))}
         {opts.length === 0 && <span className="muted" style={{ fontSize: 12 }}>{bt("bld.skill.none")}</span>}
       </div>
-      {viewing && docs[viewing] && <pre className="skill-md">{`# ${viewing}\n` + docs[viewing]}</pre>}
-      {canAdd && (adding
-        ? <div className="skill-add">
-            <div className="mono faint" style={{ fontSize: 10.5 }}>{editing ? bt("bld.skill.editing", { name: editing }) : bt("bld.skill.newOne")}</div>
-            <input className="bf-input" placeholder={bt("bld.skill.namePh")} value={name} onChange={e => setName(e.target.value)} />
-            <label className="md-upload">{bt("bld.skill.upload")}<input type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" onChange={e => { const fl = e.target.files[0]; if (!fl) return; const rd = new FileReader(); rd.onload = () => setMd(String(rd.result || "")); rd.readAsText(fl); }} /></label>
-            <RichBody key={editing || "new"} value={md} onChange={(text) => setMd(text)} placeholder={bt("bld.skill.bodyPh")} minHeight={120} />
-            <div className="mono faint" style={{ fontSize: 10.5 }}>{bt("bld.skill.required")}</div>
-            <div className="row" style={{ gap: 8 }}>
-              <Btn kind="ghost" sm onClick={cancel}>{bt("common.cancel")}</Btn>
-              <Btn kind="gold" sm onClick={save} style={{ opacity: (name.trim() && md.trim()) ? 1 : .5, pointerEvents: (name.trim() && md.trim()) ? "auto" : "none" }}>{editing ? bt("bld.skill.save") : bt("bld.skill.add")}</Btn>
-            </div>
-          </div>
-        : <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-            <button type="button" className="opt-add-btn" onClick={() => { setAdding(true); setEditing(null); setName(""); setMd(""); }}>{bt("bld.skill.addBtn")}</button>
-            <button type="button" className={`opt-add-btn ${managing ? "on" : ""}`} onClick={() => setManaging(m => !m)}>{managing ? bt("bld.skill.doneManage") : bt("bld.skill.manage")}</button>
-          </div>)}
+      {viewing && gdocs[viewing] && <pre className="skill-md">{`# ${viewing}\n` + gdocs[viewing]}</pre>}
+      {canManage && (
+        <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 10 }}
+          onClick={() => window.__guildGo && window.__guildGo("toolsmgr")}>{bt("bld.f.skillManage")}</button>
+      )}
     </div>
   );
 }
@@ -453,9 +415,15 @@ function CharacterBuilder({ initial, onSave, onClose, can, archived, onRestore, 
               <textarea className="bf-input" rows={2} value={f.goal} onChange={e => set("goal", e.target.value)} placeholder={bt("bld.f.goalPh")} />
             </Field>
 
-            <Field label={bt("bld.f.skill")} hint={bt("bld.f.skillHint")}><SkillField skills={f.skills} docs={f.skillDocs || {}} onChange={(sk, docs) => setF(p => ({ ...p, skills: sk, skillDocs: docs }))} canAdd={canOptions} /></Field>
+            <Field label={bt("bld.f.skill")} hint={bt("bld.f.skillHint")}><SkillField skills={f.skills} docs={f.skillDocs || {}} onChange={(sk, docs) => setF(p => ({ ...p, skills: sk, skillDocs: docs }))} canManage={canOptions} /></Field>
 
-            <Field label={bt("bld.f.tools")} hint={bt("bld.f.toolsHint")}><OptionMulti kind="tools" values={f.tools} onChange={v => set("tools", v)} canAdd={false} /></Field>
+            <Field label={bt("bld.f.tools")} hint={bt("bld.f.toolsHint")}>
+              <OptionMulti kind="tools" values={f.tools} onChange={v => set("tools", v)} canAdd={false} />
+              {canOptions && (
+                <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 10 }}
+                  onClick={() => window.__guildGo && window.__guildGo("toolsmgr")}>{bt("bld.f.toolsManage")}</button>
+              )}
+            </Field>
 
             <Field label={bt("bld.f.wf")} hint={bt("bld.f.wfHint")}>
               <div className="wf-pick">

@@ -4,7 +4,6 @@ const { useState, useEffect, useRef } = React;
 import { ActivityRow, AgentCard, Btn, ChatMessage, FeatureTag, HelpNote, PageHead, Panel, QuestCard, StatTile, TypingDots } from '../components/components.jsx';
 import { ACTIVITY, CHAT, GUILD, MANA, QUESTS, byId } from '../data/data.jsx';
 import { CharacterSprite } from './screens-world.jsx';
-import { PixelSprite } from '../lib/sprites.jsx';
 import { randPos } from '../lib/store.jsx';
 
 /* ============================================================
@@ -125,7 +124,7 @@ function FloorMap({ chars, height = 220, big = false, onAgent }) {
         return (
           <button key={c.id} className="wm-token" onClick={() => onAgent && onAgent(c)}
             style={{ left: p.x + "%", top: p.y + "%", border: "none", background: "transparent", cursor: onAgent ? "pointer" : "default", padding: 0 }}>
-            {window.CharacterSprite ? <CharacterSprite charId={c.characterId} walking={false} h={big ? 52 : 42} style={{ position: "static" }} /> : <PixelSprite char={c} h={big ? 46 : 38} bob style={{ position: "static", transform: "none" }} />}
+            <CharacterSprite charId={c.characterId} seed={c.id} walking={false} h={big ? 52 : 42} style={{ position: "static" }} />
             <span className="wm-name" style={{ borderColor: c.color }}>{c.name.split(" ")[0]}{big ? " · " + (c.position || c.role || "") : ""}</span>
           </button>
         );

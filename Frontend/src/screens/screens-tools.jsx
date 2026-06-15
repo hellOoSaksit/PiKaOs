@@ -8,8 +8,9 @@ import { Btn, Empty, HelpNote, PageHead, Panel } from '../components/components.
 import { Select } from '../components/ui/Dropdown.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import Switch from '../components/ui/Switch.jsx';
-import { TOOL_TYPES, addOption, loadOptions, loadToolCfgs, removeOption, saveToolCfgs } from '../lib/characters.jsx';
+import { TOOL_TYPES, addOption, loadOptions, loadSkillDocs, loadToolCfgs, removeOption, saveSkillDocs, saveToolCfgs } from '../lib/characters.jsx';
 import { ApiConnections } from './screens-extra.jsx';
+import { RichBody } from './screens-world.jsx';
 
 const typeOf = (k) => TOOL_TYPES.find(t => t.key === k) || TOOL_TYPES[TOOL_TYPES.length - 1];
 /* รองรับทั้ง spec แบบ object และ tuple [key,label,ph] เดิม */
@@ -32,31 +33,22 @@ function AiApiPanel({ mayEdit, t }) {
   const ro = !mayEdit;
   const modelOpts = [...SM_MODELS, tx("settings.modelOpt.none")];
   return (
-    <div className="tool-toolsettings">
-      <div className="tool-section-head">
-        <span className="tsh-ic">🧩</span>
-        <span className="tsh-title">{tx("head.title")}</span>
-        <span className="tsh-kicker mono">{tx("head.kicker")}</span>
+    <div style={{ opacity: ro ? .6 : 1, pointerEvents: ro ? "none" : "auto" }}>
+      <div className="bf-2">
+        <div className="bf"><label className="bf-label">{tx("settings.model")}</label>
+          <Select block value={s.model} onChange={v => set("model", v)} options={modelOpts.map(m => ({ value: m, label: m }))} />
+          <span className="bf-hint">{tx("settings.model.hint")}</span></div>
+        <div className="bf"><label className="bf-label">{tx("settings.apiMode")}</label>
+          <Select block value={s.apiMode} onChange={v => set("apiMode", v)} options={SM_APIMODES.map(m => ({ value: m, label: m }))} />
+          <span className="bf-hint">{tx("settings.apiMode.hint")}</span></div>
+        <div className="bf"><label className="bf-label">{tx("settings.endpoint")}</label>
+          <input className="bf-input mono" style={{ fontSize: 12.5 }} value={s.apiUrl || ""} onChange={e => set("apiUrl", e.target.value)} placeholder="http://localhost:11434/v1" data-no-lex />
+          <span className="bf-hint">{tx("settings.endpoint.hint")}</span></div>
+        <div className="bf"><label className="bf-label">{tx("settings.apiKey")}</label>
+          <SecretInput value={s.apiKey || ""} onChange={e => set("apiKey", e.target.value)} placeholder={tx("settings.apiKeyPh")} />
+          <span className="bf-hint">{tx("settings.apiKey.hint")}</span></div>
       </div>
-      <Panel title={tx("tab.settings")} en="AI MODEL & API" icon="🤖">
-        <div style={{ opacity: ro ? .6 : 1, pointerEvents: ro ? "none" : "auto" }}>
-          <div className="bf-2">
-            <div className="bf"><label className="bf-label">{tx("settings.model")}</label>
-              <Select block value={s.model} onChange={v => set("model", v)} options={modelOpts.map(m => ({ value: m, label: m }))} />
-              <span className="bf-hint">{tx("settings.model.hint")}</span></div>
-            <div className="bf"><label className="bf-label">{tx("settings.apiMode")}</label>
-              <Select block value={s.apiMode} onChange={v => set("apiMode", v)} options={SM_APIMODES.map(m => ({ value: m, label: m }))} />
-              <span className="bf-hint">{tx("settings.apiMode.hint")}</span></div>
-            <div className="bf"><label className="bf-label">{tx("settings.endpoint")}</label>
-              <input className="bf-input mono" style={{ fontSize: 12.5 }} value={s.apiUrl || ""} onChange={e => set("apiUrl", e.target.value)} placeholder="http://localhost:11434/v1" data-no-lex />
-              <span className="bf-hint">{tx("settings.endpoint.hint")}</span></div>
-            <div className="bf"><label className="bf-label">{tx("settings.apiKey")}</label>
-              <SecretInput value={s.apiKey || ""} onChange={e => set("apiKey", e.target.value)} placeholder={tx("settings.apiKeyPh")} />
-              <span className="bf-hint">{tx("settings.apiKey.hint")}</span></div>
-          </div>
-          <div className="sm-set-note mono">{tx("settings.note")}</div>
-        </div>
-      </Panel>
+      <div className="sm-set-note mono">{tx("settings.note")}</div>
     </div>
   );
 }
@@ -130,6 +122,54 @@ function ToolForm({ initial, onSave, onCancel, t }) {
   );
 }
 
+/* skill definition form — name + its SKILL.md (managed centrally, used by the Agent builder) */
+function SkillForm({ initial, onSave, onCancel, t }) {
+  const tx = t || ((k) => k);
+  const [name, setName] = useState(initial ? initial.name : "");
+  const [md, setMd] = useState(initial ? initial.md : "");
+  const ok = name.trim().length > 0 && md.trim().length > 0;
+  return (
+    <div className="tool-form">
+      <div className="bf"><label className="bf-label">{tx("tools.skillName")}</label>
+        <input className="bf-input" value={name} onChange={e => setName(e.target.value)} placeholder={tx("tools.skillNamePh")} /></div>
+      <div className="bf"><label className="bf-label">{tx("tools.skillMd")}</label>
+        <label className="md-upload">{tx("bld.skill.upload")}<input type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" onChange={e => { const fl = e.target.files[0]; if (!fl) return; const rd = new FileReader(); rd.onload = () => setMd(String(rd.result || "")); rd.readAsText(fl); }} /></label>
+        <RichBody key={initial ? initial.name : "new"} value={md} onChange={setMd} placeholder={tx("tools.skillMdPh")} minHeight={120} /></div>
+      <div className="row" style={{ gap: 8, justifyContent: "flex-end" }}>
+        <Btn kind="ghost" sm onClick={onCancel}>{tx("common.cancel")}</Btn>
+        <Btn kind="gold" sm onClick={() => ok && onSave({ name: name.trim(), md: md.trim() })} style={{ opacity: ok ? 1 : .5, pointerEvents: ok ? "auto" : "none" }}>{initial ? tx("toolform.save") : tx("toolform.create")}</Btn>
+      </div>
+    </div>
+  );
+}
+
+/* unified collapsible section card — same look + smooth slide (grid 0fr→1fr) for the whole page.
+   onAdd (optional) renders a ＋ action in the header (top-right); clicking it opens the
+   section and fires onAdd — so every section's "create" lives in the same spot. */
+function ToolSection({ icon, title, kicker, count, onAdd, addTitle, defaultOpen = false, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const toggle = () => setOpen(o => !o);
+  return (
+    <section className={`tsec ${open ? "open" : ""}`}>
+      <div className="tsec-head" role="button" tabIndex={0} aria-expanded={open}
+        onClick={toggle} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } }}>
+        <span className="tsec-ic">{icon}</span>
+        <span className="tsec-title">{title}</span>
+        <span className="tsec-kicker mono">{kicker}</span>
+        <span className="tsec-right" data-no-lex>
+          {count != null && <span className="tsec-count mono">{count}</span>}
+          {onAdd && <button type="button" className="tsec-add" title={addTitle} aria-label={addTitle}
+            onClick={e => { e.stopPropagation(); setOpen(true); onAdd(); }}>＋</button>}
+          <span className="tsec-chev">▾</span>
+        </span>
+      </div>
+      <div className="tsec-wrap">
+        <div className="tsec-inner"><div className="tsec-body">{children}</div></div>
+      </div>
+    </section>
+  );
+}
+
 export function ToolsManager({ can, t }) {
   const mayEdit = !can || can("options.manage");
   const tx = t || ((k) => k);
@@ -137,8 +177,11 @@ export function ToolsManager({ can, t }) {
   const [editing, setEditing] = useState(null);     // tool id | "new" | null
   const [positions, setPositions] = useState(() => loadOptions().positions || []);
   const [newPos, setNewPos] = useState("");
+  const [posAdding, setPosAdding] = useState(false);
   const [toolQuery, setToolQuery] = useState("");
-  const [toolsOpen, setToolsOpen] = useState(true);
+  const [skills, setSkills] = useState(() => loadOptions().skills || []);
+  const [skillDocs, setSkillDocs] = useState(() => loadSkillDocs());
+  const [skillEditing, setSkillEditing] = useState(null);   // skill name | "new" | null
 
   const commit = (list) => { setTools(saveToolCfgs(list)); };
   const saveTool = (f) => {
@@ -156,6 +199,28 @@ export function ToolsManager({ can, t }) {
   };
   const toggleTool = (t) => commit(tools.map(x => (x.id === t.id ? { ...x, enabled: x.enabled === false } : x)));
 
+  const saveSkill = ({ name, md }) => {
+    const old = (skillEditing && skillEditing !== "new") ? skillEditing : null;
+    if (old && old !== name) removeOption("skills", old);
+    addOption("skills", name);
+    const docs = { ...loadSkillDocs() };
+    if (old && old !== name) delete docs[old];
+    docs[name] = md;
+    setSkillDocs(saveSkillDocs(docs));
+    setSkills(loadOptions().skills || []);
+    setSkillEditing(null);
+  };
+  const delSkill = async (name) => {
+    const ok = window.uiConfirm
+      ? await window.uiConfirm({ title: tx("tools.delSkillTitle"), message: tx("tools.delSkillMsg", { name }), danger: true, confirmText: tx("tools.delSkillTitle") })
+      : window.confirm(tx("tools.delSkillMsg", { name }));
+    if (!ok) return;
+    removeOption("skills", name);
+    const docs = { ...loadSkillDocs() }; delete docs[name];
+    setSkillDocs(saveSkillDocs(docs));
+    setSkills(loadOptions().skills || []);
+  };
+
   const addPos = () => { const v = newPos.trim(); if (!v) return; addOption("positions", v); setPositions(loadOptions().positions); setNewPos(""); };
   const delPos = async (p) => {
     const ok = window.uiConfirm
@@ -167,8 +232,7 @@ export function ToolsManager({ can, t }) {
 
   return (
     <div className="content-pad fade-in">
-      <PageHead kicker={tx("tools.kicker")} title={tx("tools.title")} desc={tx("tools.desc")}
-        actions={mayEdit ? <Btn kind="gold" sm icon="➕" onClick={() => setEditing("new")}>{tx("tools.add")}</Btn> : null} />
+      <PageHead kicker={tx("tools.kicker")} title={tx("tools.title")} desc={tx("tools.desc")} />
       <HelpNote tag={tx("tools.helpTag")}>{tx("tools.help")}</HelpNote>
 
       <Modal className="tool-modal" open={editing != null} onClose={() => setEditing(null)}
@@ -178,21 +242,17 @@ export function ToolsManager({ can, t }) {
         )}
       </Modal>
 
-      <div className="tool-toolsettings">
-        <div className="tool-section-head">
-          <span className="tsh-ic">🧰</span>
-          <span className="tsh-title">{tx("tools.catalog")}</span>
-          <span className="tsh-kicker mono">TOOL CATALOG</span>
-          <span className="tsh-right" data-no-lex>
-            <span className="mono faint" style={{ fontSize: 11 }}>{tx("tools.count", { n: tools.length })}</span>
-            <button type="button" className="tool-collapse" title={toolsOpen ? tx("tools.collapse") : tx("tools.expand")}
-              onClick={() => setToolsOpen(o => !o)}>
-              <span style={{ display: "inline-block", transition: "transform .18s", transform: toolsOpen ? "rotate(0deg)" : "rotate(-90deg)" }}>▾</span>
-            </button>
-          </span>
-        </div>
-        <Panel>
-        {toolsOpen && <>
+      <Modal className="tool-modal" open={skillEditing != null} onClose={() => setSkillEditing(null)}
+        title={skillEditing === "new" ? tx("tools.skillModalAdd") : tx("tools.skillModalEdit")}>
+        {skillEditing != null && (
+          <SkillForm key={String(skillEditing)} t={t}
+            initial={skillEditing === "new" ? null : { name: skillEditing, md: (loadSkillDocs()[skillEditing] || "") }}
+            onSave={saveSkill} onCancel={() => setSkillEditing(null)} />
+        )}
+      </Modal>
+
+      <ToolSection icon="🧰" title={tx("tools.catalog")} kicker="TOOL CATALOG" count={tools.length}
+        onAdd={mayEdit ? () => setEditing("new") : undefined} addTitle={tx("tools.addNew")}>
         <div className="tool-search">
           <span className="ts-ic">🔍</span>
           <input value={toolQuery} onChange={e => setToolQuery(e.target.value)} placeholder={tx("tools.search")} data-no-lex />
@@ -220,32 +280,19 @@ export function ToolsManager({ can, t }) {
               ); })}
             </div>;
         })()}
-        {mayEdit && (
-          <button type="button" className="tool-add-row" onClick={() => setEditing("new")}>{tx("tools.addNew")}</button>
-        )}
-        </>}
-        </Panel>
-      </div>
+      </ToolSection>
 
-      <AiApiPanel mayEdit={mayEdit} t={t} />
+      <ToolSection icon="🤖" title={tx("head.title")} kicker="AI MODEL & API">
+        <AiApiPanel mayEdit={mayEdit} t={t} />
+      </ToolSection>
 
-      <div className="tool-toolsettings">
-        <div className="tool-section-head">
-          <span className="tsh-ic">🔌</span>
-          <span className="tsh-title">{tx("api.title")}</span>
-          <span className="tsh-kicker mono">API CONNECTIONS</span>
-        </div>
+      <ToolSection icon="🔌" title={tx("api.title")} kicker="API CONNECTIONS">
         <ApiConnections t={t} bare />
-      </div>
+      </ToolSection>
 
-      <div className="tool-toolsettings">
-        <div className="tool-section-head">
-          <span className="tsh-ic">🎖️</span>
-          <span className="tsh-title">{tx("tools.positions")}</span>
-          <span className="tsh-kicker mono">POSITION OPTIONS</span>
-        </div>
-        <Panel>
-        <div className="opt-chips" style={{ marginBottom: 10 }}>
+      <ToolSection icon="🎖️" title={tx("tools.positions")} kicker="POSITION OPTIONS" count={positions.length}
+        onAdd={mayEdit ? () => setPosAdding(true) : undefined} addTitle={tx("tools.addBtn")}>
+        <div className="opt-chips" style={{ marginBottom: posAdding ? 10 : 0 }}>
           {positions.map(p => (
             <span key={p} className="opt-chip manage">{p}
               {mayEdit && <button type="button" className="chip-act danger" title={tx("tools.delPosTitle")} onClick={() => delPos(p)}>✕</button>}
@@ -253,14 +300,27 @@ export function ToolsManager({ can, t }) {
           ))}
           {positions.length === 0 && <span className="muted" style={{ fontSize: 12 }}>{tx("tools.noPositions")}</span>}
         </div>
-        {mayEdit && (
+        {mayEdit && posAdding && (
           <div className="opt-add-row" style={{ maxWidth: 360 }}>
-            <input className="bf-input" placeholder={tx("tools.addPosPh")} value={newPos} onChange={e => setNewPos(e.target.value)} onKeyDown={e => e.key === "Enter" && addPos()} />
+            <input className="bf-input" autoFocus placeholder={tx("tools.addPosPh")} value={newPos} onChange={e => setNewPos(e.target.value)} onKeyDown={e => e.key === "Enter" && addPos()} />
             <Btn kind="ghost" sm onClick={addPos}>{tx("tools.addBtn")}</Btn>
+            <button type="button" className="opt-cancel" onClick={() => { setPosAdding(false); setNewPos(""); }}>✕</button>
           </div>
         )}
-        </Panel>
-      </div>
+      </ToolSection>
+
+      <ToolSection icon="🧠" title={tx("tools.skills")} kicker="SKILL OPTIONS" count={skills.length}
+        onAdd={mayEdit ? () => setSkillEditing("new") : undefined} addTitle={tx("tools.addSkill")}>
+        <div className="opt-chips">
+          {skills.map(s => (
+            <span key={s} className="opt-chip manage">{s}{skillDocs[s] ? " 📄" : ""}
+              {mayEdit && <button type="button" className="chip-act" title={tx("tools.edit")} onClick={() => setSkillEditing(s)}>✎</button>}
+              {mayEdit && <button type="button" className="chip-act danger" title={tx("tools.delSkillTitle")} onClick={() => delSkill(s)}>✕</button>}
+            </span>
+          ))}
+          {skills.length === 0 && <span className="muted" style={{ fontSize: 12 }}>{tx("tools.noSkills")}</span>}
+        </div>
+      </ToolSection>
     </div>
   );
 }

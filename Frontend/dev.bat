@@ -6,6 +6,9 @@ rem  file so the wt command line stays free of & and () which
 rem  Windows Terminal mis-parses). Can also be run on its own.
 rem ===========================================================
 cd /d "%~dp0"
+color 0B
+echo  ===  PiKaOS  -  Frontend dev  ===
+echo.
 
 where npm >nul 2>nul
 if errorlevel 1 (

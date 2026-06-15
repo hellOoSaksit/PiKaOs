@@ -115,6 +115,13 @@ function removeOption(kind, value) {
   saveOptions(o); return o;
 }
 
+/* ---- global SKILL.md store (skill name -> markdown) ----
+   Skill *definitions* live here (managed centrally in the Tools Manager);
+   the Agent builder only SELECTS skills, it no longer adds/edits/deletes them. */
+const SKILLDOCS_LS = "guildos.skilldocs.v1";
+function loadSkillDocs() { try { return JSON.parse(localStorage.getItem(SKILLDOCS_LS)) || {}; } catch (e) { return {}; } }
+function saveSkillDocs(map) { try { localStorage.setItem(SKILLDOCS_LS, JSON.stringify(map)); } catch (e) { } window.__skillDocs = map; return map; }
+
 /* ---- tool configs: typed tools (MCP / LINE OA / Telegram / CMD ...) ---- */
 const TOOLCFG_LS = "guildos.toolsConfig";
 /* field spec: { k, label, ph, kind: text|secret|select|textarea|number|toggle, opts, full, mono }
@@ -280,7 +287,7 @@ function roomAgents(room, roomIndex, rooms, chars) {
 Object.assign(window, {
   SHEET_COLS, SHEET_ROWS, SHEET_N, BUILTIN_CHARACTERS,
   loadCharacters, saveCharacters, charSetById, processCharacterSheets, addCharacter, removeCharacter,
-  loadOptions, saveOptions, addOption, removeOption, roomAgents,
+  loadOptions, saveOptions, addOption, removeOption, loadSkillDocs, saveSkillDocs, roomAgents,
   TOOL_TYPES, loadToolCfgs, saveToolCfgs,
   loadCoreRules, saveCoreRules,
   loadProfiles, saveProfiles, addProfile, removeProfile, profileNameExists,
@@ -307,6 +314,8 @@ export {
   addCharacter,
   addOption,
   removeOption,
+  loadSkillDocs,
+  saveSkillDocs,
   TOOL_TYPES,
   loadToolCfgs,
   saveToolCfgs,

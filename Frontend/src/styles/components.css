@@ -221,7 +221,7 @@
 .login-card { width: min(400px, 100%); position: relative; z-index: 2;
   background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius-lg);
   box-shadow: var(--shadow-panel); padding: 28px; }
-.login-card-title { font-family: var(--font-body); font-weight: 700; font-size: 20px; color: var(--ink); margin: 0 0 4px; }
+.login-card-title { font-family: var(--font-display); font-weight: 700; font-size: 20px; color: var(--ink); margin: 0 0 4px; }
 .login-card-sub { font-size: 13px; color: var(--ink-3); margin: 0 0 22px; }
 .field { margin-bottom: 16px; }
 .field label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-2); margin-bottom: 7px; font-family: var(--font-body); }
@@ -342,7 +342,6 @@ select.bf-input { cursor: pointer; }
   background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--radius); transition: border-color .14s, background .14s; }
 .class-opt:hover { border-color: var(--bronze); }
 .class-opt.on { border-color: var(--gold-deep); background: var(--raised-grad); box-shadow: 0 0 14px -4px var(--gold-glow); }
-.class-opt .pixel-sprite { image-rendering: pixelated; }
 .class-th { font-family: var(--font-head); font-weight: 700; font-size: 12px; color: var(--ink); margin-top: 4px; }
 .class-en { font-size: 9.5px; color: var(--ink-3); }
 
@@ -692,6 +691,42 @@ select.bf-input { cursor: pointer; }
 .pp-btn.danger:hover { background: color-mix(in srgb, var(--crimson) 12%, var(--bg-2)); border-color: color-mix(in srgb, var(--crimson) 40%, transparent); }
 .pp-pwform { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .pp-pwform .bf-label { margin-top: 7px; }
+/* ============================================================
+   Tools Manager — unified collapsible section card (smooth slide)
+   one look for every section · click header to fold/unfold
+   ============================================================ */
+.tsec { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel); margin-top: 16px; overflow: hidden;
+  transition: border-color .18s ease, box-shadow .25s var(--spring-soft); }
+.tsec.open { border-color: color-mix(in srgb, var(--gold) 22%, var(--line)); }
+.tsec-head { display: flex; align-items: center; gap: 12px; width: 100%; padding: 15px 18px;
+  background: none; border: none; cursor: pointer; text-align: left; font: inherit; color: var(--ink);
+  transition: background .14s ease; }
+.tsec-head:hover { background: color-mix(in srgb, var(--gold) 5%, var(--bg-2)); }
+.tsec-ic { width: 36px; height: 36px; flex: none; display: grid; place-items: center; font-size: 18px;
+  border-radius: var(--radius-sm); background: color-mix(in srgb, var(--gold) 11%, var(--bg-2));
+  border: 1px solid color-mix(in srgb, var(--gold) 22%, transparent); box-shadow: var(--shadow-puff); }
+.tsec-title { font-family: var(--font-display); font-weight: 700; font-size: 15.5px; color: var(--ink); }
+.tsec-kicker { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-4); }
+.tsec-right { margin-left: auto; display: inline-flex; align-items: center; gap: 10px; flex: none; }
+.tsec-count { font-size: 11px; color: var(--ink-2); background: var(--bg-3); border: 1px solid var(--line);
+  border-radius: 999px; padding: 2px 10px; box-shadow: var(--shadow-puff); }
+.tsec-add { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: var(--radius-sm);
+  background: var(--gold-grad); color: #fff; border: none; font-size: 16px; font-weight: 700; line-height: 1; cursor: pointer;
+  box-shadow: 0 2px 0 var(--gold-deep); transition: transform .2s var(--spring), box-shadow .2s var(--spring), filter .14s; }
+.tsec-add:hover { transform: translateY(-1px); box-shadow: 0 3px 0 var(--gold-deep); filter: brightness(1.05); }
+.tsec-add:active { transform: translateY(2px); box-shadow: none; }
+.tsec-chev { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: var(--radius-sm);
+  color: var(--ink-3); font-size: 12px; transition: transform .35s var(--spring), background .14s, color .14s; }
+.tsec.open .tsec-chev { transform: rotate(180deg); }
+.tsec-head:hover .tsec-chev { background: var(--bg-4); color: var(--gold-bright); }
+/* the smooth bit: grid row 0fr→1fr animates height with no fixed max-height */
+.tsec-wrap { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .34s var(--spring-soft); }
+.tsec.open .tsec-wrap { grid-template-rows: 1fr; }
+.tsec-inner { overflow: hidden; min-height: 0; }
+.tsec-body { padding: 14px 18px 18px; border-top: 1px solid var(--line-soft); }
+@media (prefers-reduced-motion: reduce) { .tsec-wrap { transition: none; } .tsec-chev { transition: color .14s; } }
+
 /* tool-specific settings block (e.g. Sitemap Match AI/API) — section header + spacing */
 .tool-toolsettings { margin-top: 26px; }
 .tool-section-head { display: flex; align-items: baseline; gap: 10px; padding: 12px 2px 10px; margin-top: 10px;
@@ -730,8 +765,48 @@ select.bf-input { cursor: pointer; }
 .lib-sec-en { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-4); }
 .lib-stage { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
 .lib-spec { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); font-size: 10.5px; color: var(--ink-4); line-height: 1.6; }
+
+/* AI reference chip — copyable canonical name ("tell AI: use this component") */
+.lib-comp { display: inline-flex; align-items: center; gap: 8px; margin: -4px 0 14px; max-width: 100%;
+  font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-2);
+  background: var(--bg-1); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px;
+  cursor: pointer; transition: border-color .14s, background .14s, transform .2s var(--spring); }
+.lib-comp:hover { border-color: color-mix(in srgb, var(--gold) 42%, var(--line)); background: var(--bg-2); }
+.lib-comp:active { transform: scale(.98); }
+.lib-comp-tag { font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--gold-bright);
+  background: color-mix(in srgb, var(--gold) 13%, transparent); border-radius: 999px; padding: 1px 7px; flex: none; }
+.lib-comp-ref { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-comp-cp { margin-left: auto; padding-left: 4px; color: var(--ink-4); flex: none; }
+.lib-comp.copied { border-color: color-mix(in srgb, var(--emerald) 48%, transparent); }
+.lib-comp.copied .lib-comp-cp { color: var(--emerald); }
+
+/* code block — smooth slide-open (grid 0fr→1fr) */
+.lib-code { margin-top: 14px; }
+.lib-code-toggle { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  color: var(--ink-3); background: none; border: none; cursor: pointer; padding: 4px 0; transition: color .14s; }
+.lib-code-toggle:hover { color: var(--gold-bright); }
+.lib-code-caret { display: inline-block; transition: transform .3s var(--spring); }
+.lib-code-toggle.on .lib-code-caret { transform: rotate(90deg); }
+.lib-code-wrap { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .35s var(--spring-soft); }
+.lib-code-wrap.open { grid-template-rows: 1fr; margin-top: 8px; }
+.lib-code-inner { overflow: hidden; min-height: 0; position: relative; }
+.lib-code-pre { margin: 0; padding: 14px 16px; background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--radius);
+  font-family: var(--font-mono); font-size: 11.5px; line-height: 1.7; color: var(--ink-2); overflow-x: auto; white-space: pre; }
+.lib-code-copy { position: absolute; top: 9px; right: 9px; font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  color: var(--ink-3); background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 4px 9px; cursor: pointer; transition: all .14s; }
+.lib-code-copy:hover { color: var(--gold-bright); border-color: color-mix(in srgb, var(--gold) 42%, var(--line)); }
+.lib-code-copy.copied { color: var(--emerald); border-color: color-mix(in srgb, var(--emerald) 45%, transparent); }
 .lib-logo { display: flex; gap: 4px; }
 .lib-logo .ltr { -webkit-text-stroke-width: 4px; text-shadow: 0 2px 0 var(--gold), 0 4px 0 var(--gold-deep), 0 6px 0 var(--gold-deep), 0 10px 14px var(--gold-glow); }
+/* page tabs (Components ↔ 3D letters) reuse .tabs/.tab */
+.lib-tabs { margin-bottom: 18px; }
+.lib-hint { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-3); margin: -2px 0 16px; }
+
+/* 3D-letter glyph grid (full set + numbers + special chars) */
+.lib-glyph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 16px 8px; width: 100%; }
+.lib-glyph { height: 92px; display: flex; align-items: center; justify-content: center; font-size: 54px; cursor: pointer; -webkit-text-stroke-width: 5px; }
+@media (max-width: 560px) { .lib-glyph-grid { grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); } .lib-glyph { font-size: 40px; height: 70px; } }
+
 .lib-type-list { display: flex; flex-direction: column; gap: 12px; width: 100%; }
 .lib-type-row { display: flex; align-items: baseline; gap: 14px; }
 .lt-tag { flex: 0 0 76px; font-size: 10px; color: var(--ink-4); }

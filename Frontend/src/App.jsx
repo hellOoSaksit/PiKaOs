@@ -13,10 +13,12 @@ import { MyDashboard } from './screens/screens-me.jsx';
 import { AuditLog, RolesPermissions, UserDetail, UserForm } from './screens/screens-rbac.jsx';
 import { AgentDrawer, Agents, Meeting, QuestBoard, QuestDrawer } from './screens/screens-secondary.jsx';
 import { SitemapAudit } from './screens/screens-sitemap.jsx';
+import { Compare } from './screens/screens-compare.jsx';
 import { ToolsManager } from './screens/screens-tools.jsx';
 import { ComponentLibrary } from './screens/screens-library.jsx';
 import { Workflows } from './screens/screens-workflows.jsx';
 import { useAuth } from './lib/auth.jsx';
+import { Menu } from './components/ui/Dropdown.jsx';
 import { World } from './screens/screens-world.jsx';
 import { SAMPLE_CHARS, loadArchived, loadChars, randPos, saveArchived, saveChars } from './lib/store.jsx';
 import { UILoadingHost, UIModalHost } from './lib/ui-modal.jsx';
@@ -38,7 +40,8 @@ const ROUTE_META = {
   meeting: { icon: "💬", title: "ห้องประชุม Agent", en: "Council" },
   codex:   { icon: "📚", title: "บันทึกความรู้", en: "Codex" },
   search:  { icon: "🔍", title: "ค้นหาความรู้", en: "Recall" },
-  sitemap: { icon: "🗺️", title: "ตรวจไซต์แมพ", en: "Sitemap Audit" },
+  sitemap: { icon: "🗺️", title: "ตรวจไซต์แมพ", en: "Sitemap Match" },
+  compare: { icon: "🔀", title: "เทียบเนื้อหา", en: "Compare Content" },
   mana:    { icon: "🔵", title: "มานา (Token)", en: "Mana" },
   treasury:{ icon: "💰", title: "คลังสมบัติ", en: "Treasury" },
   stats:   { icon: "📊", title: "สถิติการผจญภัย", en: "Chronicle" },
@@ -248,7 +251,46 @@ function ProfileMenu({ me, roles, t, onSignOut, onSaveProfile }) {
   );
 }
 
-function Topbar({ route, theme, setTheme, user, language, roleSwitch, t, me, roles, onSignOut, onSaveProfile }) {
+/* ---------------- View-as (impersonation preview) ---------------- */
+/* Admin-only control to preview the app exactly as another user sees it.
+   Gated upstream by realCan("user.manage"); the banner+exit ride on the
+   REAL identity so a preview can never trap you. */
+function ViewAsControl({ viewAs }) {
+  const { users, roles, realMe, onPick, T, t } = viewAs;
+  const items = users
+    .filter(u => u.id !== realMe.id)
+    .map(u => {
+      const r = roleByKey(roles, u.role);
+      return {
+        label: <span className="va-pick"><span className="va-pick-av">{u.avatar}</span>
+          <span className="va-pick-name">{u.display}</span>
+          <span className={`va-pick-role badge ${r.color || ""}`}>{T(r.en, r.th)}</span></span>,
+        onSelect: () => onPick(u.id),
+      };
+    });
+  return (
+    <div className="viewas-ctl" title={t("viewas.hint")}>
+      <Menu label={<span className="va-trigger">👁️ {t("viewas.enter")}</span>} items={items} minWidth={150} />
+    </div>
+  );
+}
+
+/* The persistent banner shown while previewing as someone, with the exit. */
+function ViewAsBanner({ user, roles, onExit, t, T }) {
+  const r = roleByKey(roles, user.role);
+  return (
+    <div className="viewas-banner" data-no-lex role="status">
+      <span className="vb-eye">👁️</span>
+      <span className="vb-text">
+        {t("viewas.banner")} <b>{user.avatar} {user.display}</b>
+        <span className={`badge ${r.color || ""}`} style={{ marginLeft: 6 }}>{T(r.en, r.th)}</span>
+      </span>
+      <button className="vb-exit" onClick={onExit}>✕ {t("viewas.exit")}</button>
+    </div>
+  );
+}
+
+function Topbar({ route, theme, setTheme, user, language, viewAs, t, me, roles, onSignOut, onSaveProfile }) {
   const m = ROUTE_META[route] || ROUTE_META.hall;
   const title = t("route." + route + ".title");
   const live = route === "hall" || route === "meeting" || route === "world";
@@ -262,15 +304,7 @@ function Topbar({ route, theme, setTheme, user, language, roleSwitch, t, me, rol
         {live && <span className="live-badge" style={{ marginLeft: 6 }}><span className="pulse-dot" />LIVE</span>}
       </div>
       <div className="topbar-spacer" />
-      {roleSwitch && (
-        <div className="role-switch" title={roleSwitch.label}>
-          <span className="rs-label mono">{roleSwitch.label}</span>
-          {roleSwitch.roles.map(r => (
-            <button key={r.key} className={`rs-btn ${roleSwitch.value === r.key ? "on" : ""}`}
-              onClick={() => roleSwitch.onChange(r.key)}>{roleSwitch.T(r.en, r.th)}</button>
-          ))}
-        </div>
-      )}
+      {viewAs && <ViewAsControl viewAs={viewAs} />}
       <div className="tb-stat" data-no-lex>
         <span className="tbs-ico">🔵</span>
         <span className="tbs-num">{(MANA.balance/1000).toFixed(1)}K</span>
@@ -339,7 +373,7 @@ function App() {
   const [toolRuns, setToolRuns] = useState(() => loadWF("runs", TOOL_RUNS_SEED));
   // slug used by the (still client-side) RBAC seed: "u_somchai" etc.
   const currentUserId = currentUser ? ("u_" + currentUser.username) : "u_somchai";
-  const [viewAsRole, setViewAsRole] = useState(null);   // role override for testing
+  const [viewAs, setViewAs] = useState(null);   // user id being previewed (in-memory only — never persisted)
   const [userSel, setUserSel] = useState(null);         // selected user id (detail)
   const [userForm, setUserForm] = useState(null);       // null | {} | user
 
@@ -412,10 +446,16 @@ function App() {
 
   // ---- resolve current user + permissions ----
   const T = (en, th) => language === "en" ? en : th;
-  const baseMe = userById(users, currentUserId) || users[0];
-  const effRole = viewAsRole || baseMe.role;
-  const me = { ...baseMe, role: effRole };
-  const mePerms = resolvePerms(effRole, rolePerms, userPerms[baseMe.id]);
+  // REAL identity — never affected by "view as". The view-as entry + exit ride on this,
+  // so previewing as a viewer can never trap you (you keep your real ability to leave).
+  const realMe = userById(users, currentUserId) || users[0];
+  const realPerms = resolvePerms(realMe.role, rolePerms, userPerms[realMe.id]);
+  const realCan = (k) => realPerms.has(k);
+  // EFFECTIVE identity — who you're previewing as (their role + their own overrides), or yourself.
+  const viewUser = viewAs ? userById(users, viewAs) : null;
+  const viewingAs = (viewUser && viewUser.id !== realMe.id) ? viewUser : null;
+  const me = viewUser || realMe;
+  const mePerms = resolvePerms(me.role, rolePerms, userPerms[me.id]);
   const can = (k) => mePerms.has(k);
   const logAudit = (action, targetType, target, meta) =>
     setAudit(prev => [{ id: "ev" + Date.now(), actor: currentUserId, action, targetType, target, meta, time: T("just now", "เมื่อสักครู่") }, ...prev]);
@@ -435,7 +475,6 @@ function App() {
       setWorkflows(prev => prev.map(x => x.id === wf.id ? { ...x, runs: (x.runs || 0) + 1, lastStatus: res.status } : x));
     },
     openBuilder: S.openBuilder,
-    viewAsRole, setViewAsRole,
     openUserForm: (u) => setUserForm(u || {}),
     saveUser: (f, edit) => {
       if (edit) { setUsers(prev => prev.map(x => x.id === f.id ? { ...x, ...f } : x)); logAudit("user.update", "user", f.id, T("profile updated", "แก้ไขโปรไฟล์")); }
@@ -484,7 +523,7 @@ function App() {
   useEffect(() => {
     const need = ROUTE_PERM[route];
     if (need && !can(need)) go("me");
-  }, [route, viewAsRole, rolePerms, userPerms]);
+  }, [route, viewAs, rolePerms, userPerms]);
 
   if (!auth.ready) return null;   // avoid flashing the login screen while restoring a session
   if (!auth.loggedIn) return <Login onLogin={auth.login} t={t} />;
@@ -501,6 +540,7 @@ function App() {
       case "codex": return <Codex t={t} />;
       case "search": return <Recall lang={language} />;
       case "sitemap": return <SitemapAudit t={t} lang={language} can={can} actor={me.display_name || me.username || "ผู้ใช้"} />;
+      case "compare": return <Compare t={t} lang={language} />;
       case "mana": return <Mana S={S} t={t} />;
       case "treasury": return <Treasury t={t} />;
       case "stats": return <Chronicle S={S} t={t} />;
@@ -525,7 +565,8 @@ function App() {
         <Topbar route={route} theme={theme} setTheme={setTheme} user={username} language={language} t={t}
           me={me} roles={roles} onSignOut={auth.logout}
           onSaveProfile={(u) => setUsers(prev => prev.map(x => x.id === currentUserId ? { ...x, ...u } : x))}
-          roleSwitch={{ label: t("topbar.viewAs"), value: effRole, roles, onChange: setViewAsRole, T }} />
+          viewAs={realCan("user.manage") ? { users, roles, realMe, current: viewingAs, onPick: setViewAs, T, t } : null} />
+        {viewingAs && <ViewAsBanner user={viewingAs} roles={roles} onExit={() => setViewAs(null)} t={t} T={T} />}
         <div className="content">{screen}</div>
       </div>
       {userForm && <UserForm Sys={Sys} initial={userForm.id ? userForm : null} onClose={() => setUserForm(null)} />}

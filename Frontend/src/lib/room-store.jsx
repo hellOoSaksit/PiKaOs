@@ -11,7 +11,7 @@ import { FURN, objCells } from './room-tiles.jsx';
      struct[i] 0 none · 1 wall · 2 door
      objects   [{ key, x, y, rot }]
    ============================================================ */
-const ROOM_W = 32, ROOM_H = 20;
+const ROOM_W = 44, ROOM_H = 28;
 const LS_KEY = "guildos.rooms.v2";
 const idx = (x, y, w) => y * w + x;
 let _rid = 1; const newId = () => "rm" + (_rid++) + Date.now().toString(36).slice(-3);
@@ -32,34 +32,40 @@ function blankRoom(name, fill = 1, extra = {}) {
 /* ---- the furnished demo room (showcases the system) ---- */
 function demoRoom() {
   const r = blankRoom("ออฟฟิศกลาง · Hermes HQ", 1, { dept: "ศูนย์กลาง", ceo: "HERMES" });
-  const w = r.w, h = r.h;
+  const w = r.w, h = r.h;                                  // 44×28 — layout is w/h-relative
   const setF = (x, y, v) => { if (x > 0 && y > 0 && x < w - 1 && y < h - 1) r.floor[idx(x, y, w)] = v; };
   const setS = (x, y, v) => { if (x >= 0 && y >= 0 && x < w && y < h) r.struct[idx(x, y, w)] = v; };
+  const div = 23, mid = 13;                                // interior wall col + pantry/meeting split row
   // zones: pantry (tile) top-right, meeting (carpet) bottom-right
-  for (let y = 1; y <= 9; y++) for (let x = 18; x <= 30; x++) setF(x, y, 2);
-  for (let y = 11; y <= 18; y++) for (let x = 18; x <= 30; x++) setF(x, y, 3);
+  for (let y = 1; y < mid; y++) for (let x = div + 1; x <= w - 2; x++) setF(x, y, 2);
+  for (let y = mid + 1; y <= h - 2; y++) for (let x = div + 1; x <= w - 2; x++) setF(x, y, 3);
   // interior walls + doors
-  for (let y = 1; y <= 18; y++) setS(17, y, 1);
-  setS(17, 9, 2); setS(17, 10, 2);
-  for (let x = 18; x <= 30; x++) setS(x, 10, 1);
-  setS(24, 10, 2); setF(24, 10, 2);
+  for (let y = 1; y <= h - 2; y++) setS(div, y, 1);
+  setS(div, 11, 2); setS(div, 12, 2);
+  for (let x = div + 1; x <= w - 2; x++) setS(x, mid, 1);
+  setS(div + 8, mid, 2); setF(div + 8, mid, 2);
   const o = r.objects;
   const P = (key, x, y, rot = 0) => o.push({ key, x, y, rot });
-  // left open office: desks + chairs
-  [[2, 4], [6, 4], [2, 9], [6, 9], [2, 14], [6, 14], [11, 4], [11, 9]].forEach(([x, y]) => { P("desk", x, y); P("chair", x, y + 1); });
-  P("bookshelf", 2, 1); P("bookshelf", 5, 1); P("bookshelf", 9, 1); P("bookshelf", 13, 1);
-  P("plantT", 15, 2); P("plantS", 15, 17); P("plantT", 1, 17);
-  // left lounge corner
-  P("rug", 12, 15); P("sofa", 12, 16); P("armchair", 14, 15, 3); P("coffee", 13, 14);
-  // pantry
-  P("vending", 19, 1); P("counter", 21, 1); P("counter", 22, 1); P("counter", 23, 1);
-  P("cooler", 26, 1); P("fridge", 28, 1); P("clock", 24, 1);
-  P("table", 20, 5); P("chair", 20, 6); P("chair", 21, 6);
-  P("plantS", 29, 8);
-  // meeting room
-  P("rug", 22, 13); P("table", 22, 14); P("armchair", 22, 13, 2); P("armchair", 23, 13, 2);
-  P("armchair", 22, 16); P("armchair", 23, 16); P("bookshelf", 19, 11); P("bookshelf", 27, 11);
-  P("painting", 24, 11); P("plantT", 29, 17); P("plantT", 18, 17);
+  // left open office: desk pods + chairs
+  [[2, 4], [7, 4], [12, 4], [2, 9], [7, 9], [12, 9], [2, 14], [7, 14], [12, 14], [2, 19], [7, 19], [16, 6], [16, 11]]
+    .forEach(([x, y]) => { P("desk", x, y); P("chair", x, y + 1); });
+  P("bookshelf", 2, 1); P("bookshelf", 6, 1); P("bookshelf", 10, 1); P("bookshelf", 15, 1); P("bookshelf", 19, 1);
+  P("plantT", 21, 3); P("plantS", 21, 16); P("plantT", 1, h - 3); P("plantS", 1, 12);
+  // left lounge corner (south)
+  P("rug", 13, h - 6); P("sofa", 13, h - 5); P("armchair", 16, h - 6, 3); P("coffee", 14, h - 7);
+  P("tv", 13, h - 9); P("plantS", 17, h - 4);
+  // pantry (top-right)
+  P("vending", div + 2, 1); P("counter", div + 4, 1); P("counter", div + 5, 1); P("counter", div + 6, 1);
+  P("cooler", div + 9, 1); P("fridge", div + 12, 1); P("clock", div + 7, 1);
+  P("table", div + 3, 5); P("chair", div + 3, 6); P("chair", div + 4, 6);
+  P("table", div + 9, 5); P("chair", div + 9, 6); P("chair", div + 10, 6);
+  P("sofa", div + 14, 8); P("coffee", div + 16, 7); P("plantS", w - 3, 10); P("plantT", w - 3, 2);
+  // meeting room (bottom-right)
+  P("rug", div + 6, mid + 4); P("table", div + 6, mid + 5); P("armchair", div + 6, mid + 4, 2); P("armchair", div + 7, mid + 4, 2);
+  P("armchair", div + 6, mid + 7); P("armchair", div + 7, mid + 7);
+  P("bookshelf", div + 1, mid + 1); P("bookshelf", div + 10, mid + 1); P("painting", div + 5, mid + 1); P("tv", div + 12, mid + 1);
+  P("table", div + 4, mid + 10); P("chair", div + 4, mid + 11); P("chair", div + 5, mid + 11); P("chair", div + 4, mid + 9, 2);
+  P("plantT", w - 3, h - 3); P("plantT", div + 1, h - 3); P("plantS", w - 3, mid + 2);
   return r;
 }
 

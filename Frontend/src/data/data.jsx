@@ -126,11 +126,12 @@ const NAV = [
     { id: "quests", icon: "📜", label: "กระดานภารกิจ", en: "Quest Board", tag: "4" },
     { id: "world", icon: "🌍", label: "สถานะโลก", en: "World State" },
     { id: "workflows", icon: "⚗️", label: "โต๊ะปรุงเวท", en: "Workflows" },
+    { id: "sitemap", icon: "🗺️", label: "ตรวจไซต์แมพ", en: "Sitemap Match" },
+    { id: "compare", icon: "🔀", label: "เทียบเนื้อหา", en: "Compare Content" },
   ]},
   { group: "ความรู้และความทรงจำ", items: [
     { id: "codex", icon: "📚", label: "บันทึกความรู้", en: "Codex" },
     { id: "search", icon: "🔍", label: "ค้นหาความรู้", en: "Recall" },
-    { id: "sitemap", icon: "🗺️", label: "ตรวจไซต์แมพ", en: "Sitemap Audit" },
   ]},
   { group: "ผู้ดูแลกิลด์", items: [
     { id: "admin", icon: "👥", label: "จัดการผู้ใช้", en: "User Management", perm: "user.view.any" },

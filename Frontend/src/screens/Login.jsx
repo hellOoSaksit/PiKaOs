@@ -51,7 +51,7 @@ export function Login({ onLogin, t }) {
 
   const userErr = validateUser(user);
   const pwErr = validatePw(pw);
-  const word = "PiKaOs".split("");
+  const word = "PiKaOS!".split("");
   const jelly = (e) => {
     const el = e.currentTarget;
     el.classList.remove("jelly", "drop");
@@ -93,7 +93,7 @@ export function Login({ onLogin, t }) {
   return (
     <div className="login-stage">
       <div className="login-hero">
-        <div className="login-logo" aria-label="PiKaOs">
+        <div className="login-logo" aria-label="PiKaOS!">
           {word.map((ch, i) => (
             <span key={i} className="ltr drop" onClick={jelly}
               style={{ "--i": i, "--tilt": LOGO_TILTS[i % LOGO_TILTS.length] }}>{ch}</span>
