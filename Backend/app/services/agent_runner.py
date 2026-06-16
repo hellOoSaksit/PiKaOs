@@ -33,6 +33,7 @@ from .. import redis_client
 from ..config import settings
 from ..db import SessionLocal
 from ..repositories import runs as runs_repo
+from . import events
 
 log = logging.getLogger("pikaos.engine")
 
@@ -148,6 +149,8 @@ async def run(
         agent = await runs_repo.get_agent(db, run_row.agent_id) if run_row.agent_id else None
         owner_id = agent.owner_id if agent else None
         model = (agent.model if agent and agent.model else "") or "stub"
+        # quest the worklog streams to (None → run not bound to a quest → events go nowhere)
+        quest_id = str(run_row.quest_id) if run_row.quest_id else None
 
         steps = await runs_repo.list_steps(db, rid)
         seq = (steps[-1].seq + 1) if steps else 0
@@ -160,6 +163,7 @@ async def run(
             if action == "wait_input":
                 await runs_repo.set_run_status(db, rid, "waiting_input")
                 await runs_repo.set_agent_status(db, run_row.agent_id, "idle")
+                await events.publish_run(quest_id, rid, "waiting_input")
                 log.info("run %s resumed onto pending side_effect → waiting_input", rid)
                 return "waiting_input"
             # replay-safe → re-dispatch with the SAME idempotency_key, then complete the step
@@ -173,11 +177,14 @@ async def run(
                 await runs_repo.complete_step(db, last.id, status=STATUS_FAILED, content={**(last.content or {}), "error": str(exc)})
                 return await _fail(db, run_row, f"tool_error: {exc}")
             await runs_repo.complete_step(db, last.id, status=STATUS_DONE, content={**(last.content or {}), "result": result})
+            last.status, last.content = STATUS_DONE, {**(last.content or {}), "result": result}
+            await events.publish_step(quest_id, last)
             steps = await runs_repo.list_steps(db, rid)
             seq = steps[-1].seq + 1
 
         await runs_repo.set_run_status(db, rid, "running", started=(run_row.started_at is None))
         await runs_repo.set_agent_status(db, run_row.agent_id, "busy")
+        await events.publish_run(quest_id, rid, "running")
 
         messages = messages_from_run(run_row.input, steps)
         # steps already executed this run (caps apply to the whole run, across resumes)
@@ -189,6 +196,7 @@ async def run(
             if await redis_client.is_run_cancelled(str(rid)):
                 await runs_repo.set_run_status(db, rid, "cancelled", ended=True)
                 await runs_repo.set_agent_status(db, run_row.agent_id, "idle")
+                await events.publish_run(quest_id, rid, "cancelled")
                 return "cancelled"
             if used_steps >= settings.run_max_steps:
                 return await _fail(db, run_row, "max_steps_exceeded")
@@ -208,16 +216,18 @@ async def run(
 
             # Reserve quota BEFORE persisting the step → users.used stays == Σ run_steps.tokens.
             if not await runs_repo.reserve_quota(db, owner_id, llm.tokens):
-                await runs_repo.insert_step(
+                qstep = await runs_repo.insert_step(
                     db, rid, seq, "status", content={"error": "quota_exceeded", "needed": llm.tokens}, tokens=0,
                 )
+                await events.publish_step(quest_id, qstep)
                 return await _fail(db, run_row, "quota_exceeded")
 
-            await runs_repo.insert_step(
+            step = await runs_repo.insert_step(
                 db, rid, seq, "llm", role="assistant", tokens=llm.tokens,
                 content={"text": llm.text, "tool_name": llm.tool_name, "tool_args": llm.tool_args},
             )
             await runs_repo.add_run_tokens(db, rid, llm.tokens)
+            await events.publish_step(quest_id, step)
             seq += 1
             used_steps += 1
             asst: dict = {"role": "assistant", "content": llm.text}
@@ -228,6 +238,7 @@ async def run(
             if llm.stop_reason != "tool_use" or not llm.tool_name:
                 await runs_repo.set_run_status(db, rid, "done", ended=True)
                 await runs_repo.set_agent_status(db, run_row.agent_id, "idle")
+                await events.publish_run(quest_id, rid, "done", tokens_used=run_row.tokens_used)
                 return "done"
 
             # --- two-phase tool step ---
@@ -238,6 +249,7 @@ async def run(
                 db, rid, seq, "tool", status=STATUS_PENDING, idempotency_key=idem, role="tool",
                 content={"intent": {"name": name, "args": targs}, "effect": effect},
             )
+            await events.publish_step(quest_id, pending)  # pending shows in the timeline immediately
             seq += 1
             used_steps += 1
             try:
@@ -247,12 +259,18 @@ async def run(
                 )
             except asyncio.TimeoutError:
                 await runs_repo.complete_step(db, pending.id, status=STATUS_FAILED, content={**(pending.content or {}), "error": "tool_timeout"})
+                pending.status, pending.content = STATUS_FAILED, {**(pending.content or {}), "error": "tool_timeout"}
+                await events.publish_step(quest_id, pending)
                 return await _fail(db, run_row, "tool_timeout")
             except Exception as exc:  # noqa: BLE001
                 await runs_repo.complete_step(db, pending.id, status=STATUS_FAILED, content={**(pending.content or {}), "error": str(exc)})
+                pending.status, pending.content = STATUS_FAILED, {**(pending.content or {}), "error": str(exc)}
+                await events.publish_step(quest_id, pending)
                 return await _fail(db, run_row, f"tool_error: {exc}")
 
             await runs_repo.complete_step(db, pending.id, status=STATUS_DONE, content={**(pending.content or {}), "result": result})
+            pending.status, pending.content = STATUS_DONE, {**(pending.content or {}), "result": result}
+            await events.publish_step(quest_id, pending)
             messages.append({"role": "tool", "name": name, "content": result})
             # loop back: feed the tool result to the next LLM step
 
@@ -277,8 +295,10 @@ async def run_job(run_id: str) -> str:
 
 
 async def _fail(db, run_row, error: str) -> str:
-    """Mark the run failed + free its agent, and return 'failed' for the caller."""
+    """Mark the run failed + free its agent, emit the terminal event, return 'failed'."""
     await runs_repo.set_run_status(db, run_row.id, "failed", ended=True, error=error)
     await runs_repo.set_agent_status(db, run_row.agent_id, "idle")
+    quest_id = str(run_row.quest_id) if run_row.quest_id else None
+    await events.publish_run(quest_id, run_row.id, "failed", error=error)
     log.info("run %s failed: %s", run_row.id, error)
     return "failed"

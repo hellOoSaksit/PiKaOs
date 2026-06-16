@@ -65,5 +65,7 @@ async def test_rejects_denylisted_token(monkeypatch):
     assert await wsmod._authenticate(ws) is None
 
 
-async def test_quest_authz_denied_until_phase_b():
+async def test_quest_authz_denies_malformed_ids():
+    # B5: _can_view_quest now runs real authz (quest_service.can_view); non-UUID ids are
+    # rejected before any DB hit. Owner/department/admin grants are covered in test_quest_stream.
     assert await wsmod._can_view_quest("u1", "q1") is False
