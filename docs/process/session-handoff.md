@@ -79,7 +79,7 @@
   **ต้อง restart backend container** ให้ migration+seed รัน. **เฟส A ปิดแล้ว** — เหลือเฉพาะ A2 ส่วนเฟส B (per-quest authz + run_steps backfill)
   ที่ต้องรอตาราง engine. ✅ A1·A3·A4·A5·A6·A7·A8·A9 + A2 (P0 token-in-URL + per-user channel) — เสร็จ 2026-06-16;
   migration ล่าสุด `0004_engine` (B1 ✅); backend tests 81 เขียว; CI `.github/workflows/ci.yml` รันจริงตอน push.
-> **[2026-06-16] เฟส B เริ่ม — B1 ✅:** `0004_engine` สร้าง 10 ตาราง engine (`departments`/`user_departments` m:n · `rooms`/`agents`/`quests`/`runs`/`subtasks`/`run_steps`/`tools_config`/`notifications`) + `documents.department_id` · FK/cascade/UNIQUE ตาม risk-mitigation §4.4 · ORM models ใน `models.py` · schema-only (seed แผนก + CRUD = เฟส D). **ถัดไป B2 (arq worker เป็น service ใน compose).**
+> **[2026-06-16] เฟส B เริ่ม — B1 ✅:** `0004_engine` สร้าง 10 ตาราง engine (`departments`/`user_departments` m:n · `rooms`/`agents`/`quests`/`runs`/`subtasks`/`run_steps`/`tools_config`/`notifications`) + `documents.department_id` · FK/cascade/UNIQUE ตาม risk-mitigation §4.4 · ORM models ใน `models.py` · schema-only (seed แผนก + CRUD = เฟส D). · **B2 ✅** `worker` service ใน compose + `app/worker.py` (arq 0.28, ping job; enqueue→pong ยืนยันแล้ว). **ถัดไป B3 (agent_runner loop: 2-phase steps + resume + quota + timeout + stub LLM/tool).**
 - **ถัดไปแนะนำ**: ผูก `require_perm("compare.run")` + rate-limit ที่ compare (compare-hardening §2 ปลดล็อกแล้ว) หรือ A3 FK (เล็ก).
 - **เฟส B**: engine core + arq + 2-phase resume + atomic quota + timeout.
 - ✅ **ตอบแล้ว (2026-06-12): multi-tenancy = องค์กรเดียว หลายแผนก** → `department_id` ทุก scopable table
