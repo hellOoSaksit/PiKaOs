@@ -201,7 +201,6 @@ docker compose logs -f backend    # watch a service
 |---|---|
 | [`Frontend/`](Frontend) | Vite + React SPA (UI, i18n, RBAC-aware) |
 | [`Backend/`](Backend) | FastAPI service + arq worker (auth, API, WS, engine) |
-| [`design-system/`](design-system) | Static design deliverables (HTML) |
 | [`docker-compose.yml`](docker-compose.yml) | Postgres · Redis · MinIO · backend · worker · frontend |
 
 ---
