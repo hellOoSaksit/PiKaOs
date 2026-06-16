@@ -37,12 +37,22 @@ schema ใหม่มาพร้อม FK/index ([risk-mitigation §4.4](../ar
 | A4 | ✅ **เสร็จ (2026-06-15)** Boot asserts (prod): jwt_secret/cookie_secure/seed_password/minio_secret ≠ default → ตายตอนบูต (`config.production_violations` + `main.lifespan`, `tests/test_config.py`) | risk-mitigation §5.4 |
 | A5 | 🟡 Pin `minio` image ✅ (digest, docker-compose.yml) · ⬜ ย้าย `passlib` → `argon2-cffi` ใน `security.py` (เสี่ยง hash เดิม — ทำพร้อม test login) | tech-stack §3.1–3.2 |
 | A6 | **CI** (GitHub Actions): `npm run build` + ESLint(ใหม่) + `pytest` + grep กติกา component-first | tech-stack §3.3–3.4 |
+| A7 | ✅ **เสร็จ (2026-06-15)** SSRF guard: `net_guard.py` (บล็อก private/loopback + allowlist + httpx hook) ผูกกับ compare/audit · `tests/test_net_guard.py` | compare-hardening §1–2 |
+| A8 | **Process model + กันล้ม (เพิ่ม 2026-06-16)**: รัน API หลาย worker (`gunicorn -k uvicorn.workers.UvicornWorker -w N` หรือ `uvicorn --workers`) + `restart: unless-stopped` ทุก service ใน compose — 1 request พิษ/leak ไม่ลากทั้ง API ตาย | — |
+| A9 | **Graceful degradation (เพิ่ม 2026-06-16)**: Redis ล่ม → perms อ่าน DB ตรง (ข้าม cache); MinIO ล่ม → เฉพาะ feature ไฟล์ error ไม่ใช่ 500 ทั้งระบบ — ใส่ timeout + try/catch ต่อ dependency ใน `redis_client`/`storage` | — |
+
+> **คอขวดจริงคือ I/O ไม่ใช่ CPU** (ประเมิน 2026-06-16): "เร็วกว่า" = ขนานงาน I/O + ปลด blocking
+> ไม่ใช่ optimize อัลกอริทึม (BE มีงาน CPU แค่ argon2 ซึ่งห้ามเร่ง). ของหนักจริง (LLM/engine) แยกเป็น
+> **arq worker** ตั้งแต่เกิด → ดูเฟส B (B2); A8/A9 คือกันล้มของ API เดิมที่ทำได้ทันที **โดยไม่แตก
+> microservices** (over-engineer สำหรับองค์กรเดียว — ดู §7.1 single org/many depts).
 
 **เกณฑ์ตรวจรับ (Definition of Done)**
 - เรียก API เขียนข้อมูลโดยไม่มี perm → 403 พร้อม `missing permission: <key>` (test ครอบ).
 - ผู้ใช้ B subscribe quest ของ A ที่ตนไม่มีสิทธิ์ → 4403; token ไม่ปรากฏใน access log ของ proxy.
 - `pytest` เขียว + CI เขียวบน PR; boot ด้วย `ENVIRONMENT=production` + secret default → ตายทันทีพร้อมข้อความชัด.
 - Login เดิมทั้ง 6 user ใช้ได้ต่อ (hash argon2id เดิม verify ผ่าน lib ใหม่).
+- (A8/A9) `docker compose stop redis` แล้ว login ที่ token ยังไม่หมดอายุ ยังเรียก API อ่านได้ (perms fallback DB);
+  ฆ่า 1 worker ระหว่างมี request → request อื่นไม่ร่วง.
 
 **ความเสี่ยงของเฟส**: RBAC seed ฝั่ง client/server ไม่ตรงกัน (email `@guildos.io` เดิม) —
 กำหนดให้ **server เป็น source of truth, map ด้วย `username`** ตั้งแต่ A1.

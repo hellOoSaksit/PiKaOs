@@ -21,6 +21,12 @@
   (deny ชนะ), admin = ทุก perm · **map ผู้ใช้ด้วย `username`** ไม่ใช่ email (`@guildos.io` ฝั่ง seed ทำให้ drift) ·
   cache Redis `perms:<id>` TTL 60s → **ต้อง `rbac_service.invalidate()` เมื่อแก้ role/override** ·
   **ทุก endpoint เขียนข้อมูลต่อจากนี้ประกาศ `Depends(require_perm("..."))`** (CLAUDE.md §2.2) · risk-mitigation §2.
+- **[2026-06-16] Redis ล่ม = degrade ไม่ใช่ล่ม (A9 graceful degradation)** → read-path ที่ทุก request auth
+  วิ่งผ่านทน Redis outage: deny-list **fail-open** (ตรวจ revoke ไม่ได้ → ปล่อยผ่าน เพราะ access token อายุสั้น
+  15m, gap จำกัด + log เตือน), perms cache miss → อ่าน DB ตรง; logout/cache-bust = best-effort (ไม่ raise) ·
+  login/refresh ยังต้องพึ่ง Redis (raise ตามจริง) · เพราะ availability > revoke ทันที สำหรับ internal tool ·
+  **ถ้า prod ต้องเข้มกว่า → เปลี่ยน `is_access_denied` เป็น fail-closed/ทำ config flag** ·
+  [`redis_client.py`](../../Backend/app/redis_client.py), [`tests/test_resilience.py`](../../Backend/tests/test_resilience.py).
 
 ## B. ความน่าเชื่อถือของ input (กฎที่ได้จากของจริง)
 

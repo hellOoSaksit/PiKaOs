@@ -31,8 +31,15 @@
 
 ---
 
-## สถานะงาน (อัปเดต: 2026-06-15)
+## สถานะงาน (อัปเดต: 2026-06-16)
 
+> **[2026-06-16] ประเมินทุกระบบ (read-only) + ตัดสินใจ resilience:** สำรวจ FE/BE/infra ครบ —
+> FE สุก (~19k บรรทัด, จุดอ่อนเดียว: ไม่มี CI/lint/test), BE foundation แกร่ง (auth/RBAC/compare/SSRF)
+> แต่ **engine ยังเป็น 0 บรรทัด**. เพิ่ม **A7 (SSRF, ที่หายจากตาราง) · A8 (multi-worker+restart) ·
+> A9 (graceful degradation)** ใน [improvement-plan](improvement-plan.md) — กันล้มแบบคุ้ม ไม่แตก
+> microservices. แก้ [CLAUDE.md](../../CLAUDE.md) §4 ที่ค้าง (บอก RBAC ยัง client-side ทั้งที่ A1 เสร็จ).
+> คอขวด = I/O ไม่ใช่ CPU → เร่งด้วยขนาน/queue ไม่ใช่ optimize เลข.
+>
 > **[2026-06-15] docs แยกตามหน้าที่:** เพิ่ม `process/playbook.md` (รูปแบบการทำงาน/แนวทาง) +
 > `process/lessons.md` (ประสบการณ์ + decision log — รวม "อย่าทำผิดซ้ำ" ที่เคยอยู่ใน PROMPT มาไว้ที่เดียว);
 > [docs/README.md](../README.md) เขียนใหม่เป็น router แยก 4 หน้าที่; CLAUDE.md มี **Task router** บนสุด +
