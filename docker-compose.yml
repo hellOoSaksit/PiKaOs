@@ -113,7 +113,28 @@ services:
       - ./Backend:/app
     command: ["arq", "app.worker.WorkerSettings"]
 
+  # frontend — Vite dev server in Docker (whole stack runs here; logs viewed in Docker, not a cmd tab).
+  # Bind mount = hot reload; node_modules in a named volume (off the Windows host). Vite proxies
+  # /api + /ws to the backend over the compose network. VITE_POLL=true so the watcher fires on a
+  # Windows→Docker bind mount; VITE_OPEN=false so it doesn't try to launch a browser in the container.
+  frontend:
+    build: ./Frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      VITE_PROXY_TARGET: http://backend:8000
+      VITE_OPEN: "false"
+      VITE_POLL: "true"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./Frontend:/app
+      - frontend_node_modules:/app/node_modules
+
 volumes:
   pgdata:
   redisdata:
   miniodata:
+  frontend_node_modules:

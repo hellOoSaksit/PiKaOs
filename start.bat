@@ -6,13 +6,12 @@ rem  Flow:
 rem    1) make sure the Docker engine is running
 rem         - if not, start Docker Desktop and wait
 rem         - if it still won't come up, run fix-docker.bat and wait
-rem    2) bring up the backend infra (Postgres+pgvector, Redis, MinIO, API)
-rem         via `docker compose up -d --build`
-rem    3) open ONE Windows Terminal window with two color-coded TABS
-rem         Frontend - dev (indigo)  +  Backend (green)
-rem       (tabs, not several separate windows)
+rem    2) bring up the WHOLE stack in Docker (Postgres, Redis, MinIO, API,
+rem         Worker, Frontend) via `docker compose up -d --build`
+rem    3) open the app in the browser and exit
 rem
-rem  Requires Windows Terminal (wt.exe) - built into Windows 11.
+rem  No cmd tabs for the frontend/backend any more - everything runs in Docker;
+rem  watch logs in Docker Desktop (or `docker compose logs -f <service>`).
 rem ===========================================================
 setlocal EnableExtensions
 set "ROOT=%~dp0"
@@ -72,8 +71,8 @@ exit /b 1
 echo       Docker engine OK.
 echo.
 
-rem ---- 2. bring up backend infrastructure --------------------
-echo [2/3] Starting backend infra (Postgres+pgvector, Redis, MinIO, API)...
+rem ---- 2. bring up the whole stack in Docker -----------------
+echo [2/3] Starting the stack in Docker (db, redis, minio, backend, worker, frontend)...
 pushd "%ROOT%"
 docker compose up -d --build
 popd
@@ -82,27 +81,14 @@ call :waitbackend 90
 if %errorlevel%==0 (echo       Backend API is ready.) else (echo       Backend not ready yet - opening anyway; reload the page in a moment.)
 echo.
 
-rem ---- 3. open the app in Windows Terminal tabs --------------
-echo [3/3] Opening Windows Terminal tabs...
-where wt >nul 2>nul
-if errorlevel 1 goto :nowt
-
-rem  -w pikaos = reuse one named window (re-running adds tabs, not windows).
-rem  Two tabs only (no Docker / Shell). --tabColor gives each a brand color:
-rem    Frontend = indigo (#4361EE) · Backend = green (#12A150).
-rem  Tabs that target the repo root use "%ROOT%." - the trailing dot avoids a
-rem  backslash right before the closing quote, which wt would misread.
-rem  The Frontend tab calls Frontend\dev.bat (a real file) instead of an inline
-rem  command - wt mis-parses & and () inside cmd /k, which stopped the dev server.
-wt -w pikaos new-tab --title "Frontend - dev" --tabColor "#4361EE" -d "%ROOT%Frontend" cmd /k "%ROOT%Frontend\dev.bat" ; new-tab --title "Backend" --tabColor "#12A150" -d "%ROOT%." cmd /k "docker compose logs -f backend"
-
-echo       Launched. You can close this window.
+rem ---- 3. open the app + exit (logs are in Docker Desktop) ----
+echo [3/3] Opening http://localhost:5173 ...
+start "" "http://localhost:5173"
+echo.
+echo       All services run in Docker. Watch logs in Docker Desktop, or:
+echo         docker compose logs -f frontend   (or backend / worker)
+echo       You can close this window.
 timeout /t 3 >nul
-exit /b 0
-
-:nowt
-echo       Windows Terminal (wt.exe) not found - falling back to a single window.
-call "%ROOT%Frontend\dev.bat"
 exit /b 0
 
 rem ===========================================================
