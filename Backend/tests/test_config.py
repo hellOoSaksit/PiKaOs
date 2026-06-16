@@ -33,6 +33,12 @@ def test_short_jwt_secret_flagged():
     assert any("JWT_SECRET" in x for x in s.production_violations())
 
 
+def test_jwt_secret_below_32_flagged():
+    # PyJWT 2.13 warns on <32-byte HMAC keys for SHA256 — A4 now requires >=32 chars in prod
+    s = Settings(environment="production", **{**_SAFE, "jwt_secret": "x" * 20})
+    assert any("JWT_SECRET" in x for x in s.production_violations())
+
+
 def test_no_violations_when_secure():
     s = Settings(environment="production", **_SAFE)
     assert s.production_violations() == []
