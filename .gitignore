@@ -10,6 +10,12 @@ dist-ssr
 # claude code local config / tooling (kept local, not published)
 .claude/
 CLAUDE.md
+.mcp.json
+.playwright-mcp/
+
+# local debug / test artifacts (screenshots, scratch scripts)
+ratch-pair-diff.png
+Backend/smoke_*.py
 
 # python / backend
 __pycache__/
