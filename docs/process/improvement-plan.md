@@ -66,7 +66,7 @@ schema ใหม่มาพร้อม FK/index ([risk-mitigation §4.4](../ar
 
 | # | งาน |
 |---|---|
-| B1 | Migration ตาราง engine ครบชุด: `departments` + `user_departments` (m:n) + `agents/rooms/quests/runs/run_steps/subtasks/tools_config/notifications` พร้อม `department_id` บน scopable tables + FK/UNIQUE/index ตาม risk-mitigation §4.4 + [system-design §7.1](../architecture/system-design.md#71-department-scoping-) |
+| B1 | ✅ **เสร็จ (2026-06-16)** Migration `0004_engine` + ORM models: `departments` + `user_departments` (m:n) + `agents/rooms/quests/runs/run_steps/subtasks/tools_config/notifications` + `documents.department_id`. FK/UNIQUE/index ตาม §4.4 (run_steps UNIQUE(run_id,seq)+CASCADE · runs self-FK CASCADE · agent/quest/room/dept SET NULL) — ยืนยันด้วย `\d` + 81 tests. **Seed แผนก/CRUD ไว้เฟส D.** [system-design §7.1](../architecture/system-design.md#71-department-scoping-) |
 | B2 | arq worker เป็น service ใหม่ใน compose (image เดิม, command `arq`) |
 | B3 | `agent_runner.run` loop: 2-phase tool steps + effect class + resume + atomic quota + per-step timeout (config ใหม่ใน `config.py`) |
 | B4 | **Stub LLM provider** (script ตอบตามลำดับ) + **stub side-effect tool** (เขียนแถว table ทดสอบ) |
