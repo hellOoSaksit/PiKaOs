@@ -76,9 +76,9 @@
 - ✅ **A1 RBAC server-side เสร็จแล้ว (2026-06-15)** → migration `0002_rbac` (4 ตาราง) · `repositories/rbac.py` ·
   `services/rbac_service.py` (effective perms + Redis cache) · `deps.require_perm` · `/me`+login คืน `permissions[]` ·
   seed RBAC ใน `scripts/seed.py` · [`tests/test_rbac.py`](../../Backend/tests/test_rbac.py) (8 passed, 51 รวมในเครื่อง).
-  **ต้อง restart backend container** ให้ migration+seed รัน. คงค้างเฟส A: **A6 CI** + A2 ส่วนเฟส B (per-quest authz + backfill)
-  (✅ A3 FK · A5 passlib→argon2 · A7 SSRF · A8 multi-worker/restart · A9 graceful degradation · A2 P0 token-in-URL+per-user channel
-  — เสร็จ 2026-06-16; migration ล่าสุด `0003`).
+  **ต้อง restart backend container** ให้ migration+seed รัน. **เฟส A ปิดแล้ว** — เหลือเฉพาะ A2 ส่วนเฟส B (per-quest authz + run_steps backfill)
+  ที่ต้องรอตาราง engine. ✅ A1·A3·A4·A5·A6·A7·A8·A9 + A2 (P0 token-in-URL + per-user channel) — เสร็จ 2026-06-16;
+  migration ล่าสุด `0003`; backend tests 80 เขียว; CI `.github/workflows/ci.yml` รันจริงตอน push. **ถัดไป: เฟส B (engine core).**
 - **ถัดไปแนะนำ**: ผูก `require_perm("compare.run")` + rate-limit ที่ compare (compare-hardening §2 ปลดล็อกแล้ว) หรือ A3 FK (เล็ก).
 - **เฟส B**: engine core + arq + 2-phase resume + atomic quota + timeout.
 - ✅ **ตอบแล้ว (2026-06-12): multi-tenancy = องค์กรเดียว หลายแผนก** → `department_id` ทุก scopable table
