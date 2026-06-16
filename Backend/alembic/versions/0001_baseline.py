@@ -1,26 +1,31 @@
-"""engine core schema (B1)
+"""baseline schema — modular, organized by bounded context (core · knowledge · engine)
 
-Adds the agent-ops engine tables + department scoping, designed correct from the first
-migration (no retrofit later):
-- departments + user_departments (m:n, 1 user → many depts) — system-design §7.1
-- rooms, agents, quests, runs, subtasks, run_steps, tools_config, notifications
-- documents.department_id (scopable resource)
-- FK / cascade / UNIQUE / index per risk-mitigation §4.4:
-  runs.parent_run_id self-CASCADE · runs.agent_id/quest_id/room_id SET NULL ·
-  run_steps.run_id CASCADE + UNIQUE(run_id, seq) · subtasks.orch_run_id CASCADE /
-  child_run_id SET NULL · notifications.run_id SET NULL.
-run_steps carries status(pending|done|failed)+idempotency_key for 2-phase replay (§1).
+Consolidated baseline replacing the old 0001_init…0004_engine chain (pre-prod: no deployed DB
+to preserve). Organized per docs/architecture/modularity.md §1–§2:
 
-Revision ID: 0004_engine
-Revises: 0003_documents_owner_fk
+  core      — users · departments · user_departments · roles · permissions · role_perms · user_perms
+  knowledge — documents (markdown-as-truth; no vector column — knowledge-rag.md)
+  engine    — rooms · agents · quests · runs · run_steps
+
+Extraction rule (modularity §2.1): a module's tables FK only into **core** or within themselves —
+never into another non-core module. That keeps any one module liftable to a lightweight local
+deploy. Tables with no code yet (subtasks/tools_config/notifications — HERMES/tools/notify, phase C)
+are intentionally NOT created here (YAGNI); they land in their own phase migration with soft-refs
+where they would otherwise cross a module boundary. The engine test sink (stub_tool_writes) is a
+separate migration (0002), out of the domain schema.
+
+FK/cascade/index/unique preserved exactly from the old chain (risk-mitigation §4.4).
+
+Revision ID: 0001_baseline
+Revises:
 Create Date: 2026-06-16
 """
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision = "0004_engine"
-down_revision = "0003_documents_owner_fk"
+revision = "0001_baseline"
+down_revision = None
 branch_labels = None
 depends_on = None
 
@@ -28,7 +33,6 @@ UUID = postgresql.UUID(as_uuid=True)
 JSONB = postgresql.JSONB
 ARR = postgresql.ARRAY
 _EMPTY_ARR = sa.text("'{}'")
-_EMPTY_JSON_ARR = sa.text("'[]'::jsonb")
 
 
 def _ts():
@@ -36,13 +40,65 @@ def _ts():
 
 
 def upgrade() -> None:
-    # --- departments (single org, many departments — system-design §7.1) ---
+    # ===================== MODULE: core (identity · access · tenancy) =====================
+    # The shared base every deployment carries. Other modules FK into these; core FKs nowhere.
+
+    op.create_table(
+        "users",
+        sa.Column("id", UUID, primary_key=True),
+        sa.Column("username", sa.String(64), nullable=False, unique=True),
+        sa.Column("email", sa.String(255), nullable=False, unique=True),
+        sa.Column("display", sa.String(120), nullable=False, server_default=""),
+        sa.Column("role", sa.String(32), nullable=False, server_default="member"),
+        sa.Column("status", sa.String(32), nullable=False, server_default="active"),
+        sa.Column("avatar", sa.String(64), nullable=False, server_default="🙂"),
+        sa.Column("quota", sa.BigInteger(), nullable=True),
+        sa.Column("period", sa.String(16), nullable=False, server_default="monthly"),
+        sa.Column("used", sa.BigInteger(), nullable=False, server_default="0"),
+        sa.Column("password_hash", sa.String(255), nullable=False),
+        sa.Column("last_login", sa.DateTime(timezone=True), nullable=True),
+        _ts(),
+    )
+    op.create_index("ix_users_username", "users", ["username"])
+    op.create_index("ix_users_email", "users", ["email"])
+
     op.create_table(
         "departments",
         sa.Column("id", UUID, primary_key=True),
         sa.Column("name_th", sa.String(120), nullable=False, server_default=""),
         sa.Column("name_en", sa.String(120), nullable=False, server_default=""),
         _ts(),
+    )
+
+    op.create_table(
+        "roles",
+        sa.Column("key", sa.String(32), primary_key=True),
+        sa.Column("name_th", sa.String(64), nullable=False, server_default=""),
+        sa.Column("name_en", sa.String(64), nullable=False, server_default=""),
+        sa.Column("description", sa.String(255), nullable=False, server_default=""),
+        sa.Column("color", sa.String(32), nullable=False, server_default=""),
+        sa.Column("system", sa.Boolean(), nullable=False, server_default=sa.false()),
+    )
+
+    op.create_table(
+        "permissions",
+        sa.Column("key", sa.String(64), primary_key=True),
+        sa.Column("grp", sa.String(32), nullable=False, server_default=""),
+        sa.Column("name_th", sa.String(128), nullable=False, server_default=""),
+        sa.Column("name_en", sa.String(128), nullable=False, server_default=""),
+    )
+
+    op.create_table(
+        "role_perms",
+        sa.Column("role_key", sa.String(32), sa.ForeignKey("roles.key", ondelete="CASCADE"), primary_key=True),
+        sa.Column("perm_key", sa.String(64), sa.ForeignKey("permissions.key", ondelete="CASCADE"), primary_key=True),
+    )
+
+    op.create_table(
+        "user_perms",
+        sa.Column("user_id", UUID, sa.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+        sa.Column("perm_key", sa.String(64), sa.ForeignKey("permissions.key", ondelete="CASCADE"), primary_key=True),
+        sa.Column("allow", sa.Boolean(), nullable=False, server_default=sa.true()),
     )
 
     # user ↔ department, many-to-many (1 user can belong to several departments)
@@ -54,7 +110,27 @@ def upgrade() -> None:
     )
     op.create_index("ix_user_departments_department_id", "user_departments", ["department_id"])
 
-    # --- rooms ---
+    # ===================== MODULE: knowledge (document storage) =====================
+    # Markdown is the source of truth (knowledge-rag.md); no vector column. FKs → core only.
+
+    op.create_table(
+        "documents",
+        sa.Column("id", UUID, primary_key=True),
+        sa.Column("owner_id", UUID, sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("kind", sa.String(16), nullable=False, server_default="md"),
+        sa.Column("name", sa.String(255), nullable=False),
+        sa.Column("object_key", sa.String(512), nullable=False),
+        sa.Column("content_type", sa.String(128), nullable=False, server_default="application/octet-stream"),
+        sa.Column("size", sa.BigInteger(), nullable=False, server_default="0"),
+        sa.Column("department_id", UUID, sa.ForeignKey("departments.id", ondelete="SET NULL"), nullable=True),
+        _ts(),
+    )
+    op.create_index("ix_documents_owner_id", "documents", ["owner_id"])
+    op.create_index("ix_documents_department_id", "documents", ["department_id"])
+
+    # ===================== MODULE: engine (agent-ops) =====================
+    # Stateful. FKs → core (users/departments) or within engine (rooms/agents/quests/runs) only.
+
     op.create_table(
         "rooms",
         sa.Column("id", UUID, primary_key=True),
@@ -66,7 +142,6 @@ def upgrade() -> None:
     )
     op.create_index("ix_rooms_department_id", "rooms", ["department_id"])
 
-    # --- agents ---
     op.create_table(
         "agents",
         sa.Column("id", UUID, primary_key=True),
@@ -86,7 +161,6 @@ def upgrade() -> None:
     op.create_index("ix_agents_room_id", "agents", ["room_id"])
     op.create_index("ix_agents_department_id", "agents", ["department_id"])
 
-    # --- quests ---
     op.create_table(
         "quests",
         sa.Column("id", UUID, primary_key=True),
@@ -102,11 +176,10 @@ def upgrade() -> None:
     op.create_index("ix_quests_room_id", "quests", ["room_id"])
     op.create_index("ix_quests_department_id", "quests", ["department_id"])
 
-    # --- runs (kind = orchestration | agent) ---
     op.create_table(
         "runs",
         sa.Column("id", UUID, primary_key=True),
-        sa.Column("kind", sa.String(16), nullable=False, server_default="agent"),
+        sa.Column("kind", sa.String(16), nullable=False, server_default="agent"),  # agent | orchestration
         sa.Column("parent_run_id", UUID, sa.ForeignKey("runs.id", ondelete="CASCADE"), nullable=True),
         sa.Column("agent_id", UUID, sa.ForeignKey("agents.id", ondelete="SET NULL"), nullable=True),
         sa.Column("quest_id", UUID, sa.ForeignKey("quests.id", ondelete="SET NULL"), nullable=True),
@@ -125,23 +198,6 @@ def upgrade() -> None:
     op.create_index("ix_runs_quest_status", "runs", ["quest_id", "status"])
     op.create_index("ix_runs_department_id", "runs", ["department_id"])
 
-    # --- subtasks (HERMES DAG; deps[] validated in hermes_plan, not enforceable by FK) ---
-    op.create_table(
-        "subtasks",
-        sa.Column("id", UUID, primary_key=True),
-        sa.Column("orch_run_id", UUID, sa.ForeignKey("runs.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("title", sa.String(255), nullable=False, server_default=""),
-        sa.Column("brief_doc_id", UUID, sa.ForeignKey("documents.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("assignee_agent_id", UUID, sa.ForeignKey("agents.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("deps", JSONB, nullable=False, server_default=_EMPTY_JSON_ARR),
-        sa.Column("status", sa.String(32), nullable=False, server_default="pending"),
-        sa.Column("child_run_id", UUID, sa.ForeignKey("runs.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("result_summary", sa.Text(), nullable=True),
-        _ts(),
-    )
-    op.create_index("ix_subtasks_orch_run_id", "subtasks", ["orch_run_id"])
-
-    # --- run_steps (worklog + replay; 2-phase for tools) ---
     op.create_table(
         "run_steps",
         sa.Column("id", UUID, primary_key=True),
@@ -157,61 +213,19 @@ def upgrade() -> None:
         sa.UniqueConstraint("run_id", "seq", name="uq_run_steps_run_seq"),
     )
 
-    # --- tools_config (config holds the effect class: read|idempotent_write|side_effect) ---
-    op.create_table(
-        "tools_config",
-        sa.Column("id", UUID, primary_key=True),
-        sa.Column("name", sa.String(120), nullable=False, server_default=""),
-        sa.Column("type", sa.String(32), nullable=False, server_default=""),   # mcp|line|telegram|cmd|http|webhook
-        sa.Column("config", JSONB, nullable=True),
-        sa.Column("enabled", sa.Boolean(), nullable=False, server_default=sa.true()),
-        _ts(),
-    )
-
-    # --- notifications ---
-    op.create_table(
-        "notifications",
-        sa.Column("id", UUID, primary_key=True),
-        sa.Column("user_id", UUID, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("type", sa.String(32), nullable=False, server_default=""),
-        sa.Column("body", JSONB, nullable=True),
-        sa.Column("run_id", UUID, sa.ForeignKey("runs.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("read", sa.Boolean(), nullable=False, server_default=sa.false()),
-        _ts(),
-    )
-    op.create_index("ix_notifications_user_read", "notifications", ["user_id", "read"])
-
-    # --- documents: add department scoping to the existing table ---
-    op.add_column("documents", sa.Column("department_id", UUID, nullable=True))
-    op.create_foreign_key(
-        "fk_documents_department_id", "documents", "departments", ["department_id"], ["id"], ondelete="SET NULL"
-    )
-    op.create_index("ix_documents_department_id", "documents", ["department_id"])
-
 
 def downgrade() -> None:
-    op.drop_index("ix_documents_department_id", table_name="documents")
-    op.drop_constraint("fk_documents_department_id", "documents", type_="foreignkey")
-    op.drop_column("documents", "department_id")
-    op.drop_index("ix_notifications_user_read", table_name="notifications")
-    op.drop_table("notifications")
-    op.drop_table("tools_config")
+    # reverse dependency order
     op.drop_table("run_steps")
-    op.drop_index("ix_subtasks_orch_run_id", table_name="subtasks")
-    op.drop_table("subtasks")
-    op.drop_index("ix_runs_department_id", table_name="runs")
-    op.drop_index("ix_runs_quest_status", table_name="runs")
-    op.drop_index("ix_runs_parent_run_id", table_name="runs")
     op.drop_table("runs")
-    op.drop_index("ix_quests_department_id", table_name="quests")
-    op.drop_index("ix_quests_room_id", table_name="quests")
     op.drop_table("quests")
-    op.drop_index("ix_agents_department_id", table_name="agents")
-    op.drop_index("ix_agents_room_id", table_name="agents")
-    op.drop_index("ix_agents_owner_id", table_name="agents")
     op.drop_table("agents")
-    op.drop_index("ix_rooms_department_id", table_name="rooms")
     op.drop_table("rooms")
-    op.drop_index("ix_user_departments_department_id", table_name="user_departments")
+    op.drop_table("documents")
     op.drop_table("user_departments")
+    op.drop_table("user_perms")
+    op.drop_table("role_perms")
+    op.drop_table("permissions")
+    op.drop_table("roles")
     op.drop_table("departments")
+    op.drop_table("users")

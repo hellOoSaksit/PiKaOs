@@ -176,24 +176,38 @@ starts simple: retry up to N times, else finalize with a partial result and surf
 
 ---
 
-## 7. Data model 🟡 (additions beyond `users` ✅)
+## 7. Data model ✅ (13 tables — organized by module · `0001_baseline`)
 
+**Organized by bounded-context module** ([modularity.md](modularity.md) §1). A module's tables FK
+only into **core** or within themselves — so any module can be lifted to a lightweight local deploy.
+
+**core** — identity · access · tenancy (every deployment carries this)
 | table | key columns |
 |---|---|
-| `agents` | id, owner_id, name, role, status (AI-set), model, skills[], granted_tools[], sprite, room_id |
-| `rooms` | id, name, template, created_by |
-| `quests` | id, title, brief, room_id, status, created_by, soft-deleted |
-| `runs` | id, **kind** (orchestration\|agent), **parent_run_id**, agent_id, quest_id, room_id, status, input, tokens_used, error, started_at, ended_at |
-| `subtasks` (DAG) | id, orch_run_id, title, brief_doc_id, assignee_agent_id, **deps[]**, status, child_run_id, result_summary |
-| `run_steps` | id, run_id, seq, kind (llm\|tool\|message\|status), **status (pending\|done\|failed)**, **idempotency_key**, role, content (jsonb), tokens, created_at — **worklog + replay**; **UNIQUE(run_id, seq)** |
-| `documents` ✅ | id, owner_id, kind, name, object_key, content_type, size, **embedding vector(1536)**, created_at |
-| `tools_config` | id, name, type, config (jsonb), enabled |
-| `notifications` | id, user_id, type, body, run_id, read, created_at |
-| RBAC | `roles`, `permissions`, `role_perms`, `user_perms` (move from client → server, §10) |
+| `users` ✅ | id, username, email, display, role, status, avatar, quota, used, password_hash, last_login |
+| `departments` ✅ | id, name_th, name_en |
+| `user_departments` ✅ | user_id FK, department_id FK, is_primary — **m:n** (1 user หลายแผนก) |
+| `roles`·`permissions`·`role_perms`·`user_perms` ✅ | server-side RBAC ([§10](#10-rbac-server-side-)) |
 
-FK / cascade / index policy for all of the above is defined in
-[risk-mitigation §4.4](risk-mitigation.md) and lands in the **first** engine migration
-(e.g. `run_steps.run_id` CASCADE, `runs.agent_id` SET NULL, self-FK on `runs.parent_run_id`).
+**knowledge**
+| `documents` ✅ | id, owner_id FK→users, kind, name, object_key, content_type, size, department_id FK→departments — markdown-as-truth, **no vector column** ([knowledge-rag.md](knowledge-rag.md)) |
+
+**engine** — agent-ops
+| table | key columns |
+|---|---|
+| `rooms` ✅ | id, name, template, created_by, department_id |
+| `agents` ✅ | id, owner_id, name, role, status (AI-set), model, skills[], granted_tools[], sprite, room_id, department_id |
+| `quests` ✅ | id, title, brief, room_id, status, created_by, department_id, soft-deleted |
+| `runs` ✅ | id, **kind** (agent\|orchestration), **parent_run_id**, agent_id, quest_id, room_id, department_id, status, input, tokens_used, error, started_at, ended_at |
+| `run_steps` ✅ | id, run_id, seq, kind (llm\|tool\|message\|status), **status (pending\|done\|failed)**, **idempotency_key**, role, content (jsonb), tokens — **worklog + replay**; **UNIQUE(run_id, seq)** |
+
+**Deferred to their phase** (modularity §2 — no code uses them yet; re-add with **soft-refs** where they'd
+cross a module boundary): `subtasks` (HERMES DAG, C3 — its `brief_doc_id` is engine→knowledge → soft-ref) ·
+`tools_config` (tools subsystem, C5) · `notifications` (human-in-the-loop, C6). Test fixture in a separate
+migration `0002`: `stub_tool_writes` (engine stub sink — not part of the domain ER).
+
+FK / cascade / index policy is defined in [risk-mitigation §4.4](risk-mitigation.md) and lives in
+`0001_baseline` (`run_steps.run_id` CASCADE, `runs.agent_id` SET NULL, self-FK on `runs.parent_run_id`).
 
 ### 7.1 Department scoping 🟡 (multi-tenancy = องค์กรเดียว หลายแผนก)
 
@@ -212,82 +226,67 @@ FK / cascade / index policy for all of the above is defined in
   `require_perm(...)` เช็คสิทธิ์ **+ scope check** ว่า `resource.department_id ∈ แผนกของ user`
   เว้นแต่มี cross-dept perm (`<res>.view.any` / `department.view.any`).
 
-### ER diagram (all entities — ✅ built: `users`, `documents`; the rest 🟡 planned)
+### ER diagram (13 built tables · ✅ — deferred `subtasks`/`tools_config`/`notifications` omitted)
+
+Cross-module edges go **into core only** (users/departments). No engine↔knowledge edge.
 
 ```mermaid
 erDiagram
-  roles        ||--o{ users         : "has role"
-  users        ||--o{ agents        : owns
-  users        ||--o{ documents     : owns
-  users        ||--o{ notifications : receives
-  roles        }o--o{ permissions   : role_perms
-  users        }o--o{ permissions   : "user_perms override"
-  rooms        ||--o{ quests        : holds
-  rooms        ||--o{ agents        : "placed in"
-  quests       ||--o{ runs          : dispatches
-  agents       ||--o{ runs          : executes
-  runs         ||--o{ run_steps     : worklog
-  runs         ||--o{ subtasks      : "orchestrates HERMES"
-  agents       ||--o{ subtasks      : assigned
-  subtasks     ||--|| runs          : "child run"
-  agents       }o--o{ tools_config  : granted
-  runs         ||--o{ notifications : triggers
+  roles        ||--o{ users             : "has role"
+  roles        }o--o{ permissions       : role_perms
+  users        }o--o{ permissions       : "user_perms override"
+  users        }o--o{ departments       : user_departments
+  users        ||--o{ documents         : owns
+  departments  ||--o{ documents         : scopes
+  users        ||--o{ agents            : owns
+  departments  ||--o{ agents            : scopes
+  rooms        ||--o{ agents            : "placed in"
+  rooms        ||--o{ quests            : holds
+  users        ||--o{ quests            : creates
+  quests       ||--o{ runs              : dispatches
+  agents       ||--o{ runs              : executes
+  runs         ||--o{ runs              : "parent/child"
+  runs         ||--o{ run_steps         : worklog
 
-  users        { uuid id PK
-                 string username
-                 string email
-                 string role FK
-                 string status
-                 int quota
-                 int used }
-  documents    { uuid id PK
-                 uuid owner_id FK
-                 string kind
-                 string object_key
-                 vector embedding }
-  agents       { uuid id PK
-                 uuid owner_id FK
-                 string role
-                 string status
-                 string model
-                 uuid room_id FK }
-  rooms        { uuid id PK
-                 string name
-                 string template }
-  quests       { uuid id PK
-                 string title
-                 uuid room_id FK
-                 string status }
-  runs         { uuid id PK
-                 string kind
-                 uuid parent_run_id FK
-                 uuid agent_id FK
-                 uuid quest_id FK
-                 string status }
-  subtasks     { uuid id PK
-                 uuid orch_run_id FK
-                 uuid assignee_agent_id FK
-                 uuid child_run_id FK
-                 json deps
-                 string status }
-  run_steps    { uuid id PK
-                 uuid run_id FK
-                 int seq
-                 string kind
-                 json content }
-  tools_config { uuid id PK
-                 string type
-                 json config
-                 bool enabled }
-  roles        { string key PK
-                 string name }
-  permissions  { string key PK
-                 string group }
-  notifications { uuid id PK
-                  uuid user_id FK
+  users         { uuid id PK
+                  string username
+                  string role FK
+                  int quota
+                  int used }
+  departments   { uuid id PK
+                  string name_en }
+  roles         { string key PK }
+  permissions   { string key PK }
+  documents     { uuid id PK
+                  uuid owner_id FK
+                  uuid department_id FK
+                  string kind
+                  string object_key }
+  rooms         { uuid id PK
+                  string name
+                  uuid department_id FK }
+  agents        { uuid id PK
+                  uuid owner_id FK
+                  uuid room_id FK
+                  uuid department_id FK
+                  string status }
+  quests        { uuid id PK
+                  string title
+                  uuid room_id FK
+                  uuid department_id FK
+                  string status }
+  runs          { uuid id PK
+                  string kind
+                  uuid parent_run_id FK
+                  uuid agent_id FK
+                  uuid quest_id FK
+                  uuid department_id FK
+                  string status }
+  run_steps     { uuid id PK
                   uuid run_id FK
-                  string type
-                  bool read }
+                  int seq
+                  string status
+                  json content }
 ```
 
 ---

@@ -33,6 +33,15 @@
 
 ## สถานะงาน (อัปเดต: 2026-06-16)
 
+> **[2026-06-16] Modularity + ER consolidation (clean DB):** Decision **Modular Monolith** (locked,
+> [modularity.md](../architecture/modularity.md)) — แต่ละระบบเป็น module (bounded context) ยกไปลง local ต่อแผนกได้ · กฎ: FK เข้า
+> **core เท่านั้น** (no module↔module; soft-ref) · footprint ต่อระบบ (stateless=ไม่มี DB · engine=Postgres-lite) ·
+> ส่งมอบบาง module ด้วย `ENABLED_MODULES` + compose `profiles` (โค้ดเดียว ไม่ fork). **ER consolidation:** รวม
+> migration เก่า 5 ไฟล์ → `0001_baseline` (จัดตาม module core/knowledge/engine) + `0002_stub_tool_sink` (test fixture แยก) ·
+> **เลื่อน `subtasks`(C3)/`tools_config`(C5)/`notifications`(C6)** ที่ยังไม่มีโค้ดแตะ → 17→**13 ตาราง domain** · ER §7 รีไรต์/ลบ
+> embedding · recreate volume · **112 tests เขียว**. โค้ดยัง flat — ย้ายเข้า `app/modules/` = งานเฟสหลัง (ทีละ module, เริ่ม compare).
+> **ถัดไป (เลือก):** ย้ายโค้ดเข้า modules ทีละตัว · ทำ `ENABLED_MODULES`/profiles จริง · กลับไปปิด B7 (logging) · เฟส C/D.
+>
 > **[2026-06-16] ตัดสินใจ knowledge storage (locked):** เลือก **Hermes + Obsidian (markdown = source of truth)** ·
 > Postgres สำหรับ structured · **pgvector = cache ทิ้ง/สร้างใหม่ได้** เปิดทีหลังเมื่อจำเป็น. เหตุผล: ระบบสำคัญ ดูแลน้อย ทนทาน.
 > เขียน design ลง [architecture/knowledge-rag.md](../architecture/knowledge-rag.md) (กฎเหล็ก: rebuild ทางเดียว `markdown → vector`,

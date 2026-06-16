@@ -59,6 +59,13 @@ schema ใหม่มาพร้อม FK/index ([risk-mitigation §4.4](../ar
 
 ---
 
+> **[2026-06-16] Clean DB + ER consolidation + modularity:** ลบ pgvector (unused) → `postgres:16-alpine`.
+> รวม migration `0001_init`…`0004_engine` → **`0001_baseline` เดียว จัดตาม module** (core/knowledge/engine —
+> [modularity.md](../architecture/modularity.md)) + `0002_stub_tool_sink` (test fixture แยก). **เลื่อน 3 ตารางที่ยังไม่มีโค้ดแตะ**
+> ไป phase ที่ใช้: `subtasks` (C3) · `tools_config` (C5) · `notifications` (C6) → ER 17→13 ตาราง domain.
+> Decision: **Modular Monolith** (แต่ละระบบเป็น module ยกไปลง local ต่อแผนกได้ · FK เข้า core เท่านั้น · footprint ต่อระบบ).
+> 112 tests เขียวบน baseline ใหม่. โค้ดยัง flat — ย้ายเข้า `app/modules/` เป็นงานรีแฟกเตอร์เฟสหลัง (ทีละ module).
+
 ## เฟส B — Engine core (stub LLM — ยังไม่จ่ายเงินจริง)
 
 **เป้าหมาย**: โครง engine ที่ถูกต้องครบ (queue, persistence, resume, quota, timeout) พิสูจน์ด้วย stub

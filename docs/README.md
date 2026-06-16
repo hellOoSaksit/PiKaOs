@@ -29,6 +29,7 @@
 | [`risk-mitigation.md`](architecture/risk-mitigation.md) | design แก้ความเสี่ยงครบ 15 ข้อ + build order ฉบับปรับ — **อ่านก่อนสร้าง engine** | ก่อนเขียนโค้ด engine ทุกบรรทัด |
 | [`tech-stack.md`](architecture/tech-stack.md) | stack จริง (เวอร์ชัน) + ที่จะเพิ่ม + นโยบาย dependency ("ไม่เพิ่มอะไร" ก็เขียนไว้) | จะเพิ่ม/อัปเกรด dependency |
 | [`knowledge-rag.md`](architecture/knowledge-rag.md) | เก็บเอกสาร/ความรู้ทั้งระบบ — **decision-locked: markdown = ความจริง · pgvector = cache ทิ้งได้** (Hermes+Obsidian) + โครง vault + เกณฑ์เปิด vector | จะแตะ document storage / RAG / codex |
+| [`modularity.md`](architecture/modularity.md) | **แยกแต่ละระบบไปลง local ต่อแผนกได้** — Modular Monolith · module = bounded context · FK เข้า core เท่านั้น · footprint ต่อระบบ · ส่งมอบบาง module (ENABLED_MODULES/profiles) | จะแตะ module boundary / schema / การส่งมอบ |
 
 ## features/ — ฟีเจอร์รายตัว (1 ไฟล์ = 1 ฟีเจอร์)
 

@@ -113,8 +113,9 @@ class UserPerm(Base):
     allow: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
-# --- Engine core (B1 — system-design §7; FK/index per risk-mitigation §4.4) ---
-# Schema is the source of truth in migration 0004_engine; these models mirror it.
+# --- Engine module (system-design §7; FK/index per risk-mitigation §4.4) ---
+# Schema source of truth = migration 0001_baseline (organized by module — modularity.md).
+# subtasks/tools_config/notifications are deferred to their phase (HERMES/tools/notify, phase C).
 
 
 class Department(Base):
@@ -233,31 +234,6 @@ class Run(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
-class Subtask(Base):
-    """A HERMES DAG node. `deps` = sibling subtask ids (validated in hermes_plan, not an FK)."""
-
-    __tablename__ = "subtasks"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    orch_run_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("runs.id", ondelete="CASCADE"), nullable=False
-    )
-    title: Mapped[str] = mapped_column(String(255), nullable=False, default="")
-    brief_doc_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
-    )
-    assignee_agent_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("agents.id", ondelete="SET NULL"), nullable=True
-    )
-    deps: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
-    status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
-    child_run_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("runs.id", ondelete="SET NULL"), nullable=True
-    )
-    result_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
-
 class RunStep(Base):
     """One worklog step. tool steps are two-phase (pending→done) with a deterministic
     idempotency_key for replay-safe resume (risk-mitigation §1). UNIQUE(run_id, seq)."""
@@ -279,23 +255,10 @@ class RunStep(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
-class ToolConfig(Base):
-    """A registered tool. `config` carries the effect class (read|idempotent_write|side_effect)."""
-
-    __tablename__ = "tools_config"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name: Mapped[str] = mapped_column(String(120), nullable=False, default="")
-    type: Mapped[str] = mapped_column(String(32), nullable=False, default="")  # mcp|line|telegram|cmd|http|webhook
-    config: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
-
 class StubToolWrite(Base):
-    """Sink for the B4 stub tools — see migration 0005. Lets tests observe the engine's
-    two-phase / effect-class semantics (at-most-once side_effect vs deduped idempotent_write).
-    UNIQUE(idempotency_key) backs the upsert tool's ON CONFLICT DO NOTHING."""
+    """Sink for the B4 stub tools — see migration 0002_stub_tool_sink. Lets tests observe the
+    engine's two-phase / effect-class semantics (at-most-once side_effect vs deduped
+    idempotent_write). UNIQUE(idempotency_key) backs the upsert tool's ON CONFLICT DO NOTHING."""
 
     __tablename__ = "stub_tool_writes"
     __table_args__ = (UniqueConstraint("idempotency_key", name="uq_stub_tool_writes_key"),)
@@ -307,20 +270,4 @@ class StubToolWrite(Base):
     tool: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
     payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
-
-class Notification(Base):
-    __tablename__ = "notifications"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
-    type: Mapped[str] = mapped_column(String(32), nullable=False, default="")
-    body: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    run_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("runs.id", ondelete="SET NULL"), nullable=True
-    )
-    read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

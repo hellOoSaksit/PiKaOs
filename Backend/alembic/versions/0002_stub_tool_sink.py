@@ -1,24 +1,20 @@
-"""stub engine tool sink (B4)
+"""engine test sink (stub_tool_writes) — kept out of the domain baseline
 
-A small table the stub tools write to, so the engine's two-phase / effect-class behaviour
-is *observable* end-to-end (B6 kills a worker mid-tool and asserts the row count):
-- side_effect tool (`record`) → plain INSERT (at-most-once; the runner never auto-retries it).
-- idempotent_write tool (`upsert`) → INSERT … ON CONFLICT(idempotency_key) DO NOTHING, so a
-  replay-safe resume re-runs the same key without a second row.
+A test-only fixture for the engine's stub tools (B4/B6): record (side_effect, plain INSERT,
+at-most-once) and upsert (idempotent_write, ON CONFLICT(idempotency_key) DO NOTHING). Separated
+from 0001_baseline so the canonical domain ER (core/knowledge/engine) stays free of test tables
+(modularity.md §4). Inert in any real deployment — only the stub tool registry writes here.
 
-UNIQUE(idempotency_key) makes the upsert dedup provable. The table is inert in prod (only the
-stub tools touch it) — kept as a permanent engine self-test fixture.
-
-Revision ID: 0005_stub_tool_writes
-Revises: 0004_engine
+Revision ID: 0002_stub_tool_sink
+Revises: 0001_baseline
 Create Date: 2026-06-16
 """
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision = "0005_stub_tool_writes"
-down_revision = "0004_engine"
+revision = "0002_stub_tool_sink"
+down_revision = "0001_baseline"
 branch_labels = None
 depends_on = None
 
