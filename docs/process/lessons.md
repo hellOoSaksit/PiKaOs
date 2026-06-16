@@ -44,8 +44,8 @@
 - รายละเอียด + design การแก้ครบ → [compare-hardening.md](../features/compare-hardening.md).
 - **Stack hardening**: ✅ [2026-06-15] `minio` pin by digest แล้ว (docker-compose.yml) + ✅ A4 boot asserts
   (prod ที่ใช้ secret default → ตายตอนบูต, `config.production_violations()` + main.lifespan).
-  คงค้าง: `passlib` → `argon2-cffi` (เสี่ยง hash เดิม verify ไม่ผ่าน — ทำตอนแตะ security.py พร้อม test login),
-  frontend lint/test/typecheck, CI — [tech-stack §3](../architecture/tech-stack.md).
+  ✅ [2026-06-16] `passlib` → `argon2-cffi==25.1.0` (hash argon2id เดิม verify ผ่าน — login 6 user เดิมโอเค, ไม่มี crypt deprecation).
+  คงค้าง: frontend lint/test/typecheck, CI — [tech-stack §3](../architecture/tech-stack.md).
 - รายการเต็ม + ลำดับแก้: [risk-mitigation.md](../architecture/risk-mitigation.md) (15 ข้อ) ·
   [improvement-plan.md](improvement-plan.md) (เฟส A–F).
 

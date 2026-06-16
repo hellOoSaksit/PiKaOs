@@ -5,21 +5,25 @@ import uuid
 from datetime import datetime, timezone
 
 import jwt
-from passlib.context import CryptContext
+from argon2 import PasswordHasher
+from argon2.exceptions import Argon2Error
 
 from .config import settings
 
-pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+# argon2id with the library's vetted defaults. Calls argon2-cffi directly (A5) — the same
+# backend passlib[argon2] wrapped — so hashes seeded under passlib (standard $argon2id$
+# strings) still verify; no password reset needed. passlib 1.7.4 was unmaintained.
+_hasher = PasswordHasher()
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return _hasher.hash(password)
 
 
 def verify_password(password: str, password_hash: str) -> bool:
     try:
-        return pwd_context.verify(password, password_hash)
-    except Exception:
+        return _hasher.verify(password_hash, password)
+    except (Argon2Error, ValueError, TypeError):
         return False
 
 
