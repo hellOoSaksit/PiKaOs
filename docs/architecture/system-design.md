@@ -298,6 +298,10 @@ erDiagram
 (md/pdf/img-OCR/log) → chunk → embed → store vectors in pgvector → retrieve top-k as agent
 context at run start. Embeddings provider + chunking strategy TBD.
 
+> **Storage decision locked (2026-06-16)** → [`knowledge-rag.md`](knowledge-rag.md): **markdown =
+> source of truth** (durable, low-maintenance), **pgvector = derived rebuildable cache** opened only
+> when retrieval pain is real; rule = rebuild one-way `markdown → vector`, never data-only-in-vector.
+
 ## 9. Tools subsystem + security ⚪
 
 Central registry (`tools_config`, type + per-type config) drives what an agent may call:

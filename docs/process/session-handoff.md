@@ -33,6 +33,12 @@
 
 ## สถานะงาน (อัปเดต: 2026-06-16)
 
+> **[2026-06-16] ตัดสินใจ knowledge storage (locked):** เลือก **Hermes + Obsidian (markdown = source of truth)** ·
+> Postgres สำหรับ structured · **pgvector = cache ทิ้ง/สร้างใหม่ได้** เปิดทีหลังเมื่อจำเป็น. เหตุผล: ระบบสำคัญ ดูแลน้อย ทนทาน.
+> เขียน design ลง [architecture/knowledge-rag.md](../architecture/knowledge-rag.md) (กฎเหล็ก: rebuild ทางเดียว `markdown → vector`,
+> ห้าม data-only-in-vector · โครง vault · เกณฑ์เปิด vector) + pointer ที่ docs/README.md · system-design §8 · improvement-plan เฟส E.
+> **ยังไม่ implement** (ตัวเก็บ markdown ทำได้เลย, ชั้น vector = เฟส E). CLAUDE.md ชน 301 บรรทัด — ไม่เติม router row (กฎ §8).
+>
 > **[2026-06-16] ประเมินทุกระบบ (read-only) + ตัดสินใจ resilience:** สำรวจ FE/BE/infra ครบ —
 > FE สุก (~19k บรรทัด, จุดอ่อนเดียว: ไม่มี CI/lint/test), BE foundation แกร่ง (auth/RBAC/compare/SSRF)
 > แต่ **engine ยังเป็น 0 บรรทัด**. เพิ่ม **A7 (SSRF, ที่หายจากตาราง) · A8 (multi-worker+restart) ·

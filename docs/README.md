@@ -28,6 +28,7 @@
 | [`design-review.md`](architecture/design-review.md) | รีวิววิพากษ์พิมพ์เขียว — ความเสี่ยง P0–P2 (resume/side-effect, RBAC, WS leak) | ก่อนตัดสินใจสถาปัตยกรรม |
 | [`risk-mitigation.md`](architecture/risk-mitigation.md) | design แก้ความเสี่ยงครบ 15 ข้อ + build order ฉบับปรับ — **อ่านก่อนสร้าง engine** | ก่อนเขียนโค้ด engine ทุกบรรทัด |
 | [`tech-stack.md`](architecture/tech-stack.md) | stack จริง (เวอร์ชัน) + ที่จะเพิ่ม + นโยบาย dependency ("ไม่เพิ่มอะไร" ก็เขียนไว้) | จะเพิ่ม/อัปเกรด dependency |
+| [`knowledge-rag.md`](architecture/knowledge-rag.md) | เก็บเอกสาร/ความรู้ทั้งระบบ — **decision-locked: markdown = ความจริง · pgvector = cache ทิ้งได้** (Hermes+Obsidian) + โครง vault + เกณฑ์เปิด vector | จะแตะ document storage / RAG / codex |
 
 ## features/ — ฟีเจอร์รายตัว (1 ไฟล์ = 1 ฟีเจอร์)
 
