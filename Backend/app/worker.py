@@ -16,6 +16,7 @@ from arq import func
 from arq.connections import RedisSettings
 
 from .config import settings
+from .logging_ctx import configure_worker_logging
 from .services import agent_runner
 from .services.engine_stubs import StubLLMProvider, StubToolRegistry
 
@@ -33,10 +34,11 @@ async def agent_run(ctx, run_id: str) -> str:
 
 
 async def startup(ctx) -> None:
-    """Wire the engine runtime once per worker — the stub LLM provider + tool registry (B4).
-    Real adapters (OpenAI/Anthropic/Local) swap in here at C1 without touching the runner."""
+    """Wire structured logging (B7) + the engine runtime once per worker — the stub LLM
+    provider + tool registry (B4). Real adapters (OpenAI/Anthropic/Local) swap in here at C1."""
+    configure_worker_logging()
     agent_runner.set_engine_runtime(StubLLMProvider(), StubToolRegistry())
-    log.info("pikaos worker up — engine runtime: stub LLM + stub tools (B4)")
+    log.info("pikaos worker up — structured logging on · engine runtime: stub LLM + stub tools")
 
 
 class WorkerSettings:

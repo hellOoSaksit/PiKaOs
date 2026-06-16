@@ -32,6 +32,7 @@ from typing import Protocol
 from .. import redis_client
 from ..config import settings
 from ..db import SessionLocal
+from ..logging_ctx import bind_run, reset_run
 from ..repositories import runs as runs_repo
 from . import events
 
@@ -138,6 +139,7 @@ async def run(
     `run_steps` and continues. Idempotent on an already-terminal run.
     """
     rid = uuid.UUID(str(run_id))
+    bind_run(run_id=str(rid))  # so every log line below carries the run (B7)
     async with db_factory() as db:
         run_row = await runs_repo.get_run(db, rid)
         if run_row is None:
@@ -151,6 +153,12 @@ async def run(
         model = (agent.model if agent and agent.model else "") or "stub"
         # quest the worklog streams to (None → run not bound to a quest → events go nowhere)
         quest_id = str(run_row.quest_id) if run_row.quest_id else None
+        # enrich the log context now that the run is loaded (B7)
+        bind_run(
+            parent_run_id=str(run_row.parent_run_id) if run_row.parent_run_id else None,
+            quest_id=quest_id,
+            agent_id=str(run_row.agent_id) if run_row.agent_id else None,
+        )
 
         steps = await runs_repo.list_steps(db, rid)
         seq = (steps[-1].seq + 1) if steps else 0
@@ -191,6 +199,7 @@ async def run(
         used_steps = sum(1 for s in steps if s.kind in ("llm", "tool"))
         started = time.monotonic()
         tool_schemas = tools.schemas()
+        log.info("run started (kind=%s, model=%s, resumed_steps=%d)", run_row.kind, model, used_steps)
 
         while True:
             if await redis_client.is_run_cancelled(str(rid)):
@@ -239,6 +248,7 @@ async def run(
                 await runs_repo.set_run_status(db, rid, "done", ended=True)
                 await runs_repo.set_agent_status(db, run_row.agent_id, "idle")
                 await events.publish_run(quest_id, rid, "done", tokens_used=run_row.tokens_used)
+                log.info("run done (steps=%d, tokens=%d)", used_steps, run_row.tokens_used)
                 return "done"
 
             # --- two-phase tool step ---
@@ -287,11 +297,18 @@ def set_engine_runtime(provider: LLMProvider, tools: ToolRegistry) -> None:
 
 
 async def run_job(run_id: str) -> str:
-    """arq `agent_run` job — resolves the configured runtime and runs one agent run."""
+    """arq `agent_run` job — resolves the configured runtime and runs one agent run.
+
+    Binds the run's log context for the whole job and resets it on exit, so log lines are
+    attributed to this run and nothing leaks into the next job on the worker (B7)."""
     if _runtime is None:
         raise RuntimeError("engine runtime not configured — call set_engine_runtime() at worker startup (B4)")
     provider, tools = _runtime
-    return await run(run_id, provider=provider, tools=tools)
+    token = bind_run(run_id=str(run_id))
+    try:
+        return await run(run_id, provider=provider, tools=tools)
+    finally:
+        reset_run(token)
 
 
 async def _fail(db, run_row, error: str) -> str:

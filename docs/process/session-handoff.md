@@ -33,6 +33,13 @@
 
 ## สถานะงาน (อัปเดต: 2026-06-16)
 
+> **[2026-06-16] B7 ✅ — เฟส B ปิดครบ (B1–B7):** structured logging — `app/logging_ctx.py` (contextvars +
+> `RunContextFilter` stamp ทุก log record ด้วย `run_id`/`parent_run_id`/`quest_id`/`agent_id`) · `bind_run`/`reset_run`
+> ใน `agent_runner.run_job` (ต่อ job, ไม่รั่วข้าม run) + enrich ใน `run()` · `configure_worker_logging` (scoped `pikaos.*`,
+> propagate=False ไม่ชน arq) · เพิ่ม INFO `run started`/`run done`. smoke worker จริง: `INFO pikaos.engine
+> [run=… quest=…] run done (steps=3, tokens=7)`. **117 tests เขียว.** เฟส B (engine core ด้วย stub) จบ — **ถัดไป
+> เฟส C (HERMES + LLM provider จริง)** หรืองาน infra ที่ผู้ใช้สั่ง (เอา backend ออก docker → รัน cmd, docker เหลือแค่ services).
+>
 > **[2026-06-16] Modularity + ER consolidation (clean DB):** Decision **Modular Monolith** (locked,
 > [modularity.md](../architecture/modularity.md)) — แต่ละระบบเป็น module (bounded context) ยกไปลง local ต่อแผนกได้ · กฎ: FK เข้า
 > **core เท่านั้น** (no module↔module; soft-ref) · footprint ต่อระบบ (stateless=ไม่มี DB · engine=Postgres-lite) ·

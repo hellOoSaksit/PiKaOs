@@ -189,7 +189,7 @@ def _run(store, provider, tools):
 
 def _mk(quota=None, used=0, owner=True, started_at=None):
     aid = uuid.uuid4()
-    run = SimpleNamespace(id=uuid.uuid4(), status="queued", agent_id=aid, quest_id=None, started_at=started_at, input={"task": "go"}, error=None, tokens_used=0)
+    run = SimpleNamespace(id=uuid.uuid4(), status="queued", kind="agent", agent_id=aid, quest_id=None, parent_run_id=None, started_at=started_at, input={"task": "go"}, error=None, tokens_used=0)
     agent = SimpleNamespace(id=aid, owner_id=(uuid.uuid4() if owner else None), model="stub", status="idle")
     return FakeStore(run, agent, quota=quota, used=used)
 
