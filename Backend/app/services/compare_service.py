@@ -12,6 +12,7 @@ router maps to a 4xx/5xx.
 from __future__ import annotations
 
 import asyncio
+import base64
 import difflib
 import re
 from datetime import datetime, timezone
@@ -20,31 +21,62 @@ from urllib.parse import urlsplit, urlunsplit
 import httpx
 
 from ..config import settings
-from ..schemas import CompareIn, CompareOut, CompareSummary, DeepBatchIn, DeepResult, RenderOut, UrlCheck
+from ..schemas import (
+    CompareAuth, CompareIn, CompareOut, CompareSummary, CoverageBatchIn, CoveragePair,
+    CoveragePlanIn, CoveragePlanOut, DeepBatchIn, DeepResult, UrlCheck,
+)
 from .content import fetch_page
 from .net_guard import BlockedURLError, assert_public_url, guarded_event_hooks
 from .sitemap import SitemapError, fetch_sitemap_urls
 
 __all__ = [
-    "compare", "deep_batch", "render_page", "SitemapError", "BlockedURLError",
-    "swap_origin", "default_sitemap_url",
+    "compare", "deep_batch", "coverage_plan", "coverage_batch",
+    "SitemapError", "BlockedURLError", "swap_origin", "default_sitemap_url",
 ]
-
-_HEAD_RE = re.compile(r"<head[^>]*>", re.IGNORECASE)
 
 # browser-ish UA — some CDNs 403 the default httpx agent
 _HEADERS = {"User-Agent": "PiKaOs-SiteCompare/1.0 (+https://pikaos.local)"}
 
 
-def _make_client(*, follow_redirects: bool, limits: httpx.Limits | None = None) -> httpx.AsyncClient:
+class _HostAuth(httpx.Auth):
+    """Per-host credentials. A compare run hits BOTH the Production and UAT hosts on
+    one client, so auth is dispatched by `request.url.host` — Production and UAT can
+    use different (or one-sided) logins, and creds never leak to the other origin or
+    to redirected third parties. Adds HTTP Basic (from user/pass) and/or a free-form
+    header (`Authorization: Bearer …` / `Cookie: …`). Credentials are never logged."""
+
+    def __init__(self, by_host: dict[str, CompareAuth]):
+        self._by_host = {h.lower(): a for h, a in by_host.items() if a}
+
+    def __bool__(self) -> bool:
+        return bool(self._by_host)
+
+    def auth_flow(self, request):
+        a = self._by_host.get(request.url.host.lower())
+        if a:
+            if a.username:
+                token = base64.b64encode(f"{a.username}:{a.password or ''}".encode()).decode()
+                request.headers["Authorization"] = f"Basic {token}"
+            if a.headerName and a.headerValue:
+                request.headers[a.headerName] = a.headerValue
+        yield request
+
+
+def _make_client(
+    *, follow_redirects: bool, limits: httpx.Limits | None = None, host_auth: dict[str, CompareAuth] | None = None
+) -> httpx.AsyncClient:
     """Build an httpx client for the compare path with the SSRF guard attached
-    (the guard fires on every request incl. redirects — see net_guard)."""
+    (the guard fires on every request incl. redirects — see net_guard). `host_auth`
+    maps target host → credentials for login-gated sites (dispatched per request)."""
     kwargs = dict(
         headers=_HEADERS,
         timeout=httpx.Timeout(settings.compare_timeout_seconds),
         follow_redirects=follow_redirects,
         event_hooks=guarded_event_hooks(),
     )
+    ha = _HostAuth(host_auth) if host_auth else None
+    if ha:  # falsy when no host has creds
+        kwargs["auth"] = ha
     if limits is not None:  # else httpx uses its default Limits (as render_page did before)
         kwargs["limits"] = limits
     return httpx.AsyncClient(**kwargs)
@@ -81,19 +113,25 @@ async def _probe(client: httpx.AsyncClient, url: str) -> int | None:
     """Return the HTTP status for `url`, or None if the request failed.
 
     Tries HEAD first (cheap); falls back to GET when HEAD is unsupported (405/501).
-    Redirects are NOT followed so 3xx is visible in coverage.
+    Redirects are NOT followed so 3xx is visible in coverage. A transient connect/
+    read failure is retried a few times (settings.compare_probe_retries) with linear
+    backoff — WAF/CDN fronted sites drop a fraction of a burst, which would otherwise
+    surface as bogus "unreachable" noise for a perfectly live URL.
     """
-    try:
-        resp = await client.head(url)
-        if resp.status_code in (405, 501) or (resp.status_code >= 400 and resp.status_code != 404):
-            resp = await client.get(url)
-        return resp.status_code
-    except httpx.HTTPError:
+    for attempt in range(settings.compare_probe_retries + 1):
         try:
-            resp = await client.get(url)
+            resp = await client.head(url)
+            if resp.status_code in (405, 501) or (resp.status_code >= 400 and resp.status_code != 404):
+                resp = await client.get(url)
             return resp.status_code
         except httpx.HTTPError:
-            return None
+            try:
+                resp = await client.get(url)
+                return resp.status_code
+            except httpx.HTTPError:
+                if attempt < settings.compare_probe_retries:
+                    await asyncio.sleep(settings.compare_probe_backoff_seconds * (attempt + 1))
+    return None
 
 
 def _classify(prod_status: int | None, uat_status: int | None) -> tuple[str, str | None]:
@@ -116,11 +154,32 @@ def _ok(status: int | None) -> bool:
     return status is not None and 200 <= status < 400
 
 
-async def _deep_compare(client: httpx.AsyncClient, src_url: str, tgt_url: str) -> DeepResult:
-    """Fetch both pages and compare title/h1/meta/body + image & link existence."""
+async def _deep_compare(
+    client: httpx.AsyncClient, src_url: str, tgt_url: str, *, sub_sem: asyncio.Semaphore | None = None
+) -> DeepResult:
+    """Fetch both pages and compare title/h1/meta/body + image & link existence.
+
+    `sub_sem` (when given) caps the *total* in-flight image/link sub-requests across
+    all concurrently-running deep pages. Without it, N deep pages each fan out
+    img_cap + link_cap probes at once (N × ~35) — a burst that trips the same WAF
+    rate-limiting the coverage path was tamed for, surfacing as bogus "all links
+    broken" on a page that's actually fine.
+    """
     src, tgt = await asyncio.gather(fetch_page(client, src_url), fetch_page(client, tgt_url))
     if not (src.get("ok") and tgt.get("ok")):
-        return DeepResult(deepState="unfetchable")
+        # say WHICH side failed and why (status / type / exception) so it's actionable
+        return DeepResult(
+            deepState="unfetchable",
+            srcStatus=src.get("status"), tgtStatus=tgt.get("status"),
+            srcReason=None if src.get("ok") else (src.get("reason") or "fetch failed"),
+            tgtReason=None if tgt.get("ok") else (tgt.get("reason") or "fetch failed"),
+        )
+
+    async def probe(u: str) -> int | None:
+        if sub_sem is None:
+            return await _probe(client, u)
+        async with sub_sem:
+            return await _probe(client, u)
 
     title_match = src["title"] == tgt["title"]
     h1_match = src["h1"] == tgt["h1"]
@@ -130,26 +189,49 @@ async def _deep_compare(client: httpx.AsyncClient, src_url: str, tgt_url: str) -
 
     # image presence on the TARGET page (just 200/404, capped)
     imgs = tgt["images"][: settings.compare_deep_img_cap]
-    img_status = await asyncio.gather(*(_probe(client, u) for u in imgs)) if imgs else []
+    img_status = await asyncio.gather(*(probe(u) for u in imgs)) if imgs else []
     missing_imgs = [u for u, s in zip(imgs, img_status) if not _ok(s)]
 
-    # internal-link presence on the TARGET page (capped)
+    # internal-link presence on the TARGET page (capped) — keep the broken URLs so the
+    # diff detail can list exactly which links 404 (for the webmaster/dev), not just a count
     links = tgt["links"][: settings.compare_deep_link_cap]
-    link_status = await asyncio.gather(*(_probe(client, u) for u in links)) if links else []
-    broken_links = sum(1 for s in link_status if not _ok(s))
+    link_status = await asyncio.gather(*(probe(u) for u in links)) if links else []
+    broken_link_urls = [u for u, s in zip(links, link_status) if not _ok(s)]
+    broken_links = len(broken_link_urls)
+
+    # downloadable files compared by filename (case-insensitive) — a doc on one side whose
+    # name isn't on the other is a real content gap (missing report/form), independent of host.
+    src_docs, tgt_docs = src.get("docs", []), tgt.get("docs", [])
+    src_doc_names = {d["name"].lower() for d in src_docs}
+    tgt_doc_names = {d["name"].lower() for d in tgt_docs}
+    docs_only_src = [d["url"] for d in src_docs if d["name"].lower() not in tgt_doc_names]
+    docs_only_tgt = [d["url"] for d in tgt_docs if d["name"].lower() not in src_doc_names]
+
+    # heading outline (H1-H6) per side — a structure change (heading added/removed/reworded) is a
+    # real content difference even when the body similarity stays high, so flag it on its own.
+    src_headings = src.get("headings", [])
+    tgt_headings = tgt.get("headings", [])
+    headings_differ = src_headings != tgt_headings
 
     issues = []
     if not title_match or not h1_match or meta_diff:
         issues.append("meta_diff")
     if body_sim < settings.compare_body_sim_threshold:
         issues.append("content_diff")
+    if headings_differ:
+        issues.append("headings_diff")
     if missing_imgs:
         issues.append("images_missing")
     if broken_links:
         issues.append("links_broken")
+    if docs_only_src or docs_only_tgt:
+        issues.append("docs_diff")
     state = "identical" if not issues else (issues[0] if len(issues) == 1 else "mixed")
 
     cap = settings.compare_deep_text_chars
+    nb = settings.compare_deep_max_blocks
+    src_blocks = [b[:600] for b in src.get("blocks", [])[:nb]]
+    tgt_blocks = [b[:600] for b in tgt.get("blocks", [])[:nb]]
     return DeepResult(
         deepState=state,
         titleMatch=title_match, h1Match=h1_match,
@@ -157,50 +239,19 @@ async def _deep_compare(client: httpx.AsyncClient, src_url: str, tgt_url: str) -
         srcH1=src["h1"][:300] or None, tgtH1=tgt["h1"][:300] or None,
         srcMeta=src["meta"], tgtMeta=tgt["meta"],
         srcText=src["text"][:cap] or None, tgtText=tgt["text"][:cap] or None,
+        srcBlocks=src_blocks, tgtBlocks=tgt_blocks,
+        srcHeadings=src_headings, tgtHeadings=tgt_headings,
         srcEmbeddable=src.get("embeddable"), tgtEmbeddable=tgt.get("embeddable"),
         bodySim=round(body_sim, 4), wordDelta=tgt["words"] - src["words"], metaDiff=meta_diff,
         imagesChecked=len(imgs), imagesMissing=len(missing_imgs), imagesMissingUrls=missing_imgs[:20],
-        linksChecked=len(links), linksBroken=broken_links,
+        linksChecked=len(links), linksBroken=broken_links, linksBrokenUrls=broken_link_urls[:20],
+        # per-side totals — for a direct two-page compare ("A has 12 images, B has 8")
+        srcImages=len(src["images"]), tgtImages=len(tgt["images"]),
+        srcLinks=len(src["links"]), tgtLinks=len(tgt["links"]),
+        # downloadable files: per-side counts + which files exist on only one side (by name)
+        srcDocs=len(src_docs), tgtDocs=len(tgt_docs),
+        docsOnlySrcUrls=docs_only_src[:20], docsOnlyTgtUrls=docs_only_tgt[:20],
     )
-
-
-async def render_page(url: str, *, _client: httpx.AsyncClient | None = None) -> RenderOut:
-    """Fetch a page's HTML so the client can show it in a SAME-ORIGIN sandboxed
-    `<iframe srcdoc>` — the way to preview sites that block cross-origin framing
-    via X-Frame-Options / CSP (those headers only block *framing the document*,
-    not us GETting it server-side and re-serving the markup).
-
-    We inject a `<base href>` of the final URL so the page's relative CSS/images
-    resolve to the real origin and it renders styled. The client sandboxes the
-    iframe (no scripts), so this is a static snapshot of the server HTML — which
-    is exactly what the deep comparison is about.
-    """
-    own_client = _client is None
-    if own_client:
-        assert_public_url(str(url))  # hard-reject internal targets up front (router → 400)
-    client = _client or _make_client(follow_redirects=True)
-    try:
-        try:
-            resp = await client.get(str(url), follow_redirects=True)
-        except httpx.HTTPError as exc:
-            return RenderOut(ok=False, finalUrl=str(url), reason=str(exc) or type(exc).__name__)
-        final = str(resp.url)
-        ctype = resp.headers.get("content-type", "").lower()
-        if resp.status_code != 200 or "html" not in ctype:
-            return RenderOut(ok=False, status=resp.status_code, finalUrl=final,
-                             reason=f"status {resp.status_code}, type {ctype or 'unknown'}")
-        html = resp.text[: settings.compare_render_max_chars]
-        # inject our <base> FIRST in <head> so it wins over any page <base>; add a
-        # charset guard for pages that only declared encoding via HTTP headers.
-        inject = f'<base href="{final}"><meta charset="utf-8">'
-        if _HEAD_RE.search(html):
-            html = _HEAD_RE.sub(lambda m: m.group(0) + inject, html, count=1)
-        else:
-            html = inject + html
-        return RenderOut(ok=True, status=resp.status_code, finalUrl=final, html=html)
-    finally:
-        if own_client:
-            await client.aclose()
 
 
 async def deep_batch(payload: DeepBatchIn, *, _client: httpx.AsyncClient | None = None) -> list[DeepResult]:
@@ -208,18 +259,112 @@ async def deep_batch(payload: DeepBatchIn, *, _client: httpx.AsyncClient | None 
     single request runs long enough to hit the dev-proxy timeout."""
     ceiling = settings.compare_max_concurrency
     own_client = _client is None
+    # derive the two hosts from the first pair (src=Production, tgt=UAT) for per-host auth
+    host_auth = None
+    if payload.pairs and (payload.prodAuth or payload.uatAuth):
+        p0 = payload.pairs[0]
+        host_auth = {urlsplit(str(p0.src)).netloc: payload.prodAuth, urlsplit(str(p0.tgt)).netloc: payload.uatAuth}
     client = _client or _make_client(
         follow_redirects=False,
         limits=httpx.Limits(max_connections=ceiling * 2 + 10, max_keepalive_connections=ceiling),
+        host_auth=host_auth,
     )
     sem = asyncio.Semaphore(max(1, min(len(payload.pairs), settings.compare_deep_concurrency)))
+    # caps total img/link sub-requests across all pages in the batch (not just pages). Kept at
+    # the polite coverage default — raising it backfires on WAF-fronted sites (throttling makes
+    # the batch SLOWER and inflates false "broken link" counts).
+    sub_sem = asyncio.Semaphore(settings.compare_default_concurrency)
 
     async def one(p) -> DeepResult:
         async with sem:
-            return await _deep_compare(client, str(p.src), str(p.tgt))
+            return await _deep_compare(client, str(p.src), str(p.tgt), sub_sem=sub_sem)
 
     try:
         return list(await asyncio.gather(*(one(p) for p in payload.pairs)))
+    finally:
+        if own_client:
+            await client.aclose()
+
+
+async def coverage_plan(payload: CoveragePlanIn, *, _client: httpx.AsyncClient | None = None) -> CoveragePlanOut:
+    """Step 1 of streamed coverage: read Production's sitemap (and optionally UAT's) and
+    return the URL pairs to probe + UAT-only extras — WITHOUT probing. Fast, so the heavy
+    per-URL checking can be chunked by the client (a big sitemap overran the proxy timeout
+    when probed in one shot)."""
+    prod_base = str(payload.prodBase)
+    uat_base = str(payload.uatBase)
+    sitemap_url = str(payload.sitemapUrl) if payload.sitemapUrl else default_sitemap_url(prod_base)
+    max_urls = payload.maxUrls or settings.compare_max_urls
+    uat_scheme, uat_netloc = _origin(uat_base)
+
+    own_client = _client is None
+    if own_client:
+        assert_public_url(prod_base)
+        assert_public_url(uat_base)
+        assert_public_url(sitemap_url)
+        if payload.uatSitemapUrl:
+            assert_public_url(str(payload.uatSitemapUrl))
+
+    client = _client or _make_client(follow_redirects=False)
+    try:
+        prod_urls = await fetch_sitemap_urls(client, sitemap_url, max_urls=max_urls)
+        pairs = [
+            CoveragePair(path=_rel_key(u), prodUrl=u, uatUrl=swap_origin(u, uat_scheme, uat_netloc))
+            for u in prod_urls
+        ]
+        extra_on_uat: list[str] = []
+        if payload.uatSitemapUrl:
+            try:
+                uat_urls = await fetch_sitemap_urls(client, str(payload.uatSitemapUrl), max_urls=max_urls)
+                prod_keys = {_rel_key(u) for u in prod_urls}
+                extra_on_uat = sorted({u for u in uat_urls if _rel_key(u) not in prod_keys})
+            except SitemapError:
+                extra_on_uat = []  # UAT sitemap is best-effort; don't fail the plan
+    finally:
+        if own_client:
+            await client.aclose()
+
+    return CoveragePlanOut(
+        prodBase=prod_base,
+        uatBase=uat_base,
+        sitemapUrl=sitemap_url,
+        generatedAt=datetime.now(timezone.utc),
+        pairs=pairs,
+        extraOnUat=extra_on_uat,
+    )
+
+
+async def coverage_batch(payload: CoverageBatchIn, *, _client: httpx.AsyncClient | None = None) -> list[UrlCheck]:
+    """Step 2 of streamed coverage: probe one chunk of pairs (both sides) and classify —
+    aligned to the input order. Per-host auth is derived from the first pair's hosts (the
+    whole batch shares the same Production/UAT origins)."""
+    ceiling = settings.compare_max_concurrency
+    own_client = _client is None
+    host_auth = None
+    if payload.pairs and (payload.prodAuth or payload.uatAuth):
+        p0 = payload.pairs[0]
+        host_auth = {urlsplit(str(p0.prodUrl)).netloc: payload.prodAuth, urlsplit(str(p0.uatUrl)).netloc: payload.uatAuth}
+    client = _client or _make_client(
+        follow_redirects=False,
+        limits=httpx.Limits(max_connections=ceiling * 2 + 10, max_keepalive_connections=ceiling),
+        host_auth=host_auth,
+    )
+    requested = payload.concurrency or settings.compare_default_concurrency
+    effective = max(1, min(requested, ceiling))
+    sem = asyncio.Semaphore(effective)
+
+    async def check(pair: CoveragePair) -> UrlCheck:
+        prod_url, uat_url = str(pair.prodUrl), str(pair.uatUrl)
+        async with sem:
+            prod_status, uat_status = await asyncio.gather(_probe(client, prod_url), _probe(client, uat_url))
+        state, note = _classify(prod_status, uat_status)
+        return UrlCheck(
+            path=pair.path, prodUrl=prod_url, uatUrl=uat_url,
+            prodStatus=prod_status, uatStatus=uat_status, state=state, note=note,
+        )
+
+    try:
+        return list(await asyncio.gather(*(check(p) for p in payload.pairs)))
     finally:
         if own_client:
             await client.aclose()
@@ -250,13 +395,15 @@ async def compare(payload: CompareIn, *, _client: httpx.AsyncClient | None = Non
     # Connection pool is sized to the hard ceiling (each URL probes prod + uat).
     ceiling = settings.compare_max_concurrency
     limits = httpx.Limits(max_connections=ceiling * 2 + 10, max_keepalive_connections=ceiling)
-    client = _client or _make_client(follow_redirects=False, limits=limits)
+    host_auth = {urlsplit(prod_base).netloc: payload.prodAuth, urlsplit(uat_base).netloc: payload.uatAuth}
+    client = _client or _make_client(follow_redirects=False, limits=limits, host_auth=host_auth)
     try:
         prod_urls = await fetch_sitemap_urls(client, sitemap_url, max_urls=max_urls)
 
-        # Default: fire EVERY sitemap URL simultaneously. A request may cap it lower
-        # via `concurrency`; we never exceed the ceiling regardless.
-        requested = payload.concurrency or len(prod_urls) or 1
+        # Default to a polite parallelism so a WAF/CDN-fronted host doesn't rate-limit
+        # our burst into false "unreachable"/404s. A request may raise it via
+        # `concurrency`; we never exceed the hard ceiling regardless.
+        requested = payload.concurrency or settings.compare_default_concurrency
         effective = max(1, min(requested, ceiling))
         sem = asyncio.Semaphore(effective)
 
@@ -284,10 +431,12 @@ async def compare(payload: CompareIn, *, _client: httpx.AsyncClient | None = Non
             deep_limit = min(payload.deepLimit or settings.compare_deep_limit, settings.compare_deep_max_limit)
             targets = [it for it in items if it.state in ("match", "redirect")][:deep_limit]
             deep_sem = asyncio.Semaphore(max(1, min(effective, settings.compare_deep_concurrency)))
+            # caps total img/link sub-requests across all deep pages (not just pages)
+            sub_sem = asyncio.Semaphore(effective)
 
             async def deep_one(it: UrlCheck) -> None:
                 async with deep_sem:
-                    it.deep = await _deep_compare(client, it.prodUrl, it.uatUrl)
+                    it.deep = await _deep_compare(client, it.prodUrl, it.uatUrl, sub_sem=sub_sem)
 
             await asyncio.gather(*(deep_one(it) for it in targets))
 

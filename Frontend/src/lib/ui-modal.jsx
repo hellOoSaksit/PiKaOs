@@ -121,6 +121,11 @@ function UILoadingHost() {
         <div className="load-frame"><div className="walker walking" /></div>
         <div className="load-track"><div className="load-indet" /></div>
         {m.message && <div className="load-meta"><span className="load-label">{m.message}</span></div>}
+        {typeof m.onCancel === "function" && (
+          <div className="pk-foot" style={{ justifyContent: "center", marginTop: 10 }}>
+            <button className="btn btn-ghost" onClick={() => m.onCancel()}>{m.cancelText || "ยกเลิก"}</button>
+          </div>
+        )}
       </div>
     </div>
   );

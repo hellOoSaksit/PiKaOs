@@ -14,9 +14,9 @@ import os
 import httpx
 import pytest
 
-from app.schemas import CompareIn, DeepBatchIn
+from app.schemas import CompareAuth, CompareIn, CoverageBatchIn, CoveragePair, CoveragePlanIn, DeepBatchIn
 from app.services import compare_service as cs
-from app.services.compare_service import _classify, default_sitemap_url, swap_origin
+from app.services.compare_service import _classify, _make_client, default_sitemap_url, swap_origin
 from app.services.content import embeddable, extract
 from app.services.sitemap import SitemapError, parse_sitemap_xml
 
@@ -94,6 +94,99 @@ def test_parse_invalid_xml_raises():
 )
 def test_classify(prod, uat, state):
     assert _classify(prod, uat)[0] == state
+
+
+# --- login-gated sites: per-host auth wiring -------------------------------
+
+def _flow_headers(host_auth, url):
+    """Headers an httpx request would carry after _HostAuth's auth_flow runs."""
+    gen = cs._HostAuth(host_auth).auth_flow(httpx.Request("GET", url))
+    return next(gen).headers
+
+
+def test_host_auth_basic_for_matching_host():
+    h = _flow_headers({"prod.example.com": CompareAuth(username="u", password="p")}, "https://prod.example.com/x")
+    assert h.get("Authorization", "").startswith("Basic ")
+
+
+def test_host_auth_custom_header_for_matching_host():
+    h = _flow_headers({"uat.example.com": CompareAuth(headerName="Cookie", headerValue="s=1")}, "https://uat.example.com/x")
+    assert h.get("Cookie") == "s=1"
+
+
+def test_host_auth_isolates_credentials_by_host():
+    only_prod = {"prod.example.com": CompareAuth(username="u", password="p")}
+    # a request to the OTHER host gets nothing — creds never leak across origins
+    assert "Authorization" not in _flow_headers(only_prod, "https://uat.example.com/x")
+    # an all-empty map is falsy, so _make_client attaches no auth
+    assert not cs._HostAuth({})
+    assert not cs._HostAuth({"h": None})
+
+
+def test_make_client_attaches_host_auth():
+    async def go():
+        c = _make_client(follow_redirects=False,
+                         host_auth={"prod.example.com": CompareAuth(username="u", password="p")})
+        try:
+            assert c.auth is not None     # _HostAuth attached as the client auth
+        finally:
+            await c.aclose()
+        c2 = _make_client(follow_redirects=False, host_auth={"h": None})
+        try:
+            assert c2.auth is None        # no creds → no auth
+        finally:
+            await c2.aclose()
+    asyncio.run(go())
+
+
+# --- cancel: client abort stops the in-flight run --------------------------
+# _run_cancellable cancels the work the moment the client disconnects, so an
+# aborted compare's outbound fetches actually stop instead of running to the end.
+
+class _FakeRequest:
+    """Minimal Request stand-in: reports disconnected after `after` polls."""
+    def __init__(self, after: int = 0):
+        self._after, self._n = after, 0
+
+    async def is_disconnected(self) -> bool:
+        self._n += 1
+        return self._n > self._after
+
+
+def test_run_cancellable_cancels_coro_on_disconnect():
+    from fastapi import HTTPException
+    from app.routers.compare import CLIENT_CLOSED, _run_cancellable
+
+    observed = {"cancelled": False}
+
+    async def slow():
+        try:
+            await asyncio.sleep(5)            # would outlast the test if not cancelled
+            return "done"
+        except asyncio.CancelledError:
+            observed["cancelled"] = True       # the outbound work sees the cancel and stops
+            raise
+
+    async def go():
+        try:
+            await _run_cancellable(_FakeRequest(after=0), slow())
+            return None
+        except HTTPException as exc:
+            return exc.status_code
+
+    code = asyncio.run(go())
+    assert code == CLIENT_CLOSED               # → 499, client gone
+    assert observed["cancelled"] is True       # the running coroutine was actually cancelled
+
+
+def test_run_cancellable_returns_result_when_connected():
+    from app.routers.compare import _run_cancellable
+
+    async def work():
+        return "ok"
+
+    # never disconnects → result passes through untouched
+    assert asyncio.run(_run_cancellable(_FakeRequest(after=10_000), work())) == "ok"
 
 
 # --- full flow over a mocked network (httpx.MockTransport) -----------------
@@ -183,6 +276,74 @@ def test_compare_mock_sitemap_connect_error_is_informative():
     assert "ConnectError" in msg
 
 
+# --- streamed coverage: plan (read sitemap) + batch (probe a chunk) --------
+# The plan/batch split lets the client stream a big sitemap so no single request
+# overruns the dev-proxy timeout. Same mock site as the full-compare tests above.
+
+def _run_plan(payload, handler):
+    async def go():
+        transport = httpx.MockTransport(handler)
+        async with httpx.AsyncClient(transport=transport) as client:
+            return await cs.coverage_plan(payload, _client=client)
+    return asyncio.run(go())
+
+
+def _run_cov_batch(payload, handler):
+    async def go():
+        transport = httpx.MockTransport(handler)
+        async with httpx.AsyncClient(transport=transport) as client:
+            return await cs.coverage_batch(payload, _client=client)
+    return asyncio.run(go())
+
+
+def test_coverage_plan_builds_pairs_and_extras():
+    plan = _run_plan(
+        CoveragePlanIn(prodBase="https://www.example.com", uatBase="https://uat.example.com",
+                       sitemapUrl="https://www.example.com/sitemap.xml",
+                       uatSitemapUrl="https://uat.example.com/sitemap.xml"),
+        _site_handler,
+    )
+    assert len(plan.pairs) == 3
+    assert {p.path for p in plan.pairs} == {"/", "/about", "/gone"}
+    gone = next(p for p in plan.pairs if p.path == "/gone")
+    assert str(gone.prodUrl) == "https://www.example.com/gone"
+    assert str(gone.uatUrl) == "https://uat.example.com/gone"   # path swapped onto UAT host
+    assert plan.extraOnUat == ["https://uat.example.com/uat-only"]
+
+
+def test_coverage_plan_without_uat_sitemap_has_no_extras():
+    plan = _run_plan(
+        CoveragePlanIn(prodBase="https://www.example.com", uatBase="https://uat.example.com",
+                       sitemapUrl="https://www.example.com/sitemap.xml"),
+        _site_handler,
+    )
+    assert len(plan.pairs) == 3 and plan.extraOnUat == []
+
+
+def test_coverage_batch_classifies_and_preserves_order():
+    pairs = [
+        CoveragePair(path="/", prodUrl="https://www.example.com/", uatUrl="https://uat.example.com/"),
+        CoveragePair(path="/gone", prodUrl="https://www.example.com/gone", uatUrl="https://uat.example.com/gone"),
+    ]
+    results = _run_cov_batch(CoverageBatchIn(pairs=pairs), _site_handler)
+    assert [r.path for r in results] == ["/", "/gone"]                       # aligned to input
+    assert results[0].state == "match"
+    assert results[1].state == "missing_on_uat" and results[1].uatStatus == 404
+
+
+def test_coverage_plan_then_batches_equal_full_compare():
+    # streaming the plan's pairs through batches must reconstruct the same coverage
+    # the one-shot compare() produces (states + counts), just chunked.
+    plan = _run_plan(CoveragePlanIn(
+        prodBase="https://www.example.com", uatBase="https://uat.example.com",
+        sitemapUrl="https://www.example.com/sitemap.xml"), _site_handler)
+    streamed = []
+    for i in range(0, len(plan.pairs), 2):                                   # batches of 2
+        streamed += _run_cov_batch(CoverageBatchIn(pairs=plan.pairs[i:i + 2]), _site_handler)
+    by_path = {r.path: r.state for r in streamed}
+    assert by_path == {"/": "match", "/about": "match", "/gone": "missing_on_uat"}
+
+
 # --- deep content extraction (pure) ----------------------------------------
 
 HTML_SRC = """<html><head>
@@ -223,6 +384,32 @@ def test_extract_basic():
     assert d["words"] > 0
 
 
+def test_extract_headings_outline():
+    html = (
+        "<header><h1>Site Name</h1></header>"            # chrome → excluded from the outline
+        "<main><h1>Page Title</h1>"
+        "<h2>Section A</h2><p>body</p>"
+        "<h3>Sub A1</h3>"
+        "<h2>Section B</h2></main>"
+        "<footer><h3>Quick Links</h3></footer>"          # chrome → excluded
+    )
+    d = extract(html, "https://www.example.com/p")
+    outline = [(h["level"], h["text"]) for h in d["headings"]]
+    assert outline == [(1, "Page Title"), (2, "Section A"), (3, "Sub A1"), (2, "Section B")]
+    assert d["h1"] == "Site Name"   # primary h1 = first overall (incl. header) — existing behavior
+
+
+def test_extract_downloadable_docs():
+    html = ('<a href="/files/Annual%20Report%202024.pdf">report</a>'
+            '<a href="https://cdn.example.com/forms/proxy.docx">form</a>'
+            '<a href="/about">page</a>')   # a normal page link is NOT a doc
+    d = extract(html, "https://www.example.com/p")
+    names = {x["name"] for x in d["docs"]}
+    assert names == {"Annual Report 2024.pdf", "proxy.docx"}      # %20 decoded; CDN host kept
+    assert "https://www.example.com/about" in d["links"]          # the page link stays a link, not a doc
+    assert all(not u.endswith(".pdf") for u in d["links"])        # docs excluded from links
+
+
 # --- deep compare over mocked network --------------------------------------
 
 PROD_SM_ONE = """<?xml version="1.0" encoding="UTF-8"?>
@@ -243,6 +430,8 @@ def _deep_handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, text=body, headers=html_headers)
     if path == "/img/a.png" and host == "uat.example.com":
         return httpx.Response(404)            # this image is missing on UAT
+    if path == "/about" and host == "uat.example.com":
+        return httpx.Response(404)            # this internal link is broken on UAT
     return httpx.Response(200)                 # everything else (prod image, cdn, links) exists
 
 
@@ -259,8 +448,10 @@ def test_deep_compare_detects_title_and_missing_image():
     assert deep.titleMatch is False
     assert deep.srcTitle == "Hello World" and deep.tgtTitle == "Hello UAT"
     assert deep.imagesMissing == 1                     # /img/a.png 404 on UAT
+    assert deep.linksBroken == 1                        # /about 404 on UAT
+    assert deep.linksBrokenUrls == ["https://uat.example.com/about"]   # the exact broken link, for the diff detail
     assert deep.bodySim is not None and deep.bodySim > 0.8   # bodies nearly identical
-    assert deep.deepState in ("mixed", "meta_diff", "images_missing")
+    assert deep.deepState in ("mixed", "meta_diff", "images_missing", "links_broken")
 
 
 def test_deep_batch_streams_pairs():

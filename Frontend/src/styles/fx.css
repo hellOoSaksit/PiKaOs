@@ -152,6 +152,19 @@ button, a, .nav-item, .room-card, [role="button"] { -webkit-tap-highlight-color:
   @keyframes cmpSkel { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 }
 
+/* Always-visible link for compare detail (broken-link / missing-image URLs, "open real
+   pages"). The Recall screen's .rr-open is opacity:0 until a row hovers — reusing it here
+   left these links invisible, so compare gets its own accent link. */
+.cmp-link { color: var(--gold); text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
+.cmp-link:hover { color: var(--gold-bright); }
+
+/* Deep body block → click to open the live page scrolled to + highlighting that exact text
+   (native scroll-to-text-fragment). Text stays readable; the ↗ hint is subtle until hover. */
+.cmp-jump { color: inherit; text-decoration: none; cursor: pointer; border-radius: 4px; }
+.cmp-jump:hover { text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+.cmp-jump .cmp-jump-ic { opacity: .4; font-size: .85em; white-space: nowrap; }
+.cmp-jump:hover .cmp-jump-ic { opacity: 1; color: var(--gold); }
+
 /* ============ Compare — deep-detail expand (smooth height-grow reveal) ============ */
 /* the expanded panel is tied to its row with a gold rail + a soft tint */
 .cmp-detail > td { border-left: 2px solid var(--gold); background: color-mix(in srgb, var(--gold) 5%, transparent); }

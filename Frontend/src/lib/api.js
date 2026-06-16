@@ -27,7 +27,7 @@ export class ApiError extends Error {
   }
 }
 
-async function raw(path, { method = "GET", body, auth = true, _retry = false } = {}) {
+async function raw(path, { method = "GET", body, auth = true, signal, _retry = false } = {}) {
   const headers = {};
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (auth && accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
@@ -38,9 +38,13 @@ async function raw(path, { method = "GET", body, auth = true, _retry = false } =
       method,
       headers,
       credentials: "include",
+      signal,                                  // lets callers abort (cancel) the request
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch (e) {
+    // a caller-initiated abort surfaces as AbortError — propagate it so callers can
+    // tell "cancelled" apart from a real failure (don't mask it as a network error)
+    if (e && e.name === "AbortError") throw e;
     // network/connection failure (backend down, offline)
     throw new ApiError(0, { detail: "network" });
   }
@@ -48,7 +52,7 @@ async function raw(path, { method = "GET", body, auth = true, _retry = false } =
   // transparent refresh-once on expired access token
   if (res.status === 401 && auth && !_retry && path !== "/auth/refresh") {
     const ok = await tryRefresh();
-    if (ok) return raw(path, { method, body, auth, _retry: true });
+    if (ok) return raw(path, { method, body, auth, signal, _retry: true });
   }
 
   let data = null;
@@ -106,18 +110,24 @@ export async function forgotPassword(usernameOrEmail) {
 }
 
 // --- UAT vs Production compare API ---
+// Each accepts an optional AbortSignal so the caller can cancel a long run; aborting
+// the fetch closes the connection, which the backend detects to stop its outbound work.
 // POST /api/compare → coverage of Production's sitemap URLs against UAT.
-export async function compareSites(body) {
-  return raw("/compare", { method: "POST", body });
+export async function compareSites(body, signal) {
+  return raw("/compare", { method: "POST", body, signal });
 }
 
 // POST /api/compare/deep → deep-compare one small batch of page pairs (client streams sets).
-export async function compareDeep(body) {
-  return raw("/compare/deep", { method: "POST", body });
+export async function compareDeep(body, signal) {
+  return raw("/compare/deep", { method: "POST", body, signal });
 }
 
-// POST /api/compare/render → proxy a page's HTML (with injected <base>) so a site
-// that blocks iframe embedding can still be previewed via a same-origin srcdoc.
-export async function compareRender(body) {
-  return raw("/compare/render", { method: "POST", body });
+// POST /api/compare/plan → read the sitemap(s) → URL pairs to probe (fast, no probing).
+export async function coveragePlan(body, signal) {
+  return raw("/compare/plan", { method: "POST", body, signal });
+}
+
+// POST /api/compare/batch → probe one chunk of coverage pairs (client streams chunks).
+export async function coverageBatch(body, signal) {
+  return raw("/compare/batch", { method: "POST", body, signal });
 }

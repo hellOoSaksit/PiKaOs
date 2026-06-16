@@ -19,6 +19,7 @@ import { ComponentLibrary } from './screens/screens-library.jsx';
 import { Workflows } from './screens/screens-workflows.jsx';
 import { useAuth } from './lib/auth.jsx';
 import { Menu } from './components/ui/Dropdown.jsx';
+import { ToastProvider } from './components/ui/Toast.jsx';
 import { World } from './screens/screens-world.jsx';
 import { SAMPLE_CHARS, loadArchived, loadChars, randPos, saveArchived, saveChars } from './lib/store.jsx';
 import { UILoadingHost, UIModalHost } from './lib/ui-modal.jsx';
@@ -559,6 +560,7 @@ function App() {
   })();
 
   return (
+    <ToastProvider>
     <div className="app" key={lex}>
       <Sidebar route={route} go={go} t={t} can={can} />
       <div className="main">
@@ -578,6 +580,7 @@ function App() {
       <UIModalHost />
       <UILoadingHost />
     </div>
+    </ToastProvider>
   );
 }
 
