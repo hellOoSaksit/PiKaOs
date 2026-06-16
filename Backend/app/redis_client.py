@@ -107,6 +107,38 @@ async def clear_cached_perms(user_id: str) -> None:
         log.warning("redis down — could not clear perms cache (will expire via TTL): %s", exc)
 
 
+# --- run cancellation (engine) ---
+# The runner checks this between steps; setting it asks an in-flight run to stop at the
+# next boundary (mid-step cancellation rides on the per-step timeouts). Short TTL so a
+# stale flag can't cancel a future run that happens to reuse the id.
+_CANCEL = "run:{}:cancel"
+_CANCEL_TTL = 60 * 60  # 1h — longer than any run's wall-clock ceiling
+
+
+async def request_run_cancel(run_id: str) -> None:
+    try:
+        await redis.set(_CANCEL.format(run_id), "1", ex=_CANCEL_TTL)
+    except RedisError as exc:
+        log.warning("redis down — could not flag run cancel: %s", exc)
+
+
+async def is_run_cancelled(run_id: str) -> bool:
+    # Fail-open (treat as not-cancelled) on a Redis outage: a run we can't check should
+    # finish on its own bounds (max_steps / wall-clock) rather than be force-killed.
+    try:
+        return await redis.exists(_CANCEL.format(run_id)) == 1
+    except RedisError as exc:
+        log.warning("redis down — skipping cancel check (fail-open): %s", exc)
+        return False
+
+
+async def clear_run_cancel(run_id: str) -> None:
+    try:
+        await redis.delete(_CANCEL.format(run_id))
+    except RedisError as exc:
+        log.warning("redis down — could not clear run cancel flag: %s", exc)
+
+
 async def ping() -> bool:
     try:
         return bool(await redis.ping())

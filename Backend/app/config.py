@@ -73,6 +73,16 @@ class Settings(BaseSettings):
     # public host. Set this to lock compare to known domains.
     compare_url_allowlist: str = ""
 
+    # --- agent execution engine (B3 — services/agent_runner.run, run by the arq worker) ---
+    # Hard cap on LLM+tool steps per run — a runaway agent can't loop forever / drain quota.
+    run_max_steps: int = 24
+    # Per-step deadlines (a hung provider/tool can't pin a worker). Enforced with
+    # asyncio.wait_for; on timeout the run fails with a `*_timeout` error.
+    run_llm_step_timeout_s: float = 120.0
+    run_tool_step_timeout_s: float = 60.0
+    # Whole-run wall-clock ceiling, checked between steps (belt-and-braces over max_steps).
+    run_max_wallclock_s: float = 900.0
+
     # --- CORS (frontend dev origin) ---
     cors_origins: str = "http://localhost:5173"
 
