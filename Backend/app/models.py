@@ -292,6 +292,24 @@ class ToolConfig(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
+class StubToolWrite(Base):
+    """Sink for the B4 stub tools — see migration 0005. Lets tests observe the engine's
+    two-phase / effect-class semantics (at-most-once side_effect vs deduped idempotent_write).
+    UNIQUE(idempotency_key) backs the upsert tool's ON CONFLICT DO NOTHING."""
+
+    __tablename__ = "stub_tool_writes"
+    __table_args__ = (UniqueConstraint("idempotency_key", name="uq_stub_tool_writes_key"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    run_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("runs.id", ondelete="CASCADE"), index=True, nullable=True
+    )
+    tool: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class Notification(Base):
     __tablename__ = "notifications"
 
