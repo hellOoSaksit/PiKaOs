@@ -16,13 +16,12 @@ frontend), and opens the browser at **http://localhost:5173**. Watch logs in Doc
 ## ⬇️ Download — Website Compare (standalone)
 
 A self-contained build of just the **Compare** feature (UAT vs Production content comparison) —
-no login, no nav, stateless backend. Run it on its own, anywhere with Docker.
+no login, no nav, stateless backend. It lives in its own repo: **[PiKaOS-Standalone](https://github.com/hellOoSaksit/PiKaOS-Standalone)**.
 
-- **Latest release:** **[Website Compare v0.1](https://github.com/hellOoSaksit/PiKaOs/releases/tag/website-compare-v0.1)**
-- **Direct download:** [`PikaOS-Compare-v0.1.zip`](https://github.com/hellOoSaksit/PiKaOs/releases/download/website-compare-v0.1/PikaOS-Compare-v0.1.zip)
+- **Latest release:** **[Website Compare v0.1](https://github.com/hellOoSaksit/PiKaOS-Standalone/releases/tag/website-compare-v0.1)**
+- **Direct download:** [`PikaOS-Compare-v0.1.zip`](https://github.com/hellOoSaksit/PiKaOS-Standalone/releases/download/website-compare-v0.1/PikaOS-Compare-v0.1.zip)
 
-Unzip → `docker compose up -d --build` (or `start-compare.bat`) → http://localhost:5173. The source
-also lives in this repo under [`Standalone/PikaOS-Compare/`](Standalone/PikaOS-Compare).
+Unzip → `cd PikaOS-Compare` → `docker compose up -d --build` (or `start-compare.bat`) → http://localhost:5173.
 
 ## Layout
 
@@ -30,6 +29,5 @@ also lives in this repo under [`Standalone/PikaOS-Compare/`](Standalone/PikaOS-C
 |---|---|
 | [`Frontend/`](Frontend) | Vite + React SPA (the UI) |
 | [`Backend/`](Backend) | FastAPI service (auth, API, WS) |
-| [`Standalone/PikaOS-Compare/`](Standalone/PikaOS-Compare) | standalone Website Compare app (see its own README) |
 | [`design-system/`](design-system) | static design deliverables (HTML) |
 | [`docker-compose.yml`](docker-compose.yml) | Postgres · Redis · MinIO · backend · worker · frontend |

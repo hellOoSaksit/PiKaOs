@@ -1,1 +1,0 @@
-"""Website Compare backend package."""
