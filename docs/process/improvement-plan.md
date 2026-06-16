@@ -32,7 +32,7 @@ schema ใหม่มาพร้อม FK/index ([risk-mitigation §4.4](../ar
 | # | งาน | อ้างอิง |
 |---|---|---|
 | A1 | ✅ **เสร็จ (2026-06-15)** RBAC server-side: ตาราง `roles/permissions/role_perms/user_perms` (migration `0002_rbac`) + seed จาก `data-users.jsx` + `deps.require_perm` + `rbac_service` (effective perms + Redis cache `perms:<id>`) + `/me`/login คืน `permissions[]` · `tests/test_rbac.py` (8 passed) | risk-mitigation §2 |
-| A2 | **WS refactor**: first-message auth (token ออกจาก URL) · per-quest channel + authz · snapshot/backfill | risk-mitigation §3 |
+| A2 | 🟡 **บางส่วน (2026-06-16)** first-message auth (token ออกจาก URL) ✅ + per-user channel (เลิก global cross-user leak) ✅ + subscribe/unsubscribe protocol ✅ · `tests/test_ws.py` (6) · **per-quest authz + run_steps snapshot/backfill เลื่อนเฟส B** (ต้องมีตาราง quests/run_steps) | risk-mitigation §3 |
 | A3 | ✅ **เสร็จ (2026-06-16)** Migration `0003_documents_owner_fk`: FK `documents.owner_id → users` **ON DELETE SET NULL** + index `ix_documents_owner_id` (ตารางว่าง = ฟรี) · ยืนยันด้วย `\d documents` + 74 tests เขียว | risk-mitigation §4.4 |
 | A4 | ✅ **เสร็จ (2026-06-15)** Boot asserts (prod): jwt_secret/cookie_secure/seed_password/minio_secret ≠ default → ตายตอนบูต (`config.production_violations` + `main.lifespan`, `tests/test_config.py`) | risk-mitigation §5.4 |
 | A5 | 🟡 Pin `minio` image ✅ (digest, docker-compose.yml) · ⬜ ย้าย `passlib` → `argon2-cffi` ใน `security.py` (เสี่ยง hash เดิม — ทำพร้อม test login) | tech-stack §3.1–3.2 |
