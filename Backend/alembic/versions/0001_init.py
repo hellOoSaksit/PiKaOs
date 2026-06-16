@@ -1,4 +1,8 @@
-"""init: pgvector extension + users + documents
+"""init: users + documents
+
+No pgvector — the knowledge store is markdown-as-truth (docs/architecture/knowledge-rag.md);
+the `vector` extension + an embeddings column are added by the RAG phase (E) only if/when
+semantic retrieval is actually needed, not carried here unused.
 
 Revision ID: 0001_init
 Revises:
@@ -7,7 +11,6 @@ Create Date: 2026-06-11
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
-from pgvector.sqlalchemy import Vector
 
 revision = "0001_init"
 down_revision = None
@@ -16,8 +19,6 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute("CREATE EXTENSION IF NOT EXISTS vector")
-
     op.create_table(
         "users",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
@@ -46,7 +47,6 @@ def upgrade() -> None:
         sa.Column("object_key", sa.String(512), nullable=False),
         sa.Column("content_type", sa.String(128), nullable=False, server_default="application/octet-stream"),
         sa.Column("size", sa.BigInteger(), nullable=False, server_default="0"),
-        sa.Column("embedding", Vector(1536), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
     )
 

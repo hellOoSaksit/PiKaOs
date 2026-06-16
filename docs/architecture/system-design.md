@@ -22,7 +22,7 @@ doc designs the real engine.
 ## 2. Current architecture ✅
 
 ```
-Browser ──/api──▶ Vite proxy ──▶ FastAPI ──▶ Postgres + pgvector
+Browser ──/api──▶ Vite proxy ──▶ FastAPI ──▶ Postgres
         ──/ws───▶                  │  ├──▶ Redis  (refresh tokens, denylist, pub/sub bus)
                                     │  └──▶ MinIO  (objects: md / img / log / pdf)
 ```
@@ -30,7 +30,7 @@ Browser ──/api──▶ Vite proxy ──▶ FastAPI ──▶ Postgres + pg
 - **Auth** ✅ — JWT access token + opaque refresh token in Redis (httpOnly cookie),
   argon2id hashing. See `Backend/app/services/auth_service.py`.
 - **Layering** ✅ — `routers/` (HTTP) → `services/` (logic) → `repositories/` (SQL).
-- **Infra** ✅ — `docker-compose.yml`: db (pgvector/pg16), redis, minio, backend.
+- **Infra** ✅ — `docker-compose.yml`: db (postgres:16), redis, minio, backend.
   Frontend runs via `npm`/`start.bat` (not in compose).
 - **Real-time** ✅ scaffold — FastAPI `/ws` authenticated by access token, relayed over
   a Redis pub/sub channel (`Backend/app/routers/ws.py`).

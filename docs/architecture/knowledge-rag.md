@@ -30,7 +30,7 @@
 |---|---|---|---|
 | **1. Structured** | deadline · task · quiz score · log · run_steps · RBAC | **Postgres** | ✅ มีแล้ว (`runs`/`run_steps`/`users`/`quests`…) |
 | **2. Documents (ความจริง)** | notes · Ref `.md` · ไฟล์ดิบ (md/pdf/img/log) | **markdown + MinIO** | ✅ infra พร้อม ([`storage.py`](../../Backend/app/storage.py) · [`documents`](../../Backend/app/models.py)) |
-| **3. Semantic index** | "ดึง context ที่เกี่ยวกับงานนี้" (RAG) | **pgvector** (derived) | 🟡 scaffold ([`Document.embedding`](../../Backend/app/models.py)) ยังไม่ใช้ — เฟส E |
+| **3. Semantic index** | "ดึง context ที่เกี่ยวกับงานนี้" (RAG) | **pgvector** (derived) | ⚪ **ยังไม่มี** — ลบ scaffold ออกแล้ว (unused); เพิ่ม extension ตอนเฟส E |
 
 > structured data **ห้ามเก็บใน vector** (ค้น exact/filter/aggregate ไม่ได้) — นั่นคืองานของ Postgres.
 
@@ -85,7 +85,7 @@ subjects/<department-or-subject>/
 
 ## 4. Non-goals (สิ่งที่ "ไม่ทำ" — กันการเดินผิด)
 
-- ❌ **ไม่ลง Vector DB ตัวใหม่** (Pinecone/Weaviate/Chroma) — มี **pgvector ในสแตกแล้ว** (db = `pgvector/pgvector:pg16`); ตัวที่สองคือ infra ซ้ำซ้อนที่ต้องเลี้ยง.
+- ❌ **ไม่ลง Vector DB ตัวใหม่** (Pinecone/Weaviate/Chroma) — เมื่อถึงเวลา ใช้ **pgvector ที่เป็น extension ของ Postgres** (เสริมเข้า db เดิมได้ ไม่ต้องลง DB แยก). ตอนนี้ **ถอด pgvector ออกแล้ว** (unused → db = `postgres:16-alpine`); เพิ่ม `CREATE EXTENSION vector` + คอลัมน์ via migration ตอนเฟส E.
 - ❌ **ไม่ทำชั้น vector ก่อนเจ็บ** — ดู §3 เกณฑ์.
 - ❌ **ไม่เก็บ structured data (ตาราง/วันที่/สถานะ) ใน vector** — Postgres.
 - ❌ **ไม่ให้ข้อมูลอยู่เฉพาะใน vector** — markdown เป็นความจริงเสมอ (กฎเหล็ก §0).
@@ -94,7 +94,7 @@ subjects/<department-or-subject>/
 
 ## 5. ผลต่อโค้ด/แผนที่มีอยู่
 
-- [`Document.embedding Vector(1536)`](../../Backend/app/models.py) = scaffold เดิม → เฟส E1 เปลี่ยนเป็นมิติแพลตฟอร์ม + เพิ่ม `embedding_model`.
+- [`Document`](../../Backend/app/models.py) ไม่มีคอลัมน์ embedding แล้ว (ลบ scaffold `Vector(1536)` ออก) → เฟส E1 เพิ่มคอลัมน์ embedding (มิติแพลตฟอร์ม) + `embedding_model` + `CREATE EXTENSION vector` พร้อมกัน.
 - [system-design §8](system-design.md) + build order step 6 (RAG) = ปลายทาง implement; doc นี้ล็อก "ตัวเก็บเป็น markdown" ที่เดิมเขียนกว้างไว้.
 - [improvement-plan เฟส E](../process/improvement-plan.md) (E1 model/dim · E2 ingest · E3 retrieval · E4 UI) = แผน implement เมื่อถึงเกณฑ์ §3.
 - ตัวเก็บ markdown (ชั้น 2) **ทำได้เลยไม่ต้องรอ vector** — pipeline อัปโหลด → MinIO → `documents` row.

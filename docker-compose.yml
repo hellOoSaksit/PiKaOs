@@ -4,7 +4,10 @@
 # automatically without one dead container taking the stack down — A8 resilience.
 services:
   db:
-    image: pgvector/pgvector:pg16
+    # Plain Postgres — pgvector was removed (unused; knowledge store is markdown-as-truth,
+    # docs/architecture/knowledge-rag.md). If RAG (phase E) ever needs vectors, add the
+    # `vector` extension back via a migration + the pgvector image at that point.
+    image: postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-pikaos}

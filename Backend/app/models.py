@@ -4,7 +4,6 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pgvector.sqlalchemy import Vector
 from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -35,7 +34,9 @@ class User(Base):
 
 
 class Document(Base):
-    """File metadata + embedding (scaffold for MinIO/pgvector RAG — not used yet)."""
+    """File metadata for MinIO-stored documents. The knowledge store is markdown-as-truth
+    (docs/architecture/knowledge-rag.md); a vector column is intentionally absent — RAG
+    (phase E) adds embeddings via its own migration if/when retrieval need is real."""
 
     __tablename__ = "documents"
 
@@ -50,7 +51,6 @@ class Document(Base):
     object_key: Mapped[str] = mapped_column(String(512), nullable=False)  # MinIO object path
     content_type: Mapped[str] = mapped_column(String(128), nullable=False, default="application/octet-stream")
     size: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
-    embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
     # department scoping (column added in migration 0004 — system-design §7.1)
     department_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("departments.id", ondelete="SET NULL"), index=True, nullable=True

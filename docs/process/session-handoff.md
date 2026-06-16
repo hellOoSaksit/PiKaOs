@@ -38,6 +38,7 @@
 > เขียน design ลง [architecture/knowledge-rag.md](../architecture/knowledge-rag.md) (กฎเหล็ก: rebuild ทางเดียว `markdown → vector`,
 > ห้าม data-only-in-vector · โครง vault · เกณฑ์เปิด vector) + pointer ที่ docs/README.md · system-design §8 · improvement-plan เฟส E.
 > **ยังไม่ implement** (ตัวเก็บ markdown ทำได้เลย, ชั้น vector = เฟส E). CLAUDE.md ชน 301 บรรทัด — ไม่เติม router row (กฎ §8).
+> **[2026-06-16] ลบ pgvector ออก (project clean):** db image `pgvector/pgvector:pg16` → `postgres:16-alpine` · ถอด `pgvector` จาก requirements · ลบ `Document.embedding`+`Vector` import (models + migration 0001) · recreate `pikaos_pgdata` volume (seed-reproducible). ยืนยัน: `pg_extension where extname='vector'`=0, ไม่มีคอลัมน์ embedding, **112 tests เขียว**. เฟส E จะ `CREATE EXTENSION vector` กลับเมื่อจำเป็น (knowledge-rag §4). **ถัดไป: redesign/consolidate ER (รวมตารางที่รวมได้ ลด ER ที่เยอะ/อ่านยาก เน้นหลักการ SQL).**
 >
 > **[2026-06-16] ประเมินทุกระบบ (read-only) + ตัดสินใจ resilience:** สำรวจ FE/BE/infra ครบ —
 > FE สุก (~19k บรรทัด, จุดอ่อนเดียว: ไม่มี CI/lint/test), BE foundation แกร่ง (auth/RBAC/compare/SSRF)
