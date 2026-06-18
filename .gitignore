@@ -8,8 +8,10 @@ dist-ssr
 .env
 
 # claude code local config / tooling (kept local, not published)
+# NOTE: CLAUDE.md is intentionally TRACKED — it's the project's operating contract, so a
+# fresh clone of this repo carries its own rules (mirrors ../PiKaOs-docs/CLAUDE.md; keep both
+# in sync when a rule changes). See CLAUDE.md §6.
 .claude/
-CLAUDE.md
 .mcp.json
 .playwright-mcp/
 
