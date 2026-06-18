@@ -290,33 +290,9 @@ room/agent layouts persist under `guildos.rooms.v2`, tasks under `guildos.works.
 
 ## 6. How to write a CLAUDE.md
 
-A CLAUDE.md is the project's **operating contract** — the rules and intent that code
-alone doesn't reveal. Write it so a newcomer (human or AI) can act correctly without
-asking. Principles:
-
-1. **Only non-obvious, load-bearing rules.** If the code already shows it, leave it
-   out. Capture decisions, constraints, "always/never", and *why*.
-2. **Imperative and specific, with the reason.** "Never hand-roll `<select>` — use
-   `ui/Dropdown.jsx`, so theming + a11y stay consistent" beats "be consistent".
-3. **Link to the source of truth; don't duplicate it.** Point at the file/guide that
-   owns the detail (e.g. design tokens live in the design guide). Duplication goes stale.
-4. **Scannable structure.** Short numbered sections, headings, tables, code fences.
-   Mark non-negotiables `(hard rule)`. A reader should find a rule in seconds.
-5. **Runnable as written.** Every path, command, and grep must work if pasted. Use
-   clickable links (`[file](path)`) for files.
-6. **Recipes for the common paths.** "Add an endpoint", "add a component", "add an
-   i18n string" — the steps people repeat.
-7. **Keep it current.** Update it in the same change that alters structure; a stale
-   rule is worse than none. Delete rules that no longer hold.
-8. **Scope & the 300-line cap (hard rule).** One root CLAUDE.md is the whole-project
-   contract (this file) — keep it **≤300 lines**. When it would overflow, or a single
-   feature/use-case grows large, spin that section out to its own topic `.md` (e.g.
-   [docs/features/compare.md](../PiKaOs-docs/docs/features/compare.md)) written to these same principles, and leave a **one-line
-   pointer** here. Don't duplicate — the pointer links, the topic doc owns the detail.
-
-Skeleton:
-
-```markdown
-# CLAUDE.md — <project> dev rules
-
-<
+The project's **operating contract** — rules + intent code alone doesn't reveal, so a newcomer acts
+right without asking. Principles: **(1)** only non-obvious, load-bearing rules + *why*; **(2)** imperative
++ specific, with the reason; **(3)** link the source of truth, don't duplicate; **(4)** scannable —
+numbered sections, tables, `(hard rule)`; **(5)** runnable as written (`[file](path)` links); **(6)**
+recipes for repeated paths; **(7)** keep current, delete dead rules; **(8)** **≤300 lines (hard rule)**
+— overflow → spin the section to its own topic `.md` + leave a one-line pointer.
