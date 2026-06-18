@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     # --- auth ---
     jwt_secret: str = "change-me-in-.env"
     jwt_alg: str = "HS256"
+    # Secret used to derive the at-rest encryption key (app/crypto.py — encrypts LLM API keys
+    # stored in llm_connections). Falls back to jwt_secret in dev; set a strong value in prod.
+    secret_key: str = ""
     access_ttl_seconds: int = 60 * 15          # 15 minutes
     refresh_ttl_seconds: int = 60 * 60 * 24 * 7  # 7 days
     refresh_cookie_name: str = "pikaos_refresh"
@@ -82,6 +85,59 @@ class Settings(BaseSettings):
     run_tool_step_timeout_s: float = 60.0
     # Whole-run wall-clock ceiling, checked between steps (belt-and-braces over max_steps).
     run_max_wallclock_s: float = 900.0
+
+    # --- LLM provider (engine — C1, used by the arq worker's agent_runner) ---
+    # Which LLM backend the agent loop talks to:
+    #   "stub"   = deterministic, free stand-in (B4) — default, so tests/dev run without a model.
+    #   "ollama" = local OpenAI-style server (free, private). OpenAI/Anthropic adapters land later.
+    # Default stays "stub" → existing behaviour + tests unchanged; flip to "ollama" in .env.
+    llm_provider: str = "stub"
+    # Base URL of the local LLM server. From inside the backend/worker container the host's
+    # Ollama is reachable at host.docker.internal (Docker Desktop on Windows/Mac; on Linux add
+    # `extra_hosts: ["host.docker.internal:host-gateway"]` to the worker service).
+    llm_base_url: str = "http://host.docker.internal:11434"
+    # Model used when an agent doesn't pin its own (`agents.model`). Pull it first: `ollama pull llama3.1`.
+    llm_default_model: str = "llama3.1"
+    # Per-call HTTP timeout to the LLM server. The agent loop also caps each step via
+    # run_llm_step_timeout_s — keep this ≤ that so a hung model surfaces as the step timeout.
+    llm_request_timeout_s: float = 120.0
+    # Cap on output tokens per LLM call. Anthropic *requires* max_tokens; OpenAI honors it too.
+    llm_max_tokens: int = 4096
+    # How long the worker caches the active LLM connection before re-reading the DB — so an admin's
+    # change in the UI (llm_connections) takes effect within this many seconds, no restart needed.
+    llm_config_cache_s: float = 15.0
+
+    # --- embeddings (knowledge RAG — phase E/M2, docs/architecture/knowledge-rag.md §3) ---
+    # Which embedder turns markdown chunks (and a search query) into vectors:
+    #   "stub"   = deterministic, free, offline stand-in (default — tests/dev run without a model),
+    #   "ollama" = local embedding server (`ollama pull bge-m3`), reusing the httpx path (no new dep).
+    # Default "stub" keeps existing behaviour; flip to "ollama" in .env to embed for real.
+    embed_provider: str = "stub"
+    # Embedding model + its output dimension. **Decided once, before the first ingest** — changing
+    # the dimension means re-embedding the whole corpus (knowledge-rag.md §3 / E1). bge-m3 = 1024.
+    # The dimension is also baked into the doc_chunks.embedding column (migration 0005); keep them equal.
+    embed_model: str = "bge-m3"
+    embed_dim: int = 1024
+    # Embedding server base URL (Ollama). Same host trick as llm_base_url (host.docker.internal).
+    embed_base_url: str = "http://host.docker.internal:11434"
+    embed_request_timeout_s: float = 60.0
+    # Chunking: a markdown section longer than this many characters is split into several chunks
+    # (keeping its heading) so no single embedding swallows a huge section. Tune with the model.
+    embed_chunk_max_chars: int = 1500
+    # Default top-k returned by /api/knowledge/search (and used for agent retrieval, E3).
+    embed_search_top_k: int = 5
+
+    # --- OpenAI / ChatGPT API (provider="openai") — /v1/chat/completions ---
+    openai_api_key: str = ""
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_default_model: str = "gpt-4o-mini"
+
+    # --- Anthropic / Claude Messages API (provider="anthropic") — /v1/messages ---
+    # Default model is the latest Opus per Anthropic guidance; override per-agent via agents.model.
+    anthropic_api_key: str = ""
+    anthropic_base_url: str = "https://api.anthropic.com"
+    anthropic_version: str = "2023-06-01"
+    anthropic_default_model: str = "claude-opus-4-8"
 
     # --- CORS (frontend dev origin) ---
     cors_origins: str = "http://localhost:5173"

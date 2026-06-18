@@ -52,6 +52,86 @@ class HealthOut(BaseModel):
     minio: str
 
 
+# --- knowledge / document store (markdown-as-truth — docs/architecture/knowledge-rag.md) ---
+
+
+class DocumentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    owner_id: uuid.UUID | None = None
+    kind: str                          # md|image|pdf|log|other
+    name: str
+    content_type: str
+    size: int
+    department_id: uuid.UUID | None = None
+    ingest_status: str = "pending"     # RAG ingest state: pending|done|failed|skipped (E2)
+    created_at: datetime
+    url: str | None = None             # presigned download link — set only on the detail (GET /docs/{id})
+
+
+class DocumentListOut(BaseModel):
+    items: list[DocumentOut]
+    total: int                         # total matching the scope/filter (for pagination)
+
+
+# RAG retrieval — one matched chunk from semantic search (GET /api/knowledge/search)
+class KnowledgeSearchResult(BaseModel):
+    id: uuid.UUID                      # chunk id
+    document_id: uuid.UUID
+    document_name: str
+    document_kind: str
+    seq: int
+    heading: str
+    content: str
+    score: float                       # cosine similarity (higher = closer)
+
+
+class KnowledgeSearchOut(BaseModel):
+    items: list[KnowledgeSearchResult]
+
+
+# --- runtime LLM provider config (no-hardcode — admin sets API vs Local from the UI) ---
+
+
+class LlmConnectionIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    provider: str = Field(description="ollama | openai | anthropic")
+    model: str = ""
+    base_url: str | None = None
+    api_key: str | None = None         # write-only — encrypted at rest, never returned
+
+
+class LlmConnectionUpdate(BaseModel):
+    name: str | None = None
+    provider: str | None = None
+    model: str | None = None
+    base_url: str | None = None
+    api_key: str | None = None         # omit/empty = leave the stored key unchanged
+
+
+class LlmConnectionOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    provider: str
+    model: str
+    base_url: str | None = None
+    is_active: bool
+    api_key_set: bool                  # masked — true if a key is stored (the value is never sent)
+    created_at: datetime
+
+
+# Per-system LLM assignment (which connection a role uses — engine/search/summarize)
+class LlmRoleSet(BaseModel):
+    connection_id: uuid.UUID | None = None    # null = clear the binding (fall back to active)
+
+
+class LlmRoleOut(BaseModel):
+    role: str
+    connection_id: uuid.UUID | None = None
+    connection_name: str | None = None
+
+
 # --- UAT vs Production sitemap comparison ---------------------------------
 # Production's sitemap is the source of truth for the "primary" URL set. Each
 # URL is domain-swapped onto the UAT base and both sides are probed so we can

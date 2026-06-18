@@ -7,8 +7,27 @@ from datetime import datetime
 from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.types import UserDefinedType
 
+from .config import settings
 from .db import Base
+
+
+class Vector(UserDefinedType):
+    """Minimal mapping for pgvector's `vector(N)` column — DDL/metadata only.
+
+    Reads and writes of embeddings go through raw SQL in repositories/doc_chunks.py (asyncpg has
+    no vector codec; we pass `'[..]'::vector` literals to stay zero-dep). This type exists so the
+    ORM/migrations know the column shape; it deliberately has no bind/result processors, so the
+    embedding column is never round-tripped through the ORM."""
+
+    cache_ok = True
+
+    def __init__(self, dim: int):
+        self.dim = dim
+
+    def get_col_spec(self, **_kw) -> str:
+        return f"vector({self.dim})"
 
 
 class User(Base):
@@ -55,7 +74,80 @@ class Document(Base):
     department_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("departments.id", ondelete="SET NULL"), index=True, nullable=True
     )
+    # RAG ingest state (migration 0005) — markdown stays the truth; this just records whether the
+    # file has been chunked+embedded into doc_chunks, and with which model (knowledge-rag.md §3).
+    ingest_status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")  # pending|done|failed|skipped
+    embedding_model: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class DocChunk(Base):
+    """RAG semantic index — one heading-bounded slice of a document + its embedding (migration
+    0005, knowledge-rag.md §3). A **derived, rebuildable cache**: chunks are deleted+recreated on
+    re-ingest and cascade-deleted with their document (no orphan vectors). owner_id/department_id
+    are denormalized from the document so retrieval can scope by permission without a join.
+
+    The `embedding` column is read/written only via raw SQL (repositories/doc_chunks.py) — see
+    the Vector type docstring."""
+
+    __tablename__ = "doc_chunks"
+    __table_args__ = (UniqueConstraint("document_id", "seq", name="uq_doc_chunks_document_seq"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), index=True, nullable=True
+    )
+    department_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("departments.id", ondelete="SET NULL"), index=True, nullable=True
+    )
+    seq: Mapped[int] = mapped_column(Integer, nullable=False)
+    heading: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    embedding: Mapped[list[float]] = mapped_column(Vector(settings.embed_dim), nullable=False)
+    embedding_model: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class LlmConnection(Base):
+    """Runtime-configurable LLM provider (no-hardcode) — an admin sets provider/model/endpoint/key
+    from the UI instead of `.env`. The API key is stored **encrypted** (app/crypto.py), never
+    plaintext. At most one row is `is_active` (partial unique index, migration 0003); the worker
+    resolves the active one per call so edits apply without a restart."""
+
+    __tablename__ = "llm_connections"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)  # ollama|openai|anthropic
+    model: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    base_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    api_key_enc: Mapped[str | None] = mapped_column(String(1024), nullable=True)  # Fernet ciphertext
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class LlmRoleBinding(Base):
+    """Per-system LLM assignment (no-hardcode) — maps a system role (engine/search/summarize)
+    to a specific `llm_connections` row, so an admin can route e.g. the search/RAG system to a
+    local llama while the engine uses Claude. A role with no row falls back to the active
+    connection (then the .env provider). Migration 0004; FK cascades when the connection is deleted."""
+
+    __tablename__ = "llm_role_bindings"
+
+    role: Mapped[str] = mapped_column(String(32), primary_key=True)  # engine | search | summarize
+    connection_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("llm_connections.id", ondelete="CASCADE"), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 

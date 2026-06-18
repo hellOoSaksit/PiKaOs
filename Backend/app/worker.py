@@ -4,21 +4,26 @@ Runs the agent-ops engine jobs out-of-process from the FastAPI web app — a cra
 job can't take the API down, and jobs run concurrently. Same image, different command
 (`arq app.worker.WorkerSettings`); see the `worker` service in docker-compose.yml.
 
-The `agent_run` job (B3) runs one agent loop via services/agent_runner. HERMES jobs
+The `agent_run` job (B3) runs one agent loop via services/agent_runner. The `ingest_document`
+job (E2) chunks + embeds an uploaded document into the RAG index. HERMES jobs
 (hermes_plan/advance/finalize) land in C3. The engine runtime (LLM provider + tool
 registry) is configured once on worker startup — stub in B4, real adapters in C1.
 """
 from __future__ import annotations
 
 import logging
+import uuid
 
 from arq import func
 from arq.connections import RedisSettings
 
 from .config import settings
+from .db import SessionLocal
 from .logging_ctx import configure_worker_logging
-from .services import agent_runner
-from .services.engine_stubs import StubLLMProvider, StubToolRegistry
+from .services import agent_runner, ingestion_service
+from .services.embeddings import get_embedder
+from .services.engine_stubs import StubToolRegistry
+from .services.llm_config_service import ConfiguredLLMProvider
 
 log = logging.getLogger("pikaos.worker")
 
@@ -33,12 +38,23 @@ async def agent_run(ctx, run_id: str) -> str:
     return await agent_runner.run_job(run_id)
 
 
+async def ingest_document(ctx, doc_id: str) -> str:
+    """arq job: chunk + embed one document into the RAG index (E2). The embedder is resolved
+    from config per job (stub by default), so flipping `embed_provider` needs no code change."""
+    embedder = get_embedder()
+    async with SessionLocal() as db:
+        result = await ingestion_service.ingest_document(db, embedder, uuid.UUID(doc_id))
+    return result["status"]
+
+
 async def startup(ctx) -> None:
-    """Wire structured logging (B7) + the engine runtime once per worker — the stub LLM
-    provider + tool registry (B4). Real adapters (OpenAI/Anthropic/Local) swap in here at C1."""
+    """Wire structured logging (B7) + the engine runtime once per worker. The LLM provider is
+    resolved from the DB (llm_connections) per call with a short cache, falling back to the
+    .env provider — so an admin's UI change applies without a restart. Tools stay stub until C5."""
     configure_worker_logging()
-    agent_runner.set_engine_runtime(StubLLMProvider(), StubToolRegistry())
-    log.info("pikaos worker up — structured logging on · engine runtime: stub LLM + stub tools")
+    agent_runner.set_engine_runtime(ConfiguredLLMProvider(), StubToolRegistry())
+    log.info("pikaos worker up — structured logging on · engine runtime: DB-configured LLM "
+             "(env fallback: %s) + stub tools", settings.llm_provider)
 
 
 class WorkerSettings:
@@ -48,4 +64,4 @@ class WorkerSettings:
     on_startup = startup
     # `agent_run` keyed by run_id → arq dedups concurrent enqueues of the same run, so a
     # resume can't run twice in parallel (replay-safety belt over the per-step guards).
-    functions = [ping, func(agent_run, keep_result=3600)]
+    functions = [ping, func(agent_run, keep_result=3600), ingest_document]

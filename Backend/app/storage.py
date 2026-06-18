@@ -38,6 +38,23 @@ def presigned_get(object_key: str, expires_seconds: int = 3600) -> str:
     )
 
 
+def get_object(object_key: str) -> bytes:
+    """Read an object's bytes back (used by RAG ingestion to chunk/embed a stored doc).
+    The HTTP response must be released, so read fully then close — see minio docs."""
+    resp = None
+    try:
+        resp = _client.get_object(settings.minio_bucket, object_key)
+        return resp.read()
+    finally:
+        if resp is not None:
+            resp.close()
+            resp.release_conn()
+
+
+def remove_object(object_key: str) -> None:
+    _client.remove_object(settings.minio_bucket, object_key)
+
+
 def ping() -> bool:
     try:
         _client.bucket_exists(settings.minio_bucket)

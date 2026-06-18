@@ -54,6 +54,7 @@ SEED_PERMISSIONS = [
     ("user.manage", "Admin", "จัดการสมาชิก", "Manage users"),
     ("role.manage", "Admin", "จัดการบทบาท/สิทธิ์", "Manage roles"),
     ("audit.view", "Admin", "ดูบันทึกการตรวจสอบ", "View audit log"),
+    ("llm.manage", "Admin", "ตั้งค่า LLM/โมเดล (provider/API หรือ Local)", "Manage LLM provider config"),
 ]
 _PERM_KEYS = [p[0] for p in SEED_PERMISSIONS]
 

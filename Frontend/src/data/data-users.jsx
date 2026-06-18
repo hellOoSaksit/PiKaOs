@@ -33,6 +33,7 @@ const PERMISSIONS = [
   { key: "user.manage",      group: "Admin",     th: "จัดการสมาชิก",            en: "Manage users" },
   { key: "role.manage",      group: "Admin",     th: "จัดการบทบาท/สิทธิ์",     en: "Manage roles" },
   { key: "audit.view",       group: "Admin",     th: "ดูบันทึกการตรวจสอบ",     en: "View audit log" },
+  { key: "llm.manage",       group: "Admin",     th: "ตั้งค่า LLM/โมเดล (provider/API หรือ Local)", en: "Manage LLM provider config" },
 ];
 const PERM_KEYS = PERMISSIONS.map(p => p.key);
 

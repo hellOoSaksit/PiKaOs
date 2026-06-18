@@ -4,10 +4,12 @@
 # automatically without one dead container taking the stack down — A8 resilience.
 services:
   db:
-    # Plain Postgres — pgvector was removed (unused; knowledge store is markdown-as-truth,
-    # docs/architecture/knowledge-rag.md). If RAG (phase E) ever needs vectors, add the
-    # `vector` extension back via a migration + the pgvector image at that point.
-    image: postgres:16-alpine
+    # Postgres + pgvector. RAG (phase E / M2) needs the `vector` extension: doc_chunks store
+    # bge-m3 embeddings and are searched by cosine distance (docs/architecture/knowledge-rag.md §3).
+    # The extension itself is created by migration 0005_doc_chunks; this image just ships the
+    # shared library so `CREATE EXTENSION vector` succeeds. Same PG 16 major as before — the
+    # existing pgdata volume is reused (no recreate needed).
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-pikaos}
