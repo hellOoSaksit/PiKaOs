@@ -179,6 +179,10 @@ class Settings(BaseSettings):
         problems: list[str] = []
         if self.jwt_secret in _DEV_JWT_SECRETS or len(self.jwt_secret) < 32:
             problems.append("JWT_SECRET is a dev default / too short — need a strong unique secret of >=32 chars (PyJWT 2.13 warns on shorter HMAC keys for SHA256)")
+        # SECRET_KEY (crypto.py at-rest key). Empty is fine — it derives from the (guarded) JWT_SECRET;
+        # but an explicitly-set weak value would otherwise slip past, so check it when present.
+        if self.secret_key and (self.secret_key in _DEV_JWT_SECRETS or len(self.secret_key) < 32):
+            problems.append("SECRET_KEY is a dev default / too short — set a strong unique secret of >=32 chars, or leave it empty to derive from JWT_SECRET")
         if not self.cookie_secure:
             problems.append("COOKIE_SECURE must be true behind HTTPS in production")
         if self.seed_password in _DEV_SEED_PASSWORDS:

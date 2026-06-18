@@ -2,6 +2,39 @@
 # Frontend is NOT here — it runs via npm / start.bat (see README.md).
 # Every service sets `restart: unless-stopped` so a crash (or host reboot) is recovered
 # automatically without one dead container taking the stack down — A8 resilience.
+
+# Shared backend+worker config, forwarded from the root .env (compose auto-loads it) with safe dev
+# defaults via ${VAR:-default}. ANCHORED so backend and worker stay in sync — the worker must get the
+# SAME SECRET_KEY as the backend, or it can't decrypt the LLM keys the backend stored. Risky/secret
+# values live in .env (see .env.example); never hardcode real secrets in this file.
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-pikaos}:${POSTGRES_PASSWORD:-pikaos}@db:5432/${POSTGRES_DB:-pikaos}
+  REDIS_URL: redis://redis:6379/0
+  ENVIRONMENT: ${ENVIRONMENT:-development}
+  # --- secrets (🔒 set strong unique values in .env for any shared/prod deploy) ---
+  JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+  SECRET_KEY: ${SECRET_KEY:-}                       # at-rest encryption key (LLM keys); empty → derives from JWT_SECRET
+  SEED_PASSWORD: ${SEED_PASSWORD:-pikaos123}
+  COOKIE_SECURE: ${COOKIE_SECURE:-false}            # must be true behind HTTPS in production
+  # --- object storage (MinIO / AWS S3 — switch provider via .env, no code change) ---
+  STORAGE_PROVIDER: ${STORAGE_PROVIDER:-minio}
+  STORAGE_REGION: ${STORAGE_REGION:-}
+  MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+  MINIO_SECURE: ${MINIO_SECURE:-false}
+  MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-pikaos}
+  MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-pikaos-secret}
+  MINIO_BUCKET: ${MINIO_BUCKET:-pikaos}
+  # --- LLM/embed .env fallback (most config is DB-driven via the tools tab; these are optional) ---
+  LLM_PROVIDER: ${LLM_PROVIDER:-stub}
+  LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  EMBED_PROVIDER: ${EMBED_PROVIDER:-stub}
+  EMBED_BASE_URL: ${EMBED_BASE_URL:-http://host.docker.internal:11434}
+  # --- web ---
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+  COMPARE_URL_ALLOWLIST: ${COMPARE_URL_ALLOWLIST:-}
+
 services:
   db:
     # Postgres + pgvector. RAG (phase E / M2) needs the `vector` extension: doc_chunks store
@@ -70,15 +103,7 @@ services:
       minio:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-pikaos}:${POSTGRES_PASSWORD:-pikaos}@db:5432/${POSTGRES_DB:-pikaos}
-      REDIS_URL: redis://redis:6379/0
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-pikaos}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-pikaos-secret}
-      MINIO_BUCKET: ${MINIO_BUCKET:-pikaos}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
-      SEED_PASSWORD: ${SEED_PASSWORD:-pikaos123}
+      <<: *backend-env
       # Dev: hot-reload (1 worker). For a prod-style run drop UVICORN_RELOAD and set
       # WEB_CONCURRENCY (worker count) — see Backend/docker-entrypoint.sh (A8).
       UVICORN_RELOAD: "1"
@@ -104,13 +129,7 @@ services:
       redis:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-pikaos}:${POSTGRES_PASSWORD:-pikaos}@db:5432/${POSTGRES_DB:-pikaos}
-      REDIS_URL: redis://redis:6379/0
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-pikaos}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-pikaos-secret}
-      MINIO_BUCKET: ${MINIO_BUCKET:-pikaos}
+      <<: *backend-env
     volumes:
       - ./Backend:/app
     command: ["arq", "app.worker.WorkerSettings"]
