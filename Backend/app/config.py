@@ -1,6 +1,8 @@
 """Application settings, loaded from environment (12-factor)."""
 from __future__ import annotations
 
+from urllib.parse import urlparse
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Known insecure dev defaults that must never reach production (checked at boot — A4).
@@ -189,6 +191,11 @@ class Settings(BaseSettings):
             problems.append("SEED_PASSWORD is the dev default — change it")
         if self.minio_secret_key in _DEV_MINIO_SECRETS:
             problems.append("MINIO_SECRET_KEY is the dev default — change it")
+        # Redis holds sessions, the perms cache, and the job queue; an unauthenticated Redis exposed
+        # across servers is fully readable. Require a password in production (empty is fine in dev,
+        # where Redis is only reachable on the private compose network).
+        if not urlparse(self.redis_url).password:
+            problems.append("REDIS_URL has no password — set REDIS_PASSWORD and embed it in REDIS_URL (redis://:<pw>@host:6379/0); an unauthenticated Redis must not be exposed across servers")
         return problems
 
 

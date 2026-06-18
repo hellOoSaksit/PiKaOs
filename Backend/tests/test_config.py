@@ -14,6 +14,7 @@ _SAFE = dict(
     cookie_secure=True,
     seed_password="another-strong-password",
     minio_secret_key="a-strong-minio-secret",
+    redis_url="redis://:a-strong-redis-pw@redis:6379/0",
 )
 
 
@@ -37,6 +38,11 @@ def test_jwt_secret_below_32_flagged():
     # PyJWT 2.13 warns on <32-byte HMAC keys for SHA256 — A4 now requires >=32 chars in prod
     s = Settings(environment="production", **{**_SAFE, "jwt_secret": "x" * 20})
     assert any("JWT_SECRET" in x for x in s.production_violations())
+
+
+def test_unauthenticated_redis_flagged_in_production():
+    s = Settings(environment="production", **{**_SAFE, "redis_url": "redis://redis:6379/0"})
+    assert any("REDIS_URL" in x for x in s.production_violations())
 
 
 def test_no_violations_when_secure():
