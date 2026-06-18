@@ -241,9 +241,12 @@ Services (each health-checked; backend waits for the rest to be healthy):
 | worker | build `./Backend` | — | arq engine jobs (out-of-process, B2) |
 | frontend | build `./Frontend` | 5173 | Vite dev server (hot reload via bind mount) |
 
-Secrets come from the root `.env` (gitignored; copy from `.env.example`):
-`POSTGRES_*`, `JWT_SECRET`, `MINIO_*`, `SEED_PASSWORD`. **Never commit `.env` or
-hardcode secrets.** The **frontend now runs in compose** (whole stack in Docker); its
+Config is split **per component** (deploy-separable), each loaded via compose `env_file:` (copy each
+`*.example`, all gitignored): **`Backend/.env`** = backend stack + Postgres/MinIO creds (db · minio ·
+backend · worker) · **`.env.ai`** = LLM/embedding providers (backend · worker — shares `SECRET_KEY`
+with Backend/.env) · **`Frontend/.env`** = `VITE_*` only (**PUBLIC — never a secret**). The prod guard
+refuses to boot in `ENVIRONMENT=production` with dev defaults. **Never commit a `.env*` (only
+`*.example`) or hardcode secrets.** The **frontend runs in compose**; its
 Vite dev server proxies `/api` and `/ws` to `backend:8000` over the compose network
 (`VITE_PROXY_TARGET`), with `VITE_POLL=true` so hot reload fires on the Windows bind mount.
 
