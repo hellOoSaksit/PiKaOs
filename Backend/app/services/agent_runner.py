@@ -34,7 +34,7 @@ from ..config import settings
 from ..db import SessionLocal
 from ..logging_ctx import bind_run, reset_run
 from ..repositories import runs as runs_repo
-from . import events
+from . import events, retrieval_service
 
 log = logging.getLogger("pikaos.engine")
 
@@ -195,6 +195,19 @@ async def run(
         await events.publish_run(quest_id, rid, "running")
 
         messages = messages_from_run(run_row.input, steps)
+        # RAG (E3): prepend top-k codex context, scoped to the run owner. Off unless configured
+        # (engine_retrieval_top_k > 0). Side-effect-free (no step, no quota) → safe to re-derive on
+        # resume; failures must never sink a run, so retrieval is best-effort.
+        if settings.engine_retrieval_top_k > 0:
+            try:
+                ctx = await retrieval_service.context_for_run(
+                    db, owner_id=owner_id, query=retrieval_service.query_from_input(run_row.input),
+                    k=settings.engine_retrieval_top_k,
+                )
+                if ctx:
+                    messages.insert(0, {"role": "system", "content": ctx})
+            except Exception:  # noqa: BLE001 — retrieval is an enhancement, never a failure mode
+                log.exception("run %s: retrieval failed, continuing without context", rid)
         # steps already executed this run (caps apply to the whole run, across resumes)
         used_steps = sum(1 for s in steps if s.kind in ("llm", "tool"))
         started = time.monotonic()

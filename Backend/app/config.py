@@ -126,6 +126,11 @@ class Settings(BaseSettings):
     embed_chunk_max_chars: int = 1500
     # Default top-k returned by /api/knowledge/search (and used for agent retrieval, E3).
     embed_search_top_k: int = 5
+    # --- RAG retrieval into the agent loop (E3) ---
+    # Top-k codex chunks injected as context before an agent run (scoped to the run owner's read
+    # permissions — services/retrieval_service.py). 0 = OFF (default → existing behaviour + engine
+    # tests unchanged); set >0 to turn agent retrieval on. Re-derived per run/resume, no quota cost.
+    engine_retrieval_top_k: int = 0
 
     # --- OpenAI / ChatGPT API (provider="openai") — /v1/chat/completions ---
     openai_api_key: str = ""
