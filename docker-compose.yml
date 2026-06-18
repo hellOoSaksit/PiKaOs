@@ -118,7 +118,9 @@ services:
   # /api + /ws to the backend over the compose network. VITE_POLL=true so the watcher fires on a
   # Windows→Docker bind mount; VITE_OPEN=false so it doesn't try to launch a browser in the container.
   frontend:
-    build: ./Frontend
+    build:
+      context: ./Frontend
+      target: dev                   # local dev = Vite hot-reload (the prod target is the nginx static build)
     restart: unless-stopped
     depends_on:
       backend:
