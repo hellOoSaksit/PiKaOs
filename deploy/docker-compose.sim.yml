@@ -1,0 +1,36 @@
+# PiKaOs — LOCAL SIMULATION of Topology B (separate servers) on ONE machine.
+#
+# Overlay on docker-compose.backend.yml. It overrides the datastore URLs so the backend +
+# worker reach Postgres / Redis / MinIO through `host.docker.internal` — i.e. they treat the
+# data services as EXTERNAL endpoints reached by URL (just like RDS / ElastiCache / S3 in a
+# real split deploy), NOT as compose-network siblings. This proves the env-driven switch with
+# zero code change. `environment:` here wins over the `env_file: Backend/.env` values.
+#
+# The data services run as their OWN compose project (separate network), publishing their
+# ports to the host. Bring the three stacks up in order:
+#
+#   1) DATA stack (db + redis + minio), own project/network, ports published to host:
+#        docker compose -p pikaos-data up -d db redis minio
+#
+#   2) BACKEND stack (backend + worker), own project, datastores = host.docker.internal:
+#        docker compose -p pikaos-backend \
+#          -f deploy/docker-compose.backend.yml -f deploy/docker-compose.sim.yml \
+#          up -d --build
+#
+#   3) FRONTEND stack (nginx static), own project, proxies /api,/ws to the backend host:
+#        BACKEND_URL=http://host.docker.internal:8000 \
+#          docker compose -p pikaos-frontend -f deploy/docker-compose.frontend.yml up -d --build
+#
+# Restore the normal all-in-one dev stack at any time:  start.bat  (or `docker compose up -d`).
+services:
+  backend:
+    environment:
+      DATABASE_URL: postgresql+asyncpg://pikaos:pikaos@host.docker.internal:5432/pikaos
+      REDIS_URL: redis://host.docker.internal:6379/0
+      MINIO_ENDPOINT: host.docker.internal:9000
+
+  worker:
+    environment:
+      DATABASE_URL: postgresql+asyncpg://pikaos:pikaos@host.docker.internal:5432/pikaos
+      REDIS_URL: redis://host.docker.internal:6379/0
+      MINIO_ENDPOINT: host.docker.internal:9000

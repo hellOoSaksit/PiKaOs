@@ -5,9 +5,11 @@ dist-ssr
 .DS_Store
 
 # secrets / env — per-component env files (Backend/.env, Frontend/.env are matched by `.env`).
-# `.env.ai` needs its own line (different name). `*.example` templates stay tracked.
+# `.env.ai` / `.env.prod` need their own lines (different names). `*.example` templates stay tracked.
+# `.env.prod` = real secrets for the prod-mode docker run (deploy/.env.prod) — NEVER commit.
 .env
 .env.ai
+.env.prod
 
 # claude code local config / tooling (kept local, not published)
 # NOTE: CLAUDE.md is intentionally TRACKED — it's the project's operating contract, so a
