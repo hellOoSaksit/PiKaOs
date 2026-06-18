@@ -4,8 +4,10 @@ dist-ssr
 *.local
 .DS_Store
 
-# secrets / env
+# secrets / env — per-component env files (Backend/.env, Frontend/.env are matched by `.env`).
+# `.env.ai` needs its own line (different name). `*.example` templates stay tracked.
 .env
+.env.ai
 
 # claude code local config / tooling (kept local, not published)
 # NOTE: CLAUDE.md is intentionally TRACKED — it's the project's operating contract, so a

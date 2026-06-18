@@ -2,38 +2,14 @@
 # Frontend is NOT here — it runs via npm / start.bat (see README.md).
 # Every service sets `restart: unless-stopped` so a crash (or host reboot) is recovered
 # automatically without one dead container taking the stack down — A8 resilience.
-
-# Shared backend+worker config, forwarded from the root .env (compose auto-loads it) with safe dev
-# defaults via ${VAR:-default}. ANCHORED so backend and worker stay in sync — the worker must get the
-# SAME SECRET_KEY as the backend, or it can't decrypt the LLM keys the backend stored. Risky/secret
-# values live in .env (see .env.example); never hardcode real secrets in this file.
-x-backend-env: &backend-env
-  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-pikaos}:${POSTGRES_PASSWORD:-pikaos}@db:5432/${POSTGRES_DB:-pikaos}
-  REDIS_URL: redis://redis:6379/0
-  ENVIRONMENT: ${ENVIRONMENT:-development}
-  # --- secrets (🔒 set strong unique values in .env for any shared/prod deploy) ---
-  JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
-  SECRET_KEY: ${SECRET_KEY:-}                       # at-rest encryption key (LLM keys); empty → derives from JWT_SECRET
-  SEED_PASSWORD: ${SEED_PASSWORD:-pikaos123}
-  COOKIE_SECURE: ${COOKIE_SECURE:-false}            # must be true behind HTTPS in production
-  # --- object storage (MinIO / AWS S3 — switch provider via .env, no code change) ---
-  STORAGE_PROVIDER: ${STORAGE_PROVIDER:-minio}
-  STORAGE_REGION: ${STORAGE_REGION:-}
-  MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
-  MINIO_SECURE: ${MINIO_SECURE:-false}
-  MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-pikaos}
-  MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-pikaos-secret}
-  MINIO_BUCKET: ${MINIO_BUCKET:-pikaos}
-  # --- LLM/embed .env fallback (most config is DB-driven via the tools tab; these are optional) ---
-  LLM_PROVIDER: ${LLM_PROVIDER:-stub}
-  LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434}
-  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-  EMBED_PROVIDER: ${EMBED_PROVIDER:-stub}
-  EMBED_BASE_URL: ${EMBED_BASE_URL:-http://host.docker.internal:11434}
-  # --- web ---
-  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
-  COMPARE_URL_ALLOWLIST: ${COMPARE_URL_ALLOWLIST:-}
+#
+# Per-component env (deploy-separable): each service loads its OWN env_file, so a component can be
+# deployed on its own with just its file —
+#   db · minio · backend · worker → Backend/.env   (backend stack: app config + datastore creds)
+#   backend · worker also load    → .env.ai        (LLM/embed providers — the swappable AI layer)
+#   frontend →                      Frontend/.env  (VITE_* — PUBLIC, baked into the bundle; no secrets)
+# backend and worker load the SAME Backend/.env, so they share SECRET_KEY (must match, or the worker
+# can't decrypt LLM keys the backend stored). Secrets live only in these gitignored files.
 
 services:
   db:
@@ -44,16 +20,14 @@ services:
     # existing pgdata volume is reused (no recreate needed).
     image: pgvector/pgvector:pg16
     restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-pikaos}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pikaos}
-      POSTGRES_DB: ${POSTGRES_DB:-pikaos}
+    env_file: ./Backend/.env          # POSTGRES_USER/PASSWORD/DB (the image ignores the rest)
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pikaos} -d ${POSTGRES_DB:-pikaos}"]
+      # $$ → compose passes a literal $; the container shell expands it from the env_file vars
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -78,9 +52,7 @@ services:
     image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     restart: unless-stopped
     command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-pikaos}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-pikaos-secret}
+    env_file: ./Backend/.env          # MINIO_ROOT_USER / MINIO_ROOT_PASSWORD (the image ignores the rest)
     ports:
       - "9000:9000"   # S3 API
       - "9001:9001"   # web console
@@ -102,8 +74,10 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+    env_file:
+      - ./Backend/.env
+      - ./.env.ai
     environment:
-      <<: *backend-env
       # Dev: hot-reload (1 worker). For a prod-style run drop UVICORN_RELOAD and set
       # WEB_CONCURRENCY (worker count) — see Backend/docker-entrypoint.sh (A8).
       UVICORN_RELOAD: "1"
@@ -128,8 +102,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    environment:
-      <<: *backend-env
+    env_file:
+      - ./Backend/.env
+      - ./.env.ai
     volumes:
       - ./Backend:/app
     command: ["arq", "app.worker.WorkerSettings"]
@@ -144,7 +119,9 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    env_file: ./Frontend/.env       # VITE_API_BASE (PUBLIC app config — baked into the bundle)
     environment:
+      # compose-network dev-server knobs (not app config): how Vite runs inside this stack
       VITE_PROXY_TARGET: http://backend:8000
       VITE_OPEN: "false"
       VITE_POLL: "true"
