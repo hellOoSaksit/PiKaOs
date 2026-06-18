@@ -27,8 +27,10 @@ export class ApiError extends Error {
   }
 }
 
-async function raw(path, { method = "GET", body, auth = true, signal, _retry = false } = {}) {
+async function raw(path, { method = "GET", body, form, auth = true, signal, _retry = false } = {}) {
   const headers = {};
+  // JSON body sets its content-type; a FormData (file upload) must NOT — the browser sets the
+  // multipart boundary itself.
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (auth && accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
 
@@ -39,7 +41,7 @@ async function raw(path, { method = "GET", body, auth = true, signal, _retry = f
       headers,
       credentials: "include",
       signal,                                  // lets callers abort (cancel) the request
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: form !== undefined ? form : (body !== undefined ? JSON.stringify(body) : undefined),
     });
   } catch (e) {
     // a caller-initiated abort surfaces as AbortError — propagate it so callers can
@@ -52,7 +54,7 @@ async function raw(path, { method = "GET", body, auth = true, signal, _retry = f
   // transparent refresh-once on expired access token
   if (res.status === 401 && auth && !_retry && path !== "/auth/refresh") {
     const ok = await tryRefresh();
-    if (ok) return raw(path, { method, body, auth, signal, _retry: true });
+    if (ok) return raw(path, { method, body, form, auth, signal, _retry: true });
   }
 
   let data = null;
@@ -145,3 +147,30 @@ export async function deleteLlmConnection(id) { return raw(`/llm/connections/${i
 // connectionId=null clears the binding → that system falls back to the active connection.
 export async function llmRoles() { return raw("/llm/roles"); }
 export async function setLlmRole(role, connectionId) { return raw(`/llm/roles/${role}`, { method: "PUT", body: { connection_id: connectionId } }); }
+
+// --- knowledge / codex documents API (markdown-as-truth store + RAG search) ---
+// Files live in MinIO; the backend chunks + embeds them in the background (ingest_status).
+// Upload/delete need the codex.manage permission; list/get/search are any authenticated user
+// (scoped to what the caller may read, server-side).
+export async function listDocuments({ kind, limit, offset } = {}) {
+  const qs = new URLSearchParams();
+  if (kind) qs.set("kind", kind);
+  if (limit != null) qs.set("limit", limit);
+  if (offset != null) qs.set("offset", offset);
+  const s = qs.toString();
+  return raw("/knowledge/docs" + (s ? `?${s}` : ""));
+}
+export async function getDocument(id) { return raw(`/knowledge/docs/${id}`); }  // includes a presigned `url`
+export async function uploadDocument(file, departmentId) {
+  const form = new FormData();
+  form.append("file", file);
+  if (departmentId) form.append("department_id", departmentId);
+  return raw("/knowledge/docs", { method: "POST", form });
+}
+export async function deleteDocument(id) { return raw(`/knowledge/docs/${id}`, { method: "DELETE" }); }
+// Semantic (RAG) search over the codex — returns matching chunks ranked by similarity.
+export async function searchKnowledge(q, k) {
+  const qs = new URLSearchParams({ q });
+  if (k) qs.set("k", k);
+  return raw(`/knowledge/search?${qs.toString()}`);
+}

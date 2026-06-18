@@ -1,8 +1,9 @@
 /* PiKaOs — CODEX (knowledge base): type metadata, seed bodies, the codex
    drawer + add-note modal, and the Codex screen. */
 import React from 'react';
-const { useState } = React;
+const { useState, useEffect, useRef } = React;
 import { Btn, Empty, HelpNote, PageHead, Panel } from '../../components/components.jsx';
+import { deleteDocument, getDocument, listDocuments, searchKnowledge, uploadDocument } from '../../lib/api.js';
 import { KNOWLEDGE, byId } from '../../data/data.jsx';
 import { Field, Segmented, TagInput } from '../screens-builder.jsx';
 import { RichBody } from '../screens-world.jsx';
@@ -90,8 +91,133 @@ function AddNoteModal({ onSave, onClose }) {
   );
 }
 
-function Codex({ t }) {
+/* ---------------- CODEX · เอกสาร (live) — backed by /api/knowledge (E4) ----------------
+   The markdown-as-truth document store + RAG search. Files live in MinIO; the backend
+   chunks + embeds them in the background (ingest_status). Upload/delete gate on codex.manage. */
+const DOC_ICON = { md: "📝", image: "🖼️", pdf: "📕", log: "📄", other: "📦" };
+const INGEST_ICON = { pending: "⏳", done: "✓", failed: "✕", skipped: "—" };
+
+function fmtSize(n) {
+  n = n || 0;
+  if (n < 1024) return n + " B";
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+  return (n / (1024 * 1024)).toFixed(1) + " MB";
+}
+
+function CodexDocs({ t, can }) {
+  const tx = (typeof t === "function") ? t : ((k) => k);
+  const mayManage = !can || can("codex.manage");
+  const [docs, setDocs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState(null);     // null = browse docs · array = search hits
+  const fileRef = useRef(null);
+
+  const load = async () => {
+    setLoading(true); setErr("");
+    try { const r = await listDocuments({ limit: 100 }); setDocs(r.items || []); }
+    catch (e) { setErr(e.message || tx("codex.docs.err")); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const onPick = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";                            // let the same file be re-picked
+    if (!file) return;
+    setBusy(true); setErr("");
+    try { await uploadDocument(file); await load(); }
+    catch (e2) { setErr(e2.message || tx("codex.docs.err")); }
+    finally { setBusy(false); }
+  };
+
+  const del = async (d) => {
+    const ok = window.uiConfirm
+      ? await window.uiConfirm({ title: tx("codex.docs.delConfirm"), message: d.name, danger: true, confirmText: tx("common.delete") })
+      : window.confirm(tx("codex.docs.delConfirm"));
+    if (!ok) return;
+    setErr("");
+    try { await deleteDocument(d.id); await load(); }
+    catch (e) { setErr(e.message || tx("codex.docs.err")); }
+  };
+
+  const open = async (d) => {
+    try { const full = await getDocument(d.id); if (full.url) window.open(full.url, "_blank", "noopener"); }
+    catch (e) { setErr(e.message || tx("codex.docs.err")); }
+  };
+
+  const doSearch = async () => {
+    const query = q.trim();
+    if (!query) { setResults(null); return; }
+    setBusy(true); setErr("");
+    try { const r = await searchKnowledge(query); setResults(r.items || []); }
+    catch (e) { setErr(e.message || tx("codex.docs.err")); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div>
+      <div className="search-bar" style={{ margin: "16px 0" }}>
+        <span>🔍</span>
+        <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => { if (e.key === "Enter") doSearch(); }}
+          placeholder={tx("codex.docs.searchPh")} />
+        <Btn sm onClick={doSearch} disabled={busy || !q.trim()}>{tx("codex.docs.searchBtn")}</Btn>
+        {results != null && <Btn sm kind="ghost" onClick={() => { setQ(""); setResults(null); }}>{tx("codex.docs.clear")}</Btn>}
+      </div>
+
+      {mayManage && (
+        <div style={{ marginBottom: 12 }}>
+          <input ref={fileRef} type="file" hidden onChange={onPick} />
+          <Btn kind="gold" sm icon="⬆️" disabled={busy} onClick={() => fileRef.current && fileRef.current.click()}>
+            {busy ? tx("codex.docs.uploading") : tx("codex.docs.upload")}</Btn>
+          <span className="mono faint" style={{ fontSize: 11, marginLeft: 10 }}>{tx("codex.docs.uploadHint")}</span>
+        </div>
+      )}
+
+      {err && <div className="muted" style={{ color: "var(--danger,#c0392b)", fontSize: 12.5, padding: "6px 2px" }} data-no-lex>{err}</div>}
+
+      {results != null ? (
+        results.length === 0 ? <Panel><Empty icon="🔍" title={tx("codex.docs.noHit")} /></Panel> : (
+          <div className="list-rows stagger">
+            {results.map(r => (
+              <div key={r.id} className="codex-row" style={{ cursor: "default" }}>
+                <span className="codex-type">🔎</span>
+                <div className="codex-main">
+                  <div className="codex-title">{r.document_name}{r.heading ? ` — ${r.heading}` : ""}</div>
+                  <div className="codex-meta" style={{ whiteSpace: "normal" }}>{r.content}</div>
+                </div>
+                <span className="chip" data-no-lex>{Math.round((r.score || 0) * 100)}%</span>
+              </div>
+            ))}
+          </div>
+        )
+      ) : loading ? (
+        <div className="muted" style={{ fontSize: 13, padding: "10px 2px" }}>{tx("codex.docs.loading")}</div>
+      ) : docs.length === 0 ? (
+        <Panel><Empty icon="📚" title={tx("codex.docs.empty")} sub={mayManage ? tx("codex.docs.emptySub") : ""} /></Panel>
+      ) : (
+        <div className="list-rows stagger">
+          {docs.map(d => (
+            <div key={d.id} className="codex-row" style={{ cursor: "default" }}>
+              <span className="codex-type">{DOC_ICON[d.kind] || "📦"}</span>
+              <button className="codex-main" style={{ textAlign: "left", background: "none", border: 0, padding: 0, cursor: "pointer" }} onClick={() => open(d)}>
+                <div className="codex-title">{d.name}</div>
+                <div className="codex-meta">{d.kind} · {fmtSize(d.size)} · <span className="chip" data-no-lex>{INGEST_ICON[d.ingest_status] || "⏳"} {tx("codex.docs.ingest." + d.ingest_status)}</span></div>
+              </button>
+              {mayManage && <button type="button" className="chip-act danger" title={tx("common.delete")} onClick={() => del(d)}>✕</button>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Codex({ t, can }) {
   _ct = (typeof t === "function") ? t : ((k) => k);
+  const [mode, setMode] = useState("notes");        // notes (local) | docs (live · API)
   const [extra, setExtra] = useState(() => loadCodex());
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all");
@@ -107,35 +233,46 @@ function Codex({ t }) {
   const addNote = (note) => { const next = [note, ...extra]; setExtra(next); saveCodex(next); setAdding(false); };
   const tabs = [["all", ct("codex.allTab")], ...KTYPE_OPTS.map(ty => [ty, ktypeLabel(ty)])];
 
+  const isDocs = mode === "docs";
   return (
     <div className="content-pad fade-in">
-      <PageHead kicker={ct("codex.kicker")} title={ct("codex.title")} tag="local"
+      <PageHead kicker={ct("codex.kicker")} title={ct("codex.title")} tag={isDocs ? "live" : "local"}
         desc={ct("codex.desc")}
-        actions={<Btn kind="gold" sm icon="➕" onClick={() => setAdding(true)}>{ct("codex.add")}</Btn>} />
-      <HelpNote tag="local">{ct("codex.help")}</HelpNote>
-      <div className="search-bar" style={{ margin: "16px 0" }}>
-        <span>🔍</span><input value={q} onChange={e => setQ(e.target.value)} placeholder={ct("codex.searchPh")} />
-        <span className="mono faint" style={{ fontSize: 11 }}>{list.length}/{all.length} {ct("codex.items")}</span>
+        actions={isDocs ? undefined : <Btn kind="gold" sm icon="➕" onClick={() => setAdding(true)}>{ct("codex.add")}</Btn>} />
+      <HelpNote tag={isDocs ? "live" : "local"}>{ct(isDocs ? "codex.docs.help" : "codex.help")}</HelpNote>
+      <div style={{ margin: "14px 0 4px" }}>
+        <Segmented value={mode} onChange={setMode}
+          options={[{ key: "notes", label: ct("codex.mode.notes") }, { key: "docs", label: ct("codex.mode.docs") }]} />
       </div>
-      <div className="tabs" style={{ marginBottom: 16 }}>{tabs.map(([k, l]) => <button key={k} className={`tab ${filter === k ? "active" : ""}`} onClick={() => setFilter(k)}>{l}</button>)}</div>
-      {list.length === 0 ? (
-        <Panel><Empty icon="🔍" title={ct("codex.noMatch")} sub={ct("codex.noMatchSub")} /></Panel>
+      {isDocs ? (
+        <CodexDocs t={t} can={can} />
       ) : (
-        <div className="list-rows stagger">
-          {list.map(k => {
-            const by = byId(k.by);
-            return (
-              <button key={k.id} className="codex-row" onClick={() => setSel(k)}>
-                <span className="codex-type">{KTYPE[k.type] || "📝"}</span>
-                <div className="codex-main">
-                  <div className="codex-title">{k.title}</div>
-                  <div className="codex-meta">{ktypeLabel(k.type)} · {ct("codex.by")} {by ? by.name.split(" ")[0] : ct("codex.guild")} · {ct("codex.updated")} {k.updated} · {k.refs ?? 0} {ct("codex.refs")}</div>
-                </div>
-                <div className="row" style={{ gap: 6 }}>{(k.tags || []).slice(0, 2).map(t => <span key={t} className="tag">{t}</span>)}</div>
-              </button>
-            );
-          })}
-        </div>
+        <>
+          <div className="search-bar" style={{ margin: "16px 0" }}>
+            <span>🔍</span><input value={q} onChange={e => setQ(e.target.value)} placeholder={ct("codex.searchPh")} />
+            <span className="mono faint" style={{ fontSize: 11 }}>{list.length}/{all.length} {ct("codex.items")}</span>
+          </div>
+          <div className="tabs" style={{ marginBottom: 16 }}>{tabs.map(([k, l]) => <button key={k} className={`tab ${filter === k ? "active" : ""}`} onClick={() => setFilter(k)}>{l}</button>)}</div>
+          {list.length === 0 ? (
+            <Panel><Empty icon="🔍" title={ct("codex.noMatch")} sub={ct("codex.noMatchSub")} /></Panel>
+          ) : (
+            <div className="list-rows stagger">
+              {list.map(k => {
+                const by = byId(k.by);
+                return (
+                  <button key={k.id} className="codex-row" onClick={() => setSel(k)}>
+                    <span className="codex-type">{KTYPE[k.type] || "📝"}</span>
+                    <div className="codex-main">
+                      <div className="codex-title">{k.title}</div>
+                      <div className="codex-meta">{ktypeLabel(k.type)} · {ct("codex.by")} {by ? by.name.split(" ")[0] : ct("codex.guild")} · {ct("codex.updated")} {k.updated} · {k.refs ?? 0} {ct("codex.refs")}</div>
+                    </div>
+                    <div className="row" style={{ gap: 6 }}>{(k.tags || []).slice(0, 2).map(t => <span key={t} className="tag">{t}</span>)}</div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
       {sel && <CodexDrawer k={sel} onClose={() => setSel(null)} />}
       {adding && <AddNoteModal onSave={addNote} onClose={() => setAdding(false)} />}

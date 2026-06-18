@@ -538,7 +538,7 @@ function App() {
       case "quests": return <QuestBoard onQuest={setQuestSel} can={can} t={t} />;
       case "world": return <World onAgent={setAgentSel} S={S} can={can} t={t} />;
       case "meeting": return <Meeting S={S} t={t} />;
-      case "codex": return <Codex t={t} />;
+      case "codex": return <Codex t={t} can={can} />;
       case "search": return <Recall lang={language} />;
       case "sitemap": return <SitemapAudit t={t} lang={language} can={can} actor={me.display_name || me.username || "ผู้ใช้"} />;
       case "compare": return <Compare t={t} lang={language} />;
