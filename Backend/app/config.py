@@ -34,7 +34,15 @@ class Settings(BaseSettings):
     cookie_secure: bool = False  # True behind HTTPS in production
     perms_cache_ttl_seconds: int = 60  # effective-perms cache (perms:<user_id>) freshness
 
-    # --- MinIO / S3 ---
+    # --- Object storage (MinIO / S3-compatible — pluggable via env, not the UI) ---
+    # The `minio` client speaks the S3 API, so the SAME code works against MinIO, AWS S3, or any
+    # S3-compatible store just by changing these env vars (no code change). `storage_provider` is a
+    # label surfaced read-only in the tools tab (minio | s3); switching to AWS S3 = point
+    # `minio_endpoint` at `s3.<region>.amazonaws.com`, `minio_secure=true`, set `storage_region` +
+    # AWS keys + bucket. These are bootstrap creds → env only (never UI-editable); see the tools-tab
+    # Storage panel for status/test-connection only (read-mostly, no secret editing).
+    storage_provider: str = "minio"          # minio | s3 (label; the client is S3 either way)
+    storage_region: str = ""                 # AWS region for S3 (e.g. ap-southeast-1); MinIO ignores it
     minio_endpoint: str = "minio:9000"
     minio_access_key: str = "pikaos"
     minio_secret_key: str = "pikaos-secret"

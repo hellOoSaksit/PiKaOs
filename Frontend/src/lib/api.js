@@ -174,3 +174,8 @@ export async function searchKnowledge(q, k) {
   if (k) qs.set("k", k);
   return raw(`/knowledge/search?${qs.toString()}`);
 }
+
+// --- object storage status (admin: see/test the configured store — read-only, no secrets) ---
+// Storage creds are bootstrap config (env only); these endpoints never mutate them. Need infra.manage.
+export async function storageStatus() { return raw("/storage/status"); }
+export async function storageTest() { return raw("/storage/test", { method: "POST" }); }

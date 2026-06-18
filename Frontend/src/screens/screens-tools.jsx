@@ -4,7 +4,7 @@
    ฟอร์มเป็น popup (kit Modal) · ช่องกรอก typed ตาม TOOL_TYPES (text/secret/select/textarea/number/toggle) */
 import React from 'react';
 const { useState, useEffect } = React;
-import { activateLlmConnection, createLlmConnection, deleteLlmConnection, llmConnections, llmRoles, setLlmRole, updateLlmConnection } from '../lib/api.js';
+import { activateLlmConnection, createLlmConnection, deleteLlmConnection, llmConnections, llmRoles, setLlmRole, storageStatus, storageTest, updateLlmConnection } from '../lib/api.js';
 import { Btn, Empty, HelpNote, PageHead, Panel } from '../components/components.jsx';
 import { Select } from '../components/ui/Dropdown.jsx';
 import Modal from '../components/ui/Modal.jsx';
@@ -291,8 +291,47 @@ function ToolSection({ icon, title, kicker, count, onAdd, addTitle, defaultOpen 
   );
 }
 
+/* Object-storage status — read-only view of the configured store (MinIO / AWS S3) + a
+   Test-connection button. Storage creds are bootstrap config (env only, never edited here); this
+   panel only reads `/api/storage/status|test`. Gated on `infra.manage` by the caller. */
+function StoragePanel({ t }) {
+  const tx = t || ((k) => k);
+  const [st, setSt] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [testing, setTesting] = useState(false);
+  const [err, setErr] = useState("");
+
+  const pull = async (fn) => { try { setErr(""); setSt(await fn()); } catch (e) { setErr(e.message || tx("storage.err")); } };
+  useEffect(() => { (async () => { setLoading(true); await pull(storageStatus); setLoading(false); })(); }, []);
+  const test = async () => { setTesting(true); await pull(storageTest); setTesting(false); };
+
+  return (
+    <div>
+      <div className="sm-set-note mono">{tx("storage.hint")}</div>
+      {err && <div className="muted" style={{ color: "var(--danger,#c0392b)", fontSize: 12.5, padding: "6px 2px" }} data-no-lex>{err}</div>}
+      {loading ? (
+        <div className="muted" style={{ fontSize: 13, padding: "10px 2px" }}>{tx("storage.loading")}</div>
+      ) : st && (
+        <div className="tool-list">
+          <div className="tool-row">
+            <span className="tool-ic">{st.provider === "s3" ? "☁️" : "🗄️"}</span>
+            <div className="tool-bd">
+              <div className="tool-name">{st.provider === "s3" ? "AWS S3" : "MinIO"}{" "}
+                <span className={`chip ${st.reachable ? "on" : ""}`} data-no-lex>{st.reachable ? `● ${tx("storage.reachable")}` : `○ ${tx("storage.unreachable")}`}</span></div>
+              <div className="tool-meta mono" data-no-lex>{st.endpoint} · {st.bucket}{st.region ? ` · ${st.region}` : ""}{st.secure ? " · TLS" : ""}</div>
+            </div>
+            <button type="button" className="chip-act" title={tx("storage.test")} disabled={testing} onClick={test}>↻</button>
+          </div>
+        </div>
+      )}
+      <div className="sm-set-note mono" style={{ marginTop: 10 }}>{tx("storage.envNote")}</div>
+    </div>
+  );
+}
+
 export function ToolsManager({ can, t }) {
   const mayEdit = !can || can("options.manage");
+  const mayInfra = !can || can("infra.manage");
   // LLM provider config is admin-only server-side (all /api/llm/* require `llm.manage`), so the
   // panel — which loads on mount — only renders for that permission, else a manager would 403.
   const mayLlm = !can || can("llm.manage");
@@ -409,6 +448,12 @@ export function ToolsManager({ can, t }) {
       {mayLlm && (
         <ToolSection icon="🤖" title={tx("llmcfg.title")} kicker="AI MODEL & API">
           <AiApiPanel mayEdit={mayLlm} t={t} />
+        </ToolSection>
+      )}
+
+      {mayInfra && (
+        <ToolSection icon="🗄️" title={tx("storage.title")} kicker="STORAGE">
+          <StoragePanel t={t} />
         </ToolSection>
       )}
 

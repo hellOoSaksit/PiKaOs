@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .routers import auth, compare, health, knowledge, llm_config, ws
+from .routers import storage as storage_router  # aliased: app/storage.py is the storage service
 
 
 @asynccontextmanager
@@ -47,6 +48,7 @@ app.include_router(compare.router)
 app.include_router(knowledge.router)
 app.include_router(llm_config.router)
 app.include_router(llm_config.roles_router)
+app.include_router(storage_router.router)
 app.include_router(ws.router)
 
 

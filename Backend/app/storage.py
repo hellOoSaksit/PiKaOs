@@ -1,4 +1,10 @@
-"""MinIO / S3 object storage abstraction (scaffold for files: md/image/log/pdf)."""
+"""Object storage abstraction (files: md/image/log/pdf).
+
+The `minio` client speaks the S3 API, so this one module backs MinIO, AWS S3, or any
+S3-compatible store — the backend is chosen by env (`storage_provider` + `minio_*` + `storage_region`),
+never hardcoded and never edited from the UI (bootstrap creds, config.py). The tools tab gets a
+read-only status + test-connection (`status()`/`ping()`) — it does not mutate these.
+"""
 from __future__ import annotations
 
 from datetime import timedelta
@@ -7,12 +13,27 @@ from minio import Minio
 
 from .config import settings
 
+# region is required by AWS S3 and ignored by MinIO; pass None when unset so the client picks it up.
 _client = Minio(
     settings.minio_endpoint,
     access_key=settings.minio_access_key,
     secret_key=settings.minio_secret_key,
     secure=settings.minio_secure,
+    region=settings.storage_region or None,
 )
+
+
+def status() -> dict:
+    """Non-secret storage config for the tools tab (provider/endpoint/bucket/region) + reachability.
+    Never returns access/secret keys — those stay in env."""
+    return {
+        "provider": settings.storage_provider,
+        "endpoint": settings.minio_endpoint,
+        "bucket": settings.minio_bucket,
+        "secure": settings.minio_secure,
+        "region": settings.storage_region or None,
+        "reachable": ping(),
+    }
 
 
 def ensure_bucket() -> None:

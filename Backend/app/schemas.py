@@ -132,6 +132,17 @@ class LlmRoleOut(BaseModel):
     connection_name: str | None = None
 
 
+# Object-storage status (read-only) — surfaced in the tools tab. No secrets: access/secret keys
+# stay in env (bootstrap config, never UI-editable — storage.py / the no-hardcode config tiers).
+class StorageStatusOut(BaseModel):
+    provider: str                          # minio | s3
+    endpoint: str
+    bucket: str
+    secure: bool
+    region: str | None = None
+    reachable: bool                        # can the configured store be reached right now
+
+
 # --- UAT vs Production sitemap comparison ---------------------------------
 # Production's sitemap is the source of truth for the "primary" URL set. Each
 # URL is domain-swapped onto the UAT base and both sides are probed so we can
