@@ -17,7 +17,13 @@ from ..config import settings
 from ..db import get_db
 from ..deps import get_current_user, require_perm
 from ..models import User
-from ..schemas import DocumentListOut, DocumentOut, KnowledgeSearchOut, KnowledgeSearchResult
+from ..schemas import (
+    DocumentListOut,
+    DocumentOut,
+    KnowledgeReindexOut,
+    KnowledgeSearchOut,
+    KnowledgeSearchResult,
+)
 from ..services import knowledge_service
 from ..services.embeddings import get_embedder
 
@@ -65,6 +71,29 @@ async def search_documents(
         db, embedder=get_embedder(), user=user, query=q, k=k
     )
     return KnowledgeSearchOut(items=[KnowledgeSearchResult(**r) for r in results])
+
+
+@router.post("/reindex", response_model=KnowledgeReindexOut)
+async def reindex_documents(
+    only_stale: bool = True,
+    user: User = Depends(require_perm("codex.manage")),
+    db: AsyncSession = Depends(get_db),
+) -> KnowledgeReindexOut:
+    """Rebuild the RAG index from the markdown source (knowledge-rag.md §3 'single rebuild
+    command'). Re-enqueues ingest for each in-scope document — use after switching the embedder
+    (`embed_provider`) so existing docs get re-embedded with the new model. Admin rebuilds the
+    whole corpus; otherwise only the caller's own docs. `only_stale=true` (default) skips docs
+    already on the current model; `false` forces a full rebuild. Idempotent — ingest replaces a
+    document's chunks, never appends, so re-running is safe."""
+    model = get_embedder().model_name
+    ids = await knowledge_service.reindex_targets(
+        db, user=user, only_stale=only_stale, current_model=model
+    )
+    queued = 0
+    for doc_id in ids:
+        if await queue.enqueue("ingest_document", str(doc_id)):
+            queued += 1
+    return KnowledgeReindexOut(queued=queued, matched=len(ids), model=model)
 
 
 @router.get("/docs", response_model=DocumentListOut)

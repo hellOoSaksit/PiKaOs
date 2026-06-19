@@ -3,7 +3,7 @@
 import React from 'react';
 const { useState, useEffect, useRef } = React;
 import { Btn, Empty, HelpNote, PageHead, Panel } from '../../components/components.jsx';
-import { deleteDocument, getDocument, listDocuments, searchKnowledge, uploadDocument } from '../../lib/api.js';
+import { deleteDocument, getDocument, listDocuments, reindexKnowledge, searchKnowledge, uploadDocument } from '../../lib/api.js';
 import { KNOWLEDGE, byId } from '../../data/data.jsx';
 import { Field, Segmented, TagInput } from '../screens-builder.jsx';
 import { RichBody } from '../screens-world.jsx';
@@ -111,6 +111,7 @@ function CodexDocs({ t, can }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");             // transient success line (e.g. reindex result)
   const [q, setQ] = useState("");
   const [results, setResults] = useState(null);     // null = browse docs · array = search hits
   const fileRef = useRef(null);
@@ -148,6 +149,16 @@ function CodexDocs({ t, can }) {
     catch (e) { setErr(e.message || tx("codex.docs.err")); }
   };
 
+  const reindex = async () => {
+    setBusy(true); setErr(""); setNote("");
+    try {
+      const r = await reindexKnowledge(true);       // only re-embed docs not on the current model
+      setNote(tx("codex.docs.reindexDone").replace("{n}", r.queued).replace("{model}", r.model));
+      await load();                                  // ingest runs in the worker; statuses settle shortly
+    } catch (e) { setErr(e.message || tx("codex.docs.err")); }
+    finally { setBusy(false); }
+  };
+
   const doSearch = async () => {
     const query = q.trim();
     if (!query) { setResults(null); return; }
@@ -168,15 +179,18 @@ function CodexDocs({ t, can }) {
       </div>
 
       {mayManage && (
-        <div style={{ marginBottom: 12 }}>
+        <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <input ref={fileRef} type="file" hidden onChange={onPick} />
           <Btn kind="gold" sm icon="⬆️" disabled={busy} onClick={() => fileRef.current && fileRef.current.click()}>
             {busy ? tx("codex.docs.uploading") : tx("codex.docs.upload")}</Btn>
-          <span className="mono faint" style={{ fontSize: 11, marginLeft: 10 }}>{tx("codex.docs.uploadHint")}</span>
+          <Btn kind="ghost" sm icon="🔄" disabled={busy} onClick={reindex} title={tx("codex.docs.reindexHint")}>
+            {tx("codex.docs.reindex")}</Btn>
+          <span className="mono faint" style={{ fontSize: 11 }}>{tx("codex.docs.uploadHint")}</span>
         </div>
       )}
 
       {err && <div className="muted" style={{ color: "var(--danger,#c0392b)", fontSize: 12.5, padding: "6px 2px" }} data-no-lex>{err}</div>}
+      {note && <div className="muted" style={{ color: "var(--gold,#a87f2e)", fontSize: 12.5, padding: "6px 2px" }} data-no-lex>{note}</div>}
 
       {results != null ? (
         results.length === 0 ? <Panel><Empty icon="🔍" title={tx("codex.docs.noHit")} /></Panel> : (

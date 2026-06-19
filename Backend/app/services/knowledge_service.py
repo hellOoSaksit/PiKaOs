@@ -129,6 +129,19 @@ async def search_documents(db, *, embedder: Embedder, user: User, query: str, k:
     return await chunks_repo.search(db, embedding=vector, dept_ids=dept_ids, owner_id=owner_id, k=k)
 
 
+async def reindex_targets(
+    db, *, user: User, only_stale: bool, current_model: str
+) -> list[uuid.UUID]:
+    """Document ids to re-ingest for a RAG rebuild (knowledge-rag.md §3 'single rebuild command').
+    Admin rebuilds the whole corpus; anyone else (the route already required `codex.manage`)
+    rebuilds only their own documents — re-embedding the org corpus is an admin-cost operation.
+    `only_stale=True` skips docs already embedded with `current_model` (the 'I switched the
+    embedder, re-embed the rest' case); False forces a full rebuild from markdown."""
+    owner_id = None if _is_admin(user) else user.id
+    exclude = current_model if only_stale else None
+    return await docs_repo.ids_for_reindex(db, owner_id=owner_id, exclude_model=exclude)
+
+
 async def delete_document(db, *, user: User, doc_id: uuid.UUID) -> None:
     doc = await docs_repo.get_document(db, doc_id)
     if doc is None:

@@ -68,6 +68,23 @@ async def count_documents(
     return int((await db.execute(stmt)).scalar_one())
 
 
+async def ids_for_reindex(
+    db: AsyncSession, *, owner_id: uuid.UUID | None = None, exclude_model: str | None = None,
+) -> list[uuid.UUID]:
+    """Document ids to (re)build the RAG index for — the 'single rebuild command'
+    (knowledge-rag.md §3). `owner_id` limits to one owner (a non-admin rebuilding only their
+    own); None = the whole corpus (admin). `exclude_model` skips docs already embedded with that
+    model — pass the current embedder's model to re-embed only the stale rest after switching
+    `embed_provider`; None = rebuild everything. Oldest first for a stable rebuild order."""
+    stmt = select(Document.id)
+    if owner_id is not None:
+        stmt = stmt.where(Document.owner_id == owner_id)
+    if exclude_model is not None:
+        stmt = stmt.where(Document.embedding_model != exclude_model)
+    stmt = stmt.order_by(Document.created_at.asc())
+    return list((await db.execute(stmt)).scalars().all())
+
+
 async def delete_document(db: AsyncSession, doc_id: uuid.UUID) -> bool:
     res = await db.execute(sql_delete(Document).where(Document.id == doc_id))
     await db.commit()

@@ -17,7 +17,7 @@ from sqlalchemy import delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
-from app.models import Department, Document
+from app.models import Department, Document, User
 from app.repositories import documents as docs_repo
 from app.services import knowledge_service as ks
 
@@ -122,3 +122,66 @@ def test_list_documents_scopes_by_department():
     assert n_a == 2
     # admin scope (dept_ids=None) sees everything
     assert {d_org, d_a, d_b} <= all_ids
+
+
+# --- RAG reindex targets — the 'single rebuild command' (knowledge-rag.md §3, E5) -------
+
+
+def test_reindex_targets_scope_and_stale_filter():
+    ua, ub = uuid.uuid4(), uuid.uuid4()
+    # A owns three docs on different embedding models; B owns one (never embedded).
+    a_blank, a_stub, a_bge, b_blank = (uuid.uuid4() for _ in range(4))
+
+    async def main():
+        eng = create_async_engine(settings.database_url)
+        Session = async_sessionmaker(eng, expire_on_commit=False, class_=AsyncSession)
+        try:
+            async with Session() as s:
+                s.add_all([
+                    User(id=ua, username=f"ra_{ua.hex[:8]}", email=f"{ua.hex[:8]}@t", password_hash="x"),
+                    User(id=ub, username=f"rb_{ub.hex[:8]}", email=f"{ub.hex[:8]}@t", password_hash="x"),
+                ])
+                await s.commit()
+            async with Session() as db:
+                for did, owner, model in (
+                    (a_blank, ua, ""), (a_stub, ua, "stub"), (a_bge, ua, "bge-m3"), (b_blank, ub, ""),
+                ):
+                    await docs_repo.insert_document(
+                        db, doc_id=did, owner_id=owner, department_id=None, kind="md",
+                        name="n", object_key=f"k/{did}", content_type="text/markdown", size=1,
+                    )
+                    if model:
+                        await docs_repo.set_ingest_status(db, did, status="done", embedding_model=model)
+
+                # repo: exclude the current model → only stale docs (whole corpus)
+                stale_all = set(await docs_repo.ids_for_reindex(db, exclude_model="bge-m3"))
+                # repo: scope to one owner + exclude current model
+                stale_a = set(await docs_repo.ids_for_reindex(db, owner_id=ua, exclude_model="bge-m3"))
+                # repo: full rebuild for one owner (no exclude)
+                all_a = set(await docs_repo.ids_for_reindex(db, owner_id=ua))
+
+                # service: admin rebuilds the corpus; a member only their own
+                admin = SimpleNamespace(role="admin", id=uuid.uuid4())
+                member = SimpleNamespace(role="member", id=ua)
+                svc_admin = set(await ks.reindex_targets(db, user=admin, only_stale=True, current_model="bge-m3"))
+                svc_member = set(await ks.reindex_targets(db, user=member, only_stale=True, current_model="bge-m3"))
+                svc_member_full = set(await ks.reindex_targets(db, user=member, only_stale=False, current_model="bge-m3"))
+                return stale_all, stale_a, all_a, svc_admin, svc_member, svc_member_full
+        finally:
+            async with Session() as c:
+                await c.execute(sql_delete(Document).where(Document.id.in_([a_blank, a_stub, a_bge, b_blank])))
+                await c.execute(sql_delete(User).where(User.id.in_([ua, ub])))
+                await c.commit()
+            await eng.dispose()
+
+    stale_all, stale_a, all_a, svc_admin, svc_member, svc_member_full = asyncio.run(main())
+    # stale filter drops only docs already on the current model (a_bge)
+    assert {a_blank, a_stub, b_blank} <= stale_all and a_bge not in stale_all
+    # owner scope keeps only A's docs, still minus the current-model one
+    assert stale_a == {a_blank, a_stub}
+    # full rebuild for A = all of A's docs regardless of model
+    assert all_a == {a_blank, a_stub, a_bge}
+    # service: admin sees every stale doc (incl. B's); member only their own stale ones
+    assert {a_blank, a_stub, b_blank} <= svc_admin and a_bge not in svc_admin
+    assert svc_member == {a_blank, a_stub}
+    assert svc_member_full == {a_blank, a_stub, a_bge}

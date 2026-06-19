@@ -91,6 +91,13 @@ class KnowledgeSearchOut(BaseModel):
     items: list[KnowledgeSearchResult]
 
 
+# RAG rebuild — result of POST /api/knowledge/reindex ('single rebuild command', knowledge-rag.md §3)
+class KnowledgeReindexOut(BaseModel):
+    matched: int   # documents in scope to rebuild
+    queued: int    # ingest jobs actually enqueued (best-effort; < matched on a Redis outage)
+    model: str     # the embedding model they'll be (re)embedded with
+
+
 # --- runtime LLM provider config (no-hardcode — admin sets API vs Local from the UI) ---
 
 

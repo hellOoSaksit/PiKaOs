@@ -174,6 +174,12 @@ export async function searchKnowledge(q, k) {
   if (k) qs.set("k", k);
   return raw(`/knowledge/search?${qs.toString()}`);
 }
+// Rebuild the RAG index from the markdown source ('single rebuild command' — knowledge-rag.md §3).
+// Needs codex.manage. onlyStale=true (default) re-embeds only docs not on the current model — use
+// after switching the embedder; false forces a full rebuild. Returns { matched, queued, model }.
+export async function reindexKnowledge(onlyStale = true) {
+  return raw(`/knowledge/reindex?only_stale=${onlyStale ? "true" : "false"}`, { method: "POST" });
+}
 
 // --- object storage status (admin: see/test the configured store — read-only, no secrets) ---
 // Storage creds are bootstrap config (env only); these endpoints never mutate them. Need infra.manage.
