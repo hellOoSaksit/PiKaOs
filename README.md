@@ -186,13 +186,18 @@ lower footprint, faster local deployment, smaller attack surface.
 
 ## 6. Getting started
 
-The whole stack runs in Docker. On Windows, double-click **`start.bat`** — it ensures the Docker engine
-is up, runs `docker compose up -d --build` (Postgres · Redis · MinIO · backend · worker · frontend), and
-opens **http://localhost:5173**. Default dev login: `somchai` / `pikaos123`.
+Runs in Docker as **4 separate stacks** (data · backend · ai · frontend) — each its own compose
+project/network, talking over the host. On Windows, double-click **`start.bat`** — it ensures the
+Docker engine is up, brings the 4 stacks up in order, and opens **http://localhost:5173**
+(Vite dev, hot reload). Stop everything with **`stop.bat`**. Default dev login: `somchai` / `pikaos123`.
 
 ```bash
-docker compose up -d --build      # bring the stack up
-docker compose logs -f backend    # watch a service
+# what start.bat runs (each stack = its own project):
+docker compose -p pikaos-data     -f deploy/docker-compose.data.yml up -d --wait
+docker compose -p pikaos-backend  -f deploy/docker-compose.backend.yml -f deploy/docker-compose.sim.yml up -d --build --wait backend
+docker compose -p pikaos-ai       -f deploy/docker-compose.ai.yml up -d --build
+docker compose -p pikaos-frontend -f deploy/docker-compose.frontend.dev.yml up -d --build
+docker compose -p pikaos-backend logs -f backend   # watch a service
 ```
 
 **Repository layout**
@@ -201,7 +206,7 @@ docker compose logs -f backend    # watch a service
 |---|---|
 | [`Frontend/`](Frontend) | Vite + React SPA (UI, i18n, RBAC-aware) |
 | [`Backend/`](Backend) | FastAPI service + arq worker (auth, API, WS, engine) |
-| [`docker-compose.yml`](docker-compose.yml) | Postgres · Redis · MinIO · backend · worker · frontend |
+| [`deploy/`](deploy) | per-stack compose files (data · backend · ai · frontend) — no all-in-one |
 
 ---
 

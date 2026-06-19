@@ -2,7 +2,7 @@
 
 Runs the agent-ops engine jobs out-of-process from the FastAPI web app — a crashed or slow
 job can't take the API down, and jobs run concurrently. Same image, different command
-(`arq app.worker.WorkerSettings`); see the `worker` service in docker-compose.yml.
+(`arq app.worker.WorkerSettings`); see the `worker` service in deploy/docker-compose.ai.yml.
 
 The `agent_run` job (B3) runs one agent loop via services/agent_runner. The `ingest_document`
 job (E2) chunks + embeds an uploaded document into the RAG index. HERMES jobs

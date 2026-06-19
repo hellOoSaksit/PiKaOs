@@ -8,7 +8,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-# --- dev: Vite dev server. Source + node_modules arrive as volumes at runtime (docker-compose.yml):
+# --- dev: Vite dev server. Source + node_modules arrive as volumes at runtime (deploy/docker-compose.frontend.dev.yml):
 #     the bind mount gives hot reload; a named volume keeps node_modules off the Windows host. ---
 FROM deps AS dev
 EXPOSE 5173

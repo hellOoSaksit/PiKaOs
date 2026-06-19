@@ -37,6 +37,8 @@ services:
       # local model server colocated in THIS box (used only when a provider in .env.ai = ollama)
       LLM_BASE_URL: http://ollama:11434
       EMBED_BASE_URL: http://ollama:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # resolve host.docker.internal on Linux/CI too
     command: ["arq", "app.worker.WorkerSettings"]
 
   ollama:

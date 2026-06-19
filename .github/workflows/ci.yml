@@ -36,19 +36,31 @@ jobs:
 
   backend:
     runs-on: ubuntu-latest
+    # The split stacks load gitignored .env files; seed CI with the tracked *.example (dev creds).
+    env:
+      BE: docker compose -p pikaos-backend -f deploy/docker-compose.backend.yml -f deploy/docker-compose.sim.yml
     steps:
       - uses: actions/checkout@v5
-      - name: Start stack
-        run: docker compose up -d --build
+      - name: Seed env files (dev defaults)
+        run: |
+          cp Backend/.env.example Backend/.env
+          cp Frontend/.env.example Frontend/.env
+          cp .env.ai.example .env.ai
+      - name: Start data stack (db, redis, minio)
+        run: docker compose -p pikaos-data -f deploy/docker-compose.data.yml up -d --wait
+      - name: Start backend stack (migrate + seed)
+        run: $BE up -d --build backend
       - name: Wait for backend health
         run: |
           for i in $(seq 1 60); do
             curl -fsS http://localhost:8000/api/health && { echo "healthy"; exit 0; }
             sleep 2
           done
-          echo "backend did not become healthy"; docker compose logs backend; exit 1
+          echo "backend did not become healthy"; $BE logs backend; exit 1
       - name: Run tests
-        run: docker compose exec -T backend pytest -q
+        run: $BE exec -T backend pytest -q
       - name: Tear down
         if: always()
-        run: docker compose down -v
+        run: |
+          $BE down -v
+          docker compose -p pikaos-data -f deploy/docker-compose.data.yml down -v
