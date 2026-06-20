@@ -1,0 +1,23 @@
+# Umbrella meta-repo — tracks ONLY the shared cross-project root files
+# (CLAUDE.md router, AGENTS.md, llms.txt, .claude/skills). Each project below is its OWN
+# git repo with its own remote, so ignore them here (don't nest/embed them).
+/PiKaOs/
+/PiKaOs-docs/
+/PiKaOs-Standalone/
+
+# Claude Code local/user state (keep .claude/skills, drop the rest)
+.claude/*
+!.claude/skills/
+.claude/settings.local.json
+
+# local tooling / MCP state (not shared)
+.mcp.json
+.playwright-mcp/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.idea/
+.vscode/
