@@ -1,0 +1,6 @@
+# ripgrep-only (NOT git): re-include the per-project repos that .gitignore hides from GIT,
+# so code/content search (ripgrep, and tools built on it) still descends into them.
+# Git tracking is unaffected — the sub-repos stay untracked here (they have their own remotes).
+!/PiKaOs/
+!/PiKaOs-docs/
+!/PiKaOs-Standalone/
