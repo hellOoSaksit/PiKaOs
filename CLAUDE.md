@@ -24,6 +24,15 @@ disclosure) — don't load the whole knowledge base.
 2. **No hardcode — config-driven (hard rule).** System settings are editable from the
    **"จัดการเครื่องมือ"** tools screen + DB, not baked into `.env`/frontend. Don't scatter
    literals; read/extend the file or setting that owns the value.
+   **Secrets & keys — any source (hard rule, applies to you the agent).** Treat every credential
+   (API key, token, password, private key, connection string) as sensitive **wherever it appears** —
+   `.env`, a config file, `.mcp.json`, a pasted chat snippet, a notebook, command output. **Never**
+   print / echo / log / paste a real key value back (redact to `****`, keep ≤ last 4 chars); **never**
+   hardcode one in code or docs; **never** commit one (only `*.example` placeholders). Real values live
+   **only** in gitignored env files (or a secret manager) and are read via config — `Frontend/.env`
+   (`VITE_*`) ships to the browser, so a real secret must never go there. If you find a key that is
+   committed, logged, or in the frontend bundle: **stop, flag it, treat it as compromised → rotate** —
+   don't keep using it. Detail: [pikaos-dev-rules §3](PiKaOs-docs/docs/pikaos-dev-rules.md).
 3. **Registries — read first, update same commit (hard rule).** Single sources of truth the whole
    system reads before acting: **[ports.md](PiKaOs-docs/docs/architecture/ports.md)** (host ports —
    main `5173/8000`, Compare `5174/8001`, RedirectMap `5175/8002`, …) and
@@ -87,7 +96,6 @@ point into it). Match your task → read what it points to **first**, then work.
 | Change the DB schema | **§2.3** (migrations) + update [data-model.md](PiKaOs-docs/docs/architecture/data-model.md) |
 | Design a schema / decide whether to **split a DB** | [database-design.md](PiKaOs-docs/docs/architecture/database-design.md) (clarity + performance + split-on-bounded-context) |
 | Pause/resume · new session/move machine · remove a lib/file · audit deps · incident/rollback · release/deploy · expose a standalone · create a skill | [ai-runbooks.md](PiKaOs-docs/docs/process/ai-runbooks.md) (R1–R8) |
-| Start a **new (non-PiKaOs) project** with this structure | [new-project-scaffold.md](PiKaOs-docs/docs/prompts/new-project-scaffold.md) — umbrella `[Name]-Project/` + `[Name]-{Main,Docs,Standalone}`, derived from PiKaOs |
 | Build a **big new feature** / start or extract a **standalone** app | **§6** + [standalone/README.md](PiKaOs-docs/docs/standalone/README.md) — build standalone-first · drop login · own DB+Docker if stateful · re-integration-ready |
 | **Bump a version** / **promote** a standalone into main | **§6.4–§6.5** + [versions.md](PiKaOs-docs/docs/architecture/versions.md) (UAT↔Prod; promote only on explicit approval) |
 | Look up a **domain term** | [GLOSSARY.md](PiKaOs-docs/docs/GLOSSARY.md) |

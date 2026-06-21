@@ -11,7 +11,6 @@
 - [AGENTS.md](AGENTS.md): tool-agnostic entry pointing to the router.
 - [docs index](PiKaOs-docs/docs/README.md): the documentation map — which doc owns which topic, in what order to read.
 - [GLOSSARY.md](PiKaOs-docs/docs/GLOSSARY.md): domain terms.
-- [principles.html](PiKaOs-docs/principles.html): visual overview of the principles/workflows as graphs (human presentation; .md is the source of truth).
 
 ## Rules & conventions
 - [dev rules §0–§6](PiKaOs-docs/docs/pikaos-dev-rules.md): running · frontend · backend · infra · auth · data · standalone lifecycle.
@@ -32,7 +31,3 @@
 ## Standalone line
 - [standalone contract](PiKaOs-docs/docs/standalone/README.md): the line every standalone obeys.
 - [Compare](PiKaOs-docs/docs/standalone/compare/README.md) · [RedirectMap](PiKaOs-docs/docs/standalone/redirectmap/README.md).
-
-## Starting other projects
-- [new-project scaffolder](PiKaOs-docs/docs/prompts/new-project-scaffold.md): bootstrap a non-PiKaOs project (`[Name]-Project/` + `[Name]-{Main,Docs,Standalone}`) with this whole structure.
-- [knowledge-refactorer](PiKaOs-docs/docs/prompts/knowledge-refactorer.md): refactor an existing project's docs into this architecture.
