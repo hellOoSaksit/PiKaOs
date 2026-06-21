@@ -9,8 +9,9 @@ chunks are a rebuildable cache, so this is safe to re-run any time (it replaces,
 a StubEmbedder against a real DB, exactly like the agent_runner loop. The worker job is a thin shim
 that resolves the configured embedder and calls it.
 
-Only text-shaped documents are embedded for now (md / log); pdf/image are marked `skipped` until
-extraction/OCR lands (E2, later). No SQL here (repositories) and no FastAPI types (routers) — §2.1.
+Text-native documents (md / log) are chunked directly; pdf / docx are converted to markdown first
+(E6, `converters.py`) — the markdown becomes the truth and the original is kept as a Ref. image /
+other are marked `skipped`. No SQL here (repositories) and no FastAPI types (routers) — §2.1.
 """
 from __future__ import annotations
 
@@ -23,19 +24,39 @@ from .. import storage
 from ..config import settings
 from ..repositories import doc_chunks as chunks_repo
 from ..repositories import documents as docs_repo
-from . import chunking
+from . import chunking, converters
 from .embeddings import Embedder
 
 log = logging.getLogger("pikaos.engine.ingest")
 
-# Document kinds whose bytes are text we can chunk + embed directly. pdf/image need
-# extraction/OCR first (deferred) → marked "skipped" so the UI shows they weren't indexed.
-_EMBEDDABLE_KINDS = {"md", "log"}
+# Kinds we can turn into embeddable markdown: text-native (md/log) + converted (pdf/docx). Anything
+# else (image/other) is marked "skipped" so the UI shows it wasn't indexed.
+_EMBEDDABLE_KINDS = converters.CONVERTIBLE_KINDS
 
 
 def _embed_text(heading: str, content: str) -> str:
     """What we actually embed for a chunk: its heading (context) prepended to its body."""
     return f"{heading}\n{content}" if heading else content
+
+
+async def _markdown_body(db, doc) -> str | None:
+    """The markdown text to chunk for `doc`. A pdf/docx is converted on its first ingest: the
+    generated markdown is stored as the new truth (`object_key`) and the original is kept as a Ref
+    (`source_object_key`) — knowledge-rag.md §6.4. md/log (and already-converted docs, where
+    `source_object_key` is set) are read back as text. Returns None when a converted file yields no
+    embeddable text (e.g. a scanned PDF → OCR deferred), so the caller marks it `skipped`."""
+    raw = await asyncio.to_thread(storage.get_object, doc.object_key)
+    # object_key already points at markdown: a text-native kind, or a pdf/docx converted before.
+    if doc.source_object_key is not None or doc.kind not in converters.CONVERTED_KINDS:
+        return raw.decode("utf-8", errors="replace")
+
+    md = converters.to_markdown(doc.kind, raw, doc.name)
+    if md is None:
+        return None
+    md_key = f"{doc.object_key}.md"
+    await asyncio.to_thread(storage.put_object, md_key, md.encode("utf-8"), "text/markdown")
+    await docs_repo.set_converted_markdown(db, doc.id, markdown_key=md_key, source_key=doc.object_key)
+    return md
 
 
 async def ingest_document(db, embedder: Embedder, doc_id: uuid.UUID) -> dict:
@@ -54,8 +75,12 @@ async def ingest_document(db, embedder: Embedder, doc_id: uuid.UUID) -> dict:
         return {"status": "skipped", "chunks": 0}
 
     try:
-        raw = await asyncio.to_thread(storage.get_object, doc.object_key)
-        body = raw.decode("utf-8", errors="replace")
+        body = await _markdown_body(db, doc)
+        if body is None:
+            # A convertible file with no extractable text (e.g. a scanned PDF) → skip until OCR.
+            await chunks_repo.delete_for_document(db, doc_id)
+            await docs_repo.set_ingest_status(db, doc_id, status="skipped", embedding_model="")
+            return {"status": "skipped", "chunks": 0}
         pairs = chunking.chunk_markdown(body, max_chars=settings.embed_chunk_max_chars)
 
         if not pairs:

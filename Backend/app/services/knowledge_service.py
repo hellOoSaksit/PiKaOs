@@ -47,8 +47,11 @@ def build_object_key(doc_id: uuid.UUID, name: str | None) -> str:
     return f"documents/{doc_id}/{safe_name(name)}"
 
 
+_DOCX_CT = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
 def infer_kind(content_type: str | None, name: str | None) -> str:
-    """Coarse class for the `documents.kind` column (md|image|pdf|log|other)."""
+    """Coarse class for the `documents.kind` column (md|image|pdf|docx|log|other)."""
     n = (name or "").lower()
     ct = (content_type or "").lower()
     if n.endswith((".md", ".markdown")) or ct in ("text/markdown", "text/x-markdown"):
@@ -57,6 +60,8 @@ def infer_kind(content_type: str | None, name: str | None) -> str:
         return "image"
     if ct == "application/pdf" or n.endswith(".pdf"):
         return "pdf"
+    if n.endswith(".docx") or ct == _DOCX_CT:
+        return "docx"
     if n.endswith((".log", ".txt")) or ct == "text/plain":
         return "log"
     return "other"
@@ -109,7 +114,10 @@ async def get_document_with_url(db, *, user: User, doc_id: uuid.UUID) -> tuple[D
     dept_ids = [] if _is_admin(user) else await docs_repo.user_department_ids(db, user.id)
     if not can_view(user, doc, dept_ids):
         raise Forbidden
-    url = await asyncio.to_thread(storage.presigned_get, doc.object_key)
+    # Download the original upload (the Ref) when it was converted to markdown for RAG — the user
+    # wants the file they uploaded, not the derived markdown (knowledge-rag.md §6.4).
+    download_key = doc.source_object_key or doc.object_key
+    url = await asyncio.to_thread(storage.presigned_get, download_key)
     return doc, url
 
 
@@ -148,8 +156,13 @@ async def delete_document(db, *, user: User, doc_id: uuid.UUID) -> None:
         raise NotFound
     if not can_manage(user, doc):
         raise Forbidden
-    try:
-        await asyncio.to_thread(storage.remove_object, doc.object_key)
-    except Exception:  # noqa: BLE001 — object may already be gone; the metadata row is the truth
-        pass
+    # Remove the markdown truth AND the original Ref (if the file was converted) — both are this
+    # doc's objects; the metadata row is the truth, so a stray object is best-effort cleanup.
+    for key in (doc.object_key, doc.source_object_key):
+        if not key:
+            continue
+        try:
+            await asyncio.to_thread(storage.remove_object, key)
+        except Exception:  # noqa: BLE001 — object may already be gone
+            pass
     await docs_repo.delete_document(db, doc_id)

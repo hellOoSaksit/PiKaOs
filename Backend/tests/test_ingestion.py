@@ -79,6 +79,79 @@ def test_ingest_is_idempotent_replace(monkeypatch):
     assert asyncio.run(main()) == 3      # not 6 — replaced, not appended
 
 
+def test_ingest_pdf_converts_to_markdown_and_binds_ref(monkeypatch):
+    """A pdf is converted to markdown (the new truth) on ingest; the original is kept as a Ref
+    (knowledge-rag.md §6.4). Conversion itself (pypdf) is stubbed — this asserts the wiring."""
+    did = uuid.uuid4()
+    original_key = f"documents/{did}/report.pdf"
+    puts: dict[str, bytes] = {}
+    monkeypatch.setattr(storage, "get_object", lambda key: b"%PDF-fake-bytes")
+    monkeypatch.setattr(
+        storage, "put_object",
+        lambda key, data, content_type="application/octet-stream": puts.update({key: data}),
+    )
+    monkeypatch.setattr(ingestion_service.converters, "to_markdown",
+                        lambda kind, data, name=None: _MD)
+
+    async def main():
+        eng = create_async_engine(settings.database_url)
+        Session = async_sessionmaker(eng, expire_on_commit=False, class_=AsyncSession)
+        try:
+            async with Session() as db:
+                await docs_repo.insert_document(
+                    db, doc_id=did, owner_id=None, department_id=None, kind="pdf",
+                    name="report.pdf", object_key=original_key,
+                    content_type="application/pdf", size=16,
+                )
+                result = await ingestion_service.ingest_document(db, StubEmbedder(), did)
+                doc = await docs_repo.get_document(db, did)
+                return result, doc.object_key, doc.source_object_key
+        finally:
+            async with Session() as c:
+                await c.execute(sql_delete(Document).where(Document.id == did))
+                await c.commit()
+            await eng.dispose()
+
+    result, object_key, source = asyncio.run(main())
+    assert result == {"status": "done", "chunks": 3}
+    assert source == original_key                   # original kept as a Ref
+    assert object_key == f"{original_key}.md"       # truth is now the generated markdown
+    assert object_key in puts                       # markdown was written to storage
+
+
+def test_ingest_pdf_without_text_is_skipped(monkeypatch):
+    """A scanned PDF (no extractable text) → converter returns None → skipped until OCR."""
+    did = uuid.uuid4()
+    monkeypatch.setattr(storage, "get_object", lambda key: b"%PDF-scanned")
+    monkeypatch.setattr(storage, "put_object",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("no md to write")))
+    monkeypatch.setattr(ingestion_service.converters, "to_markdown",
+                        lambda kind, data, name=None: None)
+
+    async def main():
+        eng = create_async_engine(settings.database_url)
+        Session = async_sessionmaker(eng, expire_on_commit=False, class_=AsyncSession)
+        try:
+            async with Session() as db:
+                await docs_repo.insert_document(
+                    db, doc_id=did, owner_id=None, department_id=None, kind="pdf",
+                    name="scan.pdf", object_key=f"documents/{did}/scan.pdf",
+                    content_type="application/pdf", size=8,
+                )
+                result = await ingestion_service.ingest_document(db, StubEmbedder(), did)
+                doc = await docs_repo.get_document(db, did)
+                return result, doc.ingest_status, doc.source_object_key
+        finally:
+            async with Session() as c:
+                await c.execute(sql_delete(Document).where(Document.id == did))
+                await c.commit()
+            await eng.dispose()
+
+    result, status, source = asyncio.run(main())
+    assert result == {"status": "skipped", "chunks": 0} and status == "skipped"
+    assert source is None                            # nothing converted → no Ref bound
+
+
 def test_ingest_skips_non_text_kind(monkeypatch):
     did = uuid.uuid4()
     # get_object must not even be called for a skipped kind

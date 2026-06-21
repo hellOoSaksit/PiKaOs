@@ -67,7 +67,10 @@ class Document(Base):
     )
     kind: Mapped[str] = mapped_column(String(16), nullable=False, default="md")  # md|image|log|pdf|other
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    object_key: Mapped[str] = mapped_column(String(512), nullable=False)  # MinIO object path
+    object_key: Mapped[str] = mapped_column(String(512), nullable=False)  # MinIO object path (markdown truth once ingested)
+    # The original uploaded file (pdf/word) kept as a Ref after conversion to markdown (E6,
+    # knowledge-rag.md §6.4). NULL = the upload was already markdown/text (object_key IS the truth).
+    source_object_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
     content_type: Mapped[str] = mapped_column(String(128), nullable=False, default="application/octet-stream")
     size: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     # department scoping (column added in migration 0004 — system-design §7.1)

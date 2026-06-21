@@ -91,6 +91,20 @@ async def delete_document(db: AsyncSession, doc_id: uuid.UUID) -> bool:
     return res.rowcount > 0
 
 
+async def set_converted_markdown(
+    db: AsyncSession, doc_id: uuid.UUID, *, markdown_key: str, source_key: str
+) -> None:
+    """Bind a converted pdf/docx (knowledge-rag.md §6.4): point `object_key` at the generated
+    markdown (the new RAG truth) and keep the original upload as a Ref in `source_object_key`.
+    Tolerates a missing row (the doc may have been deleted mid-ingest)."""
+    doc = await db.get(Document, doc_id)
+    if doc is None:
+        return
+    doc.object_key = markdown_key
+    doc.source_object_key = source_key
+    await db.commit()
+
+
 async def set_ingest_status(
     db: AsyncSession, doc_id: uuid.UUID, *, status: str, embedding_model: str | None = None
 ) -> None:
