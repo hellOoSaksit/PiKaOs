@@ -1,18 +1,26 @@
 """FastAPI application entrypoint."""
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from . import modules
 from .config import settings
-from .routers import auth, compare, health, knowledge, llm_config, ws
-from .routers import storage as storage_router  # aliased: app/storage.py is the storage service
+
+# uvicorn configures this logger with a handler, so the line actually prints in the web log
+# (a bare "pikaos.app" logger would propagate to a root with no INFO handler and be swallowed).
+log = logging.getLogger("uvicorn.error")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Announce exactly which modules this build serves (ENABLED_MODULES) — logged at startup, once
+    # uvicorn's logging is configured, so a per-department deploy shows its footprint up front.
+    log.info("modules loaded: %s", ", ".join(_LOADED_MODULES))
+
     # Fail fast if a production deploy still carries dev secrets / insecure cookies (A4).
     if settings.is_production:
         violations = settings.production_violations()
@@ -42,14 +50,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(health.router)
-app.include_router(auth.router)
-app.include_router(compare.router)
-app.include_router(knowledge.router)
-app.include_router(llm_config.router)
-app.include_router(llm_config.roles_router)
-app.include_router(storage_router.router)
-app.include_router(ws.router)
+# Load only the modules this build serves (ENABLED_MODULES) — the foundation always loads,
+# optional contexts are switchable (modularity.md §2.5). The worker gates its jobs the same way.
+# Routers must mount at import time (before serving); the startup log of the result is in lifespan.
+_LOADED_MODULES = modules.register_routers(app)
 
 
 @app.get("/")

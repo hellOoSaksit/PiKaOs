@@ -17,6 +17,7 @@ import uuid
 from arq import func
 from arq.connections import RedisSettings
 
+from . import modules
 from .config import settings
 from .db import SessionLocal
 from .logging_ctx import configure_worker_logging
@@ -57,6 +58,23 @@ async def startup(ctx) -> None:
              "(env fallback: %s) + stub tools", settings.llm_provider)
 
 
+# Jobs owned by an optional module — loaded only when that module is enabled (modularity.md §2.5),
+# so a build without the engine doesn't advertise agent_run, etc. `ping` is infra (always on).
+_MODULE_JOBS = {
+    "engine": [func(agent_run, keep_result=3600)],
+    "knowledge": [ingest_document],
+}
+
+
+def _active_functions() -> list:
+    """The arq job set for this build: infra `ping` + the jobs of every enabled module."""
+    fns = [ping]
+    for name, jobs in _MODULE_JOBS.items():
+        if modules.is_module_active(name):
+            fns.extend(jobs)
+    return fns
+
+
 class WorkerSettings:
     """arq worker config. Discovered via `arq app.worker.WorkerSettings`."""
 
@@ -64,4 +82,4 @@ class WorkerSettings:
     on_startup = startup
     # `agent_run` keyed by run_id → arq dedups concurrent enqueues of the same run, so a
     # resume can't run twice in parallel (replay-safety belt over the per-step guards).
-    functions = [ping, func(agent_run, keep_result=3600), ingest_document]
+    functions = _active_functions()

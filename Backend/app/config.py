@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     app_name: str = "PiKaOs API"
     environment: str = "development"
 
+    # --- modules (pluggable Modular Monolith — docs/architecture/modularity.md §2.5) ---
+    # Which OPTIONAL modules this build serves; core + infra always load. A department can run a
+    # lightweight build by listing only what it needs (e.g. "compare"). "*" / empty = all of them.
+    # Comma-separated allowlist of module names — see app/modules.py for the registry.
+    enabled_modules: str = "*"
+
     # --- database (async SQLAlchemy / asyncpg) ---
     database_url: str = "postgresql+asyncpg://pikaos:pikaos@db:5432/pikaos"
 
