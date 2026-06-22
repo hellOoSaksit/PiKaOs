@@ -4,7 +4,7 @@
    this screen out. Forgot-password posts to the backend but always shows the same
    "check your inbox" screen (never reveals whether an account exists). */
 import React from 'react';
-const { useState } = React;
+const { useState, useEffect } = React;
 import * as api from '../lib/api.js';
 
 const LOGO_TILTS = ["-9deg", "6deg", "-5deg", "8deg", "-7deg", "5deg"];
@@ -49,6 +49,10 @@ export function Login({ onLogin, t, language, onLang }) {
   const [formError, setFormError] = useState("");
   const [sentTo, setSentTo] = useState("");
 
+  // hide the off-canvas hamburger (#nav-burger / .nav-scrim, injected into <body> by fx.js) while
+  // the login screen is up — there is no sidebar to open here.
+  useEffect(() => { document.body.classList.add("on-login"); return () => document.body.classList.remove("on-login"); }, []);
+
   const userErr = validateUser(user);
   const pwErr = validatePw(pw);
   const word = "PiKaOS!".split("");
@@ -91,9 +95,21 @@ export function Login({ onLogin, t, language, onLang }) {
   const isForgot = view === "forgot";
 
   return (
-    <div className="login-stage"
-      onMouseMove={(e) => { e.currentTarget.style.setProperty("--mx", e.clientX + "px"); e.currentTarget.style.setProperty("--my", e.clientY + "px"); }}>
-      <div className="login-spot" aria-hidden="true" />
+    <div className="login-stage login-sea"
+      onMouseMove={(e) => {
+        e.currentTarget.style.setProperty("--px", (e.clientX / window.innerWidth - 0.5).toFixed(3));
+        e.currentTarget.style.setProperty("--py", (e.clientY / window.innerHeight - 0.5).toFixed(3));
+      }}>
+      <div className="login-scene" aria-hidden="true">
+        <div className="ls-sky" />
+        <div className="ls-sun" />
+        <div className="ls-cloud ls-cloud-a" />
+        <div className="ls-cloud ls-cloud-b" />
+        <svg className="ls-mtn ls-mtn-far" viewBox="0 0 1440 320" preserveAspectRatio="none"><path d="M0 220 L180 150 L360 205 L560 120 L760 195 L980 130 L1200 205 L1440 150 L1440 320 L0 320 Z" /></svg>
+        <svg className="ls-mtn ls-mtn-mid" viewBox="0 0 1440 320" preserveAspectRatio="none"><path d="M0 250 L220 170 L430 245 L640 150 L880 235 L1120 160 L1440 245 L1440 320 L0 320 Z" /></svg>
+        <svg className="ls-mtn ls-mtn-near" viewBox="0 0 1440 320" preserveAspectRatio="none"><path d="M0 290 L260 215 L520 285 L820 200 L1120 285 L1440 220 L1440 320 L0 320 Z" /></svg>
+        <div className="ls-water"><div className="ls-wave" /><div className="ls-wave ls-wave2" /></div>
+      </div>
       {onLang && (
         <div className="login-lang" role="group" aria-label="language">
           <button type="button" className={language === "th" ? "on" : ""} onClick={() => onLang("th")}>TH</button>

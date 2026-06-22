@@ -253,15 +253,49 @@
 .login-lang button:hover { color: var(--ink); }
 .login-lang button.on { background: var(--gold-grad); color: #fff; box-shadow: 0 0 8px var(--gold-glow); }
 
-/* cursor spotlight over the dot grid — gold dots light up near the mouse (aligned to the same grid) */
-.login-spot {
-  position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s ease;
-  background: radial-gradient(var(--gold) 1.3px, transparent 1.6px) 0 0 / 26px 26px;
-  -webkit-mask: radial-gradient(170px circle at var(--mx, 50%) var(--my, 50%), #000 0%, transparent 72%);
-          mask: radial-gradient(170px circle at var(--mx, 50%) var(--my, 50%), #000 0%, transparent 72%);
-}
-.login-stage > .login-spot { z-index: 0; }
-.login-stage:hover .login-spot { opacity: .5; }
+/* hide the body-level off-canvas hamburger (#nav-burger / .nav-scrim from fx.js) on the login screen */
+body.on-login .nav-burger, body.on-login .nav-scrim { display: none !important; }
+
+/* login — mountain + sea parallax backdrop (replaces the dot grid on this screen) */
+.login-sea { background: #163a5f; }
+.login-sea::before { content: none; }                 /* drop the dot-grid fade over the scene */
+.login-scene { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.login-stage > .login-scene { z-index: 0; }
+
+.ls-sky { position: absolute; inset: 0;
+  background: linear-gradient(180deg, #15233f 0%, #21426c 28%, #3f6f9c 50%, #7db0c8 70%, #cfe9e6 84%, #eaf6ef 100%); }
+.ls-sun { position: absolute; left: 50%; top: 16%; width: 160px; height: 160px; margin-left: -80px; border-radius: 50%;
+  background: radial-gradient(circle, #fff7e6 0%, #ffe3a6 42%, rgba(255,221,150,0) 70%);
+  transform: translate(calc(var(--px, 0) * -16px), calc(var(--py, 0) * -10px)); }
+
+.ls-cloud { position: absolute; height: 26px; border-radius: 999px; background: rgba(255,255,255,.6); filter: blur(3px); }
+.ls-cloud-a { width: 150px; top: 15%; animation: ls-drift 46s linear infinite; }
+.ls-cloud-b { width: 96px; top: 24%; opacity: .7; animation: ls-drift 64s linear infinite; animation-delay: -28s; }
+@keyframes ls-drift { from { transform: translateX(-190px); } to { transform: translateX(110vw); } }
+
+.ls-mtn { position: absolute; left: -2%; width: 104%; height: 46%; }
+.ls-mtn-far  { bottom: 21%; transform: translateX(calc(var(--px, 0) * 14px)); }
+.ls-mtn-mid  { bottom: 19%; transform: translateX(calc(var(--px, 0) * 26px)); }
+.ls-mtn-near { bottom: 16%; transform: translateX(calc(var(--px, 0) * 40px)); }
+.ls-mtn-far  path { fill: #5d83a3; }
+.ls-mtn-mid  path { fill: #426888; }
+.ls-mtn-near path { fill: #2c4a64; }
+
+.ls-water { position: absolute; left: 0; right: 0; bottom: 0; height: 20%; overflow: hidden;
+  background: linear-gradient(180deg, #2b6885 0%, #1c4d6c 55%, #143a52 100%); }
+.ls-water::before { content: ""; position: absolute; inset: 0;
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 2px, transparent 2px 10px); }
+.ls-wave { position: absolute; top: -7px; left: 0; width: 200%; height: 16px;
+  background: radial-gradient(circle at 12px 16px, #2b6885 12px, transparent 13px) 0 0 / 26px 16px repeat-x;
+  animation: ls-wave 7s linear infinite; }
+.ls-wave2 { top: -4px; opacity: .6; background-size: 34px 16px; animation-duration: 11s; animation-direction: reverse; }
+@keyframes ls-wave { from { transform: translateX(0); } to { transform: translateX(-26px); } }
+
+/* legibility of the hero text over the scene */
+.login-sea .login-tagline { color: rgba(255, 255, 255, .82); }
+.login-sea .login-credit .credit { color: rgba(255, 255, 255, .72); }
+
+@media (prefers-reduced-motion: reduce) { .ls-cloud, .ls-wave { animation: none; } }
 
 /* ---------- Login — full PiKaOs auth states (validation / forgot / success) ---------- */
 .login-cardhead { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 20px; }
