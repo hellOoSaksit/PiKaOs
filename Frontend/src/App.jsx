@@ -77,13 +77,24 @@ function Sidebar({ route, go, t, can }) {
           return (
           <div className="nav-group" key={g.group}>
             <div className="nav-label">{t("navgroup." + (NAV_GROUP_KEY[g.group] || g.group))}</div>
-            {items.map(it => (
-              <div key={it.id} className={`nav-item ${route === it.id ? "active" : ""}`} onClick={() => go(it.id)}>
-                <span className="ni-icon">{it.icon}</span>
-                <span style={{ flex: 1 }}>{t("nav." + it.id)}</span>
-                {it.tag && <span className={`ni-tag ${it.tag === "live" ? "alert" : ""}`}>{it.tag === "live" ? "● LIVE" : it.tag}</span>}
-              </div>
-            ))}
+            {items.map(it => {
+              const kids = (it.children || []).filter(c => !c.perm || (can && can(c.perm)));
+              return (
+              <React.Fragment key={it.id}>
+                <div className={`nav-item ${route === it.id ? "active" : ""}`} onClick={() => go(it.id)}>
+                  <span className="ni-icon">{it.icon}</span>
+                  <span style={{ flex: 1 }}>{t("nav." + it.id)}</span>
+                  {it.tag && <span className={`ni-tag ${it.tag === "live" ? "alert" : ""}`}>{it.tag === "live" ? "● LIVE" : it.tag}</span>}
+                </div>
+                {kids.map(c => (
+                  <div key={c.id} className={`nav-item nav-subitem ${route === c.id ? "active" : ""}`} onClick={() => go(c.id)}>
+                    <span className="ni-icon">{c.icon}</span>
+                    <span style={{ flex: 1 }}>{t("nav." + c.id)}</span>
+                  </div>
+                ))}
+              </React.Fragment>
+              );
+            })}
           </div>
           );
         })}
