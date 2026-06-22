@@ -238,6 +238,31 @@
 }
 @keyframes rise-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 
+/* login logo — gentle continuous bob on a wrapper, so it never fights the drop/jelly on the letter */
+.login-logo .login-ltr-wrap { display: inline-block; }
+@media (prefers-reduced-motion: no-preference) {
+  .login-logo .login-ltr-wrap { animation: logo-bob 2.8s ease-in-out infinite; animation-delay: calc(var(--i, 0) * .12s); }
+}
+@keyframes logo-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+
+/* login language toggle (TH/EN) — top-right */
+.login-lang { position: absolute; top: 18px; right: 20px; z-index: 3; display: inline-flex; gap: 3px; padding: 3px;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow-puff); }
+.login-lang button { border: 0; background: none; cursor: pointer; font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  letter-spacing: .06em; color: var(--ink-3); padding: 5px 11px; border-radius: 999px; transition: background .15s, color .15s; }
+.login-lang button:hover { color: var(--ink); }
+.login-lang button.on { background: var(--gold-grad); color: #fff; box-shadow: 0 0 8px var(--gold-glow); }
+
+/* cursor spotlight over the dot grid — gold dots light up near the mouse (aligned to the same grid) */
+.login-spot {
+  position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s ease;
+  background: radial-gradient(var(--gold) 1.3px, transparent 1.6px) 0 0 / 26px 26px;
+  -webkit-mask: radial-gradient(170px circle at var(--mx, 50%) var(--my, 50%), #000 0%, transparent 72%);
+          mask: radial-gradient(170px circle at var(--mx, 50%) var(--my, 50%), #000 0%, transparent 72%);
+}
+.login-stage > .login-spot { z-index: 0; }
+.login-stage:hover .login-spot { opacity: .5; }
+
 /* ---------- Login — full PiKaOs auth states (validation / forgot / success) ---------- */
 .login-cardhead { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 20px; }
 .login-kicker { font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-4); }

@@ -39,7 +39,7 @@ function LoginErr({ children }) {
   );
 }
 
-export function Login({ onLogin, t }) {
+export function Login({ onLogin, t, language, onLang }) {
   const [view, setView] = useState("login");      // login | forgot | forgot-sent
   const [user, setUser] = useState("somchai");
   const [pw, setPw] = useState("");
@@ -91,12 +91,22 @@ export function Login({ onLogin, t }) {
   const isForgot = view === "forgot";
 
   return (
-    <div className="login-stage">
+    <div className="login-stage"
+      onMouseMove={(e) => { e.currentTarget.style.setProperty("--mx", e.clientX + "px"); e.currentTarget.style.setProperty("--my", e.clientY + "px"); }}>
+      <div className="login-spot" aria-hidden="true" />
+      {onLang && (
+        <div className="login-lang" role="group" aria-label="language">
+          <button type="button" className={language === "th" ? "on" : ""} onClick={() => onLang("th")}>TH</button>
+          <button type="button" className={language === "en" ? "on" : ""} onClick={() => onLang("en")}>EN</button>
+        </div>
+      )}
       <div className="login-hero">
         <div className="login-logo" aria-label="PiKaOS!">
           {word.map((ch, i) => (
-            <span key={i} className="ltr drop" onClick={jelly}
-              style={{ "--i": i, "--tilt": LOGO_TILTS[i % LOGO_TILTS.length] }}>{ch}</span>
+            <span key={i} className="login-ltr-wrap" style={{ "--i": i }}>
+              <span className="ltr drop" onClick={jelly}
+                style={{ "--i": i, "--tilt": LOGO_TILTS[i % LOGO_TILTS.length] }}>{ch}</span>
+            </span>
           ))}
         </div>
         <div className="login-tagline rise-in" style={{ animationDelay: "1.05s" }}>{t("login.tagline")}</div>

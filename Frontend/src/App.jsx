@@ -601,7 +601,7 @@ function App() {
   }, [route, viewAs, rolePerms, userPerms]);
 
   if (!auth.ready) return null;   // avoid flashing the login screen while restoring a session
-  if (!auth.loggedIn) return <Login onLogin={auth.login} t={t} />;
+  if (!auth.loggedIn) return <Login onLogin={auth.login} t={t} language={language} onLang={pickLanguage} />;
 
   const screen = (() => {
     const guard = (perm, el) => can(perm) ? el : <MyDashboard Sys={Sys} onAgent={setAgentSel} onQuest={setQuestSel} />;
