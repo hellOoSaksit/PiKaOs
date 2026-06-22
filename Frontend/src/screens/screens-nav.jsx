@@ -25,7 +25,7 @@ function NavManagerPanel({ Sys }) {
     const name = window.uiPrompt
       ? await window.uiPrompt({ title: T("Rename menu item", "เปลี่ยนชื่อเมนู"), placeholder: cur, value: cur })
       : window.prompt(T("Rename", "เปลี่ยนชื่อ"), cur);
-    if (name == null || !String(name).trim()) return;
+    if (!name || !String(name).trim()) return;   // uiPrompt resolves false on cancel — must not become the name
     setNav(rename(nav, node.id, String(name).trim(), String(name).trim()));   // one shared label (both langs)
   };
 
