@@ -256,46 +256,43 @@
 /* hide the body-level off-canvas hamburger (#nav-burger / .nav-scrim from fx.js) on the login screen */
 body.on-login .nav-burger, body.on-login .nav-scrim { display: none !important; }
 
-/* login — mountain + sea parallax backdrop (replaces the dot grid on this screen) */
-.login-sea { background: #163a5f; }
-.login-sea::before { content: none; }                 /* drop the dot-grid fade over the scene */
+/* login — cute underwater scene (replaces the dot grid; pure CSS/SVG, no Three.js → instant paint) */
+.login-underwater { background: #0a3a52; }
+.login-underwater::before { content: none; }          /* drop the dot-grid fade over the scene */
 .login-scene { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .login-stage > .login-scene { z-index: 0; }
 
-.ls-sky { position: absolute; inset: 0;
-  background: linear-gradient(180deg, #15233f 0%, #21426c 28%, #3f6f9c 50%, #7db0c8 70%, #cfe9e6 84%, #eaf6ef 100%); }
-.ls-sun { position: absolute; left: 50%; top: 16%; width: 160px; height: 160px; margin-left: -80px; border-radius: 50%;
-  background: radial-gradient(circle, #fff7e6 0%, #ffe3a6 42%, rgba(255,221,150,0) 70%);
-  transform: translate(calc(var(--px, 0) * -16px), calc(var(--py, 0) * -10px)); }
+.uw-water { position: absolute; inset: 0;
+  background: linear-gradient(180deg, #0a3a52 0%, #0e5170 32%, #12688a 62%, #1b87a8 100%); }
+.uw-rays { position: absolute; inset: -10% 0 0; pointer-events: none; mix-blend-mode: screen; opacity: .4;
+  background: repeating-linear-gradient(106deg, rgba(255,255,255,.07) 0 42px, transparent 42px 120px);
+  animation: uw-rays 16s ease-in-out infinite alternate; }
+@keyframes uw-rays { from { opacity: .25; transform: translateX(-26px); } to { opacity: .55; transform: translateX(26px); } }
 
-.ls-cloud { position: absolute; height: 26px; border-radius: 999px; background: rgba(255,255,255,.6); filter: blur(3px); }
-.ls-cloud-a { width: 150px; top: 15%; animation: ls-drift 46s linear infinite; }
-.ls-cloud-b { width: 96px; top: 24%; opacity: .7; animation: ls-drift 64s linear infinite; animation-delay: -28s; }
-@keyframes ls-drift { from { transform: translateX(-190px); } to { transform: translateX(110vw); } }
+.uw-fish { position: absolute; left: 0; will-change: transform;
+  animation: uw-swim var(--dur, 32s) linear var(--delay, 0s) infinite; animation-direction: var(--adir, normal); }
+.uw-bob { animation: uw-bob var(--bd, 3.6s) ease-in-out infinite; }
+.uw-fish-svg { display: inline-block; filter: drop-shadow(0 4px 6px rgba(0,0,0,.18)); }
+@keyframes uw-swim { from { transform: translateX(-16vw); } to { transform: translateX(116vw); } }
+@keyframes uw-bob  { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
 
-.ls-mtn { position: absolute; left: -2%; width: 104%; height: 46%; }
-.ls-mtn-far  { bottom: 21%; transform: translateX(calc(var(--px, 0) * 14px)); }
-.ls-mtn-mid  { bottom: 19%; transform: translateX(calc(var(--px, 0) * 26px)); }
-.ls-mtn-near { bottom: 16%; transform: translateX(calc(var(--px, 0) * 40px)); }
-.ls-mtn-far  path { fill: #5d83a3; }
-.ls-mtn-mid  path { fill: #426888; }
-.ls-mtn-near path { fill: #2c4a64; }
+.uw-bub { position: absolute; bottom: -22px; width: var(--bs, 6px); height: var(--bs, 6px); border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, rgba(255,255,255,.95), rgba(255,255,255,.18) 62%, transparent);
+  animation: uw-rise var(--bd, 8s) linear var(--delay, 0s) infinite; }
+@keyframes uw-rise { 0% { transform: translate(0, 0); opacity: 0; } 12% { opacity: .75; } 88% { opacity: .5; } 100% { transform: translate(16px, -104vh); opacity: 0; } }
 
-.ls-water { position: absolute; left: 0; right: 0; bottom: 0; height: 20%; overflow: hidden;
-  background: linear-gradient(180deg, #2b6885 0%, #1c4d6c 55%, #143a52 100%); }
-.ls-water::before { content: ""; position: absolute; inset: 0;
-  background: repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 2px, transparent 2px 10px); }
-.ls-wave { position: absolute; top: -7px; left: 0; width: 200%; height: 16px;
-  background: radial-gradient(circle at 12px 16px, #2b6885 12px, transparent 13px) 0 0 / 26px 16px repeat-x;
-  animation: ls-wave 7s linear infinite; }
-.ls-wave2 { top: -4px; opacity: .6; background-size: 34px 16px; animation-duration: 11s; animation-direction: reverse; }
-@keyframes ls-wave { from { transform: translateX(0); } to { transform: translateX(-26px); } }
+.uw-floor { position: absolute; left: 0; right: 0; bottom: 0; height: 24%; transform: translateX(calc(var(--px, 0) * 18px)); }
+.uw-bed { position: absolute; inset: 0; width: 100%; height: 100%; }
+.uw-bed path { fill: #07303f; }
+.uw-weed { position: absolute; bottom: 0; width: 11px; border-radius: 9px 9px 0 0; transform-origin: bottom center;
+  animation: uw-sway var(--dur, 5s) ease-in-out var(--delay, 0s) infinite alternate; }
+@keyframes uw-sway { from { transform: rotate(-8deg); } to { transform: rotate(8deg); } }
 
 /* legibility of the hero text over the scene */
-.login-sea .login-tagline { color: rgba(255, 255, 255, .82); }
-.login-sea .login-credit .credit { color: rgba(255, 255, 255, .72); }
+.login-underwater .login-tagline { color: rgba(255, 255, 255, .85); }
+.login-underwater .login-credit .credit { color: rgba(255, 255, 255, .72); }
 
-@media (prefers-reduced-motion: reduce) { .ls-cloud, .ls-wave { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .uw-fish, .uw-bob, .uw-bub, .uw-weed, .uw-rays { animation: none; } }
 
 /* ---------- Login — full PiKaOs auth states (validation / forgot / success) ---------- */
 .login-cardhead { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 20px; }

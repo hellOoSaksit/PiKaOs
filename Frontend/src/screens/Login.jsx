@@ -9,6 +9,32 @@ import * as api from '../lib/api.js';
 
 const LOGO_TILTS = ["-9deg", "6deg", "-5deg", "8deg", "-7deg", "5deg"];
 
+// --- underwater scene actors (pure CSS/SVG; cheap + cute, no Three.js so login paints instantly) ---
+const UW_FISH = [
+  { top: "20%", dur: 30, delay: 0,   dir: 1,  adir: "normal",  sc: 1,    bob: 3.2, color: "#ff9f68" },
+  { top: "37%", dur: 38, delay: -9,  dir: -1, adir: "reverse", sc: 0.82, bob: 4.0, color: "#ffd166" },
+  { top: "53%", dur: 33, delay: -17, dir: 1,  adir: "normal",  sc: 1.15, bob: 3.6, color: "#67c9b8" },
+  { top: "67%", dur: 44, delay: -25, dir: -1, adir: "reverse", sc: 0.7,  bob: 4.4, color: "#9db4ff" },
+  { top: "30%", dur: 52, delay: -33, dir: 1,  adir: "normal",  sc: 0.58, bob: 5.0, color: "#ff8fab" },
+];
+const UW_WEEDS = [
+  { left: "6%",  h: 96,  dur: 5.0, delay: 0,    color: "#2f8f6b" },
+  { left: "15%", h: 62,  dur: 6.5, delay: -1.5, color: "#28825f" },
+  { left: "83%", h: 104, dur: 5.5, delay: -0.8, color: "#2f8f6b" },
+  { left: "92%", h: 70,  dur: 7.0, delay: -2.2, color: "#28825f" },
+];
+function Fish({ color }) {
+  return (
+    <svg viewBox="0 0 64 40" width="60" height="38" aria-hidden="true">
+      <path d="M16 20 L2 6 L2 34 Z" fill={color} opacity=".82" />
+      <ellipse cx="38" cy="20" rx="22" ry="13" fill={color} />
+      <path d="M30 8 Q40 0 47 10 Z" fill={color} opacity=".65" />
+      <circle cx="50" cy="16" r="3.4" fill="#1c2b33" />
+      <circle cx="51.2" cy="14.8" r="1.1" fill="#fff" />
+    </svg>
+  );
+}
+
 function validateUser(v) {
   const s = (v || "").trim();
   if (!s) return "login.val.userReq";
@@ -95,20 +121,32 @@ export function Login({ onLogin, t, language, onLang }) {
   const isForgot = view === "forgot";
 
   return (
-    <div className="login-stage login-sea"
+    <div className="login-stage login-underwater"
       onMouseMove={(e) => {
         e.currentTarget.style.setProperty("--px", (e.clientX / window.innerWidth - 0.5).toFixed(3));
         e.currentTarget.style.setProperty("--py", (e.clientY / window.innerHeight - 0.5).toFixed(3));
       }}>
       <div className="login-scene" aria-hidden="true">
-        <div className="ls-sky" />
-        <div className="ls-sun" />
-        <div className="ls-cloud ls-cloud-a" />
-        <div className="ls-cloud ls-cloud-b" />
-        <svg className="ls-mtn ls-mtn-far" viewBox="0 0 1440 320" preserveAspectRatio="none"><path d="M0 220 L180 150 L360 205 L560 120 L760 195 L980 130 L1200 205 L1440 150 L1440 320 L0 320 Z" /></svg>
-        <svg className="ls-mtn ls-mtn-mid" viewBox="0 0 1440 320" preserveAspectRatio="none"><path d="M0 250 L220 170 L430 245 L640 150 L880 235 L1120 160 L1440 245 L1440 320 L0 320 Z" /></svg>
-        <svg className="ls-mtn ls-mtn-near" viewBox="0 0 1440 320" preserveAspectRatio="none"><path d="M0 290 L260 215 L520 285 L820 200 L1120 285 L1440 220 L1440 320 L0 320 Z" /></svg>
-        <div className="ls-water"><div className="ls-wave" /><div className="ls-wave ls-wave2" /></div>
+        <div className="uw-water" />
+        <div className="uw-rays" />
+        {UW_FISH.map((f, i) => (
+          <div key={i} className="uw-fish" style={{ top: f.top, "--dur": f.dur + "s", "--delay": f.delay + "s", "--adir": f.adir }}>
+            <div className="uw-bob" style={{ "--bd": f.bob + "s" }}>
+              <span className="uw-fish-svg" style={{ transform: `scaleX(${f.dir}) scale(${f.sc})` }}><Fish color={f.color} /></span>
+            </div>
+          </div>
+        ))}
+        {Array.from({ length: 9 }, (_, i) => (
+          <span key={"b" + i} className="uw-bub"
+            style={{ left: `${7 + i * 10}%`, "--bd": (7 + (i % 4) * 2) + "s", "--delay": (-i * 1.3) + "s", "--bs": (4 + (i % 3) * 3) + "px" }} />
+        ))}
+        <div className="uw-floor">
+          <svg className="uw-bed" viewBox="0 0 1440 200" preserveAspectRatio="none"><path d="M0 120 Q180 70 360 110 T720 100 T1080 112 T1440 95 L1440 200 L0 200 Z" /></svg>
+          {UW_WEEDS.map((w, i) => (
+            <span key={"w" + i} className="uw-weed"
+              style={{ left: w.left, height: w.h, "--dur": w.dur + "s", "--delay": w.delay + "s", background: `linear-gradient(${w.color}, #1f6b50)` }} />
+          ))}
+        </div>
       </div>
       {onLang && (
         <div className="login-lang" role="group" aria-label="language">
