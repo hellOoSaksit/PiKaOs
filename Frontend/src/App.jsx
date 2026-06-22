@@ -61,6 +61,7 @@ const ROUTE_META = {
 const NAV_GROUP_KEY = { "ศูนย์บัญชาการ": "command", "ความรู้และความทรงจำ": "knowledge", "ทรัพยากร": "resources", "ผู้ดูแลกิลด์": "admin" };
 
 function Sidebar({ route, go, t, can }) {
+  const [navOpen, setNavOpen] = useState({});   // parent id -> expanded (overrides the route-based default)
   return (
     <aside className="sidebar" data-no-lex>
       <div className="brand">
@@ -79,19 +80,31 @@ function Sidebar({ route, go, t, can }) {
             <div className="nav-label">{t("navgroup." + (NAV_GROUP_KEY[g.group] || g.group))}</div>
             {items.map(it => {
               const kids = (it.children || []).filter(c => !c.perm || (can && can(c.perm)));
+              const hasKids = kids.length > 0;
+              const childActive = kids.some(c => c.id === route);
+              // default open when you're inside the section; an explicit caret toggle overrides it
+              const isOpen = childActive || (it.id in navOpen ? navOpen[it.id] : route === it.id);
               return (
               <React.Fragment key={it.id}>
                 <div className={`nav-item ${route === it.id ? "active" : ""}`} onClick={() => go(it.id)}>
                   <span className="ni-icon">{it.icon}</span>
                   <span style={{ flex: 1 }}>{t("nav." + it.id)}</span>
                   {it.tag && <span className={`ni-tag ${it.tag === "live" ? "alert" : ""}`}>{it.tag === "live" ? "● LIVE" : it.tag}</span>}
+                  {hasKids && (
+                    <button type="button" className={`nav-caret ${isOpen ? "open" : ""}`} aria-label="toggle submenu"
+                      onClick={(e) => { e.stopPropagation(); setNavOpen(o => ({ ...o, [it.id]: !isOpen })); }}>▾</button>
+                  )}
                 </div>
-                {kids.map(c => (
-                  <div key={c.id} className={`nav-item nav-subitem ${route === c.id ? "active" : ""}`} onClick={() => go(c.id)}>
-                    <span className="ni-icon">{c.icon}</span>
-                    <span style={{ flex: 1 }}>{t("nav." + c.id)}</span>
+                {hasKids && (
+                  <div className={`nav-sub ${isOpen ? "open" : ""}`}>
+                    {kids.map(c => (
+                      <div key={c.id} className={`nav-item nav-subitem ${route === c.id ? "active" : ""}`} onClick={() => go(c.id)}>
+                        <span className="ni-icon">{c.icon}</span>
+                        <span style={{ flex: 1 }}>{t("nav." + c.id)}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </React.Fragment>
               );
             })}

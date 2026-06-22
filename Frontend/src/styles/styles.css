@@ -340,9 +340,19 @@ body {
 }
 .nav-item .ni-tag.alert { color: #fff; background: var(--crimson-deep); border-color: var(--crimson); }
 
-/* nested sub-item (e.g. Roles under the Permissions catalog) — indented + dimmer */
+/* nested sub-items (e.g. Roles under the Permissions catalog) — collapsible + indented */
+.nav-sub { overflow: hidden; max-height: 0; opacity: 0; transition: max-height .28s ease, opacity .2s ease; }
+.nav-sub.open { max-height: 320px; opacity: 1; }
 .nav-subitem { margin-left: 18px; }
 .nav-subitem .ni-icon { opacity: .65; font-size: 13px; }
+.nav-caret {
+  background: none; border: 0; color: inherit; cursor: pointer;
+  font-size: 10px; line-height: 1; padding: 2px 4px; margin-left: 4px;
+  opacity: .55; transform: rotate(-90deg);
+  transition: transform .25s ease, opacity .15s ease;
+}
+.nav-caret.open { transform: rotate(0deg); opacity: .9; }
+.nav-caret:hover { opacity: 1; }
 
 .sidebar-foot {
   padding: 12px 16px;
