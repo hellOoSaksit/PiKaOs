@@ -53,6 +53,7 @@
     "nav.admin": "ユーザー管理",
     "nav.toolsmgr": "ツール管理",
     "nav.roles": "ロールと権限",
+    "nav.permissions": "権限カタログ",
     "nav.audit": "監査ログ",
     "nav.settings": "設定",
     "nav.history": "タスク履歴",
