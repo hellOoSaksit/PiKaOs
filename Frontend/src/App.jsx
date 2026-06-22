@@ -13,7 +13,6 @@ import { Chronicle, Codex, Mana, QuestLog, Recall, Settings, Treasury, Watchtowe
 import { Login } from './screens/Login.jsx';
 import { MyDashboard } from './screens/screens-me.jsx';
 import { AuditLog, PermissionsCatalog, RolesPermissions, UserDetail, UserForm } from './screens/screens-rbac.jsx';
-import { NavManager } from './screens/screens-nav.jsx';
 import { AgentDrawer, Agents, Meeting, QuestBoard, QuestDrawer } from './screens/screens-secondary.jsx';
 import { SitemapAudit } from './screens/screens-sitemap.jsx';
 import { Compare } from './screens/screens-compare.jsx';
@@ -596,11 +595,10 @@ function App() {
       case "treasury": return <Treasury t={t} />;
       case "stats": return <Chronicle S={S} t={t} />;
       case "admin": return guard("user.view.any", <Admin Sys={Sys} onUser={(id) => { setUserSel(id); go("userDetail"); }} />);
-      case "toolsmgr": return guard("options.manage", <ToolsManager can={can} t={t} />);
+      case "toolsmgr": return guard("options.manage", <ToolsManager can={can} t={t} Sys={Sys} />);
       case "userDetail": return guard("user.view.any", <UserDetail Sys={Sys} userId={userSel} onAgent={setAgentSel} />);
       case "roles": return guard("role.manage", <RolesPermissions Sys={Sys} />);
       case "permissions": return guard("user.view.any", <PermissionsCatalog Sys={Sys} />);
-      case "navmgr": return guard("options.manage", <NavManager Sys={Sys} />);
       case "audit": return guard("audit.view", <AuditLog Sys={Sys} />);
       case "workflows": return <Workflows Sys={Sys} />;
       case "settings": return <Settings theme={theme} setTheme={setTheme} lex={lex} setLex={setLex} pickLanguage={pickLanguage} language={language} formal={formal} go={go} t={t} />;

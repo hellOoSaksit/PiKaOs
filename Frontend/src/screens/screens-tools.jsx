@@ -5,6 +5,7 @@
 import React from 'react';
 const { useState, useEffect } = React;
 import { activateLlmConnection, createLlmConnection, deleteLlmConnection, llmConnections, llmRoles, setLlmRole, storageStatus, storageTest, updateLlmConnection } from '../lib/api.js';
+import { NavManagerPanel } from './screens-nav.jsx';
 import { Btn, Empty, HelpNote, PageHead, Panel } from '../components/components.jsx';
 import { Select } from '../components/ui/Dropdown.jsx';
 import Modal from '../components/ui/Modal.jsx';
@@ -329,7 +330,7 @@ function StoragePanel({ t }) {
   );
 }
 
-export function ToolsManager({ can, t }) {
+export function ToolsManager({ can, t, Sys }) {
   const mayEdit = !can || can("options.manage");
   const mayInfra = !can || can("infra.manage");
   // LLM provider config is permission-split server-side: reading the panel needs `llm.view`,
@@ -457,6 +458,12 @@ export function ToolsManager({ can, t }) {
       {mayInfra && (
         <ToolSection icon="🗄️" title={tx("storage.title")} kicker="STORAGE">
           <StoragePanel t={t} />
+        </ToolSection>
+      )}
+
+      {mayEdit && Sys && (
+        <ToolSection icon="☰" title={tx("nav.navmgr")} kicker="MENU ORDER">
+          <NavManagerPanel Sys={Sys} />
         </ToolSection>
       )}
 

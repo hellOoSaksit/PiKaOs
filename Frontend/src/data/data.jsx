@@ -136,7 +136,6 @@ const NAV = [
   { group: "ผู้ดูแลกิลด์", items: [
     { id: "admin", icon: "👥", label: "จัดการผู้ใช้", en: "User Management", perm: "user.view.any" },
     { id: "toolsmgr", icon: "🧰", label: "จัดการเครื่องมือ", en: "Tools", perm: "options.manage" },
-    { id: "navmgr", icon: "☰", label: "จัดการเมนู", en: "Menu Manager", perm: "options.manage" },
     { id: "permissions", icon: "🗝️", label: "แคตตาล็อกสิทธิ์", en: "Permissions", perm: "user.view.any", children: [
       { id: "roles", icon: "🔑", label: "บทบาทและสิทธิ์", en: "Roles & Access", perm: "role.manage" },
     ]},

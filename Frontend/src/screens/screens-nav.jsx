@@ -1,11 +1,12 @@
-/* PiKaOs — Menu Manager: admin arranges the global sidebar navigation.
+/* PiKaOs — Menu Manager panel: admin arranges the global sidebar navigation.
 
-   Edits one shared config (data-nav.jsx) so the arrangement is the same for every user.
+   Lives inside the "จัดการเครื่องมือ" (Tools) screen — system settings belong there (CLAUDE.md
+   rule 2). Edits one shared config (data-nav.jsx) so the arrangement is the same for every user.
    Reorder by drag (within the same parent) or the ↑↓ buttons; nest with indent/outdent up to
    MAX_DEPTH levels (Main → Sub → Sub); hide/show; rename; reset to the code default. */
 import React from 'react';
 const { useState } = React;
-import { Btn, HelpNote, PageHead, Panel } from '../components/components.jsx';
+import { Btn } from '../components/components.jsx';
 import {
   MAX_DEPTH, moveUp, moveDown, indent, outdent, canIndent, canOutdent,
   toggleHidden, rename, reorderBefore, resetNav,
@@ -13,7 +14,7 @@ import {
 
 const LEVEL_NAME = ["Main", "Sub", "Sub"];   // by depth (0,1,2)
 
-function NavManager({ Sys }) {
+function NavManagerPanel({ Sys }) {
   const { nav, setNav, T } = Sys;
   const [drag, setDrag] = useState(null);     // id of the row being dragged
 
@@ -67,26 +68,24 @@ function NavManager({ Sys }) {
   };
 
   return (
-    <div className="content-pad fade-in" data-no-lex>
-      <PageHead kicker={T("Administration · Menu", "ผู้ดูแลระบบ · เมนู")} title={T("Menu Manager", "จัดการเมนู")} tag="local"
-        desc={T(`Arrange the sidebar for everyone: drag (or ↑↓) to reorder, indent/outdent to nest up to ${MAX_DEPTH} levels (Main → Sub → Sub), hide, or rename.`,
-                `จัดเรียงเมนูให้ทุกคน: ลาก (หรือ ↑↓) จัดลำดับ · เลื่อนเข้า/ออกเพื่อซ้อนได้ถึง ${MAX_DEPTH} ระดับ (หลัก → ย่อย → ย่อย) · ซ่อน · เปลี่ยนชื่อ`)}
-        actions={<Btn kind="ghost" sm onClick={doReset}>{T("Reset to default", "รีเซตค่าเริ่มต้น")}</Btn>} />
-
-      <HelpNote tag="local">{T("One shared menu — changes apply to every user. Hidden items disappear from the sidebar; their pages still open via direct link.",
-        "เมนูนี้ใช้ร่วมกันทั้งระบบ — การแก้มีผลกับทุกคน · รายการที่ซ่อนจะหายจาก sidebar แต่หน้ายังเข้าได้ผ่านลิงก์ตรง")}</HelpNote>
+    <div data-no-lex>
+      <div className="navmgr-bar">
+        <div className="sm-set-note mono">{T(`Shared for everyone — drag or ↑↓ to reorder, indent/outdent to nest up to ${MAX_DEPTH} levels, hide, rename. Hidden items leave the sidebar; their pages still open by link.`,
+          `ใช้ร่วมกันทุกคน — ลาก หรือ ↑↓ จัดลำดับ · เลื่อนเข้า/ออกเพื่อซ้อนได้ถึง ${MAX_DEPTH} ระดับ · ซ่อน · เปลี่ยนชื่อ · รายการที่ซ่อนจะหายจาก sidebar แต่หน้ายังเข้าได้ผ่านลิงก์`)}</div>
+        <Btn kind="ghost" sm onClick={doReset}>{T("Reset to default", "รีเซตค่าเริ่มต้น")}</Btn>
+      </div>
 
       {nav.map(g => (
-        <Panel key={g.group} className="navmgr-group" style={{ marginBottom: 14 }}>
+        <div key={g.group} style={{ marginBottom: 12 }}>
           <div className="navmgr-grouphead">{g.group}</div>
           {g.items.length === 0
             ? <div className="muted" style={{ fontSize: 13, padding: "8px 4px" }}>{T("No items", "ไม่มีรายการ")}</div>
             : g.items.map(it => renderRow(it, 0))}
-        </Panel>
+        </div>
       ))}
     </div>
   );
 }
 
-Object.assign(window, { NavManager });
-export { NavManager };
+Object.assign(window, { NavManagerPanel });
+export { NavManagerPanel };
