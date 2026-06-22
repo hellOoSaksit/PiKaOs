@@ -6,7 +6,8 @@ import { AUDIT_SEED, ROLES_SEED, ROLE_PERMS_SEED, USERS_SEED, USER_PERMS_SEED, f
 import { TOOL_RUNS_SEED, WORKFLOWS_SEED, loadWF, saveWF } from './data/data-workflows.jsx';
 import { MANA, NAV, NAV_GROUP_FORMAL, NAV_LABEL_FORMAL, QUESTS, ROUTE_TITLE_FORMAL, byId } from './data/data.jsx';
 import { loadNav, saveNav, mergeWithDefault } from './data/data-nav.jsx';
-import { getNavConfig, setNavConfig, getMySettings, setMySetting } from './lib/api.js';
+import { getNavConfig, setNavConfig, getMySettings, setMySetting, getGlobalConfig, setGlobalConfig } from './lib/api.js';
+import { applyGlobalConfig } from './lib/characters.jsx';
 import { Admin } from './screens/screens-admin.jsx';
 import { CharacterBuilder } from './screens/screens-builder.jsx';
 import { Chronicle, Codex, Mana, QuestLog, Recall, Settings, Treasury, Watchtower } from './screens/screens-extra.jsx';
@@ -456,6 +457,16 @@ function App() {
   }, [auth.loggedIn]);
   useEffect(() => { if (settingsLoaded.current) setMySetting("theme", theme).catch(() => {}); }, [theme]);
   useEffect(() => { if (settingsLoaded.current) setMySetting("lex", lex).catch(() => {}); }, [lex]);
+  // global Tools/roster config (positions/skills, tool catalog, skill docs) — shared by everyone.
+  // Pull into the local cache on sign-in; admin edits push back (save* fire window.__syncGlobal).
+  useEffect(() => {
+    if (!auth.loggedIn) return;
+    window.__syncGlobal = (key, value) => { if (can("options.manage")) setGlobalConfig(key, value).catch(() => {}); };
+    let alive = true;
+    ["options", "skill_docs", "tool_cfgs"].forEach(k =>
+      getGlobalConfig(k).then(r => { if (alive && r && r.value != null) applyGlobalConfig(k, r.value); }).catch(() => {}));
+    return () => { alive = false; };
+  }, [auth.loggedIn]);
   useEffect(() => { saveU("rolePerms", rolePerms); }, [rolePerms]);
   useEffect(() => { saveU("userPerms", userPerms); }, [userPerms]);
   useEffect(() => { saveU("audit", audit); }, [audit]);

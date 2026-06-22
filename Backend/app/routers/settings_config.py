@@ -15,7 +15,7 @@ from ..deps import get_current_user, require_perm
 from ..models import User
 from ..repositories import app_settings as repo
 from ..repositories import user_settings as user_repo
-from ..schemas import NavConfigIn, NavConfigOut, SettingValueIn, UserSettingsOut
+from ..schemas import GlobalConfigOut, NavConfigIn, NavConfigOut, SettingValueIn, UserSettingsOut
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -67,3 +67,29 @@ async def set_my_setting(
     """Set one of the current user's settings (own scope only)."""
     await user_repo.upsert(db, user.id, key, body.value)
     return UserSettingsOut(values=await user_repo.get_all(db, user.id))
+
+
+# --- generic global config blobs (Tools/system settings — same for everyone, the global tier) ---
+
+
+@router.get("/global/{key}", response_model=GlobalConfigOut)
+async def get_global(
+    key: str,
+    _: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> GlobalConfigOut:
+    """A shared config blob by key (or null). Any authenticated user can read it."""
+    row = await repo.get(db, key)
+    return GlobalConfigOut(value=row.value if row else None)
+
+
+@router.put("/global/{key}", response_model=GlobalConfigOut)
+async def put_global(
+    key: str,
+    body: SettingValueIn,
+    user: User = Depends(require_perm("options.manage")),
+    db: AsyncSession = Depends(get_db),
+) -> GlobalConfigOut:
+    """Set a shared config blob (requires options.manage). Seen by every user/device."""
+    row = await repo.upsert(db, key, body.value, updated_by=user.id)
+    return GlobalConfigOut(value=row.value)

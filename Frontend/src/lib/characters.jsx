@@ -102,7 +102,7 @@ function loadOptions() {
   try { const r = localStorage.getItem(OPTS_LS); if (r) { const o = JSON.parse(r); return { ...OPTS_DEFAULT, ...o }; } } catch (e) { }
   return JSON.parse(JSON.stringify(OPTS_DEFAULT));
 }
-function saveOptions(o) { try { localStorage.setItem(OPTS_LS, JSON.stringify(o)); } catch (e) { } window.__options = o; }
+function saveOptions(o) { try { localStorage.setItem(OPTS_LS, JSON.stringify(o)); } catch (e) { } window.__options = o; if (window.__syncGlobal) window.__syncGlobal("options", o); }
 function addOption(kind, value) {
   const o = loadOptions(); const v = (value || "").trim(); if (!v) return o;
   if (!o[kind]) o[kind] = [];
@@ -120,7 +120,7 @@ function removeOption(kind, value) {
    the Agent builder only SELECTS skills, it no longer adds/edits/deletes them. */
 const SKILLDOCS_LS = "guildos.skilldocs.v1";
 function loadSkillDocs() { try { return JSON.parse(localStorage.getItem(SKILLDOCS_LS)) || {}; } catch (e) { return {}; } }
-function saveSkillDocs(map) { try { localStorage.setItem(SKILLDOCS_LS, JSON.stringify(map)); } catch (e) { } window.__skillDocs = map; return map; }
+function saveSkillDocs(map) { try { localStorage.setItem(SKILLDOCS_LS, JSON.stringify(map)); } catch (e) { } window.__skillDocs = map; if (window.__syncGlobal) window.__syncGlobal("skill_docs", map); return map; }
 
 /* ---- tool configs: typed tools (MCP / LINE OA / Telegram / CMD ...) ---- */
 const TOOLCFG_LS = "guildos.toolsConfig";
@@ -224,8 +224,21 @@ function loadToolCfgs() {
 function saveToolCfgs(list) {
   try { localStorage.setItem(TOOLCFG_LS, JSON.stringify(list)); } catch (e) { }
   const o = loadOptions(); o.tools = list.filter(t => t.enabled !== false).map(t => t.name); saveOptions(o);
+  if (window.__syncGlobal) window.__syncGlobal("tool_cfgs", list);
   return list;
 }
+
+/* Apply a global config blob pulled from the server into the local cache, WITHOUT re-syncing
+   (used on sign-in so Tools/roster config is shared across devices). Tools config = global tier. */
+function applyGlobalConfig(key, value) {
+  if (value == null) return;
+  try {
+    if (key === "options") { localStorage.setItem(OPTS_LS, JSON.stringify(value)); window.__options = value; }
+    else if (key === "skill_docs") { localStorage.setItem(SKILLDOCS_LS, JSON.stringify(value)); window.__skillDocs = value; }
+    else if (key === "tool_cfgs") { localStorage.setItem(TOOLCFG_LS, JSON.stringify(value)); }
+  } catch (e) { }
+}
+
 window.__options = loadOptions();
 
 /* ---- CORE (mandatory) rules — shared across every agent, edited only by privileged users ---- */
@@ -319,6 +332,7 @@ export {
   TOOL_TYPES,
   loadToolCfgs,
   saveToolCfgs,
+  applyGlobalConfig,
   addProfile,
   charSetById,
   loadCharacters,

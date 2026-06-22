@@ -30,6 +30,10 @@ class UserSettingsOut(BaseModel):
     values: dict   # {key: value} of the current user's settings
 
 
+class GlobalConfigOut(BaseModel):
+    value: Any = None   # a shared (global) config blob — shape owned by the frontend
+
+
 class ForgotIn(BaseModel):
     usernameOrEmail: str = Field(min_length=1)
 

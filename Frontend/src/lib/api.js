@@ -193,3 +193,7 @@ export async function setNavConfig(value) { return raw("/settings/nav", { method
 // --- per-user settings (theme/lexicon; follow the user across devices) ---
 export async function getMySettings() { return raw("/settings/me"); }                                           // { values: {...} }
 export async function setMySetting(key, value) { return raw(`/settings/me/${key}`, { method: "PUT", body: { value } }); }
+
+// --- global config blobs (Tools/system settings; same for everyone) ---
+export async function getGlobalConfig(key) { return raw(`/settings/global/${key}`); }                           // { value }
+export async function setGlobalConfig(key, value) { return raw(`/settings/global/${key}`, { method: "PUT", body: { value } }); }  // options.manage
