@@ -185,3 +185,7 @@ export async function reindexKnowledge(onlyStale = true) {
 // Storage creds are bootstrap config (env only); these endpoints never mutate them. Need infra.manage.
 export async function storageStatus() { return raw("/storage/status"); }
 export async function storageTest() { return raw("/storage/test", { method: "POST" }); }
+
+// --- shared sidebar nav arrangement (server-scoped; admin edits, every user/device sees the same) ---
+export async function getNavConfig() { return raw("/settings/nav"); }                                          // any authenticated user
+export async function setNavConfig(value) { return raw("/settings/nav", { method: "PUT", body: { value } }); }  // requires options.manage

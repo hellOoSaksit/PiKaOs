@@ -155,6 +155,26 @@ class LlmRoleBinding(Base):
     )
 
 
+class AppSetting(Base):
+    """Server-scoped key/value config shared by every user and device (migration 0007).
+
+    A small JSONB store for settings that must be identical app-wide — the first is the sidebar
+    nav arrangement (`key="nav"`), which previously lived in per-browser localStorage. Reads are
+    any authenticated user; a write needs the relevant permission (gated per key in the router).
+    Generic so later server-scope config reuses the same table."""
+
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[dict | list] = mapped_column(JSONB, nullable=False)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 # --- RBAC (server-side permission model — mirrors Frontend/src/data/data-users.jsx) ---
 # Roles map to permission sets; per-user overrides grant/deny single permissions on top.
 # Effective perms = role_perms ∪ grants − denies (deny wins); admin implicitly has all.

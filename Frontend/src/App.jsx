@@ -5,7 +5,8 @@ const { useState, useEffect } = React;
 import { AUDIT_SEED, ROLES_SEED, ROLE_PERMS_SEED, USERS_SEED, USER_PERMS_SEED, fmtTok, loadU, resolvePerms, roleByKey, saveU, userById } from './data/data-users.jsx';
 import { TOOL_RUNS_SEED, WORKFLOWS_SEED, loadWF, saveWF } from './data/data-workflows.jsx';
 import { MANA, NAV, NAV_GROUP_FORMAL, NAV_LABEL_FORMAL, QUESTS, ROUTE_TITLE_FORMAL, byId } from './data/data.jsx';
-import { loadNav, saveNav } from './data/data-nav.jsx';
+import { loadNav, saveNav, mergeWithDefault } from './data/data-nav.jsx';
+import { getNavConfig, setNavConfig } from './lib/api.js';
 import { Admin } from './screens/screens-admin.jsx';
 import { CharacterBuilder } from './screens/screens-builder.jsx';
 import { Chronicle, Codex, Mana, QuestLog, Recall, Settings, Treasury, Watchtower } from './screens/screens-extra.jsx';
@@ -434,7 +435,14 @@ function App() {
   useEffect(() => { saveArchived(archived); window.__archived = archived; }, [archived]);
   useEffect(() => { saveU("users", users); }, [users]);
   useEffect(() => { saveU("roles", roles); }, [roles]);
-  useEffect(() => { saveNav(navCfg); }, [navCfg]);
+  useEffect(() => { saveNav(navCfg); }, [navCfg]);   // local cache for instant render next load
+  // pull the shared arrangement from the server once signed in (authoritative; overrides the cache)
+  useEffect(() => {
+    if (!auth.loggedIn) return;
+    let alive = true;
+    getNavConfig().then(r => { if (alive && r && r.value) setNavCfg(mergeWithDefault(r.value)); }).catch(() => {});
+    return () => { alive = false; };
+  }, [auth.loggedIn]);
   useEffect(() => { saveU("rolePerms", rolePerms); }, [rolePerms]);
   useEffect(() => { saveU("userPerms", userPerms); }, [userPerms]);
   useEffect(() => { saveU("audit", audit); }, [audit]);
@@ -499,9 +507,12 @@ function App() {
   const logAudit = (action, targetType, target, meta) =>
     setAudit(prev => [{ id: "ev" + Date.now(), actor: currentUserId, action, targetType, target, meta, time: T("just now", "เมื่อสักครู่") }, ...prev]);
 
+  // persist a nav edit: update the UI now + push to the shared server config (best-effort)
+  const saveNavCfg = (cfg) => { setNavCfg(cfg); setNavConfig(cfg).catch(() => {}); };
+
   const Sys = {
     users, roles, rolePerms, userPerms, audit, me, can, T, language, go,
-    nav: navCfg, setNav: setNavCfg,
+    nav: navCfg, setNav: saveNavCfg,
     workflows, toolRuns,
     toggleWorkflow: (w) => {
       setWorkflows(prev => prev.map(x => x.id === w.id ? { ...x, enabled: !x.enabled } : x));

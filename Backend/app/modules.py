@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from fastapi import APIRouter, FastAPI
 
 from .config import settings
-from .routers import auth, compare, health, knowledge, llm_config, ws
+from .routers import auth, compare, health, knowledge, llm_config, settings_config, ws
 from .routers import storage as storage_router
 
 
@@ -37,7 +37,8 @@ MODULES: tuple[Module, ...] = (
     Module("infra", routers=(health.router,), optional=False),
     Module(
         "core",  # identity / access / system config every module relies on
-        routers=(auth.router, llm_config.router, llm_config.roles_router, storage_router.router),
+        routers=(auth.router, llm_config.router, llm_config.roles_router, storage_router.router,
+                 settings_config.router),
         optional=False,
     ),
     Module("engine", routers=(ws.router,)),            # agent-ops live quest stream (CRUD lands in phase D)

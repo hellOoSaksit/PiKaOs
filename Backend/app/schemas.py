@@ -12,6 +12,15 @@ class LoginIn(BaseModel):
     password: str = Field(min_length=1)
 
 
+class NavConfigIn(BaseModel):
+    value: list   # the sidebar nav arrangement (list of groups) — the frontend owns the shape
+
+
+class NavConfigOut(BaseModel):
+    value: list | None = None
+    updated_at: datetime | None = None
+
+
 class ForgotIn(BaseModel):
     usernameOrEmail: str = Field(min_length=1)
 
