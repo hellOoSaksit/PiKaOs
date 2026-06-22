@@ -19,7 +19,9 @@ const PERMISSIONS = [
   { key: "agent.delete.any", group: "Agents",    th: "ลบ Agent ของผู้อื่น",    en: "Delete any agent" },
   { key: "quest.run",        group: "Work",      th: "สั่งรันงาน/เควส",        en: "Run quests" },
   { key: "task.delete",      group: "Work",      th: "ลบงาน (Task)",           en: "Delete tasks" },
-  { key: "codex.manage",     group: "Knowledge", th: "จัดการคลังความรู้",      en: "Manage codex" },
+  { key: "codex.view",       group: "Knowledge", th: "ดู/ค้นหาคลังความรู้",     en: "View & search codex" },
+  { key: "codex.manage",     group: "Knowledge", th: "อัปโหลด/จัดการเนื้อหาคลังความรู้", en: "Upload & manage codex content" },
+  { key: "codex.delete",     group: "Knowledge", th: "ลบเอกสารในคลังความรู้",   en: "Delete codex documents" },
   { key: "workflow.manage",  group: "Workflows", th: "จัดการ workflow",        en: "Manage workflows" },
   { key: "room.build",      group: "Room",      th: "เปิดโหมดสร้างห้อง",      en: "Open build mode" },
   { key: "room.place",      group: "Room",      th: "วางของ/เฟอร์นิเจอร์",   en: "Place items" },
@@ -33,7 +35,9 @@ const PERMISSIONS = [
   { key: "user.manage",      group: "Admin",     th: "จัดการสมาชิก",            en: "Manage users" },
   { key: "role.manage",      group: "Admin",     th: "จัดการบทบาท/สิทธิ์",     en: "Manage roles" },
   { key: "audit.view",       group: "Admin",     th: "ดูบันทึกการตรวจสอบ",     en: "View audit log" },
+  { key: "llm.view",         group: "Admin",     th: "ดูการตั้งค่า LLM/โมเดล", en: "View LLM provider config" },
   { key: "llm.manage",       group: "Admin",     th: "ตั้งค่า LLM/โมเดล (provider/API หรือ Local)", en: "Manage LLM provider config" },
+  { key: "llm.assign",       group: "Admin",     th: "มอบหมายโมเดลให้ระบบ (engine/search/summarize)", en: "Assign LLM to system roles" },
   { key: "infra.manage",     group: "Admin",     th: "ดู/ทดสอบการเชื่อมต่อ Storage/ระบบ", en: "View/test infrastructure connections" },
 ];
 const PERM_KEYS = PERMISSIONS.map(p => p.key);
@@ -49,9 +53,9 @@ const ROLES_SEED = [
 /* ---- default role → permission set ---- */
 const ROLE_PERMS_SEED = {
   admin:   [...PERM_KEYS],
-  manager: ["agent.create", "agent.edit.any", "agent.delete.any", "quest.run", "codex.manage", "workflow.manage", "user.view.any", "audit.view", "room.build", "room.place", "room.move", "room.reset", "room.create", "room.delete", "room.template", "options.manage", "character.manage", "rules.manage", "agent.config", "task.delete"],
-  member:  ["agent.create", "quest.run", "codex.manage", "workflow.manage", "room.build", "room.place", "room.move"],
-  viewer:  [],
+  manager: ["agent.create", "agent.edit.any", "agent.delete.any", "quest.run", "codex.view", "codex.manage", "codex.delete", "workflow.manage", "user.view.any", "audit.view", "room.build", "room.place", "room.move", "room.reset", "room.create", "room.delete", "room.template", "options.manage", "character.manage", "rules.manage", "agent.config", "task.delete"],
+  member:  ["agent.create", "quest.run", "codex.view", "codex.manage", "codex.delete", "workflow.manage", "room.build", "room.place", "room.move"],
+  viewer:  ["codex.view"],
 };
 
 /* ---- users (real accounts) ---- */

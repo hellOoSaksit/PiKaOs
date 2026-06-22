@@ -10,7 +10,7 @@ import { CharacterBuilder } from './screens/screens-builder.jsx';
 import { Chronicle, Codex, Mana, QuestLog, Recall, Settings, Treasury, Watchtower } from './screens/screens-extra.jsx';
 import { Login } from './screens/Login.jsx';
 import { MyDashboard } from './screens/screens-me.jsx';
-import { AuditLog, RolesPermissions, UserDetail, UserForm } from './screens/screens-rbac.jsx';
+import { AuditLog, PermissionsCatalog, RolesPermissions, UserDetail, UserForm } from './screens/screens-rbac.jsx';
 import { AgentDrawer, Agents, Meeting, QuestBoard, QuestDrawer } from './screens/screens-secondary.jsx';
 import { SitemapAudit } from './screens/screens-sitemap.jsx';
 import { Compare } from './screens/screens-compare.jsx';
@@ -520,7 +520,7 @@ function App() {
   };
 
   // auto-redirect away from a protected route the current (possibly switched) role can't see
-  const ROUTE_PERM = { admin: "user.view.any", userDetail: "user.view.any", roles: "role.manage", audit: "audit.view" };
+  const ROUTE_PERM = { admin: "user.view.any", userDetail: "user.view.any", roles: "role.manage", permissions: "user.view.any", audit: "audit.view" };
   useEffect(() => {
     const need = ROUTE_PERM[route];
     if (need && !can(need)) go("me");
@@ -549,6 +549,7 @@ function App() {
       case "toolsmgr": return guard("options.manage", <ToolsManager can={can} t={t} />);
       case "userDetail": return guard("user.view.any", <UserDetail Sys={Sys} userId={userSel} onAgent={setAgentSel} />);
       case "roles": return guard("role.manage", <RolesPermissions Sys={Sys} />);
+      case "permissions": return guard("user.view.any", <PermissionsCatalog Sys={Sys} />);
       case "audit": return guard("audit.view", <AuditLog Sys={Sys} />);
       case "workflows": return <Workflows Sys={Sys} />;
       case "settings": return <Settings theme={theme} setTheme={setTheme} lex={lex} setLex={setLex} pickLanguage={pickLanguage} language={language} formal={formal} go={go} t={t} />;

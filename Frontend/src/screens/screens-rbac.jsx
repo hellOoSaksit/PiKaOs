@@ -422,10 +422,56 @@ function AuditLog({ Sys }) {
   );
 }
 
-Object.assign(window, { UserForm, UserDetail, RolesPermissions, AuditLog });
+/* ---------------- PERMISSIONS CATALOG (read-only) ----------------
+   A reference view of every permission in the system, grouped by area, showing which roles
+   currently hold each. Read-only on purpose — assignments are edited in RolesPermissions; this
+   page is gated wider (user.view.any) so managers can see what exists without edit rights. */
+function PermissionsCatalog({ Sys }) {
+  const { roles, rolePerms, T } = Sys;
+  const groups = [...new Set(PERMISSIONS.map(p => p.group))];
+  // admin implicitly holds every permission, so it always counts as holding one
+  const rolesWith = (pk) => roles.filter(r => r.key === "admin" || (rolePerms[r.key] || []).includes(pk));
+
+  return (
+    <div className="content-pad fade-in" data-no-lex>
+      <PageHead kicker={T("Administration · Access", "ผู้ดูแลระบบ · สิทธิ์")}
+        title={T("Permissions catalog", "แคตตาล็อกสิทธิ์")} tag="local"
+        desc={T("Every permission in the system, grouped by area, with the roles that hold each. Read-only — change who gets what in Roles & Permissions.",
+                "สิทธิ์ทั้งหมดในระบบ จัดกลุ่มตามส่วนงาน พร้อมบทบาทที่ถืออยู่ · อ่านอย่างเดียว — แก้การมอบสิทธิ์ได้ที่หน้าบทบาทและสิทธิ์")} />
+
+      <HelpNote tag="local">{T("Admin implicitly holds every permission. A permission with only the Admin badge is not yet granted to any other role.",
+        "ผู้ดูแลระบบมีทุกสิทธิ์โดยปริยาย · สิทธิ์ที่มีเฉพาะป้าย Admin แปลว่ายังไม่มี role อื่นได้รับ")}</HelpNote>
+
+      {groups.map(g => {
+        const perms = PERMISSIONS.filter(p => p.group === g);
+        return (
+          <Panel key={g} className="rbac-panel" style={{ marginBottom: 14 }}>
+            <div className="rbac-grouprow" style={{ padding: "8px 12px", fontWeight: 600 }}>
+              {g} <span className="mono faint">· {perms.length}</span>
+            </div>
+            {perms.map(p => (
+              <div key={p.key} className="tool-row">
+                <div className="tool-bd">
+                  <div className="tool-name">{T(p.en, p.th)}</div>
+                  <div className="tool-meta mono faint">{p.key}</div>
+                </div>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "55%" }}>
+                  {rolesWith(p.key).map(r => <RoleBadge key={r.key} roleKey={r.key} roles={roles} T={T} />)}
+                </div>
+              </div>
+            ))}
+          </Panel>
+        );
+      })}
+    </div>
+  );
+}
+
+Object.assign(window, { UserForm, UserDetail, RolesPermissions, AuditLog, PermissionsCatalog });
 
 export {
   AuditLog,
+  PermissionsCatalog,
   RolesPermissions,
   UserDetail,
   UserForm

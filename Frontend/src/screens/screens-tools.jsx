@@ -29,7 +29,7 @@ const LLM_BLANK = { name: "", provider: "ollama", model: "", base_url: "", api_k
 // per-system role assignment — icons only; labels/desc come from i18n (llmcfg.role.<key>[.desc])
 const LLM_ROLE_ICON = { engine: "🧩", search: "🔎", summarize: "📝" };
 
-function AiApiPanel({ mayEdit, t }) {
+function AiApiPanel({ mayEdit, mayAssign, t }) {
   const tx = t || ((k) => k);
   const [conns, setConns] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -99,7 +99,7 @@ function AiApiPanel({ mayEdit, t }) {
         <div style={{ marginTop: 10 }}><Btn onClick={startNew}>{tx("llmcfg.add")}</Btn></div>
       )}
 
-      {!loading && conns.length > 0 && <RoleAssignments conns={conns} mayEdit={mayEdit} t={tx} />}
+      {!loading && conns.length > 0 && <RoleAssignments conns={conns} mayEdit={mayAssign} t={tx} />}
 
       {mayEdit && editing != null && (
         <div className="bf-2" style={{ marginTop: 12 }}>
@@ -332,9 +332,12 @@ function StoragePanel({ t }) {
 export function ToolsManager({ can, t }) {
   const mayEdit = !can || can("options.manage");
   const mayInfra = !can || can("infra.manage");
-  // LLM provider config is admin-only server-side (all /api/llm/* require `llm.manage`), so the
-  // panel — which loads on mount — only renders for that permission, else a manager would 403.
-  const mayLlm = !can || can("llm.manage");
+  // LLM provider config is permission-split server-side: reading the panel needs `llm.view`,
+  // connection writes need `llm.manage`, role bindings need `llm.assign`. The panel loads on
+  // mount, so render it only when the user can read — else the list call would 403.
+  const mayLlm = !can || can("llm.view");
+  const mayLlmManage = !can || can("llm.manage");
+  const mayLlmAssign = !can || can("llm.assign");
   const tx = t || ((k) => k);
   const [tools, setTools] = useState(() => loadToolCfgs());
   const [editing, setEditing] = useState(null);     // tool id | "new" | null
@@ -447,7 +450,7 @@ export function ToolsManager({ can, t }) {
 
       {mayLlm && (
         <ToolSection icon="🤖" title={tx("llmcfg.title")} kicker="AI MODEL & API">
-          <AiApiPanel mayEdit={mayLlm} t={t} />
+          <AiApiPanel mayEdit={mayLlmManage} mayAssign={mayLlmAssign} t={t} />
         </ToolSection>
       )}
 

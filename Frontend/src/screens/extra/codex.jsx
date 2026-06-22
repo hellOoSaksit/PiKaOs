@@ -93,7 +93,8 @@ function AddNoteModal({ onSave, onClose }) {
 
 /* ---------------- CODEX · เอกสาร (live) — backed by /api/knowledge (E4) ----------------
    The markdown-as-truth document store + RAG search. Files live in MinIO; the backend
-   chunks + embeds them in the background (ingest_status). Upload/delete gate on codex.manage. */
+   chunks + embeds them in the background (ingest_status). Upload/reindex gate on codex.manage,
+   delete on codex.delete; reading is open to any user holding codex.view. */
 const DOC_ICON = { md: "📝", image: "🖼️", pdf: "📕", log: "📄", other: "📦" };
 const INGEST_ICON = { pending: "⏳", done: "✓", failed: "✕", skipped: "—" };
 
@@ -106,7 +107,8 @@ function fmtSize(n) {
 
 function CodexDocs({ t, can }) {
   const tx = (typeof t === "function") ? t : ((k) => k);
-  const mayManage = !can || can("codex.manage");
+  const mayManage = !can || can("codex.manage");   // upload + reindex
+  const mayDelete = !can || can("codex.delete");
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -220,7 +222,7 @@ function CodexDocs({ t, can }) {
                 <div className="codex-title">{d.name}</div>
                 <div className="codex-meta">{d.kind} · {fmtSize(d.size)} · <span className="chip" data-no-lex>{INGEST_ICON[d.ingest_status] || "⏳"} {tx("codex.docs.ingest." + d.ingest_status)}</span></div>
               </button>
-              {mayManage && <button type="button" className="chip-act danger" title={tx("common.delete")} onClick={() => del(d)}>✕</button>}
+              {mayDelete && <button type="button" className="chip-act danger" title={tx("common.delete")} onClick={() => del(d)}>✕</button>}
             </div>
           ))}
         </div>

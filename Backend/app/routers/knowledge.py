@@ -1,9 +1,9 @@
 """Knowledge / codex HTTP routes — the document store (markdown-as-truth).
 
 Thin edge over services/knowledge_service (§2.1): parse the request → call the service →
-shape the response / map domain errors to HTTP. Writes require the existing `codex.manage`
-permission; reads are any authenticated user, scoped by department in the service.
-RAG search lands here later (phase E) as `GET /search`.
+shape the response / map domain errors to HTTP. Permission split: reads require `codex.view`
+(then department-scoped in the service), upload/reindex require `codex.manage`, and deleting a
+document requires `codex.delete`. RAG search lands here later (phase E) as `GET /search`.
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import queue
 from ..config import settings
 from ..db import get_db
-from ..deps import get_current_user, require_perm
+from ..deps import require_perm
 from ..models import User
 from ..schemas import (
     DocumentListOut,
@@ -61,7 +61,7 @@ async def upload_document(
 async def search_documents(
     q: str,
     k: int = 0,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_perm("codex.view")),
     db: AsyncSession = Depends(get_db),
 ) -> KnowledgeSearchOut:
     """Semantic search over the codex (RAG retrieval). Returns the top-k chunks the caller may
@@ -101,7 +101,7 @@ async def list_documents(
     kind: str | None = None,
     limit: int = 50,
     offset: int = 0,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_perm("codex.view")),
     db: AsyncSession = Depends(get_db),
 ) -> DocumentListOut:
     """Documents visible to the caller (own + department + org-wide), newest first."""
@@ -116,7 +116,7 @@ async def list_documents(
 @router.get("/docs/{doc_id}", response_model=DocumentOut)
 async def get_document(
     doc_id: uuid.UUID,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_perm("codex.view")),
     db: AsyncSession = Depends(get_db),
 ) -> DocumentOut:
     """Document metadata + a presigned download URL."""
@@ -134,7 +134,7 @@ async def get_document(
 @router.delete("/docs/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(
     doc_id: uuid.UUID,
-    user: User = Depends(require_perm("codex.manage")),
+    user: User = Depends(require_perm("codex.delete")),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete a document (owner or admin)."""

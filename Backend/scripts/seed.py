@@ -40,7 +40,9 @@ SEED_PERMISSIONS = [
     ("agent.delete.any", "Agents", "ลบ Agent ของผู้อื่น", "Delete any agent"),
     ("quest.run", "Work", "สั่งรันงาน/เควส", "Run quests"),
     ("task.delete", "Work", "ลบงาน (Task)", "Delete tasks"),
-    ("codex.manage", "Knowledge", "จัดการคลังความรู้", "Manage codex"),
+    ("codex.view", "Knowledge", "ดู/ค้นหาคลังความรู้", "View & search codex"),
+    ("codex.manage", "Knowledge", "อัปโหลด/จัดการเนื้อหาคลังความรู้", "Upload & manage codex content"),
+    ("codex.delete", "Knowledge", "ลบเอกสารในคลังความรู้", "Delete codex documents"),
     ("workflow.manage", "Workflows", "จัดการ workflow", "Manage workflows"),
     ("room.build", "Room", "เปิดโหมดสร้างห้อง", "Open build mode"),
     ("room.place", "Room", "วางของ/เฟอร์นิเจอร์", "Place items"),
@@ -54,7 +56,9 @@ SEED_PERMISSIONS = [
     ("user.manage", "Admin", "จัดการสมาชิก", "Manage users"),
     ("role.manage", "Admin", "จัดการบทบาท/สิทธิ์", "Manage roles"),
     ("audit.view", "Admin", "ดูบันทึกการตรวจสอบ", "View audit log"),
+    ("llm.view", "Admin", "ดูการตั้งค่า LLM/โมเดล", "View LLM provider config"),
     ("llm.manage", "Admin", "ตั้งค่า LLM/โมเดล (provider/API หรือ Local)", "Manage LLM provider config"),
+    ("llm.assign", "Admin", "มอบหมายโมเดลให้ระบบ (engine/search/summarize)", "Assign LLM to system roles"),
     ("infra.manage", "Admin", "ดู/ทดสอบการเชื่อมต่อ Storage/ระบบภายนอก", "View/test infrastructure connections"),
 ]
 _PERM_KEYS = [p[0] for p in SEED_PERMISSIONS]
@@ -68,13 +72,14 @@ SEED_ROLES = [
 
 SEED_ROLE_PERMS = {
     "admin": list(_PERM_KEYS),
-    "manager": ["agent.create", "agent.edit.any", "agent.delete.any", "quest.run", "codex.manage",
+    "manager": ["agent.create", "agent.edit.any", "agent.delete.any", "quest.run",
+                "codex.view", "codex.manage", "codex.delete",
                 "workflow.manage", "user.view.any", "audit.view", "room.build", "room.place",
                 "room.move", "room.reset", "room.create", "room.delete", "room.template",
                 "options.manage", "character.manage", "rules.manage", "agent.config", "task.delete"],
-    "member": ["agent.create", "quest.run", "codex.manage", "workflow.manage",
-               "room.build", "room.place", "room.move"],
-    "viewer": [],
+    "member": ["agent.create", "quest.run", "codex.view", "codex.manage", "codex.delete",
+               "workflow.manage", "room.build", "room.place", "room.move"],
+    "viewer": ["codex.view"],
 }
 
 # username -> {perm_key: allow(bool)}  (frontend "grant"/"deny" -> True/False)

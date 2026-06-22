@@ -1,8 +1,10 @@
 """LLM provider config HTTP routes (no-hardcode) — `/api/llm/connections`.
 
 Admin-managed: which provider (Local/Ollama vs OpenAI vs Anthropic), model, endpoint, and key
-the engine uses — set from the UI instead of `.env`. All routes require `llm.manage`; the API
-key is write-only (sent in, never returned — `DocumentOut`-style masking in the service).
+the engine uses — set from the UI instead of `.env`. Permission split: reads require `llm.view`,
+connection writes require `llm.manage`, and binding a connection to a system role requires
+`llm.assign` (a role granted a write perm should also hold `llm.view` so the panel can load).
+The API key is write-only (sent in, never returned — `DocumentOut`-style masking in the service).
 """
 from __future__ import annotations
 
@@ -32,7 +34,7 @@ def _bad(e: svc.BadProvider) -> HTTPException:
 
 @router.get("", response_model=list[LlmConnectionOut])
 async def list_connections(
-    _: object = Depends(require_perm("llm.manage")),
+    _: object = Depends(require_perm("llm.view")),
     db: AsyncSession = Depends(get_db),
 ) -> list[LlmConnectionOut]:
     return [LlmConnectionOut(**o) for o in await svc.list_out(db)]
@@ -99,7 +101,7 @@ async def delete_connection(
 
 @roles_router.get("", response_model=list[LlmRoleOut])
 async def list_roles(
-    _: object = Depends(require_perm("llm.manage")),
+    _: object = Depends(require_perm("llm.view")),
     db: AsyncSession = Depends(get_db),
 ) -> list[LlmRoleOut]:
     return [LlmRoleOut(**o) for o in await svc.roles_out(db)]
@@ -109,7 +111,7 @@ async def list_roles(
 async def set_role(
     role: str,
     body: LlmRoleSet,
-    _: object = Depends(require_perm("llm.manage")),
+    _: object = Depends(require_perm("llm.assign")),
     db: AsyncSession = Depends(get_db),
 ) -> LlmRoleOut:
     try:
