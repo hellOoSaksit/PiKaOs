@@ -369,6 +369,8 @@ body {
 .navmgr-acts { display: flex; gap: 4px; flex: 0 0 auto; }
 .navmgr-acts .chip-act[disabled] { opacity: .3; cursor: default; }
 .navmgr-badges { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 55%; flex: 0 0 auto; }
+/* Permissions catalog — clear gap between each group block */
+.permcat-block { margin-bottom: 22px; }
 
 .sidebar-foot {
   padding: 12px 16px;

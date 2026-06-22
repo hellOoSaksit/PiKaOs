@@ -445,7 +445,7 @@ function PermissionsCatalog({ Sys }) {
       {groups.map(g => {
         const perms = PERMISSIONS.filter(p => p.group === g);
         return (
-          <Panel key={g} style={{ marginBottom: 18 }}>
+          <Panel key={g} className="permcat-block">
             <div className="navmgr-grouphead">{g} <span className="mono faint">· {perms.length}</span></div>
             {perms.map(p => (
               <div key={p.key} className="tool-row">
