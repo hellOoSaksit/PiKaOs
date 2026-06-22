@@ -6,7 +6,7 @@ import { AUDIT_SEED, ROLES_SEED, ROLE_PERMS_SEED, USERS_SEED, USER_PERMS_SEED, f
 import { TOOL_RUNS_SEED, WORKFLOWS_SEED, loadWF, saveWF } from './data/data-workflows.jsx';
 import { MANA, NAV, NAV_GROUP_FORMAL, NAV_LABEL_FORMAL, QUESTS, ROUTE_TITLE_FORMAL, byId } from './data/data.jsx';
 import { loadNav, saveNav, mergeWithDefault } from './data/data-nav.jsx';
-import { getNavConfig, setNavConfig } from './lib/api.js';
+import { getNavConfig, setNavConfig, getMySettings, setMySetting } from './lib/api.js';
 import { Admin } from './screens/screens-admin.jsx';
 import { CharacterBuilder } from './screens/screens-builder.jsx';
 import { Chronicle, Codex, Mana, QuestLog, Recall, Settings, Treasury, Watchtower } from './screens/screens-extra.jsx';
@@ -442,6 +442,20 @@ function App() {
     getNavConfig().then(r => { if (alive && r && r.value) setNavCfg(mergeWithDefault(r.value)); }).catch(() => {});
     return () => { alive = false; };
   }, [auth.loggedIn]);
+  // per-user prefs (theme, lexicon) — load this user's saved values on sign-in (so they follow the
+  // user across devices), then persist any change. localStorage stays only as an instant-render cache.
+  const settingsLoaded = React.useRef(false);
+  useEffect(() => {
+    if (!auth.loggedIn) return;
+    let alive = true;
+    getMySettings().then(r => {
+      const v = (r && r.values) || {};
+      if (alive) { if (v.theme) setTheme(v.theme); if (v.lex) setLex(v.lex); }
+    }).catch(() => {}).finally(() => { settingsLoaded.current = true; });
+    return () => { alive = false; };
+  }, [auth.loggedIn]);
+  useEffect(() => { if (settingsLoaded.current) setMySetting("theme", theme).catch(() => {}); }, [theme]);
+  useEffect(() => { if (settingsLoaded.current) setMySetting("lex", lex).catch(() => {}); }, [lex]);
   useEffect(() => { saveU("rolePerms", rolePerms); }, [rolePerms]);
   useEffect(() => { saveU("userPerms", userPerms); }, [userPerms]);
   useEffect(() => { saveU("audit", audit); }, [audit]);

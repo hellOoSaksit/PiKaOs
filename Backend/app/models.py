@@ -175,6 +175,25 @@ class AppSetting(Base):
     )
 
 
+class UserSetting(Base):
+    """Per-user config that follows the user across devices (migration 0008).
+
+    Personal preferences (theme, lexicon pack, ...) keyed by (user_id, key). Counterpart to
+    `app_settings` (global); the two-tier config rule is in process/lessons.md. localStorage on the
+    client is only a cache — this row is the source of truth."""
+
+    __tablename__ = "user_settings"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[dict | list | str] = mapped_column(JSONB, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 # --- RBAC (server-side permission model — mirrors Frontend/src/data/data-users.jsx) ---
 # Roles map to permission sets; per-user overrides grant/deny single permissions on top.
 # Effective perms = role_perms ∪ grants − denies (deny wins); admin implicitly has all.

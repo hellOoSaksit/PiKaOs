@@ -14,7 +14,8 @@ from ..db import get_db
 from ..deps import get_current_user, require_perm
 from ..models import User
 from ..repositories import app_settings as repo
-from ..schemas import NavConfigIn, NavConfigOut
+from ..repositories import user_settings as user_repo
+from ..schemas import NavConfigIn, NavConfigOut, SettingValueIn, UserSettingsOut
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -42,3 +43,27 @@ async def put_nav(
     """Replace the shared sidebar arrangement (admin only). The frontend owns the value's shape."""
     row = await repo.upsert(db, _NAV_KEY, body.value, updated_by=user.id)
     return NavConfigOut(value=row.value, updated_at=row.updated_at)
+
+
+# --- per-user settings (theme/lexicon/...) — follow the user across devices (the per-user tier) ---
+
+
+@router.get("/me", response_model=UserSettingsOut)
+async def get_my_settings(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserSettingsOut:
+    """All of the current user's personal settings ({key: value}); empty for a fresh account."""
+    return UserSettingsOut(values=await user_repo.get_all(db, user.id))
+
+
+@router.put("/me/{key}", response_model=UserSettingsOut)
+async def set_my_setting(
+    key: str,
+    body: SettingValueIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserSettingsOut:
+    """Set one of the current user's settings (own scope only)."""
+    await user_repo.upsert(db, user.id, key, body.value)
+    return UserSettingsOut(values=await user_repo.get_all(db, user.id))

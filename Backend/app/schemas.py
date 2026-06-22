@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
 
@@ -19,6 +20,14 @@ class NavConfigIn(BaseModel):
 class NavConfigOut(BaseModel):
     value: list | None = None
     updated_at: datetime | None = None
+
+
+class SettingValueIn(BaseModel):
+    value: Any   # a personal preference value (theme string, lexicon id, ...)
+
+
+class UserSettingsOut(BaseModel):
+    values: dict   # {key: value} of the current user's settings
 
 
 class ForgotIn(BaseModel):

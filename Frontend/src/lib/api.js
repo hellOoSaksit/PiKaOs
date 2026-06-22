@@ -189,3 +189,7 @@ export async function storageTest() { return raw("/storage/test", { method: "POS
 // --- shared sidebar nav arrangement (server-scoped; admin edits, every user/device sees the same) ---
 export async function getNavConfig() { return raw("/settings/nav"); }                                          // any authenticated user
 export async function setNavConfig(value) { return raw("/settings/nav", { method: "PUT", body: { value } }); }  // requires options.manage
+
+// --- per-user settings (theme/lexicon; follow the user across devices) ---
+export async function getMySettings() { return raw("/settings/me"); }                                           // { values: {...} }
+export async function setMySetting(key, value) { return raw(`/settings/me/${key}`, { method: "PUT", body: { value } }); }
