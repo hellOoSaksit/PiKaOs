@@ -457,6 +457,7 @@
     "navgroup.admin": "ผู้ดูแลระบบ",
     "nav.admin": "จัดการผู้ใช้",
     "nav.toolsmgr": "จัดการเครื่องมือ",
+    "nav.navmgr": "จัดการเมนู",
     "nav.roles": "บทบาทและสิทธิ์",
     "nav.permissions": "แคตตาล็อกสิทธิ์",
     "nav.audit": "บันทึกการตรวจสอบ",

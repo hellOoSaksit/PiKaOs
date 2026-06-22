@@ -5,12 +5,14 @@ const { useState, useEffect } = React;
 import { AUDIT_SEED, ROLES_SEED, ROLE_PERMS_SEED, USERS_SEED, USER_PERMS_SEED, fmtTok, loadU, resolvePerms, roleByKey, saveU, userById } from './data/data-users.jsx';
 import { TOOL_RUNS_SEED, WORKFLOWS_SEED, loadWF, saveWF } from './data/data-workflows.jsx';
 import { MANA, NAV, NAV_GROUP_FORMAL, NAV_LABEL_FORMAL, QUESTS, ROUTE_TITLE_FORMAL, byId } from './data/data.jsx';
+import { loadNav, saveNav } from './data/data-nav.jsx';
 import { Admin } from './screens/screens-admin.jsx';
 import { CharacterBuilder } from './screens/screens-builder.jsx';
 import { Chronicle, Codex, Mana, QuestLog, Recall, Settings, Treasury, Watchtower } from './screens/screens-extra.jsx';
 import { Login } from './screens/Login.jsx';
 import { MyDashboard } from './screens/screens-me.jsx';
 import { AuditLog, PermissionsCatalog, RolesPermissions, UserDetail, UserForm } from './screens/screens-rbac.jsx';
+import { NavManager } from './screens/screens-nav.jsx';
 import { AgentDrawer, Agents, Meeting, QuestBoard, QuestDrawer } from './screens/screens-secondary.jsx';
 import { SitemapAudit } from './screens/screens-sitemap.jsx';
 import { Compare } from './screens/screens-compare.jsx';
@@ -60,8 +62,45 @@ const ROUTE_META = {
 
 const NAV_GROUP_KEY = { "ศูนย์บัญชาการ": "command", "ความรู้และความทรงจำ": "knowledge", "ทรัพยากร": "resources", "ผู้ดูแลกิลด์": "admin" };
 
-function Sidebar({ route, go, t, can }) {
-  const [navOpen, setNavOpen] = useState({});   // parent id -> expanded (overrides the route-based default)
+// does this node, or any descendant, match the current route? → keep that branch expanded
+function navContains(node, route) {
+  if (node.id === route) return true;
+  return (node.children || []).some(c => navContains(c, route));
+}
+
+/* one sidebar row + its (recursive) children — supports up to 3 levels (Main -> Sub -> Sub).
+   hidden nodes, and perm-gated nodes the user can't reach, are dropped; a node with visible
+   children shows a caret that collapses them. Indent grows with depth. */
+function NavNode({ node, depth, route, go, t, can, navOpen, setNavOpen }) {
+  const kids = (node.children || []).filter(c => !c.hidden && (!c.perm || (can && can(c.perm))));
+  const hasKids = kids.length > 0;
+  const branchActive = kids.some(c => navContains(c, route));
+  const isOpen = branchActive || (node.id in navOpen ? navOpen[node.id] : route === node.id);
+  return (
+    <React.Fragment>
+      <div className={`nav-item ${depth > 0 ? "nav-subitem" : ""} ${route === node.id ? "active" : ""}`}
+        style={depth > 0 ? { marginLeft: depth * 16 } : undefined} onClick={() => go(node.id)}>
+        <span className="ni-icon">{node.icon}</span>
+        <span style={{ flex: 1 }}>{t("nav." + node.id)}</span>
+        {node.tag && <span className={`ni-tag ${node.tag === "live" ? "alert" : ""}`}>{node.tag === "live" ? "● LIVE" : node.tag}</span>}
+        {hasKids && (
+          <button type="button" className={`nav-caret ${isOpen ? "open" : ""}`} aria-label="toggle submenu"
+            onClick={(e) => { e.stopPropagation(); setNavOpen(o => ({ ...o, [node.id]: !isOpen })); }}>▾</button>
+        )}
+      </div>
+      {hasKids && (
+        <div className={`nav-sub ${isOpen ? "open" : ""}`}>
+          {kids.map(c => (
+            <NavNode key={c.id} node={c} depth={depth + 1} route={route} go={go} t={t} can={can} navOpen={navOpen} setNavOpen={setNavOpen} />
+          ))}
+        </div>
+      )}
+    </React.Fragment>
+  );
+}
+
+function Sidebar({ route, go, t, can, nav }) {
+  const [navOpen, setNavOpen] = useState({});   // node id -> expanded (overrides the route-based default)
   return (
     <aside className="sidebar" data-no-lex>
       <div className="brand">
@@ -72,43 +111,16 @@ function Sidebar({ route, go, t, can }) {
         </div>
       </div>
       <nav className="nav">
-        {NAV.map(g => {
-          const items = g.items.filter(it => !it.perm || (can && can(it.perm)));
+        {(nav || NAV).map(g => {
+          const items = g.items.filter(it => !it.hidden && (!it.perm || (can && can(it.perm))));
           if (items.length === 0) return null;
           return (
-          <div className="nav-group" key={g.group}>
-            <div className="nav-label">{t("navgroup." + (NAV_GROUP_KEY[g.group] || g.group))}</div>
-            {items.map(it => {
-              const kids = (it.children || []).filter(c => !c.perm || (can && can(c.perm)));
-              const hasKids = kids.length > 0;
-              const childActive = kids.some(c => c.id === route);
-              // default open when you're inside the section; an explicit caret toggle overrides it
-              const isOpen = childActive || (it.id in navOpen ? navOpen[it.id] : route === it.id);
-              return (
-              <React.Fragment key={it.id}>
-                <div className={`nav-item ${route === it.id ? "active" : ""}`} onClick={() => go(it.id)}>
-                  <span className="ni-icon">{it.icon}</span>
-                  <span style={{ flex: 1 }}>{t("nav." + it.id)}</span>
-                  {it.tag && <span className={`ni-tag ${it.tag === "live" ? "alert" : ""}`}>{it.tag === "live" ? "● LIVE" : it.tag}</span>}
-                  {hasKids && (
-                    <button type="button" className={`nav-caret ${isOpen ? "open" : ""}`} aria-label="toggle submenu"
-                      onClick={(e) => { e.stopPropagation(); setNavOpen(o => ({ ...o, [it.id]: !isOpen })); }}>▾</button>
-                  )}
-                </div>
-                {hasKids && (
-                  <div className={`nav-sub ${isOpen ? "open" : ""}`}>
-                    {kids.map(c => (
-                      <div key={c.id} className={`nav-item nav-subitem ${route === c.id ? "active" : ""}`} onClick={() => go(c.id)}>
-                        <span className="ni-icon">{c.icon}</span>
-                        <span style={{ flex: 1 }}>{t("nav." + c.id)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </React.Fragment>
-              );
-            })}
-          </div>
+            <div className="nav-group" key={g.group}>
+              <div className="nav-label">{t("navgroup." + (NAV_GROUP_KEY[g.group] || g.group))}</div>
+              {items.map(it => (
+                <NavNode key={it.id} node={it} depth={0} route={route} go={go} t={t} can={can} navOpen={navOpen} setNavOpen={setNavOpen} />
+              ))}
+            </div>
           );
         })}
       </nav>
@@ -381,6 +393,7 @@ function App() {
   // ---- RBAC / users (Phase 4) ----
   const [users, setUsers] = useState(() => loadU("users", USERS_SEED));
   const [roles, setRoles] = useState(() => loadU("roles", ROLES_SEED));
+  const [navCfg, setNavCfg] = useState(() => loadNav());   // global sidebar arrangement (admin-set, shared)
   const [rolePerms, setRolePerms] = useState(() => {
     const loaded = loadU("rolePerms", ROLE_PERMS_SEED);
     // migrate: ensure newer room.* permissions exist per seed (union, never removes)
@@ -421,6 +434,7 @@ function App() {
   useEffect(() => { saveArchived(archived); window.__archived = archived; }, [archived]);
   useEffect(() => { saveU("users", users); }, [users]);
   useEffect(() => { saveU("roles", roles); }, [roles]);
+  useEffect(() => { saveNav(navCfg); }, [navCfg]);
   useEffect(() => { saveU("rolePerms", rolePerms); }, [rolePerms]);
   useEffect(() => { saveU("userPerms", userPerms); }, [userPerms]);
   useEffect(() => { saveU("audit", audit); }, [audit]);
@@ -487,6 +501,7 @@ function App() {
 
   const Sys = {
     users, roles, rolePerms, userPerms, audit, me, can, T, language, go,
+    nav: navCfg, setNav: setNavCfg,
     workflows, toolRuns,
     toggleWorkflow: (w) => {
       setWorkflows(prev => prev.map(x => x.id === w.id ? { ...x, enabled: !x.enabled } : x));
@@ -574,6 +589,7 @@ function App() {
       case "userDetail": return guard("user.view.any", <UserDetail Sys={Sys} userId={userSel} onAgent={setAgentSel} />);
       case "roles": return guard("role.manage", <RolesPermissions Sys={Sys} />);
       case "permissions": return guard("user.view.any", <PermissionsCatalog Sys={Sys} />);
+      case "navmgr": return guard("options.manage", <NavManager Sys={Sys} />);
       case "audit": return guard("audit.view", <AuditLog Sys={Sys} />);
       case "workflows": return <Workflows Sys={Sys} />;
       case "settings": return <Settings theme={theme} setTheme={setTheme} lex={lex} setLex={setLex} pickLanguage={pickLanguage} language={language} formal={formal} go={go} t={t} />;
@@ -587,7 +603,7 @@ function App() {
   return (
     <ToastProvider>
     <div className="app" key={lex}>
-      <Sidebar route={route} go={go} t={t} can={can} />
+      <Sidebar route={route} go={go} t={t} can={can} nav={navCfg} />
       <div className="main">
         <Topbar route={route} theme={theme} setTheme={setTheme} user={username} language={language} t={t}
           me={me} roles={roles} onSignOut={auth.logout}

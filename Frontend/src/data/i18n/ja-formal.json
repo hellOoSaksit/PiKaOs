@@ -52,6 +52,7 @@
     "nav.stats": "分析",
     "nav.admin": "ユーザー管理",
     "nav.toolsmgr": "ツール管理",
+    "nav.navmgr": "メニュー管理",
     "nav.roles": "ロールと権限",
     "nav.permissions": "権限カタログ",
     "nav.audit": "監査ログ",

@@ -520,6 +520,7 @@
     "navgroup.admin": "Administration",
     "nav.admin": "User Management",
     "nav.toolsmgr": "Manage Tools",
+    "nav.navmgr": "Menu Manager",
     "nav.roles": "Roles & Access",
     "nav.permissions": "Permissions",
     "nav.audit": "Audit Log",
