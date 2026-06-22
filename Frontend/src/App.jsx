@@ -81,7 +81,7 @@ function NavNode({ node, depth, route, go, t, can, navOpen, setNavOpen }) {
       <div className={`nav-item ${depth > 0 ? "nav-subitem" : ""} ${route === node.id ? "active" : ""}`}
         style={depth > 0 ? { marginLeft: depth * 16 } : undefined} onClick={() => go(node.id)}>
         <span className="ni-icon">{node.icon}</span>
-        <span style={{ flex: 1 }}>{t("nav." + node.id)}</span>
+        <span style={{ flex: 1 }}>{node.customLabel || t("nav." + node.id)}</span>
         {node.tag && <span className={`ni-tag ${node.tag === "live" ? "alert" : ""}`}>{node.tag === "live" ? "● LIVE" : node.tag}</span>}
         {hasKids && (
           <button type="button" className={`nav-caret ${isOpen ? "open" : ""}`} aria-label="toggle submenu"

@@ -463,7 +463,7 @@ export function ToolsManager({ can, t, Sys }) {
 
       {mayEdit && Sys && (
         <ToolSection icon="☰" title={tx("nav.navmgr")} kicker="MENU ORDER">
-          <NavManagerPanel Sys={Sys} />
+          <NavManagerPanel Sys={Sys} t={t} />
         </ToolSection>
       )}
 

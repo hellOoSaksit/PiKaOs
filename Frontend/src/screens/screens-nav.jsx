@@ -14,19 +14,21 @@ import {
 
 const LEVEL_NAME = ["Main", "Sub", "Sub"];   // by depth (0,1,2)
 
-function NavManagerPanel({ Sys }) {
+function NavManagerPanel({ Sys, t }) {
   const { nav, setNav, T } = Sys;
+  const tx = (typeof t === "function") ? t : ((k) => k);
+  const labelOf = (node) => node.customLabel || tx("nav." + node.id);   // custom rename wins over i18n
   const [drag, setDrag] = useState(null);     // id of the row being dragged
 
   const apply = (fn, id) => setNav(fn(nav, id));
 
   const doRename = async (node) => {
-    const cur = T(node.en || "", node.label || "");
+    const cur = labelOf(node);
     const name = window.uiPrompt
       ? await window.uiPrompt({ title: T("Rename menu item", "เปลี่ยนชื่อเมนู"), placeholder: cur, value: cur })
-      : window.prompt(T("Rename", "เปลี่ยนชื่อ"), cur);
-    if (!name || !String(name).trim()) return;   // uiPrompt resolves false on cancel — must not become the name
-    setNav(rename(nav, node.id, String(name).trim(), String(name).trim()));   // one shared label (both langs)
+      : window.prompt(T("Rename (blank = default)", "เปลี่ยนชื่อ (เว้นว่าง = ค่าเริ่มต้น)"), cur);
+    if (name === false || name == null) return;          // cancelled (uiPrompt resolves false on cancel)
+    setNav(rename(nav, node.id, String(name).trim()));   // "" -> revert to the i18n default
   };
 
   const doReset = async () => {
@@ -50,7 +52,7 @@ function NavManagerPanel({ Sys }) {
           <span className="navmgr-grip" title={T("Drag to reorder", "ลากเพื่อจัดลำดับ")}>⠿</span>
           <span className="navmgr-ic">{node.icon}</span>
           <div className="navmgr-bd">
-            <div className="navmgr-name">{T(node.en, node.label)}{hidden && <span className="navmgr-tag">{T("hidden", "ซ่อน")}</span>}</div>
+            <div className="navmgr-name">{labelOf(node)}{node.customLabel && <span className="navmgr-tag">{T("custom", "ตั้งเอง")}</span>}{hidden && <span className="navmgr-tag">{T("hidden", "ซ่อน")}</span>}</div>
             <div className="navmgr-meta mono faint">{node.id} · {LEVEL_NAME[depth] || ("L" + (depth + 1))}{node.perm ? " · " + node.perm : ""}</div>
           </div>
           <div className="navmgr-acts">

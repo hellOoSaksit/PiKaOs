@@ -10,10 +10,12 @@ import { NAV } from './data.jsx';
 const NAV_KEY = "guildos-nav-v1";
 export const MAX_DEPTH = 3;                 // Main(0) -> Sub(1) -> Sub(2)
 
-/* ---- default config: a deep clone of the static NAV (route metadata lives in code) ---- */
+/* ---- default config: a deep clone of the static NAV (route metadata lives in code) ----
+   Labels are NOT cloned — the sidebar shows the i18n string `nav.<id>` (language-aware). A rename
+   only sets `customLabel`, which then wins over i18n. So a default item has no label field at all. */
 function cloneItems(items) {
   return (items || []).map(it => ({
-    id: it.id, icon: it.icon, label: it.label, en: it.en,
+    id: it.id, icon: it.icon,
     ...(it.perm ? { perm: it.perm } : {}),
     ...(it.tag ? { tag: it.tag } : {}),
     ...(it.hidden ? { hidden: true } : {}),
@@ -65,9 +67,10 @@ function mergeWithDefault(saved) {
     .filter(it => defIndex[it.id])           // drop removed routes
     .map(it => {
       const d = defIndex[it.id];
-      const out = { id: it.id, icon: d.icon, en: d.en, label: it.label != null ? it.label : d.label };
+      const out = { id: it.id, icon: d.icon };
       if (d.perm) out.perm = d.perm;
       if (d.tag) out.tag = d.tag;
+      if (it.customLabel) out.customLabel = it.customLabel;   // the only label the user owns (rename)
       if (it.hidden) out.hidden = true;
       if (it.children) out.children = prune(it.children);
       return out;
@@ -135,9 +138,13 @@ function toggleHidden(cfg, id) {
   if (loc) { if (loc.node.hidden) delete loc.node.hidden; else loc.node.hidden = true; }
   return c;
 }
-function rename(cfg, id, label, en) {
+function rename(cfg, id, customLabel) {
   const c = _clone(cfg); const loc = _locateInCfg(c, id);
-  if (loc) { if (label != null) loc.node.label = label; if (en != null) loc.node.en = en; }
+  if (loc) {
+    const v = (customLabel || "").trim();
+    if (v) loc.node.customLabel = v;
+    else delete loc.node.customLabel;        // cleared -> revert to the i18n default
+  }
   return c;
 }
 /* drag reorder: move `id` to sit before `targetId`, only when they share a parent list */
