@@ -445,20 +445,20 @@ function PermissionsCatalog({ Sys }) {
       {groups.map(g => {
         const perms = PERMISSIONS.filter(p => p.group === g);
         return (
-          <div key={g} style={{ marginBottom: 16 }}>
+          <Panel key={g} style={{ marginBottom: 18 }}>
             <div className="navmgr-grouphead">{g} <span className="mono faint">· {perms.length}</span></div>
             {perms.map(p => (
-              <div key={p.key} className="navmgr-row">
-                <div className="navmgr-bd">
-                  <div className="navmgr-name">{T(p.en, p.th)}</div>
-                  <div className="navmgr-meta mono faint">{p.key}</div>
+              <div key={p.key} className="tool-row">
+                <div className="tool-bd">
+                  <div className="tool-name">{T(p.en, p.th)}</div>
+                  <div className="tool-meta mono faint">{p.key}</div>
                 </div>
                 <div className="navmgr-badges">
                   {rolesWith(p.key).map(r => <RoleBadge key={r.key} roleKey={r.key} roles={roles} T={T} />)}
                 </div>
               </div>
             ))}
-          </div>
+          </Panel>
         );
       })}
     </div>
