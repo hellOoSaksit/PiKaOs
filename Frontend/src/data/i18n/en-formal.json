@@ -543,6 +543,8 @@
     "route.admin.title": "User Management",
     "route.toolsmgr.title": "Manage Tools",
     "route.roles.title": "Roles & Access",
+    "route.permissions.title": "Permissions",
+    "route.navmgr.title": "Menu Manager",
     "route.workflows.title": "Workflows",
     "route.audit.title": "Audit Log",
     "route.userDetail.title": "User",

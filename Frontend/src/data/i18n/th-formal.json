@@ -480,6 +480,8 @@
     "route.admin.title": "จัดการผู้ใช้",
     "route.toolsmgr.title": "จัดการเครื่องมือ",
     "route.roles.title": "บทบาทและสิทธิ์",
+    "route.permissions.title": "แคตตาล็อกสิทธิ์",
+    "route.navmgr.title": "จัดการเมนู",
     "route.workflows.title": "เวิร์กโฟลว์",
     "route.audit.title": "บันทึกการตรวจสอบ",
     "route.userDetail.title": "ข้อมูลสมาชิก",

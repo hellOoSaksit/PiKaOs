@@ -76,6 +76,8 @@
     "route.admin.title": "ユーザー管理",
     "route.toolsmgr.title": "ツール管理",
     "route.roles.title": "ロールと権限",
+    "route.permissions.title": "権限カタログ",
+    "route.navmgr.title": "メニュー管理",
     "route.workflows.title": "ワークフロー",
     "route.audit.title": "監査ログ",
     "route.userDetail.title": "ユーザー",
