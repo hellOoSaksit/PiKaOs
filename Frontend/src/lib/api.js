@@ -174,6 +174,12 @@ export async function searchKnowledge(q, k) {
   if (k) qs.set("k", k);
   return raw(`/knowledge/search?${qs.toString()}`);
 }
+// Ask a question and get an answer synthesized from the codex with citations (E8). Any logged-in
+// user (codex.view); scope is enforced server-side. k omitted → server default. Returns
+// { answer, sources:[{n, document_id, document_name, heading, score}], rewritten_query, used_chunks }.
+export async function askKnowledge(question, k) {
+  return raw("/knowledge/answer", { method: "POST", body: { question, ...(k ? { k } : {}) } });
+}
 // Rebuild the RAG index from the markdown source ('single rebuild command' — knowledge-rag.md §3).
 // Needs codex.manage. onlyStale=true (default) re-embeds only docs not on the current model — use
 // after switching the embedder; false forces a full rebuild. Returns { matched, queued, model }.

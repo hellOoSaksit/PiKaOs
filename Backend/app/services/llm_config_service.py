@@ -29,7 +29,7 @@ PROVIDERS = ("ollama", "openai", "anthropic")
 # System roles that consume an LLM. The catalog is the *source of truth* the UI reads (no-hardcode:
 # the frontend renders whatever roles the backend exposes, labelled via i18n `llmcfg.role.<key>`).
 # A role with no binding falls back to the active connection — so "engine" works out of the box.
-ROLES = ("engine", "search", "summarize")
+ROLES = ("engine", "search", "summarize", "answer")
 
 
 class NotFound(Exception):

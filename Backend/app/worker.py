@@ -41,10 +41,15 @@ async def agent_run(ctx, run_id: str) -> str:
 
 async def ingest_document(ctx, doc_id: str) -> str:
     """arq job: chunk + embed one document into the RAG index (E2). The embedder is resolved
-    from config per job (stub by default), so flipping `embed_provider` needs no code change."""
+    from config per job (stub by default), so flipping `embed_provider` needs no code change.
+    When `ingest_summary_enabled` (E7 enrich B) the doc is also summarized via the 'summarize'
+    role — best-effort, off by default so ingest stays free/offline."""
     embedder = get_embedder()
+    summarizer = ConfiguredLLMProvider(role="summarize") if settings.ingest_summary_enabled else None
     async with SessionLocal() as db:
-        result = await ingestion_service.ingest_document(db, embedder, uuid.UUID(doc_id))
+        result = await ingestion_service.ingest_document(
+            db, embedder, uuid.UUID(doc_id), summarizer=summarizer
+        )
     return result["status"]
 
 

@@ -88,6 +88,7 @@ class DocumentOut(BaseModel):
     size: int
     department_id: uuid.UUID | None = None
     ingest_status: str = "pending"     # RAG ingest state: pending|done|failed|skipped (E2)
+    summary: str | None = None         # doc-level summary produced at ingest (E7 enrich B)
     created_at: datetime
     url: str | None = None             # presigned download link — set only on the detail (GET /docs/{id})
 
@@ -111,6 +112,27 @@ class KnowledgeSearchResult(BaseModel):
 
 class KnowledgeSearchOut(BaseModel):
     items: list[KnowledgeSearchResult]
+
+
+# RAG answer — POST /api/knowledge/answer (E8: search → answer with citations, knowledge-rag.md §6.5)
+class KnowledgeAnswerIn(BaseModel):
+    question: str
+    k: int = 0                         # 0 → server default (config.rag_answer_top_k)
+
+
+class KnowledgeAnswerSource(BaseModel):
+    n: int                             # citation marker [n] in the answer text
+    document_id: uuid.UUID
+    document_name: str
+    heading: str
+    score: float
+
+
+class KnowledgeAnswerOut(BaseModel):
+    answer: str
+    sources: list[KnowledgeAnswerSource]
+    rewritten_query: str               # the query actually searched (may equal the question)
+    used_chunks: int                   # how many chunks were fed to the answer model
 
 
 # RAG rebuild — result of POST /api/knowledge/reindex ('single rebuild command', knowledge-rag.md §3)

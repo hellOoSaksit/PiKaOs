@@ -20,12 +20,15 @@ from ..models import User
 from ..schemas import (
     DocumentListOut,
     DocumentOut,
+    KnowledgeAnswerIn,
+    KnowledgeAnswerOut,
     KnowledgeReindexOut,
     KnowledgeSearchOut,
     KnowledgeSearchResult,
 )
-from ..services import knowledge_service
+from ..services import answer_service, knowledge_service
 from ..services.embeddings import get_embedder
+from ..services.llm_config_service import ConfiguredLLMProvider
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
 
@@ -71,6 +74,24 @@ async def search_documents(
         db, embedder=get_embedder(), user=user, query=q, k=k
     )
     return KnowledgeSearchOut(items=[KnowledgeSearchResult(**r) for r in results])
+
+
+@router.post("/answer", response_model=KnowledgeAnswerOut)
+async def answer_question(
+    body: KnowledgeAnswerIn,
+    user: User = Depends(require_perm("codex.view")),
+    db: AsyncSession = Depends(get_db),
+) -> KnowledgeAnswerOut:
+    """Ask a question and get an answer synthesized from the codex, with citations (E8). Retrieves
+    the top-k chunks the caller may read (same scope as /search), then the 'answer'-role LLM writes
+    the reply citing them as [n]. Any authenticated user; the answer model is config-driven (falls
+    back to the stub offline). `k<=0` uses the server default (`rag_answer_top_k`)."""
+    k = settings.rag_answer_top_k if body.k <= 0 else max(1, min(body.k, 50))
+    result = await answer_service.answer_question(
+        db, embedder=get_embedder(), provider=ConfiguredLLMProvider(role="answer"),
+        user=user, question=body.question, k=k, rewrite=settings.rag_answer_rewrite,
+    )
+    return KnowledgeAnswerOut(**result)
 
 
 @router.post("/reindex", response_model=KnowledgeReindexOut)

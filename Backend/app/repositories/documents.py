@@ -105,6 +105,16 @@ async def set_converted_markdown(
     await db.commit()
 
 
+async def set_summary(db: AsyncSession, doc_id: uuid.UUID, *, summary: str | None) -> None:
+    """Store the doc-level summary produced at ingest (enrich B, knowledge-rag.md §6.2). Derived
+    metadata — rebuilt on every ingest. Tolerates a missing row (deleted mid-ingest)."""
+    doc = await db.get(Document, doc_id)
+    if doc is None:
+        return
+    doc.summary = summary
+    await db.commit()
+
+
 async def set_ingest_status(
     db: AsyncSession, doc_id: uuid.UUID, *, status: str, embedding_model: str | None = None
 ) -> None:

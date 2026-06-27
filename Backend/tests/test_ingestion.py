@@ -180,6 +180,86 @@ def test_ingest_skips_non_text_kind(monkeypatch):
     assert result == {"status": "skipped", "chunks": 0} and status == "skipped"
 
 
+class _SummaryResult:
+    def __init__(self, text):
+        self.text = text
+
+
+class _FakeSummarizer:
+    """An injected summarize provider (enrich B) — returns a fixed summary."""
+
+    def __init__(self, text="This document is about greetings and details."):
+        self.text = text
+
+    async def complete(self, *, model, messages, tools):
+        return _SummaryResult(self.text)
+
+
+class _BoomSummarizer:
+    async def complete(self, *, model, messages, tools):
+        raise RuntimeError("summarize provider down")
+
+
+def test_ingest_with_summarizer_adds_summary_chunk(monkeypatch):
+    """Enrich B: a summarizer → one extra summary-chunk + documents.summary stored."""
+    did = uuid.uuid4()
+    monkeypatch.setattr(storage, "get_object", lambda key: _MD.encode("utf-8"))
+
+    async def main():
+        eng = create_async_engine(settings.database_url)
+        Session = async_sessionmaker(eng, expire_on_commit=False, class_=AsyncSession)
+        try:
+            async with Session() as db:
+                await docs_repo.insert_document(
+                    db, doc_id=did, owner_id=None, department_id=None, kind="md",
+                    name="notes.md", object_key=f"k/{did}", content_type="text/markdown", size=len(_MD),
+                )
+                result = await ingestion_service.ingest_document(
+                    db, StubEmbedder(), did, summarizer=_FakeSummarizer())
+                n = await chunks_repo.count_for_document(db, did)
+                doc = await docs_repo.get_document(db, did)
+                return result, n, doc.summary
+        finally:
+            async with Session() as c:
+                await c.execute(sql_delete(Document).where(Document.id == did))
+                await c.commit()
+            await eng.dispose()
+
+    result, n, summary = asyncio.run(main())
+    assert result == {"status": "done", "chunks": 4}     # 3 section chunks + 1 summary chunk
+    assert n == 4
+    assert summary == "This document is about greetings and details."
+
+
+def test_ingest_summarizer_failure_still_ingests(monkeypatch):
+    """Best-effort B: a failing summarizer leaves the section chunks intact, summary unset."""
+    did = uuid.uuid4()
+    monkeypatch.setattr(storage, "get_object", lambda key: _MD.encode("utf-8"))
+
+    async def main():
+        eng = create_async_engine(settings.database_url)
+        Session = async_sessionmaker(eng, expire_on_commit=False, class_=AsyncSession)
+        try:
+            async with Session() as db:
+                await docs_repo.insert_document(
+                    db, doc_id=did, owner_id=None, department_id=None, kind="md",
+                    name="n.md", object_key=f"k/{did}", content_type="text/markdown", size=1,
+                )
+                result = await ingestion_service.ingest_document(
+                    db, StubEmbedder(), did, summarizer=_BoomSummarizer())
+                doc = await docs_repo.get_document(db, did)
+                return result, doc.summary
+        finally:
+            async with Session() as c:
+                await c.execute(sql_delete(Document).where(Document.id == did))
+                await c.commit()
+            await eng.dispose()
+
+    result, summary = asyncio.run(main())
+    assert result == {"status": "done", "chunks": 3}     # summary skipped → 3, not 4
+    assert summary is None
+
+
 def test_ingest_missing_document_is_noop(monkeypatch):
     monkeypatch.setattr(storage, "get_object", lambda key: b"")
 

@@ -81,6 +81,10 @@ class Document(Base):
     # file has been chunked+embedded into doc_chunks, and with which model (knowledge-rag.md §3).
     ingest_status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")  # pending|done|failed|skipped
     embedding_model: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    # Doc-level summary produced at ingest (enrich B, migration 0009, knowledge-rag.md §6.2) — a
+    # coarse "what is this file" layer for high-level retrieval. Derived/rebuildable; NULL until
+    # summarized (off by default, or no summarize provider configured).
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

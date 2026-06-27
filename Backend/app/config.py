@@ -148,6 +148,26 @@ class Settings(BaseSettings):
     # tests unchanged); set >0 to turn agent retrieval on. Re-derived per run/resume, no quota cost.
     engine_retrieval_top_k: int = 0
 
+    # --- ingest enrich B: doc summary (E7, knowledge-rag.md §6.2) ---
+    # Summarize the whole markdown once at ingest → stored on documents.summary + embedded as a
+    # summary-chunk so high-level queries match it (the coarse "find the file fast" layer). Costs
+    # one LLM call per document via the 'summarize' role (llm_connections). OFF by default so
+    # ingest stays free/offline (stub) and the existing chunk-count tests are unchanged; turn on
+    # once a real summarize provider is configured. The summary is derived metadata, rebuilt from
+    # the markdown — a failed/absent summary never fails ingest (the chunks still embed).
+    ingest_summary_enabled: bool = False
+    # Only the first N characters of a long doc are summarized — bounds cost/latency of the call.
+    ingest_summary_max_input_chars: int = 12000
+
+    # --- RAG answer service (E8, knowledge-rag.md §6.5): search → answer + citations ---
+    # Default top-k chunks fed to the answer LLM as context (scoped like search). The answer model
+    # resolves via the 'answer' role (llm_connections); with no real provider it falls back to the
+    # stub, so the endpoint works offline but only synthesizes for real once a provider is set.
+    rag_answer_top_k: int = 6
+    # Best-effort LLM query-rewrite before retrieval (expand/clarify the question). On failure the
+    # original question is used, so this never blocks an answer.
+    rag_answer_rewrite: bool = True
+
     # --- OpenAI / ChatGPT API (provider="openai") — /v1/chat/completions ---
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"

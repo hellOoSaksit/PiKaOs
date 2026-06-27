@@ -682,6 +682,8 @@
     "llmcfg.role.search.desc": "Knowledge-base search (e.g. a local llama)",
     "llmcfg.role.summarize": "Summarize",
     "llmcfg.role.summarize.desc": "Condense / summarize long documents",
+    "llmcfg.role.answer": "Answer (RAG)",
+    "llmcfg.role.answer.desc": "Synthesize an answer from the codex with source citations",
     "tools.desc": "The system's central tool catalog — add / edit / disable here, and the agent builder always sees the latest list",
     "tools.add": "Add tool",
     "tools.help": "Each tool has its own type + settings (MCP · LINE OA · Telegram · CMD/PowerShell · HTTP API · Webhook · Database · Email) — turn off the switch to hide it from the agent builder without deleting it",

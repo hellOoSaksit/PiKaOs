@@ -24,7 +24,7 @@ from .. import storage
 from ..config import settings
 from ..repositories import doc_chunks as chunks_repo
 from ..repositories import documents as docs_repo
-from . import chunking, converters
+from . import chunking, converters, summarize_service
 from .embeddings import Embedder
 
 log = logging.getLogger("pikaos.engine.ingest")
@@ -33,10 +33,17 @@ log = logging.getLogger("pikaos.engine.ingest")
 # else (image/other) is marked "skipped" so the UI shows it wasn't indexed.
 _EMBEDDABLE_KINDS = converters.CONVERTIBLE_KINDS
 
+# Heading for the doc-level summary chunk (enrich B) — marks it apart from real section chunks so
+# retrieval/answer can label it as the document overview.
+_SUMMARY_HEADING = "(document summary)"
 
-def _embed_text(heading: str, content: str) -> str:
-    """What we actually embed for a chunk: its heading (context) prepended to its body."""
-    return f"{heading}\n{content}" if heading else content
+
+def _embed_text(title: str, heading: str, content: str) -> str:
+    """What we actually embed for a chunk: the document title + section heading prepended to the
+    body (enrich A, knowledge-rag.md §6.2), so each chunk carries which document/section it came
+    from — high-level queries match the context, not just the bare section text."""
+    prefix = " — ".join(p for p in (title, heading) if p)
+    return f"{prefix}\n{content}" if prefix else content
 
 
 async def _markdown_body(db, doc) -> str | None:
@@ -59,12 +66,17 @@ async def _markdown_body(db, doc) -> str | None:
     return md
 
 
-async def ingest_document(db, embedder: Embedder, doc_id: uuid.UUID) -> dict:
+async def ingest_document(db, embedder: Embedder, doc_id: uuid.UUID, *, summarizer=None) -> dict:
     """Chunk + embed one document into `doc_chunks`. Returns `{status, chunks}`.
 
     Records ingest state on the document throughout so the result is observable without the
     worker logs. Never raises for an expected condition (missing/non-text doc); on an unexpected
-    failure it marks the doc `failed` and re-raises so the job is visibly failed."""
+    failure it marks the doc `failed` and re-raises so the job is visibly failed.
+
+    `summarizer` (optional, enrich B) is an injected LLM provider: when given, the whole markdown
+    is summarized once → stored on `documents.summary` and embedded as an extra summary-chunk so
+    high-level queries match the document. None (default) skips B entirely — keeping ingest free
+    and offline. Summarization is best-effort: a failure leaves the section chunks intact."""
     doc = await docs_repo.get_document(db, doc_id)
     if doc is None:
         return {"status": "missing", "chunks": 0}
@@ -88,19 +100,42 @@ async def ingest_document(db, embedder: Embedder, doc_id: uuid.UUID) -> dict:
             await docs_repo.set_ingest_status(db, doc_id, status="done", embedding_model=embedder.model_name)
             return {"status": "done", "chunks": 0}
 
-        vectors = await embedder.embed([_embed_text(h, c) for h, c in pairs])
+        # (heading, content) for each chunk to store + the text we embed for it (enrich A).
+        chunk_specs = [(h, c, _embed_text(doc.name, h, c)) for h, c in pairs]
+
+        # Enrich B: a doc-level summary stored on the document and appended as one more chunk.
+        summary = await _summarize(summarizer, title=doc.name, markdown=body)
+        if summary:
+            chunk_specs.append(
+                (_SUMMARY_HEADING, summary, _embed_text(doc.name, _SUMMARY_HEADING, summary))
+            )
+
+        vectors = await embedder.embed([t for _, _, t in chunk_specs])
         rows = [
             {"seq": i, "heading": h, "content": c, "embedding": vec}
-            for i, ((h, c), vec) in enumerate(zip(pairs, vectors))
+            for i, ((h, c, _), vec) in enumerate(zip(chunk_specs, vectors))
         ]
         n = await chunks_repo.replace_chunks(
             db, document_id=doc.id, owner_id=doc.owner_id, department_id=doc.department_id,
             embedding_model=embedder.model_name, chunks=rows,
         )
+        await docs_repo.set_summary(db, doc_id, summary=summary)
         await docs_repo.set_ingest_status(db, doc_id, status="done", embedding_model=embedder.model_name)
-        log.info("ingested document %s — %d chunks (model=%s)", doc_id, n, embedder.model_name)
+        log.info("ingested document %s — %d chunks (model=%s, summary=%s)",
+                 doc_id, n, embedder.model_name, bool(summary))
         return {"status": "done", "chunks": n}
     except Exception:
         await docs_repo.set_ingest_status(db, doc_id, status="failed")
         log.exception("ingest failed for document %s", doc_id)
         raise
+
+
+async def _summarize(summarizer, *, title: str, markdown: str) -> str | None:
+    """Enrich B helper: the doc summary via the injected provider, or None when B is off
+    (no summarizer) — isolated so the main path reads cleanly."""
+    if summarizer is None:
+        return None
+    return await summarize_service.summarize_document(
+        summarizer, title=title, markdown=markdown,
+        max_input_chars=settings.ingest_summary_max_input_chars,
+    )
