@@ -15,6 +15,7 @@ from sqlalchemy import delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
+from app.db import register_pgvector
 from app.models import Department, Document, User, UserDepartment
 from app.repositories import doc_chunks as chunks_repo
 from app.repositories import documents as docs_repo
@@ -54,7 +55,7 @@ def test_context_for_run_is_owner_scoped_and_toggleable():
     specs = [(d_org, None, None), (d_a, dept_a, None), (d_b, dept_b, None), (d_own, dept_b, member)]
 
     async def main():
-        eng = create_async_engine(settings.database_url)
+        eng = register_pgvector(create_async_engine(settings.database_url))
         Session = async_sessionmaker(eng, expire_on_commit=False, class_=AsyncSession)
         emb = StubEmbedder()
         try:

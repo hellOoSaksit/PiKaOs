@@ -16,10 +16,10 @@ from .db import Base
 class Vector(UserDefinedType):
     """Minimal mapping for pgvector's `vector(N)` column — DDL/metadata only.
 
-    Reads and writes of embeddings go through raw SQL in repositories/doc_chunks.py (asyncpg has
-    no vector codec; we pass `'[..]'::vector` literals to stay zero-dep). This type exists so the
-    ORM/migrations know the column shape; it deliberately has no bind/result processors, so the
-    embedding column is never round-tripped through the ORM."""
+    Reads and writes of embeddings go through raw SQL in repositories/doc_chunks.py, binding the
+    embedding as a `list[float]` via the official pgvector asyncpg codec (`db.register_pgvector`).
+    This type exists so the ORM/migrations know the column shape; it deliberately has no bind/result
+    processors, so the embedding column is never round-tripped through the ORM."""
 
     cache_ok = True
 

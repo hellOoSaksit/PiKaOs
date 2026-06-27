@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app import storage
 from app.config import settings
+from app.db import register_pgvector
 from app.models import Document
 from app.repositories import doc_chunks as chunks_repo
 from app.repositories import documents as docs_repo
@@ -29,7 +30,7 @@ def test_ingest_markdown_creates_chunks(monkeypatch):
     monkeypatch.setattr(storage, "get_object", lambda key: _MD.encode("utf-8"))
 
     async def main():
-        eng = create_async_engine(settings.database_url)
+        eng = register_pgvector(create_async_engine(settings.database_url))
         Session = async_sessionmaker(eng, expire_on_commit=False, class_=AsyncSession)
         try:
             async with Session() as db:
@@ -59,7 +60,7 @@ def test_ingest_is_idempotent_replace(monkeypatch):
     monkeypatch.setattr(storage, "get_object", lambda key: _MD.encode("utf-8"))
 
     async def main():
-        eng = create_async_engine(settings.database_url)
+        eng = register_pgvector(create_async_engine(settings.database_url))
         Session = async_sessionmaker(eng, expire_on_commit=False, class_=AsyncSession)
         try:
             async with Session() as db:
@@ -94,7 +95,7 @@ def test_ingest_pdf_converts_to_markdown_and_binds_ref(monkeypatch):
                         lambda kind, data, name=None: _MD)
 
     async def main():
-        eng = create_async_engine(settings.database_url)
+        eng = register_pgvector(create_async_engine(settings.database_url))
         Session = async_sessionmaker(eng, expire_on_commit=False, class_=AsyncSession)
         try:
             async with Session() as db:
@@ -129,7 +130,7 @@ def test_ingest_pdf_without_text_is_skipped(monkeypatch):
                         lambda kind, data, name=None: None)
 
     async def main():
-        eng = create_async_engine(settings.database_url)
+        eng = register_pgvector(create_async_engine(settings.database_url))
         Session = async_sessionmaker(eng, expire_on_commit=False, class_=AsyncSession)
         try:
             async with Session() as db:
@@ -159,7 +160,7 @@ def test_ingest_skips_non_text_kind(monkeypatch):
                         lambda key: (_ for _ in ()).throw(AssertionError("should skip")))
 
     async def main():
-        eng = create_async_engine(settings.database_url)
+        eng = register_pgvector(create_async_engine(settings.database_url))
         Session = async_sessionmaker(eng, expire_on_commit=False, class_=AsyncSession)
         try:
             async with Session() as db:
@@ -206,7 +207,7 @@ def test_ingest_with_summarizer_adds_summary_chunk(monkeypatch):
     monkeypatch.setattr(storage, "get_object", lambda key: _MD.encode("utf-8"))
 
     async def main():
-        eng = create_async_engine(settings.database_url)
+        eng = register_pgvector(create_async_engine(settings.database_url))
         Session = async_sessionmaker(eng, expire_on_commit=False, class_=AsyncSession)
         try:
             async with Session() as db:
@@ -237,7 +238,7 @@ def test_ingest_summarizer_failure_still_ingests(monkeypatch):
     monkeypatch.setattr(storage, "get_object", lambda key: _MD.encode("utf-8"))
 
     async def main():
-        eng = create_async_engine(settings.database_url)
+        eng = register_pgvector(create_async_engine(settings.database_url))
         Session = async_sessionmaker(eng, expire_on_commit=False, class_=AsyncSession)
         try:
             async with Session() as db:
@@ -264,7 +265,7 @@ def test_ingest_missing_document_is_noop(monkeypatch):
     monkeypatch.setattr(storage, "get_object", lambda key: b"")
 
     async def main():
-        eng = create_async_engine(settings.database_url)
+        eng = register_pgvector(create_async_engine(settings.database_url))
         Session = async_sessionmaker(eng, expire_on_commit=False, class_=AsyncSession)
         try:
             async with Session() as db:
