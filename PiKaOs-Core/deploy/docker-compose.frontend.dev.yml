@@ -1,0 +1,35 @@
+# PiKaOs — FRONTEND stack (DEV): Vite dev server with hot-reload, in its OWN compose project/network.
+# This is the default dev frontend (the split runs every component separately). The backend lives in
+# another stack, so Vite proxies /api + /ws to the backend over the HOST (host.docker.internal:8000),
+# not a compose-network sibling. The browser stays same-origin (localhost:5173) → no CORS needed.
+#
+# Run:
+#   docker compose -p pikaos-frontend -f deploy/docker-compose.frontend.dev.yml up -d --build
+#
+# Hot reload: ../Frontend is bind-mounted; node_modules stays in a named volume (off the Windows host).
+# VITE_POLL=true so the watcher fires on a Windows→Docker bind mount; VITE_OPEN=false so it doesn't try
+# to launch a browser inside the container. For the prod static (nginx) frontend, use
+# deploy/docker-compose.frontend.yml instead (that one listens on :80).
+services:
+  frontend:
+    build:
+      context: ../Frontend
+      target: dev                     # Vite hot-reload (the prod target is the nginx static build)
+    restart: unless-stopped
+    env_file: ../Frontend/.env        # VITE_API_BASE (PUBLIC app config — baked into the bundle)
+    environment:
+      # dev-server knobs (not app config): how Vite runs inside this stack. Backend is reached over the
+      # host because it runs in a SEPARATE compose project (pikaos-backend), not this network.
+      VITE_PROXY_TARGET: http://host.docker.internal:8000
+      VITE_OPEN: "false"
+      VITE_POLL: "true"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # so it resolves on Linux too (Docker Desktop adds it anyway)
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../Frontend:/app
+      - frontend_node_modules:/app/node_modules
+
+volumes:
+  frontend_node_modules:

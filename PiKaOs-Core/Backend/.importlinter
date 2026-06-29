@@ -1,0 +1,46 @@
+# import-linter — the static gate behind plugin-architecture.md §2 + §15.
+# Run from Backend/:  lint-imports
+# grimp parses the source (it does NOT import/execute modules) so this needs no app deps installed.
+#
+# Two rules, both architectural invariants the Loader can't catch at import time:
+#   1. Core ↛ plugins   (§2.1) — the Base never reaches up into a feature; remove any plugin and
+#      Core still imports. As of Phase 3 there are NO exceptions: the engine reaches the knowledge
+#      plugin only through the DI container (`knowledge.Retriever` contract) + the Event Bus, and the
+#      worker discovers plugin jobs via the Loader's dynamic import — zero static plugin imports.
+#   2. Plugin ↛ sibling plugin (§2.3) — features talk only through Core contracts, never each other.
+#      Add every new app.plugins.<id> to the independence contract as it lands.
+
+[importlinter]
+root_package = app
+
+[importlinter:contract:core-must-not-import-plugins]
+name = Core (Base) must not import any plugin (§2.1)
+type = forbidden
+source_modules =
+    app.main
+    app.worker
+    app.config
+    app.contracts
+    app.container
+    app.events
+    app.db
+    app.deps
+    app.models
+    app.schemas
+    app.storage
+    app.crypto
+    app.security
+    app.queue
+    app.redis_client
+    app.logging_ctx
+    app.routers
+    app.services
+    app.repositories
+forbidden_modules =
+    app.plugins
+
+[importlinter:contract:plugins-are-independent]
+name = Plugins must not import sibling plugins (§2.3)
+type = independence
+modules =
+    app.plugins.knowledge

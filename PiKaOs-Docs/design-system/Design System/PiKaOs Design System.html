@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="pro">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PiKaOs · Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Mitr:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<!-- real PiKaOs CSS (same order as the app's index.css) -->
+<link rel="stylesheet" href="css/pikaos-kit.css" />
+<link rel="stylesheet" href="css/pikaos-core.css" />
+<link rel="stylesheet" href="css/pikaos-components.css" />
+<style>
+  /* --- override the app-shell globals so this doc scrolls normally --- */
+  html, body { height: auto; overflow: visible; }
+  body { background: var(--bg-1); color: var(--ink); }
+
+  .ds { max-width: 1140px; margin: 0 auto; padding: 0 32px 120px; }
+
+  /* hero */
+  .ds-hero { padding: 64px 0 30px; display: flex; align-items: flex-end; justify-content: space-between; gap: 28px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+  .ds-hero-letters { display: flex; gap: 2px; }
+  .ds-hero-letters .ltr { font-size: 64px; }
+  .ds-hero h1 { font-family: var(--font-head); font-weight: 700; font-size: 30px; margin: 18px 0 6px; color: var(--ink); letter-spacing: .01em; }
+  .ds-hero p { margin: 0; color: var(--ink-3); font-size: 15px; max-width: 540px; line-height: 1.65; }
+  .ds-hero .kicker { margin-bottom: 14px; }
+
+  .theme-toggle { display: inline-flex; background: var(--bg-3); border: 1px solid var(--line); border-radius: var(--radius); padding: 3px; gap: 2px; }
+  .theme-toggle button { font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; padding: 8px 16px; border: none; background: none; color: var(--ink-3); border-radius: var(--radius-sm); cursor: pointer; font-weight: 600; transition: background .15s, color .15s; }
+  .theme-toggle button.on { background: var(--bg-2); color: var(--gold-bright); box-shadow: var(--shadow-raised); }
+
+  /* sections */
+  .ds-sec { padding: 52px 0 0; }
+  .ds-sec-head { margin-bottom: 22px; }
+  .ds-sec-head h2 { font-family: var(--font-head); font-weight: 700; font-size: 21px; margin: 6px 0 4px; color: var(--ink); }
+  .ds-sec-head p { margin: 0; color: var(--ink-3); font-size: 13.5px; line-height: 1.6; max-width: 620px; }
+
+  .ds-grid { display: grid; gap: 14px; }
+  .ds-grid.c2 { grid-template-columns: repeat(2, 1fr); }
+  .ds-grid.c3 { grid-template-columns: repeat(3, 1fr); }
+  .ds-grid.c4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 880px) { .ds-grid.c3, .ds-grid.c4 { grid-template-columns: repeat(2, 1fr); } }
+
+  /* a plain doc card */
+  .ds-card { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-panel); }
+  .ds-card.pad-lg { padding: 26px; }
+  .ds-card-title { font-family: var(--font-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 14px; }
+
+  /* principle cards */
+  .principle { display: flex; flex-direction: column; gap: 9px; }
+  .principle .p-ic { font-size: 22px; }
+  .principle h3 { font-family: var(--font-head); font-weight: 700; font-size: 15px; margin: 0; color: var(--ink); }
+  .principle p { margin: 0; font-size: 12.5px; color: var(--ink-3); line-height: 1.6; }
+
+  /* color swatches */
+  .sw { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); background: var(--bg-2); }
+  .sw-chip { height: 64px; }
+  .sw-meta { padding: 9px 11px; }
+  .sw-meta .sw-name { font-family: var(--font-head); font-weight: 600; font-size: 12.5px; color: var(--ink); }
+  .sw-meta .sw-var { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-3); margin-top: 2px; }
+  .sw-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line-soft); }
+  .sw-row:first-child { border-top: none; }
+  .sw-dot { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line); flex: 0 0 30px; }
+  .sw-row .sw-name { font-family: var(--font-head); font-weight: 600; font-size: 13px; color: var(--ink); white-space: nowrap; }
+  .sw-row .sw-var { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); margin-left: auto; }
+
+  /* type specimens */
+  .type-row { display: flex; align-items: baseline; gap: 18px; padding: 16px 0; border-top: 1px solid var(--line-soft); }
+  .type-row:first-child { border-top: none; }
+  .type-row .t-tag { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-4); width: 130px; flex: 0 0 130px; letter-spacing: .04em; }
+  .type-row .t-spec { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-4); margin-left: auto; text-align: right; white-space: nowrap; }
+
+  /* token rows */
+  .tok-row { display: flex; align-items: center; gap: 14px; padding: 11px 0; border-top: 1px solid var(--line-soft); }
+  .tok-row:first-child { border-top: none; }
+  .tok-row .tok-name { font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); width: 120px; flex: 0 0 120px; }
+  .tok-row .tok-val { font-family: var(--font-mono); font-size: 11px; color: var(--ink-4); margin-left: auto; }
+  .radius-demo { background: color-mix(in srgb, var(--gold) 14%, var(--bg-2)); border: 1.5px solid var(--gold); height: 40px; flex: 1; }
+  .shadow-demo { background: var(--bg-2); height: 56px; border-radius: var(--radius); flex: 1; border: 1px solid var(--line-soft); }
+  .space-demo { background: var(--gold); height: 18px; border-radius: 3px; }
+
+  /* component bench */
+  .bench { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  .bench.col { flex-direction: column; align-items: stretch; }
+  .bench-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-4); width: 100%; margin: 4px 0 -2px; }
+
+  footer.ds-foot { margin-top: 60px; padding-top: 26px; border-top: 1px solid var(--line); }
+</style>
+</head>
+<body>
+<div class="ds">
+
+  <!-- ===== HERO ===== -->
+  <header class="ds-hero">
+    <div>
+      <div class="kicker">PiKaOs · Agent Workspace</div>
+      <div class="ds-hero-letters">
+        <span class="ltr">P</span><span class="ltr">i</span><span class="ltr">K</span><span class="ltr">a</span><span class="ltr">O</span><span class="ltr">s</span>
+      </div>
+      <h1>Design System</h1>
+      <p>The PiKaOs design language — calm neutral surfaces, one confident indigo accent, and springy "physical-button" motion. Two themes only: <b>pro</b> (light) and <b>pro-dark</b> (night).</p>
+    </div>
+    <div class="theme-toggle" id="themeToggle">
+      <button data-theme-set="pro" class="on">☀ Day</button>
+      <button data-theme-set="pro-dark">☾ Night</button>
+    </div>
+  </header>
+
+  <!-- ===== PRINCIPLES ===== -->
+  <section class="ds-sec" style="padding-top:34px;">
+    <div class="ds-grid c4">
+      <div class="ds-card principle"><span class="p-ic">🧊</span><h3>Calm surfaces</h3><p>Cool neutral greys carry the UI. Color is reserved, never decorative — surfaces stay quiet so content leads.</p></div>
+      <div class="ds-card principle"><span class="p-ic">🔵</span><h3>One indigo accent</h3><p>A single confident indigo (<code class="mono">--gold</code> family, named for history) marks every primary action and active state.</p></div>
+      <div class="ds-card principle"><span class="p-ic">🟦</span><h3>Springy physics</h3><p>Buttons are 3D "physical" objects — a base shadow, sink on press, overshoot on release via shared spring easings.</p></div>
+      <div class="ds-card principle"><span class="p-ic">🅿️</span><h3>3D Mitr letters</h3><p>The brand signature: chunky cartoon glyphs with a stroke-behind-fill and stacked hard shadows.</p></div>
+    </div>
+  </section>
+
+  <!-- ===== COLOR ===== -->
+  <section class="ds-sec">
+    <div class="ds-sec-head">
+      <div class="kicker">Foundations</div>
+      <h2>Color</h2>
+      <p>Values are CSS custom properties that re-map per theme. Switch Day/Night above to see every swatch shift live.</p>
+    </div>
+
+    <div class="bench-label">Accent · indigo (the <span class="mono">--gold</span> family)</div>
+    <div class="ds-grid c4" id="accentGrid"></div>
+
+    <div style="height:18px"></div>
+    <div class="ds-grid c2">
+      <div class="ds-card">
+        <div class="ds-card-title">Ink · text</div>
+        <div id="inkRows"></div>
+      </div>
+      <div class="ds-card">
+        <div class="ds-card-title">Surfaces &amp; lines</div>
+        <div id="surfaceRows"></div>
+      </div>
+    </div>
+
+    <div style="height:14px"></div>
+    <div class="bench-label">Semantic</div>
+    <div class="ds-grid c4" id="semanticGrid"></div>
+  </section>
+
+  <!-- ===== TYPOGRAPHY ===== -->
+  <section class="ds-sec">
+    <div class="ds-sec-head">
+      <div class="kicker">Foundations</div>
+      <h2>Typography</h2>
+      <p>Three families: <b>Mitr</b> for 3D display letters, <b>IBM Plex Sans Thai</b> for all UI text (Thai-first), and <b>JetBrains Mono</b> for kickers, code and tabular numbers.</p>
+    </div>
+
+    <div class="ds-grid c3">
+      <div class="ds-card"><div class="ds-card-title">Mitr · display / brand</div><div style="font-family:var(--font-toon);font-weight:700;font-size:34px;color:var(--ink);line-height:1.1;">พีคะโอเอส</div><div style="font-family:var(--font-toon);font-weight:600;font-size:20px;color:var(--ink-2);margin-top:6px;">Agent Workspace</div></div>
+      <div class="ds-card"><div class="ds-card-title">IBM Plex Sans Thai · UI</div><div style="font-weight:700;font-size:20px;color:var(--ink);">หัวข้อหลัก · Page title</div><div style="font-size:14px;color:var(--ink-2);margin-top:7px;line-height:1.65;">เนื้อหาทั่วไป body text — readable at 14px, line-height 1.65.</div></div>
+      <div class="ds-card"><div class="ds-card-title">JetBrains Mono · meta</div><div class="mono" style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3);">KICKER · META</div><div class="mono" style="font-size:14px;color:var(--ink);margin-top:9px;">tokens: 48.2K · 240ms</div></div>
+    </div>
+
+    <div style="height:14px"></div>
+    <div class="ds-card pad-lg">
+      <div class="type-row"><span class="t-tag">display / 700</span><span class="display" style="font-size:26px;color:var(--ink);">Stat value 26</span><span class="t-spec">.display · 26px · +.04em</span></div>
+      <div class="type-row"><span class="t-tag">head / 700</span><span style="font-family:var(--font-head);font-weight:700;font-size:18px;color:var(--ink);">Topbar title 18</span><span class="t-spec">--font-head · 18px</span></div>
+      <div class="type-row"><span class="t-tag">head / 700</span><span style="font-family:var(--font-head);font-weight:700;font-size:15px;color:var(--ink);">Panel heading 15</span><span class="t-spec">--font-head · 15px</span></div>
+      <div class="type-row"><span class="t-tag">body / 400</span><span style="font-size:14px;color:var(--ink-2);">Body copy 14 · อ่านสบาย</span><span class="t-spec">--font-body · 14px</span></div>
+      <div class="type-row"><span class="t-tag">kicker</span><span class="kicker">SECTION KICKER</span><span class="t-spec">.kicker · 10.5px · +.2em</span></div>
+      <div class="type-row"><span class="t-tag">mono</span><span class="mono" style="color:var(--ink-2);">1,284 · GQ-04-A1</span><span class="t-spec">.mono · tabular-nums</span></div>
+    </div>
+  </section>
+
+  <!-- ===== SPACING / RADIUS / SHADOW ===== -->
+  <section class="ds-sec">
+    <div class="ds-sec-head">
+      <div class="kicker">Foundations</div>
+      <h2>Radius, spacing &amp; shadow</h2>
+      <p>Soft corners, a small spacing rhythm, and a three-step elevation ladder (raised → panel → pop).</p>
+    </div>
+    <div class="ds-grid c3">
+      <div class="ds-card">
+        <div class="ds-card-title">Corner radius</div>
+        <div class="tok-row"><span class="tok-name">--radius-sm</span><span class="radius-demo" style="border-radius:var(--radius-sm)"></span><span class="tok-val">6px</span></div>
+        <div class="tok-row"><span class="tok-name">--radius</span><span class="radius-demo" style="border-radius:var(--radius)"></span><span class="tok-val">9px</span></div>
+        <div class="tok-row"><span class="tok-name">--radius-lg</span><span class="radius-demo" style="border-radius:var(--radius-lg)"></span><span class="tok-val">14px</span></div>
+      </div>
+      <div class="ds-card">
+        <div class="ds-card-title">Spacing rhythm</div>
+        <div class="tok-row"><span class="tok-name">tight</span><span class="space-demo" style="width:7px"></span><span class="tok-val">7px</span></div>
+        <div class="tok-row"><span class="tok-name">base</span><span class="space-demo" style="width:14px"></span><span class="tok-val">14px</span></div>
+        <div class="tok-row"><span class="tok-name">card pad</span><span class="space-demo" style="width:16px"></span><span class="tok-val">16px</span></div>
+        <div class="tok-row"><span class="tok-name">page pad</span><span class="space-demo" style="width:40px"></span><span class="tok-val">40px</span></div>
+      </div>
+      <div class="ds-card">
+        <div class="ds-card-title">Elevation</div>
+        <div class="tok-row"><span class="tok-name">raised</span><span class="shadow-demo" style="box-shadow:var(--shadow-raised)"></span></div>
+        <div class="tok-row"><span class="tok-name">panel</span><span class="shadow-demo" style="box-shadow:var(--shadow-panel)"></span></div>
+        <div class="tok-row"><span class="tok-name">pop</span><span class="shadow-demo" style="box-shadow:var(--shadow-pop)"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== MOTION ===== -->
+  <section class="ds-sec">
+    <div class="ds-sec-head">
+      <div class="kicker">Foundations</div>
+      <h2>Motion</h2>
+      <p>Two shared spring easings drive the whole UI. Press the buttons — they sink and spring back. All motion is wrapped in <span class="mono">prefers-reduced-motion</span>.</p>
+    </div>
+    <div class="ds-grid c2">
+      <div class="ds-card"><div class="ds-card-title">--spring · release overshoot</div><div class="mono" style="font-size:12px;color:var(--ink-2);">cubic-bezier(.34, 1.9, .6, 1)</div><div style="margin-top:16px"><button class="btn btn-gold">Press me</button></div></div>
+      <div class="ds-card"><div class="ds-card-title">--spring-soft · gentle</div><div class="mono" style="font-size:12px;color:var(--ink-2);">cubic-bezier(.34, 1.4, .64, 1)</div><div style="margin-top:16px;max-width:240px"><div class="meter xp"><i style="width:64%"></i></div></div></div>
+    </div>
+  </section>
+
+  <!-- ===== COMPONENTS ===== -->
+  <section class="ds-sec">
+    <div class="ds-sec-head">
+      <div class="kicker">Library</div>
+      <h2>Components</h2>
+      <p>Real primitives from <span class="mono">src/components/ui</span> and the global kit — rendered here with the production CSS.</p>
+    </div>
+
+    <div class="ds-grid c2">
+      <!-- Buttons -->
+      <div class="ds-card">
+        <div class="ds-card-title">Buttons</div>
+        <div class="bench">
+          <button class="btn btn-gold">Primary</button>
+          <button class="btn btn-ghost">Ghost</button>
+          <button class="btn btn-danger">Danger</button>
+        </div>
+        <div class="bench" style="margin-top:12px">
+          <button class="btn btn-gold btn-sm">Small</button>
+          <button class="btn btn-ghost btn-sm">Small</button>
+          <button class="btn btn-gold" disabled>Disabled</button>
+        </div>
+      </div>
+
+      <!-- Form controls -->
+      <div class="ds-card">
+        <div class="ds-card-title">Form controls</div>
+        <div class="bench" style="gap:18px">
+          <label class="pk-switch"><input type="checkbox" checked /><span class="track"></span> Notifications</label>
+          <label class="pk-check"><input type="checkbox" checked /><span class="box"><svg viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3 6-6.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span> Accept</label>
+        </div>
+        <div class="seg" style="max-width:260px;margin-top:16px">
+          <button type="button" class="seg-btn on">Day</button>
+          <button type="button" class="seg-btn">Week</button>
+          <button type="button" class="seg-btn">Month</button>
+        </div>
+      </div>
+
+      <!-- Inputs -->
+      <div class="ds-card">
+        <div class="ds-card-title">Inputs</div>
+        <div class="bf" style="margin-bottom:12px"><label class="bf-label">Agent name <span class="bf-hint">required</span></label><input class="bf-input" placeholder="e.g. Aoy the Analyst" /></div>
+        <div class="bf"><label class="bf-label">Endpoint</label><input class="bf-input mono" style="font-size:12.5px" value="http://localhost:11434/v1" /></div>
+      </div>
+
+      <!-- Badges + ranks -->
+      <div class="ds-card">
+        <div class="ds-card-title">Badges &amp; ranks</div>
+        <div class="bench">
+          <span class="badge on"><span class="dot"></span>Active</span>
+          <span class="badge busy"><span class="dot"></span>Running</span>
+          <span class="badge idle"><span class="dot"></span>Idle</span>
+          <span class="badge warn"><span class="dot"></span>Alert</span>
+          <span class="badge info"><span class="dot"></span>Review</span>
+          <span class="badge magic"><span class="dot"></span>Research</span>
+        </div>
+        <div class="bench" style="margin-top:14px">
+          <span class="rank S">S</span><span class="rank A">A</span><span class="rank B">B</span><span class="rank C">C</span><span class="rank D">D</span>
+        </div>
+      </div>
+
+      <!-- Stat tiles -->
+      <div class="ds-card">
+        <div class="ds-card-title">Stat tiles</div>
+        <div class="ds-grid c2" style="gap:12px">
+          <div class="stat-tile"><div class="st-label">Tokens today</div><div class="st-value">48.2<span class="unit">K</span></div><div class="st-delta down">▲ more than yesterday</div></div>
+          <div class="stat-tile"><div class="st-label">Win rate</div><div class="st-value">94<span class="unit">%</span></div><div class="st-delta up">▲ +1.2%</div></div>
+        </div>
+      </div>
+
+      <!-- Meters -->
+      <div class="ds-card">
+        <div class="ds-card-title">Meters</div>
+        <div class="bench col" style="gap:14px">
+          <div><div class="mono" style="font-size:11px;color:var(--ink-3);margin-bottom:6px">mana / token</div><div class="meter mana"><i style="width:72%"></i></div></div>
+          <div><div class="mono" style="font-size:11px;color:var(--ink-3);margin-bottom:6px">xp / progress</div><div class="meter xp"><i style="width:48%"></i></div></div>
+          <div><div class="mono" style="font-size:11px;color:var(--ink-3);margin-bottom:6px">hp / health</div><div class="meter hp"><i style="width:33%"></i></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel showcase -->
+    <div style="height:14px"></div>
+    <div class="panel" style="max-width:420px">
+      <div class="panel-head"><span class="ph-icon">🔌</span><h3>API connections</h3><span class="ph-spacer"></span><span class="mono faint" style="font-size:11px">2 keys</span></div>
+      <div class="panel-body">
+        <div class="muted" style="font-size:12.5px;line-height:1.6;margin-bottom:12px">A titled container — the standard surface for grouped content across the app.</div>
+        <div class="bench"><button class="btn btn-gold btn-sm">＋ Add key</button><button class="btn btn-ghost btn-sm">Cancel</button></div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="ds-foot">
+    <div class="credit">PiKaOs Design System · Created by <b>saksit chuenmaiwaiy</b></div>
+  </footer>
+</div>
+
+<script>
+  // ---- theme toggle ----
+  const tt = document.getElementById('themeToggle');
+  tt.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-theme-set]'); if (!b) return;
+    const theme = b.getAttribute('data-theme-set');
+    document.documentElement.setAttribute('data-theme', theme);
+    tt.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    try { localStorage.setItem('ds-theme', theme); } catch (e) {}
+  });
+  try { const saved = localStorage.getItem('ds-theme'); if (saved) { document.documentElement.setAttribute('data-theme', saved); tt.querySelectorAll('button').forEach(x => x.classList.toggle('on', x.getAttribute('data-theme-set') === saved)); } } catch (e) {}
+
+  // ---- build color swatches from real token names ----
+  const accent = [['--gold','Accent'],['--gold-bright','Accent bright'],['--gold-deep','Accent deep'],['--gold-glow','Accent glow']];
+  const ink = [['--ink','Ink'],['--ink-2','Ink 2'],['--ink-3','Ink 3'],['--ink-4','Ink 4']];
+  const surface = [['--bg-0','Bg 0'],['--bg-1','Bg 1 · app'],['--bg-2','Bg 2 · card'],['--bg-3','Bg 3'],['--bg-4','Bg 4'],['--line','Line'],['--line-soft','Line soft']];
+  const semantic = [['--emerald','Emerald · ok'],['--crimson','Crimson · danger'],['--amber','Amber · warning'],['--sapphire','Sapphire · info'],['--amethyst','Amethyst'],['--ruby','Ruby']];
+
+  const chip = (v, name) => `<div class="sw"><div class="sw-chip" style="background:var(${v})"></div><div class="sw-meta"><div class="sw-name">${name}</div><div class="sw-var">${v}</div></div></div>`;
+  const row = (v, name) => `<div class="sw-row"><span class="sw-dot" style="background:var(${v})"></span><span class="sw-name">${name}</span><span class="sw-var">${v}</span></div>`;
+
+  document.getElementById('accentGrid').innerHTML = accent.map(([v,n]) => chip(v,n)).join('');
+  document.getElementById('semanticGrid').innerHTML = semantic.map(([v,n]) => chip(v,n)).join('');
+  document.getElementById('inkRows').innerHTML = ink.map(([v,n]) => row(v,n)).join('');
+  document.getElementById('surfaceRows').innerHTML = surface.map(([v,n]) => row(v,n)).join('');
+</script>
+</body>
+</html>

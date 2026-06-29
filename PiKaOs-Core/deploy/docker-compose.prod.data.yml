@@ -1,0 +1,26 @@
+# PiKaOs — PROD-MODE DATA stack overlay (on deploy/docker-compose.data.yml).
+#
+# Injects strong creds from deploy/.env.prod (via `--env-file`) so Postgres / Redis / MinIO init
+# with PRODUCTION passwords instead of the dev defaults baked in Backend/.env. `environment:` wins
+# over `env_file:`. NO secrets live here — only ${refs} resolved from the --env-file at run time.
+#
+#   docker compose --env-file deploy/.env.prod \
+#     -f deploy/docker-compose.data.yml -f deploy/docker-compose.prod.data.yml \
+#     -p pikaos-data up -d --wait
+#
+# ⚠ Postgres bakes POSTGRES_PASSWORD at FIRST init only — `docker compose -p pikaos-data down -v`
+#   (wipe the pgdata volume) before the first prod boot, or it keeps the old password.
+services:
+  db:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+  redis:
+    # REDIS_PASSWORD present → the image's command enables --requirepass (auth ON).
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+  minio:
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}

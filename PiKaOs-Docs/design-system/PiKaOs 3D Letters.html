@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PiKaOs — 3D Letter Set (A–Z, ก–ฮ)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  /* ============ PiKaOs tokens (pro / pro-dark) ============ */
+  [data-theme="pro"] {
+    --bg-0:#eceef2; --bg-1:#f4f6f8; --bg-2:#ffffff; --bg-3:#f3f5f7; --bg-4:#e8ebef;
+    --line:#e3e7ec; --line-soft:#eef1f4;
+    --ink:#111726; --ink-2:#3e4654; --ink-3:#69707d; --ink-4:#9aa1ad;
+    --gold:#4361ee; --gold-bright:#5872f2; --gold-deep:#3048d4; --gold-glow:rgba(67,97,238,.26);
+    --crimson:#e0413f;
+    --letter-face:#ffffff;
+    --shadow-panel:0 10px 30px rgba(17,23,38,.08), 0 2px 6px rgba(17,23,38,.05);
+  }
+  [data-theme="pro-dark"] {
+    --bg-0:#0c0e12; --bg-1:#111419; --bg-2:#171a21; --bg-3:#1d2129; --bg-4:#262b34;
+    --line:#2a2f39; --line-soft:#21252d;
+    --ink:#e8eaef; --ink-2:#b2b8c3; --ink-3:#828a97; --ink-4:#5a626e;
+    --gold:#6076f6; --gold-bright:#8194f9; --gold-deep:#4d63ec; --gold-glow:rgba(96,118,246,.34);
+    --crimson:#f0524f;
+    --letter-face:#eef1ff;
+    --shadow-panel:0 14px 40px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.35);
+  }
+  :root { --radius:9px; --radius-lg:14px; --radius-sm:6px;
+    --font-body:"IBM Plex Sans Thai", system-ui, sans-serif;
+    --font-mono:"JetBrains Mono", monospace;
+    --font-toon:"Mitr", var(--font-body);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg-1); color: var(--ink);
+    min-height: 100vh;
+    padding: 40px 24px 60px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 28px; }
+  .kicker {
+    font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--ink-4);
+    margin-bottom: 6px;
+  }
+  h1.page-title { font-size: 22px; font-weight: 700; }
+  .page-desc { font-size: 13px; color: var(--ink-3); margin-top: 4px; }
+  .theme-toggle {
+    font-family: var(--font-mono); font-size: 11.5px; font-weight: 600;
+    letter-spacing: .06em;
+    background: var(--bg-2); color: var(--ink-2);
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 8px 16px; cursor: pointer;
+    transition: transform .25s cubic-bezier(.34,2.2,.6,1), background .15s ease;
+  }
+  .theme-toggle:hover { background: var(--bg-4); }
+  .theme-toggle:active { transform: scale(.92); transition-duration: .05s; }
+
+  section.panel {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-panel);
+    padding: 26px 26px 30px;
+    margin-bottom: 26px;
+  }
+  .panel h2 {
+    font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3);
+    margin-bottom: 20px;
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  .panel h2 .count { color: var(--ink-4); font-weight: 400; }
+
+  .glyph-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 18px 10px;
+  }
+
+  /* ============ 3D cartoon letter recipe ============ */
+  .ltr {
+    display: flex; align-items: center; justify-content: center;
+    height: 110px;
+    font-family: var(--font-toon);
+    font-weight: 700;
+    font-size: 64px;
+    line-height: 1;
+    color: var(--letter-face);
+    -webkit-text-stroke: 6px var(--gold-deep);
+    paint-order: stroke fill;
+    text-shadow:
+      0 2px 0 var(--gold),
+      0 4px 0 var(--gold),
+      0 6px 0 var(--gold-deep),
+      0 8px 0 var(--gold-deep),
+      0 10px 0 color-mix(in srgb, var(--gold-deep) 70%, #0c0e12),
+      0 16px 22px var(--gold-glow);
+    user-select: none;
+    cursor: pointer;
+    transform-origin: 50% 100%;
+  }
+  @supports not (paint-order: stroke) {
+    .ltr { -webkit-text-stroke: 0; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .ltr.drop {
+      animation: ltr-drop 1.05s cubic-bezier(.22,.9,.32,1) both;
+      animation-delay: var(--d, 0s);
+    }
+    .ltr.jelly {
+      animation: ltr-jelly .6s cubic-bezier(.45,.05,.35,1) both;
+      animation-delay: 0s !important;
+    }
+  }
+  @keyframes ltr-drop {
+    0%   { transform: translateY(-50vh) rotate(var(--tilt, -8deg)) scaleY(1.15); opacity: 0; }
+    55%  { transform: translateY(0) rotate(0deg) scaleY(1); opacity: 1; }
+    68%  { transform: translateY(-4%) scaleX(1.12) scaleY(.82); }
+    80%  { transform: translateY(-14%) scaleX(.96) scaleY(1.06); }
+    90%  { transform: translateY(0) scaleX(1.04) scaleY(.94); }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
+  }
+  @keyframes ltr-jelly {
+    0%   { transform: scale(1, 1); }
+    35%  { transform: scale(1.12, .84) translateY(3%); }
+    60%  { transform: scale(.93, 1.07) translateY(-4%); }
+    80%  { transform: scale(1.04, .96) translateY(0); }
+    100% { transform: scale(1, 1); }
+  }
+
+  /* ============ UI typography specimen ============ */
+  .type-rows { display: flex; flex-direction: column; }
+  .type-row {
+    display: grid; grid-template-columns: 150px 1fr; gap: 8px 20px;
+    align-items: baseline;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .type-row:last-child { border-bottom: none; }
+  .type-spec {
+    font-family: var(--font-mono); font-size: 10.5px; font-weight: 500;
+    letter-spacing: .05em; color: var(--ink-4); line-height: 1.6;
+  }
+  .type-spec b { display: block; color: var(--ink-3); font-weight: 600; font-size: 11px; }
+  .type-sample { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+  .t-hero { font-family: var(--font-toon); font-weight: 700; font-size: 34px; line-height: 1.15; color: var(--ink); }
+  .t-page-title { font-size: 22px; font-weight: 700; color: var(--ink); }
+  .t-card-title { font-size: 20px; font-weight: 700; color: var(--ink); }
+  .t-kicker { font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-4); }
+  .t-body { font-size: 14px; font-weight: 400; color: var(--ink); line-height: 1.65; }
+  .t-body-2 { font-size: 13px; font-weight: 400; color: var(--ink-3); line-height: 1.6; }
+  .t-label { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+  .t-btn { font-size: 14.5px; font-weight: 700; color: var(--ink); }
+  .t-link { font-size: 12px; font-weight: 500; color: var(--gold-bright); }
+  .t-error { font-size: 12px; font-weight: 500; color: var(--crimson, #e0413f); }
+  .t-mono { font-family: var(--font-mono); font-size: 11.5px; font-weight: 500; color: var(--ink-2); }
+
+  @media (max-width: 560px) {
+    .type-row { grid-template-columns: 1fr; gap: 6px; }
+  }
+
+  footer.credit {
+    font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+    letter-spacing: .1em; text-transform: uppercase;
+    color: var(--ink-4); text-align: center; margin-top: 36px;
+  }
+  footer.credit b { color: var(--ink-3); font-weight: 600; }
+
+  @media (max-width: 560px) {
+    body { padding: 28px 14px 40px; }
+    .glyph-grid { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); }
+    .ltr { font-size: 48px; height: 84px; }
+  }
+</style>
+</head>
+<body data-theme="pro">
+<div class="wrap">
+  <header>
+    <div>
+      <div class="kicker">PIKAOS / TYPE SPECIMEN</div>
+      <h1 class="page-title">3D Letter Set</h1>
+      <p class="page-desc">Font: Mitr 700 — one family for both EN / TH. A–Z · a–z · ก–ฮ · สระ. Click any glyph to wobble.</p>
+    </div>
+    <button class="theme-toggle" id="themeBtn" type="button">THEME: PRO</button>
+  </header>
+
+  <section class="panel" data-screen-label="Latin A-Z">
+    <h2>Latin Uppercase <span class="count">A – Z · 26</span></h2>
+    <div class="glyph-grid" id="latinGrid"></div>
+  </section>
+
+  <section class="panel" data-screen-label="Latin a-z">
+    <h2>Latin Lowercase <span class="count">a – z · 26</span></h2>
+    <div class="glyph-grid" id="latinLowerGrid"></div>
+  </section>
+
+  <section class="panel" data-screen-label="Thai ก-ฮ">
+    <h2>Thai Consonants <span class="count">ก – ฮ · 44</span></h2>
+    <div class="glyph-grid" id="thaiGrid"></div>
+  </section>
+
+  <section class="panel" data-screen-label="Thai vowels สระ">
+    <h2>Thai Vowels <span class="count">สระ · ◌ = ตำแหน่งพยัญชนะ</span></h2>
+    <div class="glyph-grid" id="thaiVowelGrid"></div>
+  </section>
+
+  <section class="panel" data-screen-label="UI typography">
+    <h2>Normal Text <span class="count">UI TYPE SCALE · EN / TH</span></h2>
+    <div class="type-rows">
+      <div class="type-row">
+        <div class="type-spec"><b>Hero / Display</b>Mitr 700 · 28–34px</div>
+        <div class="type-sample t-hero">Welcome back · ยินดีต้อนรับกลับ</div>
+      </div>
+      <div class="type-row">
+        <div class="type-spec"><b>Page title</b>IBM Plex Sans Thai 700 · 22px</div>
+        <div class="type-sample t-page-title">Account settings · ตั้งค่าบัญชี</div>
+      </div>
+      <div class="type-row">
+        <div class="type-spec"><b>Card title</b>IBM Plex Sans Thai 700 · 20px</div>
+        <div class="type-sample t-card-title">Login · เข้าสู่ระบบ</div>
+      </div>
+      <div class="type-row">
+        <div class="type-spec"><b>Kicker</b>JetBrains Mono 500 · 11px · .1em · UPPER</div>
+        <div class="type-sample t-kicker">PIKAOS / AUTH · SIGN IN TO CONTINUE</div>
+      </div>
+      <div class="type-row">
+        <div class="type-spec"><b>Body</b>IBM Plex Sans Thai 400 · 14px</div>
+        <div class="type-sample t-body">Enter your credentials to access the internal workspace. กรอกข้อมูลบัญชีของคุณเพื่อเข้าใช้งานระบบภายในองค์กร</div>
+      </div>
+      <div class="type-row">
+        <div class="type-spec"><b>Body secondary</b>IBM Plex Sans Thai 400 · 13px · ink-3</div>
+        <div class="type-sample t-body-2">If an account exists, we'll send a reset link. หากมีบัญชีอยู่ในระบบ เราจะส่งลิงก์รีเซ็ตรหัสผ่านให้</div>
+      </div>
+      <div class="type-row">
+        <div class="type-spec"><b>Form label</b>IBM Plex Sans Thai 600 · 13px · ink-2</div>
+        <div class="type-sample t-label">Username / Email · ชื่อผู้ใช้ / อีเมล</div>
+      </div>
+      <div class="type-row">
+        <div class="type-spec"><b>Button</b>IBM Plex Sans Thai 700 · 14.5px</div>
+        <div class="type-sample t-btn">Sign in · เข้าสู่ระบบ</div>
+      </div>
+      <div class="type-row">
+        <div class="type-spec"><b>Link / action</b>IBM Plex Sans Thai 500 · 12px · gold-bright</div>
+        <div class="type-sample t-link">Forgot password? · ลืมรหัสผ่าน?</div>
+      </div>
+      <div class="type-row">
+        <div class="type-spec"><b>Error</b>IBM Plex Sans Thai 500 · 12px · crimson</div>
+        <div class="type-sample t-error">Password is required · กรุณากรอกรหัสผ่าน</div>
+      </div>
+      <div class="type-row">
+        <div class="type-spec"><b>Mono / meta</b>JetBrains Mono 500 · 11.5px</div>
+        <div class="type-sample t-mono"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="235650465163534a48424c500d4a4c">[email&#160;protected]</a> · TK-2026-0610 · 14:32:08</div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="credit">Created by <b>saksit chuenmaiwaiy</b></footer>
+</div>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+  const LATIN = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+  const LATIN_LOWER = "abcdefghijklmnopqrstuvwxyz".split("");
+  const THAI = "กขฃคฅฆงจฉชซฌญฎฏฐฑฒณดตถทธนบปผฝพฟภมยรลวศษสหฬอฮ".split("");
+  // สระ (Thai vowels) — combining vowels shown on a dotted-circle base ◌
+  const THAI_VOWELS = ["ะ","◌ั","า","◌ำ","◌ิ","◌ี","◌ึ","◌ื","◌ุ","◌ู","เ","แ","โ","ใ","ไ","ฤ","ฦ","ๅ"];
+  const TILTS = ["-9deg", "6deg", "-5deg", "8deg", "-7deg", "5deg"];
+
+  function fill(gridId, letters, baseDelay) {
+    const grid = document.getElementById(gridId);
+    letters.forEach((ch, i) => {
+      const el = document.createElement("span");
+      el.className = "ltr drop";
+      el.textContent = ch;
+      el.style.setProperty("--d", (baseDelay + i * 0.03) + "s");
+      el.style.setProperty("--tilt", TILTS[i % TILTS.length]);
+      el.addEventListener("click", () => {
+        el.classList.remove("drop");
+        el.classList.remove("jelly");
+        void el.offsetWidth;
+        el.classList.add("jelly");
+      });
+      grid.appendChild(el);
+    });
+  }
+  fill("latinGrid", LATIN, 0.1);
+  fill("latinLowerGrid", LATIN_LOWER, 0.9);
+  fill("thaiGrid", THAI, 1.7);
+  fill("thaiVowelGrid", THAI_VOWELS, 2.5);
+
+  const btn = document.getElementById("themeBtn");
+  const saved = localStorage.getItem("pikaos-specimen-theme");
+  if (saved === "pro" || saved === "pro-dark") {
+    document.body.dataset.theme = saved;
+  }
+  const syncBtn = () => btn.textContent = "THEME: " + document.body.dataset.theme.toUpperCase();
+  syncBtn();
+  btn.addEventListener("click", () => {
+    document.body.dataset.theme = document.body.dataset.theme === "pro" ? "pro-dark" : "pro";
+    localStorage.setItem("pikaos-specimen-theme", document.body.dataset.theme);
+    syncBtn();
+  });
+</script>
+</body>
+</html>

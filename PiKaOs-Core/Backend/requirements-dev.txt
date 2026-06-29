@@ -1,0 +1,5 @@
+# CI / dev-only tooling — NOT installed into the runtime image (keep requirements.txt lean).
+# Used by the lightweight `architecture` CI job (plugin-architecture.md §15) and local checks.
+-r requirements.txt
+import-linter==2.12      # static gate: Core ↛ plugins, plugin ↛ sibling plugin (.importlinter)
+jsonschema==4.26.0       # validates every plugin manifest.json against manifest.schema.json

@@ -1,0 +1,74 @@
+# PiKaOs — DATA stack: Postgres (pgvector) · Redis · MinIO. Its OWN compose project/network.
+# This is the canonical datastore stack for BOTH dev (default split) and the prod overlays — there is
+# no longer an "all-in-one" root compose; every stack runs separately and reaches these over the host
+# (host.docker.internal:<published-port>), exactly like managed RDS / ElastiCache / S3 in a real deploy.
+#
+# Run (dev):
+#   docker compose -p pikaos-data -f deploy/docker-compose.data.yml up -d --wait
+# Prod (strong creds from deploy/.env.prod — overlay docker-compose.prod.data.yml):
+#   docker compose --env-file deploy/.env.prod \
+#     -f deploy/docker-compose.data.yml -f deploy/docker-compose.prod.data.yml \
+#     -p pikaos-data up -d --wait
+#
+# Ports published to the host so the backend/ai stacks (separate networks) can reach them via
+# host.docker.internal. `restart: unless-stopped` → a crash/host-reboot recovers automatically (A8).
+services:
+  db:
+    # Postgres + pgvector. RAG (phase E / M2) needs the `vector` extension: doc_chunks store
+    # bge-m3 embeddings and are searched by cosine distance (docs/architecture/knowledge-rag.md §3).
+    # The extension itself is created by migration 0005_doc_chunks; this image just ships the
+    # shared library so `CREATE EXTENSION vector` succeeds.
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    env_file: ../Backend/.env         # POSTGRES_USER/PASSWORD/DB (the image ignores the rest)
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # $$ → compose passes a literal $; the container shell expands it from the env_file vars
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    env_file: ../Backend/.env         # REDIS_PASSWORD (empty = no auth; the image ignores the rest)
+    # Enable --requirepass only when REDIS_PASSWORD is set. $$ → compose passes a literal $, the
+    # container shell does the ${VAR:+...} expansion at runtime.
+    command: ["sh", "-c", "redis-server $${REDIS_PASSWORD:+--requirepass \"$$REDIS_PASSWORD\"}"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli $${REDIS_PASSWORD:+--no-auth-warning -a \"$$REDIS_PASSWORD\"} ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    # Pinned by digest (was :latest) for reproducible/secure builds — A4 hardening.
+    # Bump deliberately after testing a newer MinIO release
+    # (re-pin via: docker image inspect minio/minio --format '{{.RepoDigests}}').
+    image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    env_file: ../Backend/.env         # MINIO_ROOT_USER / MINIO_ROOT_PASSWORD (the image ignores the rest)
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # web console
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:

@@ -1,0 +1,42 @@
+# PiKaOs — PROD-MODE BACKEND stack overlay (on deploy/docker-compose.backend.yml).
+#
+# Runs backend + worker in PRODUCTION mode against the external (prod-cred) data stack. All values
+# come from deploy/.env.prod via `--env-file` (compose interpolation); `environment:` wins over the
+# `env_file: Backend/.env` dev defaults. NO secrets live here — only ${refs}. This is the prod-mode
+# counterpart of docker-compose.sim.yml (which is dev-mode).
+#
+#   docker compose --env-file deploy/.env.prod \
+#     -f deploy/docker-compose.backend.yml -f deploy/docker-compose.prod.backend.yml \
+#     -p pikaos-backend up -d --build
+#
+# The backend refuses to boot (config.production_violations) unless ENVIRONMENT=production has strong
+# JWT_SECRET/SECRET_KEY (>=32), COOKIE_SECURE=true, non-default SEED_PASSWORD/MINIO_SECRET_KEY, and a
+# password in REDIS_URL — all satisfied by deploy/.env.prod.
+#
+# NOTE: COOKIE_SECURE=true means the refresh cookie is only sent over HTTPS. Over plain http://localhost
+# the access-token login works (token is in the JSON body) but the refresh round-trip needs TLS in front.
+x-prod-env: &prod-env
+  ENVIRONMENT: ${ENVIRONMENT}
+  COOKIE_SECURE: ${COOKIE_SECURE}
+  DATABASE_URL: ${DATABASE_URL}
+  REDIS_URL: ${REDIS_URL}
+  MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+  MINIO_SECURE: ${MINIO_SECURE}
+  MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+  MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+  MINIO_BUCKET: ${MINIO_BUCKET}
+  STORAGE_PROVIDER: ${STORAGE_PROVIDER}
+  JWT_SECRET: ${JWT_SECRET}
+  SECRET_KEY: ${SECRET_KEY}
+  SEED_PASSWORD: ${SEED_PASSWORD}
+  CORS_ORIGINS: ${CORS_ORIGINS}
+
+services:
+  backend:
+    environment:
+      <<: *prod-env
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY}
+
+  worker:
+    environment:
+      <<: *prod-env

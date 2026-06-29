@@ -1,0 +1,807 @@
+{
+  "template": "esg-website-standard",
+  "name": "ESG Website Information Architecture (SEAFCO example)",
+  "source": "20260506-SEAFCO-FSTE-ESG-Sitemap.pdf (ShareInvestor IA diagram)",
+  "format": "ia-tree",
+  "transcribed_by": "vision-read of diagram image — verify against source file",
+  "legend": {
+    "node_type": {
+      "menu": "Menu Level 1 / Homepage",
+      "submenu": "Sub Menu / Module Page",
+      "landing": "Landing Page",
+      "group": "Group / Module",
+      "scene": "Scene / Static Details",
+      "module": "colored module box (see module)",
+      "field": "form field",
+      "link_out": "Link Out",
+      "link_in": "Link In Website",
+      "api": "API (Appendix B)"
+    },
+    "module": {
+      "download": "Download Module",
+      "gallery": "Gallery Module",
+      "activities": "Activities Module",
+      "sustainability_report": "Sustainability Report Module",
+      "contact_form": "Contact Form"
+    }
+  },
+  "global": {
+    "header": [
+      "Language Switch TH/EN",
+      "Contact Us",
+      "Google Custom Search"
+    ],
+    "footer": [
+      "Sustainability Report",
+      "Contact Info",
+      "Follow Us On (Social Media)",
+      "Sitemap",
+      "Useful Link",
+      "Copyright",
+      "Terms & Conditions",
+      "Privacy Policy",
+      "Cookies Policy"
+    ]
+  },
+  "tree": [
+    {
+      "title": "ESG Homepage",
+      "node_type": "menu",
+      "children": [
+        {
+          "title": "ESG Key Visual / Company ESG Video",
+          "node_type": "scene",
+          "kind": "dynamic"
+        },
+        {
+          "title": "ESG Overview",
+          "node_type": "scene"
+        },
+        {
+          "title": "Sustainability Development Operations",
+          "node_type": "group",
+          "children": [
+            {
+              "title": "Environment",
+              "node_type": "group",
+              "children": [
+                {
+                  "title": "Climate Change",
+                  "node_type": "static"
+                },
+                {
+                  "title": "Carbon Management",
+                  "node_type": "static"
+                },
+                {
+                  "title": "Energy Management",
+                  "node_type": "static"
+                },
+                {
+                  "title": "Water Management",
+                  "node_type": "static"
+                },
+                {
+                  "title": "Waste Management",
+                  "node_type": "static"
+                }
+              ]
+            },
+            {
+              "title": "Social",
+              "node_type": "group",
+              "children": [
+                {
+                  "title": "Human Capital",
+                  "node_type": "static"
+                },
+                {
+                  "title": "Occupational Health & Safety",
+                  "node_type": "static"
+                },
+                {
+                  "title": "Human Rights",
+                  "node_type": "static"
+                },
+                {
+                  "title": "Diversity & Inclusion",
+                  "node_type": "static"
+                },
+                {
+                  "title": "Community Engagement",
+                  "node_type": "static"
+                }
+              ]
+            },
+            {
+              "title": "Governance",
+              "node_type": "group",
+              "children": [
+                {
+                  "title": "Corporate Governance",
+                  "node_type": "static"
+                },
+                {
+                  "title": "Ethics & Compliance",
+                  "node_type": "static"
+                },
+                {
+                  "title": "Whistleblowing",
+                  "node_type": "static"
+                },
+                {
+                  "title": "Tax Transparency",
+                  "node_type": "static"
+                }
+              ]
+            },
+            {
+              "title": "Responsible Supply Chain",
+              "node_type": "group",
+              "children": [
+                {
+                  "title": "Sustainable Procurement",
+                  "node_type": "static"
+                },
+                {
+                  "title": "Supplier Management",
+                  "node_type": "static"
+                },
+                {
+                  "title": "Contractor Safety",
+                  "node_type": "static"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Latest Activities",
+          "node_type": "module",
+          "module": "activities",
+          "kind": "dynamic",
+          "note": "Pull Data from ACTIVITIES Page"
+        }
+      ]
+    },
+    {
+      "title": "Sustainability at Seafco",
+      "node_type": "menu",
+      "children": [
+        {
+          "title": "Sustainability Overview",
+          "node_type": "static"
+        },
+        {
+          "title": "Message from CEO",
+          "node_type": "static"
+        },
+        {
+          "title": "Sustainability Strategy",
+          "node_type": "static"
+        },
+        {
+          "title": "Materiality Assessment",
+          "node_type": "static"
+        },
+        {
+          "title": "ESG Highlights & Performance",
+          "node_type": "static"
+        },
+        {
+          "title": "Awards and Certifications",
+          "node_type": "static"
+        }
+      ]
+    },
+    {
+      "title": "Environmental",
+      "node_type": "menu",
+      "children": [
+        {
+          "title": "Climate Change",
+          "node_type": "submenu",
+          "children": [
+            {
+              "title": "Climate Strategy",
+              "node_type": "static"
+            },
+            {
+              "title": "Climate Governance",
+              "node_type": "static"
+            },
+            {
+              "title": "TCFD Disclosure",
+              "node_type": "static"
+            },
+            {
+              "title": "Net Zero Roadmap",
+              "node_type": "static"
+            },
+            {
+              "title": "Related Documents",
+              "node_type": "module",
+              "module": "download",
+              "kind": "dynamic"
+            }
+          ]
+        },
+        {
+          "title": "Carbon Management",
+          "node_type": "submenu",
+          "children": [
+            {
+              "title": "Scope 1 Emissions",
+              "node_type": "static"
+            },
+            {
+              "title": "Scope 2 Emissions",
+              "node_type": "static"
+            },
+            {
+              "title": "Scope 3 Emissions",
+              "node_type": "static"
+            },
+            {
+              "title": "GHG Reduction Projects",
+              "node_type": "static"
+            },
+            {
+              "title": "Related Documents",
+              "node_type": "module",
+              "module": "download",
+              "kind": "dynamic"
+            }
+          ]
+        },
+        {
+          "title": "Energy Management",
+          "node_type": "submenu",
+          "children": [
+            {
+              "title": "Energy Consumption",
+              "node_type": "static"
+            },
+            {
+              "title": "Energy Efficiency",
+              "node_type": "static"
+            },
+            {
+              "title": "Renewable Energy",
+              "node_type": "static"
+            },
+            {
+              "title": "Related Documents",
+              "node_type": "module",
+              "module": "download",
+              "kind": "dynamic"
+            }
+          ]
+        },
+        {
+          "title": "Water Management",
+          "node_type": "submenu",
+          "children": [
+            {
+              "title": "Water Consumption",
+              "node_type": "static"
+            },
+            {
+              "title": "Water Conservation",
+              "node_type": "static"
+            },
+            {
+              "title": "Related Documents",
+              "node_type": "module",
+              "module": "download",
+              "kind": "dynamic"
+            }
+          ]
+        },
+        {
+          "title": "Waste Management",
+          "node_type": "submenu",
+          "children": [
+            {
+              "title": "Construction Waste",
+              "node_type": "static"
+            },
+            {
+              "title": "Recycling Program",
+              "node_type": "static"
+            },
+            {
+              "title": "Hazardous Waste",
+              "node_type": "static"
+            },
+            {
+              "title": "Related Documents",
+              "node_type": "module",
+              "module": "download",
+              "kind": "dynamic"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Social",
+      "node_type": "menu",
+      "children": [
+        {
+          "title": "Human Capital",
+          "node_type": "submenu",
+          "children": [
+            {
+              "title": "Workforce Overview",
+              "node_type": "static"
+            },
+            {
+              "title": "Talent Development",
+              "node_type": "static"
+            },
+            {
+              "title": "Training Programs",
+              "node_type": "static"
+            },
+            {
+              "title": "Succession Planning",
+              "node_type": "static"
+            },
+            {
+              "title": "Related Documents",
+              "node_type": "module",
+              "module": "download",
+              "kind": "dynamic"
+            }
+          ]
+        },
+        {
+          "title": "Occupational Health & Safety",
+          "node_type": "submenu",
+          "children": [
+            {
+              "title": "Safety Governance",
+              "node_type": "static"
+            },
+            {
+              "title": "ISO 45001",
+              "node_type": "static"
+            },
+            {
+              "title": "LTIFR Performance",
+              "node_type": "static"
+            },
+            {
+              "title": "Safety Campaigns",
+              "node_type": "static"
+            },
+            {
+              "title": "Related Documents",
+              "node_type": "module",
+              "module": "download",
+              "kind": "dynamic"
+            }
+          ]
+        },
+        {
+          "title": "Human Rights",
+          "node_type": "submenu",
+          "children": [
+            {
+              "title": "Human Rights Policy",
+              "node_type": "static"
+            },
+            {
+              "title": "Due Diligence",
+              "node_type": "static"
+            },
+            {
+              "title": "Grievance Mechanism",
+              "node_type": "static"
+            },
+            {
+              "title": "Related Documents",
+              "node_type": "module",
+              "module": "download",
+              "kind": "dynamic"
+            }
+          ]
+        },
+        {
+          "title": "Diversity & Inclusion",
+          "node_type": "submenu",
+          "children": [
+            {
+              "title": "Workforce Diversity",
+              "node_type": "static"
+            },
+            {
+              "title": "Equal Opportunity",
+              "node_type": "static"
+            },
+            {
+              "title": "Gender Representation",
+              "node_type": "static"
+            },
+            {
+              "title": "Related Documents",
+              "node_type": "module",
+              "module": "download",
+              "kind": "dynamic"
+            }
+          ]
+        },
+        {
+          "title": "Community Engagement",
+          "node_type": "submenu",
+          "children": [
+            {
+              "title": "Community Projects",
+              "node_type": "static"
+            },
+            {
+              "title": "Social Investment",
+              "node_type": "static"
+            },
+            {
+              "title": "Stakeholder Relations",
+              "node_type": "static"
+            },
+            {
+              "title": "Related Documents",
+              "node_type": "module",
+              "module": "download",
+              "kind": "dynamic"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Governance",
+      "node_type": "menu",
+      "children": [
+        {
+          "title": "Corporate Governance",
+          "node_type": "submenu",
+          "children": [
+            {
+              "title": "Governance Structure",
+              "node_type": "static"
+            },
+            {
+              "title": "Board Composition",
+              "node_type": "static"
+            },
+            {
+              "title": "Board Independence",
+              "node_type": "static"
+            },
+            {
+              "title": "Board Skills Matrix",
+              "node_type": "static"
+            },
+            {
+              "title": "Related Documents",
+              "node_type": "module",
+              "module": "download",
+              "kind": "dynamic"
+            }
+          ]
+        },
+        {
+          "title": "Ethics & Compliance",
+          "node_type": "submenu",
+          "children": [
+            {
+              "title": "Code of Conduct",
+              "node_type": "static"
+            },
+            {
+              "title": "Anti-Corruption Policy",
+              "node_type": "static"
+            },
+            {
+              "title": "Compliance Program",
+              "node_type": "static"
+            },
+            {
+              "title": "Conflict of Interest",
+              "node_type": "static"
+            },
+            {
+              "title": "Related Documents",
+              "node_type": "module",
+              "module": "download",
+              "kind": "dynamic"
+            }
+          ]
+        },
+        {
+          "title": "Whistleblowing",
+          "node_type": "submenu",
+          "children": [
+            {
+              "title": "Reporting Channel",
+              "node_type": "static"
+            },
+            {
+              "title": "Investigation Process",
+              "node_type": "static"
+            },
+            {
+              "title": "Protection Measures",
+              "node_type": "static"
+            },
+            {
+              "title": "Related Documents",
+              "node_type": "module",
+              "module": "download",
+              "kind": "dynamic"
+            }
+          ]
+        },
+        {
+          "title": "Tax Transparency",
+          "node_type": "submenu",
+          "children": [
+            {
+              "title": "Tax Policy",
+              "node_type": "static"
+            },
+            {
+              "title": "Tax Governance",
+              "node_type": "static"
+            },
+            {
+              "title": "Related Documents",
+              "node_type": "module",
+              "module": "download",
+              "kind": "dynamic"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Responsible Supply Chain",
+      "node_type": "menu",
+      "children": [
+        {
+          "title": "Sustainable Procurement",
+          "node_type": "submenu",
+          "children": [
+            {
+              "title": "Procurement Policy",
+              "node_type": "static"
+            },
+            {
+              "title": "ESG Criteria",
+              "node_type": "static"
+            },
+            {
+              "title": "Local Supplier Support",
+              "node_type": "static"
+            },
+            {
+              "title": "Related Documents",
+              "node_type": "module",
+              "module": "download",
+              "kind": "dynamic"
+            }
+          ]
+        },
+        {
+          "title": "Supplier Management",
+          "node_type": "submenu",
+          "children": [
+            {
+              "title": "Supplier Code of Conduct",
+              "node_type": "static"
+            },
+            {
+              "title": "Supplier Assessment",
+              "node_type": "static"
+            },
+            {
+              "title": "Supplier Audit",
+              "node_type": "static"
+            },
+            {
+              "title": "Supplier Development",
+              "node_type": "static"
+            },
+            {
+              "title": "Related Documents",
+              "node_type": "module",
+              "module": "download",
+              "kind": "dynamic"
+            }
+          ]
+        },
+        {
+          "title": "Contractor Safety",
+          "node_type": "submenu",
+          "children": [
+            {
+              "title": "Safety Requirements",
+              "node_type": "static"
+            },
+            {
+              "title": "Safety Training",
+              "node_type": "static"
+            },
+            {
+              "title": "Performance Monitoring",
+              "node_type": "static"
+            },
+            {
+              "title": "Related Documents",
+              "node_type": "module",
+              "module": "download",
+              "kind": "dynamic"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Activities",
+      "node_type": "menu",
+      "module": "activities",
+      "kind": "dynamic",
+      "children": [
+        {
+          "title": "Filter by Year",
+          "node_type": "scene",
+          "kind": "dynamic"
+        },
+        {
+          "title": "Activities #1",
+          "node_type": "submenu",
+          "children": [
+            {
+              "title": "Date",
+              "node_type": "static"
+            },
+            {
+              "title": "Topics",
+              "node_type": "static"
+            },
+            {
+              "title": "Cover Image",
+              "node_type": "static"
+            },
+            {
+              "title": "Content (Text & Images)",
+              "node_type": "static"
+            },
+            {
+              "title": "Gallery",
+              "node_type": "module",
+              "module": "gallery",
+              "kind": "dynamic"
+            },
+            {
+              "title": "5 Related Activities",
+              "node_type": "static",
+              "kind": "dynamic"
+            },
+            {
+              "title": "Share This Page",
+              "node_type": "static"
+            }
+          ]
+        },
+        {
+          "title": "Activities #X",
+          "node_type": "submenu",
+          "note": "repeating template"
+        }
+      ]
+    },
+    {
+      "title": "Disclosure & Reporting",
+      "node_type": "menu",
+      "children": [
+        {
+          "title": "ESG KPIs & Metrics",
+          "node_type": "static"
+        },
+        {
+          "title": "Targets & Progress",
+          "node_type": "static"
+        },
+        {
+          "title": "Year-on-Year Performance",
+          "node_type": "static"
+        },
+        {
+          "title": "ESG Reporting Library",
+          "node_type": "static"
+        },
+        {
+          "title": "ESG Indexes",
+          "node_type": "static"
+        },
+        {
+          "title": "Sustainability Report",
+          "node_type": "module",
+          "module": "sustainability_report",
+          "kind": "dynamic",
+          "children": [
+            {
+              "title": "SD Report #1",
+              "node_type": "submenu",
+              "children": [
+                {
+                  "title": "Cover Image",
+                  "node_type": "static"
+                },
+                {
+                  "title": "Download PDF",
+                  "node_type": "module",
+                  "module": "download"
+                },
+                {
+                  "title": "View Online (Flipbook)",
+                  "node_type": "scene",
+                  "kind": "dynamic"
+                }
+              ]
+            },
+            {
+              "title": "SD Report #X",
+              "node_type": "submenu",
+              "note": "repeating template"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Contact Us",
+      "node_type": "menu",
+      "children": [
+        {
+          "title": "Head Office",
+          "node_type": "scene",
+          "note": "Address / Telephone / Email / Google Maps / Graphic Maps"
+        },
+        {
+          "title": "Contact Form (Email Only)",
+          "node_type": "module",
+          "module": "contact_form",
+          "kind": "form",
+          "children": [
+            {
+              "title": "Full Name*",
+              "node_type": "field"
+            },
+            {
+              "title": "Telephone",
+              "node_type": "field"
+            },
+            {
+              "title": "Email*",
+              "node_type": "field"
+            },
+            {
+              "title": "Subject*",
+              "node_type": "field"
+            },
+            {
+              "title": "Message",
+              "node_type": "field"
+            }
+          ]
+        },
+        {
+          "title": "Privacy Notice",
+          "node_type": "scene"
+        }
+      ]
+    }
+  ]
+}

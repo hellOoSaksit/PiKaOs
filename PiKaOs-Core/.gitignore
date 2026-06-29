@@ -1,0 +1,35 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+
+# secrets / env — per-component env files (Backend/.env, Frontend/.env are matched by `.env`).
+# `.env.ai` / `.env.prod` need their own lines (different names). `*.example` templates stay tracked.
+# `.env.prod` = real secrets for the prod-mode docker run (deploy/.env.prod) — NEVER commit.
+.env
+.env.ai
+.env.prod
+
+# claude code local config / tooling (kept local, not published)
+# NOTE: no per-repo CLAUDE.md — the ONE shared router lives at the umbrella root
+# (../CLAUDE.md); rules there, knowledge in ../PiKaOs-Docs/docs/.
+.claude/
+.mcp.json
+.playwright-mcp/
+
+# local debug / test artifacts (screenshots, scratch scripts)
+ratch-pair-diff.png
+Backend/smoke_*.py
+
+# python / backend
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.pytest_cache/
+.vscode/*
+!.vscode/extensions.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
