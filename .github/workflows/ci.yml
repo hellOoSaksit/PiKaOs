@@ -1,27 +1,29 @@
-# CI — makes the CLAUDE.md pre-ship checks machine-enforced, not human memory (A6).
-# Frontend: lint (react-hooks) + build + component-first guard. Backend: pytest on the
-# real stack (tests hit the live server, so we spin docker compose).
+# CI — makes the pre-ship checks machine-enforced, not human memory (A6).
+# Monorepo: the app lives under PiKaOs-Core/, so every path is prefixed with it. GitHub Actions only
+# reads workflows from the repo-root .github/, which is why this lives here (not PiKaOs-Core/.github/).
+# Frontend: lint (react-hooks) + build + component-first guard. Architecture: static plugin gates.
+# Backend: pytest on the real stack (tests hit the live server, so we spin docker compose).
 name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
 
 jobs:
   frontend:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: Frontend
+        working-directory: PiKaOs-Core/Frontend
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: Frontend/package-lock.json
+          cache-dependency-path: PiKaOs-Core/Frontend/package-lock.json
       - run: npm ci
       - name: Lint (react-hooks/rules-of-hooks = error)
         run: npm run lint
@@ -40,14 +42,14 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: Backend
+        working-directory: PiKaOs-Core/Backend
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'  # match the runtime image (Dockerfile: python:3.12-slim)
           cache: pip
-          cache-dependency-path: Backend/requirements-dev.txt
+          cache-dependency-path: PiKaOs-Core/Backend/requirements-dev.txt
       - run: pip install -r requirements-dev.txt
       - name: No forbidden imports (Core ↛ plugins · plugin ↛ sibling plugin, §2)
         run: lint-imports
@@ -58,16 +60,16 @@ jobs:
     runs-on: ubuntu-latest
     # The split stacks load gitignored .env files; seed CI with the tracked *.example (dev creds).
     env:
-      BE: docker compose -p pikaos-backend -f deploy/docker-compose.backend.yml -f deploy/docker-compose.sim.yml
+      BE: docker compose -p pikaos-backend -f PiKaOs-Core/deploy/docker-compose.backend.yml -f PiKaOs-Core/deploy/docker-compose.sim.yml
     steps:
       - uses: actions/checkout@v5
       - name: Seed env files (dev defaults)
         run: |
-          cp Backend/.env.example Backend/.env
-          cp Frontend/.env.example Frontend/.env
-          cp .env.ai.example .env.ai
+          cp PiKaOs-Core/Backend/.env.example PiKaOs-Core/Backend/.env
+          cp PiKaOs-Core/Frontend/.env.example PiKaOs-Core/Frontend/.env
+          cp PiKaOs-Core/.env.ai.example PiKaOs-Core/.env.ai
       - name: Start data stack (db, redis, minio)
-        run: docker compose -p pikaos-data -f deploy/docker-compose.data.yml up -d --wait
+        run: docker compose -p pikaos-data -f PiKaOs-Core/deploy/docker-compose.data.yml up -d --wait
       - name: Start backend stack (migrate + seed)
         run: $BE up -d --build backend
       - name: Wait for backend health
@@ -83,4 +85,4 @@ jobs:
         if: always()
         run: |
           $BE down -v
-          docker compose -p pikaos-data -f deploy/docker-compose.data.yml down -v
+          docker compose -p pikaos-data -f PiKaOs-Core/deploy/docker-compose.data.yml down -v
