@@ -26,7 +26,7 @@ Run the validator and report the result.
   keywords · related · summary · updated`); `type`/`status` from the allowed vocabulary
   ([templates/frontmatter.md](../../../PiKaOs-Docs/docs/templates/frontmatter.md)).
 - **Links / anchors / related** — within-repo targets must exist; an `#anchor` must match a heading
-  (GitHub slug). Cross-repo links (`../../PiKaOs-Main/…`) are checked only if the sibling is present.
+  (GitHub slug). Cross-repo links (`../../PiKaOs-Core/…`) are checked only if the sibling is present.
 - `templates/` bodies hold destination-relative skeleton links → skipped by design.
 
 ## Notes

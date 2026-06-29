@@ -1,7 +1,7 @@
 # CLAUDE.md — PiKaOs-Projects (shared router for all projects)
 
 The **single CLAUDE.md** for everything under `PiKaOs-Projects/`. Every project
-([`PiKaOs-Main/`](PiKaOs-Main), [`PiKaOs-Docs/`](PiKaOs-Docs), [`PiKaOs-Plugin/`](PiKaOs-Plugin))
+([`PiKaOs-Core/`](PiKaOs-Core), [`PiKaOs-Docs/`](PiKaOs-Docs), [`PiKaOs-Plugin/`](PiKaOs-Plugin))
 shares these rules. This is a **thin router**: durable always-on rules + a map into the
 doc that owns each topic. Read it, then open **only** the doc your task needs (progressive
 disclosure) — don't load the whole knowledge base.
@@ -41,7 +41,7 @@ disclosure) — don't load the whole knowledge base.
    reuse a port; update the registry in the same commit as the change.
 4. **Running an app — ask first, every time (hard rule).** Before launching/serving any app or stack,
    **ask: _"Want me to run it, or will you run it yourself?"_** and wait. If the user says you run it →
-   the **start script** ([`start.bat`](PiKaOs-Main/start.bat) / `start-*.bat`) or `docker compose up -d`
+   the **start script** ([`start.bat`](PiKaOs-Core/start.bat) / `start-*.bat`) or `docker compose up -d`
    **only** — never a hidden/backgrounded `npm run dev`/`vite`/detached dev server. (Compile checks +
    tests don't need to ask.) Detail: [pikaos-dev-rules §0](PiKaOs-Docs/docs/pikaos-dev-rules.md).
 5. **Docs discipline.** New knowledge → the doc that owns it under `PiKaOs-Docs/docs/`
@@ -81,7 +81,7 @@ disclosure) — don't load the whole knowledge base.
 
 | Project | What it is | GitHub README | Deep docs |
 |---|---|---|---|
-| [`PiKaOs-Main/`](PiKaOs-Main) | Main app — Vite+React `Frontend/`, FastAPI `Backend/`, 4-stack `deploy/` | [README](PiKaOs-Main/README.md) | [pikaos-dev-rules.md](PiKaOs-Docs/docs/pikaos-dev-rules.md) + [docs/](PiKaOs-Docs/docs/README.md) |
+| [`PiKaOs-Core/`](PiKaOs-Core) | Main app — Vite+React `Frontend/`, FastAPI `Backend/`, 4-stack `deploy/` | [README](PiKaOs-Core/README.md) | [pikaos-dev-rules.md](PiKaOs-Docs/docs/pikaos-dev-rules.md) + [docs/](PiKaOs-Docs/docs/README.md) |
 | [`PiKaOs-Docs/`](PiKaOs-Docs) | Central knowledge ( [`docs/`](PiKaOs-Docs/docs) ) + static [`design-system/`](PiKaOs-Docs/design-system) (not built) | [README](PiKaOs-Docs/README.md) | [docs/README.md](PiKaOs-Docs/docs/README.md) · [design guide](PiKaOs-Docs/design-system/Design%20System/README.md) |
 | [`PiKaOs-Plugin/PiKaOs-Compare/`](PiKaOs-Plugin/PiKaOs-Compare) | Compare (UAT vs Prod) extracted as its own app — ports `5174/8001` | [README](PiKaOs-Plugin/PiKaOs-Compare/README.md) | [features/compare.md](PiKaOs-Docs/docs/features/compare.md) |
 | [`PiKaOs-Plugin/PiKaOs-RedirectMap/`](PiKaOs-Plugin/PiKaOs-RedirectMap) | RedirectMap extracted as its own app — ports `5175/8002` | [README](PiKaOs-Plugin/PiKaOs-RedirectMap/README.md) | [plugin/redirectmap/](PiKaOs-Docs/docs/plugin/redirectmap/README.md) |
@@ -103,7 +103,7 @@ point into it). Match your task → read what it points to **first**, then work.
 |---|---|
 | Run / serve the app | **§0** — **ask first** ("I run it, or you?"), then `start.bat` / `docker compose up -d` |
 | Allocate / change a host port (any app) | **§3** + [ports.md](PiKaOs-Docs/docs/architecture/ports.md) |
-| Add / extend a UI component | **§1.1** + [`screens-library.jsx`](PiKaOs-Main/Frontend/src/screens/screens-library.jsx) |
+| Add / extend a UI component | **§1.1** + [`screens-library.jsx`](PiKaOs-Core/Frontend/src/screens/screens-library.jsx) |
 | Add / change UI text | **§1.2** (i18n) |
 | Touch login / session | **§1.3** (client) + **§4** (flow) |
 | Style / theme / tokens | **§1.4** + [design guide](PiKaOs-Docs/design-system/Design%20System/README.md) |
