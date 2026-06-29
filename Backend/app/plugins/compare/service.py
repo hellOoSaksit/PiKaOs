@@ -20,8 +20,8 @@ from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 
-from ..config import settings
-from ..schemas import (
+from ...config import settings
+from ...schemas import (
     CompareAuth, CompareIn, CompareOut, CompareSummary, CoverageBatchIn, CoveragePair,
     CoveragePlanIn, CoveragePlanOut, DeepBatchIn, DeepResult, UrlCheck,
 )

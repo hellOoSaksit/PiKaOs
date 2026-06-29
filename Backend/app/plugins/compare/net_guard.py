@@ -25,7 +25,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from ..config import settings
+from ...config import settings
 
 
 class BlockedURLError(Exception):

@@ -34,7 +34,7 @@ from ..config import settings
 from ..db import SessionLocal
 from ..logging_ctx import bind_run, reset_run
 from ..repositories import runs as runs_repo
-from . import events, retrieval_service
+from . import events
 
 log = logging.getLogger("pikaos.engine")
 
@@ -73,6 +73,13 @@ class ToolRegistry(Protocol):
     def schemas(self) -> list[dict]: ...
     def effect_of(self, name: str) -> str: ...
     async def call(self, name: str, args: dict, *, idempotency_key: str) -> dict: ...
+
+
+class Retriever(Protocol):
+    """Optional RAG source the engine injects at runtime — so the engine never imports the knowledge
+    plugin (modularity §2). A build without knowledge passes `retriever=None` → the agent runs without
+    retrieved context. The knowledge plugin's KnowledgeRetriever structurally matches this."""
+    async def retrieve_context(self, db, *, owner_id, run_input: dict | None, k: int) -> str: ...
 
 
 # --- pure helpers (no DB/Redis — unit-tested directly, like rbac_service.resolve_perms) ---
@@ -131,6 +138,7 @@ async def run(
     *,
     provider: LLMProvider,
     tools: ToolRegistry,
+    retriever: "Retriever | None" = None,
     db_factory=SessionLocal,
 ) -> str:
     """Execute (or resume) one agent run to a terminal status. Returns the final status.
@@ -198,11 +206,10 @@ async def run(
         # RAG (E3): prepend top-k codex context, scoped to the run owner. Off unless configured
         # (engine_retrieval_top_k > 0). Side-effect-free (no step, no quota) → safe to re-derive on
         # resume; failures must never sink a run, so retrieval is best-effort.
-        if settings.engine_retrieval_top_k > 0:
+        if retriever is not None and settings.engine_retrieval_top_k > 0:
             try:
-                ctx = await retrieval_service.context_for_run(
-                    db, owner_id=owner_id, query=retrieval_service.query_from_input(run_row.input),
-                    k=settings.engine_retrieval_top_k,
+                ctx = await retriever.retrieve_context(
+                    db, owner_id=owner_id, run_input=run_row.input, k=settings.engine_retrieval_top_k,
                 )
                 if ctx:
                     messages.insert(0, {"role": "system", "content": ctx})
@@ -301,12 +308,17 @@ async def run(
 # --- worker entrypoint glue ---
 # The provider + tool registry are configured once at worker startup (B4 stubs / C1 adapters)
 # via set_engine_runtime, so the arq `agent_run` job stays a thin shim over run().
-_runtime: tuple[LLMProvider, ToolRegistry] | None = None
+_runtime: tuple[LLMProvider, ToolRegistry, "Retriever | None"] | None = None
 
 
-def set_engine_runtime(provider: LLMProvider, tools: ToolRegistry) -> None:
+def set_engine_runtime(
+    provider: LLMProvider, tools: ToolRegistry, retriever: "Retriever | None" = None
+) -> None:
+    """Wire the engine's runtime deps once at worker startup. `retriever` is optional and injected by
+    the composition root (worker) only when the knowledge plugin is active — so the engine stays
+    decoupled from knowledge (modularity §2)."""
     global _runtime
-    _runtime = (provider, tools)
+    _runtime = (provider, tools, retriever)
 
 
 async def run_job(run_id: str) -> str:
@@ -316,10 +328,10 @@ async def run_job(run_id: str) -> str:
     attributed to this run and nothing leaks into the next job on the worker (B7)."""
     if _runtime is None:
         raise RuntimeError("engine runtime not configured — call set_engine_runtime() at worker startup (B4)")
-    provider, tools = _runtime
+    provider, tools, retriever = _runtime
     token = bind_run(run_id=str(run_id))
     try:
-        return await run(run_id, provider=provider, tools=tools)
+        return await run(run_id, provider=provider, tools=tools, retriever=retriever)
     finally:
         reset_run(token)
 

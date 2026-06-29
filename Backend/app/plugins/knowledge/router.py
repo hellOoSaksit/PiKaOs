@@ -12,12 +12,12 @@ import uuid
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import queue
-from ..config import settings
-from ..db import get_db
-from ..deps import require_perm
-from ..models import User
-from ..schemas import (
+from ... import queue
+from ...config import settings
+from ...db import get_db
+from ...deps import require_perm
+from ...models import User
+from ...schemas import (
     DocumentListOut,
     DocumentOut,
     KnowledgeAnswerIn,
@@ -26,9 +26,9 @@ from ..schemas import (
     KnowledgeSearchOut,
     KnowledgeSearchResult,
 )
-from ..services import answer_service, knowledge_service
-from ..services.embeddings import get_embedder
-from ..services.llm_config_service import ConfiguredLLMProvider
+from . import answer_service, knowledge_service
+from ...services.embeddings import get_embedder
+from ...services.llm_config_service import ConfiguredLLMProvider
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
 

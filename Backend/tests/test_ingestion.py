@@ -17,9 +17,9 @@ from app import storage
 from app.config import settings
 from app.db import register_pgvector
 from app.models import Document
-from app.repositories import doc_chunks as chunks_repo
-from app.repositories import documents as docs_repo
-from app.services import ingestion_service
+from app.plugins.knowledge import doc_chunks as chunks_repo
+from app.plugins.knowledge import documents as docs_repo
+from app.plugins.knowledge import ingestion_service
 from app.services.embeddings import StubEmbedder
 
 _MD = "# Intro\nhello world\n\n## Details\nmore body text here\n\n## More\nand even more"

@@ -13,7 +13,7 @@ from urllib.parse import unquote, urljoin, urlsplit
 
 import httpx
 
-from ..config import settings
+from ...config import settings
 
 _SKIP = {"script", "style", "noscript", "template", "svg"}
 # page CHROME (menu/header/footer/sidebar) — excluded from body text + content blocks so the

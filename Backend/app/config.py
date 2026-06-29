@@ -17,12 +17,22 @@ class Settings(BaseSettings):
     # --- core ---
     app_name: str = "PiKaOs API"
     environment: str = "development"
+    # The release version of FE+BE+migrations+flags moving as one unit (release-and-rollback.md §7).
+    # Declared ONCE here (versions.md registry rule) — surfaced in /api/health, /api/version, and the
+    # OpenAPI title. Bump per versions.md §… (MINOR on behaviour/schema, PATCH on fix).
+    app_version: str = "0.1.0"
+    # Immutable build identity (git sha / CI run). Set at image-build time via the BUILD_HASH ARG→ENV;
+    # "dev" on a local checkout. Drives version-skew detection — the SPA compares its own build hash to
+    # /api/version and prompts a reload on mismatch (release-and-rollback.md §4).
+    build_hash: str = "dev"
 
-    # --- modules (pluggable Modular Monolith — docs/architecture/modularity.md §2.5) ---
-    # Which OPTIONAL modules this build serves; core + infra always load. A department can run a
-    # lightweight build by listing only what it needs (e.g. "compare"). "*" / empty = all of them.
-    # Comma-separated allowlist of module names — see app/modules.py for the registry.
-    enabled_modules: str = "*"
+    # --- modules: Base + plugins (Modular Monolith — docs/architecture/modularity.md §2.5/§3) ---
+    # Which PLUGINS this build loads ON TOP OF the Base. The **Base always loads** (infra + core +
+    # engine = the agent runtime); plugins (knowledge/compare/…) are opt-in so a clean/prod deploy is
+    # just the Base, ready for plugins later. Values: "" / unset = Base only (DEFAULT) · "*" = all
+    # plugins (full build) · comma-list = those plugins. Dev runs the full build via ENABLED_MODULES=*
+    # in Backend/.env so plugin code is exercised. See app/modules.py for the registry.
+    enabled_modules: str = ""
 
     # --- database (async SQLAlchemy / asyncpg) ---
     database_url: str = "postgresql+asyncpg://pikaos:pikaos@db:5432/pikaos"
@@ -144,7 +154,7 @@ class Settings(BaseSettings):
     embed_search_top_k: int = 5
     # --- RAG retrieval into the agent loop (E3) ---
     # Top-k codex chunks injected as context before an agent run (scoped to the run owner's read
-    # permissions — services/retrieval_service.py). 0 = OFF (default → existing behaviour + engine
+    # permissions — app/plugins/knowledge/retrieval_service.py). 0 = OFF (default → existing behaviour + engine
     # tests unchanged); set >0 to turn agent retrieval on. Re-derived per run/resume, no quota cost.
     engine_retrieval_top_k: int = 0
 
@@ -179,6 +189,20 @@ class Settings(BaseSettings):
     anthropic_base_url: str = "https://api.anthropic.com"
     anthropic_version: str = "2023-06-01"
     anthropic_default_model: str = "claude-opus-4-8"
+
+    # --- Telegram channel (features/telegram-integration.md) ---
+    # The bot TOKEN is NOT here (no-hardcode) — it lives encrypted in telegram_connections, set from
+    # the UI. These are only transport tunables. Base is overridable for tests/proxy.
+    telegram_api_base: str = "https://api.telegram.org"
+    # Long-poll hold time for getUpdates (polling mode) — 30–60s avoids hammering Telegram.
+    telegram_poll_timeout_s: float = 50.0
+    # Per-call HTTP timeout for Bot API requests (must exceed telegram_poll_timeout_s for getUpdates).
+    telegram_request_timeout_s: float = 60.0
+    # Reply formatting — MarkdownV2 (escape user content) or HTML; "" = plain text.
+    telegram_parse_mode: str = "MarkdownV2"
+    # Public base URL of THIS deployment (e.g. https://app.example.com) — used to build the
+    # setWebhook callback URL in webhook mode. Empty → webhook mode can't self-register (polling only).
+    public_base_url: str = ""
 
     # --- CORS (frontend dev origin) ---
     cors_origins: str = "http://localhost:5173"

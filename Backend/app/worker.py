@@ -21,8 +21,8 @@ from . import modules
 from .config import settings
 from .db import SessionLocal
 from .logging_ctx import configure_worker_logging
-from .services import agent_runner, ingestion_service
-from .services.embeddings import get_embedder
+from .services import agent_runner
+from .services.embeddings import get_embedder  # Base shared infra (used by db/models/config too)
 from .services.engine_stubs import StubToolRegistry
 from .services.llm_config_service import ConfiguredLLMProvider
 
@@ -44,6 +44,8 @@ async def ingest_document(ctx, doc_id: str) -> str:
     from config per job (stub by default), so flipping `embed_provider` needs no code change.
     When `ingest_summary_enabled` (E7 enrich B) the doc is also summarized via the 'summarize'
     role — best-effort, off by default so ingest stays free/offline."""
+    from .plugins.knowledge import ingestion_service  # plugin import inside the gated job (Base stays clean)
+
     embedder = get_embedder()
     summarizer = ConfiguredLLMProvider(role="summarize") if settings.ingest_summary_enabled else None
     async with SessionLocal() as db:
@@ -58,13 +60,22 @@ async def startup(ctx) -> None:
     resolved from the DB (llm_connections) per call with a short cache, falling back to the
     .env provider — so an admin's UI change applies without a restart. Tools stay stub until C5."""
     configure_worker_logging()
-    agent_runner.set_engine_runtime(ConfiguredLLMProvider(), StubToolRegistry())
+    # Inject RAG only when the knowledge plugin is active → the engine stays decoupled from knowledge
+    # (modularity §2). No knowledge plugin → retriever=None → the agent runs without retrieved context.
+    retriever = None
+    if modules.is_module_active("knowledge"):
+        from .plugins.knowledge.retriever import KnowledgeRetriever
+
+        retriever = KnowledgeRetriever()
+    agent_runner.set_engine_runtime(ConfiguredLLMProvider(), StubToolRegistry(), retriever=retriever)
     log.info("pikaos worker up — structured logging on · engine runtime: DB-configured LLM "
-             "(env fallback: %s) + stub tools", settings.llm_provider)
+             "(env fallback: %s) + stub tools · RAG retriever: %s",
+             settings.llm_provider, "on" if retriever else "off")
 
 
-# Jobs owned by an optional module — loaded only when that module is enabled (modularity.md §2.5),
-# so a build without the engine doesn't advertise agent_run, etc. `ping` is infra (always on).
+# Jobs keyed by their module — loaded only when that module is active (modularity.md §2.5). `engine`
+# is part of the Base now, so `agent_run` always loads; `knowledge` is a plugin, so `ingest_document`
+# loads only when that plugin is enabled. `ping` is infra (always on).
 _MODULE_JOBS = {
     "engine": [func(agent_run, keep_result=3600)],
     "knowledge": [ingest_document],

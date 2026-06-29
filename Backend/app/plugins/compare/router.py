@@ -10,15 +10,15 @@ import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from ..deps import get_current_user
-from ..models import User
-from ..schemas import (
+from ...deps import get_current_user
+from ...models import User
+from ...schemas import (
     CompareIn, CompareOut, CoverageBatchIn, CoverageBatchOut, CoveragePlanIn,
     CoveragePlanOut, DeepBatchIn, DeepBatchOut,
 )
-from ..services import compare_service
-from ..services.net_guard import BlockedURLError
-from ..services.sitemap import SitemapError
+from . import service as compare_service
+from .net_guard import BlockedURLError
+from .sitemap import SitemapError
 
 router = APIRouter(prefix="/api/compare", tags=["compare"])
 

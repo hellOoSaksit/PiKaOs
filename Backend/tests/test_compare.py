@@ -15,10 +15,10 @@ import httpx
 import pytest
 
 from app.schemas import CompareAuth, CompareIn, CoverageBatchIn, CoveragePair, CoveragePlanIn, DeepBatchIn
-from app.services import compare_service as cs
-from app.services.compare_service import _classify, _make_client, default_sitemap_url, swap_origin
-from app.services.content import embeddable, extract
-from app.services.sitemap import SitemapError, parse_sitemap_xml
+from app.plugins.compare import service as cs
+from app.plugins.compare.service import _classify, _make_client, default_sitemap_url, swap_origin
+from app.plugins.compare.content import embeddable, extract
+from app.plugins.compare.sitemap import SitemapError, parse_sitemap_xml
 
 BASE = os.environ.get("TEST_BASE_URL", "http://localhost:8000")
 
@@ -155,7 +155,7 @@ class _FakeRequest:
 
 def test_run_cancellable_cancels_coro_on_disconnect():
     from fastapi import HTTPException
-    from app.routers.compare import CLIENT_CLOSED, _run_cancellable
+    from app.plugins.compare.router import CLIENT_CLOSED, _run_cancellable
 
     observed = {"cancelled": False}
 
@@ -180,7 +180,7 @@ def test_run_cancellable_cancels_coro_on_disconnect():
 
 
 def test_run_cancellable_returns_result_when_connected():
-    from app.routers.compare import _run_cancellable
+    from app.plugins.compare.router import _run_cancellable
 
     async def work():
         return "ok"

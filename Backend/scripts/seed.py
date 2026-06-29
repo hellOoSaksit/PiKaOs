@@ -40,6 +40,10 @@ SEED_PERMISSIONS = [
     ("agent.delete.any", "Agents", "ลบ Agent ของผู้อื่น", "Delete any agent"),
     ("quest.run", "Work", "สั่งรันงาน/เควส", "Run quests"),
     ("task.delete", "Work", "ลบงาน (Task)", "Delete tasks"),
+    # Chat access (channel-agnostic — enforced by the Telegram bot today, the web chat later).
+    # Two tiers per the access model in features/telegram-integration.md: read-only vs read+command.
+    ("chat.read", "Chat", "อ่าน/รับข้อความจาก agent ผ่านแชต (อ่านอย่างเดียว)", "Read agent chat (read-only)"),
+    ("chat.use", "Chat", "อ่าน + สั่งงาน agent ผ่านแชต", "Use agent chat (read & command)"),
     ("codex.view", "Knowledge", "ดู/ค้นหาคลังความรู้", "View & search codex"),
     ("codex.manage", "Knowledge", "อัปโหลด/จัดการเนื้อหาคลังความรู้", "Upload & manage codex content"),
     ("codex.delete", "Knowledge", "ลบเอกสารในคลังความรู้", "Delete codex documents"),
@@ -60,6 +64,7 @@ SEED_PERMISSIONS = [
     ("llm.manage", "Admin", "ตั้งค่า LLM/โมเดล (provider/API หรือ Local)", "Manage LLM provider config"),
     ("llm.assign", "Admin", "มอบหมายโมเดลให้ระบบ (engine/search/summarize)", "Assign LLM to system roles"),
     ("infra.manage", "Admin", "ดู/ทดสอบการเชื่อมต่อ Storage/ระบบภายนอก", "View/test infrastructure connections"),
+    ("telegram.manage", "Admin", "ตั้งค่าบอท Telegram (เชื่อมต่อ/webhook)", "Manage Telegram bot connection"),
 ]
 _PERM_KEYS = [p[0] for p in SEED_PERMISSIONS]
 
@@ -73,13 +78,13 @@ SEED_ROLES = [
 SEED_ROLE_PERMS = {
     "admin": list(_PERM_KEYS),
     "manager": ["agent.create", "agent.edit.any", "agent.delete.any", "quest.run",
-                "codex.view", "codex.manage", "codex.delete",
+                "codex.view", "codex.manage", "codex.delete", "chat.use",
                 "workflow.manage", "user.view.any", "audit.view", "room.build", "room.place",
                 "room.move", "room.reset", "room.create", "room.delete", "room.template",
                 "options.manage", "character.manage", "rules.manage", "agent.config", "task.delete"],
-    "member": ["agent.create", "quest.run", "codex.view", "codex.manage", "codex.delete",
+    "member": ["agent.create", "quest.run", "codex.view", "codex.manage", "codex.delete", "chat.use",
                "workflow.manage", "room.build", "room.place", "room.move"],
-    "viewer": ["codex.view"],
+    "viewer": ["codex.view", "chat.read"],
 }
 
 # username -> {perm_key: allow(bool)}  (frontend "grant"/"deny" -> True/False)

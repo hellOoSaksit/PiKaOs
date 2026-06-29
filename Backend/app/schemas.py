@@ -69,9 +69,19 @@ class LoginResult(BaseModel):
 
 class HealthOut(BaseModel):
     status: str
+    version: str       # app_version (versions.md registry — surfaced here per the SSOT rule)
+    build: str         # build_hash (immutable build identity)
     db: str
     redis: str
     minio: str
+
+
+class VersionOut(BaseModel):
+    """Lightweight liveness + build identity — no dependency I/O, so it's safe as the container
+    HEALTHCHECK probe and as the SPA's version-skew check (release-and-rollback.md §4/§7)."""
+    version: str       # app_version
+    build: str         # build_hash
+    name: str          # app_name
 
 
 # --- knowledge / document store (markdown-as-truth — docs/architecture/knowledge-rag.md) ---

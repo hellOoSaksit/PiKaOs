@@ -32,6 +32,21 @@ async def test_health():
         body = r.json()
         assert body["db"] == "ok"
         assert body["redis"] == "ok"
+        # version/build are surfaced here per the versions.md registry rule
+        assert body["version"] == settings.app_version
+        assert body["build"] == settings.build_hash
+
+
+@pytest.mark.asyncio
+async def test_version():
+    # liveness probe — no deps, so it must answer even when a datastore is down (the HEALTHCHECK relies on this)
+    async with client() as c:
+        r = await c.get("/api/version")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["version"] == settings.app_version
+        assert body["build"] == settings.build_hash
+        assert body["name"] == settings.app_name
 
 
 @pytest.mark.asyncio

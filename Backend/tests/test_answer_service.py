@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 
-from app.services import answer_service as asvc
+from app.plugins.knowledge import answer_service as asvc
 
 
 class _Result:

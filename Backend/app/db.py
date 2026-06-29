@@ -14,7 +14,7 @@ from .config import settings
 def register_pgvector(eng: AsyncEngine) -> AsyncEngine:
     """Register pgvector's asyncpg codec on every connection this engine opens, so the RAG repo
     binds/reads embeddings as `list[float]` directly instead of formatting a `'[..]'::vector`
-    string literal (repositories/doc_chunks.py). The `vector` type must exist — it does once
+    string literal (app/plugins/knowledge/doc_chunks.py). The `vector` type must exist — it does once
     migration 0005 has run `CREATE EXTENSION vector`, which is before any app/test query.
 
     Returns the engine so the call site can wrap creation in one expression. Tests that build

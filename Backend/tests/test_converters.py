@@ -7,7 +7,7 @@ extractor here (the extractors themselves wrap pypdf/mammoth, exercised live in 
 """
 from __future__ import annotations
 
-from app.services import converters
+from app.plugins.knowledge import converters
 
 
 def test_text_kinds_decode_as_is():

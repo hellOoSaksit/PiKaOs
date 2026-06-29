@@ -6,7 +6,7 @@ Pure functions — driven directly, no I/O.
 """
 from __future__ import annotations
 
-from app.services.chunking import chunk_markdown
+from app.plugins.knowledge.chunking import chunk_markdown
 
 
 def test_splits_along_headings():

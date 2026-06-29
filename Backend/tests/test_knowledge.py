@@ -18,8 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.config import settings
 from app.models import Department, Document, User
-from app.repositories import documents as docs_repo
-from app.services import knowledge_service as ks
+from app.plugins.knowledge import documents as docs_repo
+from app.plugins.knowledge import knowledge_service as ks
 
 
 # --- pure helpers -----------------------------------------------------------

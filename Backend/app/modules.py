@@ -17,8 +17,9 @@ from dataclasses import dataclass
 from fastapi import APIRouter, FastAPI
 
 from .config import settings
-from .routers import auth, compare, health, knowledge, llm_config, settings_config, ws
+from .routers import auth, health, llm_config, settings_config, ws
 from .routers import storage as storage_router
+from .plugins import compare, knowledge  # plugin folders app/plugins/<name>/ (extraction-plan.md)
 
 
 @dataclass(frozen=True)
@@ -31,9 +32,11 @@ class Module:
     optional: bool = True
 
 
-# The single source of truth for module → router wiring. Foundation first (always on), then the
-# switchable contexts. Keep this list in sync with worker.py's job map (the other half of §2.5).
+# The single source of truth for module → router wiring. The **Base** (foundation, always on —
+# infra + core + engine = the agent runtime) first, then the **plugins** (opt-in via ENABLED_MODULES).
+# Keep this list in sync with worker.py's job map (the other half of §2.5).
 MODULES: tuple[Module, ...] = (
+    # --- Base: the agent runtime plugins attach to (always loads, ignores ENABLED_MODULES) ---
     Module("infra", routers=(health.router,), optional=False),
     Module(
         "core",  # identity / access / system config every module relies on
@@ -41,22 +44,26 @@ MODULES: tuple[Module, ...] = (
                  settings_config.router),
         optional=False,
     ),
-    Module("engine", routers=(ws.router,)),            # agent-ops live quest stream (CRUD lands in phase D)
+    Module("engine", routers=(ws.router,), optional=False),  # agent-ops runtime — part of the Base
+    # --- Plugins: off unless listed in ENABLED_MODULES ("" = Base only, "*" = all) ---
     Module("knowledge", routers=(knowledge.router,)),  # codex / documents / RAG
-    Module("compare", routers=(compare.router,)),      # UAT vs Prod (stateless)
+    Module("compare", routers=(compare.router,)),      # UAT vs Prod (also the PiKaOs-Compare plugin)
 )
 
-# Optional module names a deployment may toggle via ENABLED_MODULES.
+# Plugin names a deployment may switch on via ENABLED_MODULES (everything not in the Base).
 OPTIONAL_MODULE_NAMES: tuple[str, ...] = tuple(m.name for m in MODULES if m.optional)
 
 
 def enabled_optional_modules() -> set[str]:
-    """The optional modules this build should serve, parsed from `settings.enabled_modules`.
-    "*" or empty = all optional modules; otherwise the comma-separated allowlist, intersected with
-    the known names (an unknown name is ignored, never an error that takes the app down)."""
-    raw = (settings.enabled_modules or "*").strip()
-    if raw in ("", "*"):
+    """The PLUGINS this build loads on top of the Base, parsed from `settings.enabled_modules`:
+    "" / unset = **Base only, no plugins** (the default) · "*" = every plugin (full build) ·
+    a comma-list = those plugins, intersected with the known names (an unknown name is ignored,
+    never an error that takes the app down)."""
+    raw = (settings.enabled_modules or "").strip()
+    if raw == "*":
         return set(OPTIONAL_MODULE_NAMES)
+    if raw == "":
+        return set()
     wanted = {p.strip() for p in raw.split(",") if p.strip()}
     return wanted & set(OPTIONAL_MODULE_NAMES)
 

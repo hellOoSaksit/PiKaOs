@@ -12,7 +12,7 @@ from sqlalchemy import delete as sql_delete
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import Document, UserDepartment
+from ...models import Document, UserDepartment
 
 
 async def user_department_ids(db: AsyncSession, user_id: uuid.UUID) -> list[uuid.UUID]:

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 
-from app.services import summarize_service as ss
+from app.plugins.knowledge import summarize_service as ss
 
 
 class _Result:

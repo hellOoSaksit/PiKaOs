@@ -13,10 +13,10 @@ from __future__ import annotations
 
 import uuid
 
-from ..repositories import doc_chunks as chunks_repo
-from ..repositories import documents as docs_repo
-from ..repositories import users as users_repo
-from .embeddings import Embedder, get_embedder
+from . import doc_chunks as chunks_repo
+from . import documents as docs_repo
+from ...repositories import users as users_repo
+from ...services.embeddings import Embedder, get_embedder
 
 
 def query_from_input(run_input: dict | None) -> str:

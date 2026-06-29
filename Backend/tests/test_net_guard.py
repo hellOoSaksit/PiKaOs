@@ -15,8 +15,8 @@ import httpx
 import pytest
 
 from app.config import settings
-from app.services import compare_service as cs
-from app.services.net_guard import BlockedURLError, assert_public_url
+from app.plugins.compare import service as cs
+from app.plugins.compare.net_guard import BlockedURLError, assert_public_url
 
 
 @contextmanager
