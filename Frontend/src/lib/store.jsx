@@ -1,4 +1,4 @@
-/* PiKaOs — ES module (migrated from PiKaOs-Main/store.jsx). */
+/* PiKaOs — ES module (migrated from PiKaOs-Core/store.jsx). */
 import React from 'react';
 import { CLASS_OPTS } from './sprites.jsx';
 

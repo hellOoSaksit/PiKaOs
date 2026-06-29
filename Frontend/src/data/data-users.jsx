@@ -1,4 +1,4 @@
-/* PiKaOs — ES module (migrated from PiKaOs-Main/data-users.jsx). */
+/* PiKaOs — ES module (migrated from PiKaOs-Core/data-users.jsx). */
 
 /* ============================================================
    USERS / RBAC / AUDIT — real people who log in (distinct from agents).

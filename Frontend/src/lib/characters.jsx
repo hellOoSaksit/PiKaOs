@@ -1,4 +1,4 @@
-/* PiKaOs — ES module (migrated from PiKaOs-Main/characters.jsx). */
+/* PiKaOs — ES module (migrated from PiKaOs-Core/characters.jsx). */
 import React from 'react';
 
 /* ============================================================

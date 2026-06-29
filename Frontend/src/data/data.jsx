@@ -1,4 +1,4 @@
-/* PiKaOs — ES module (migrated from PiKaOs-Main/data.jsx). Pure data — no imports. */
+/* PiKaOs — ES module (migrated from PiKaOs-Core/data.jsx). Pure data — no imports. */
 
 /* ============================================================
    GUILD DATA — AI multi-agent system framed as an adventurer guild

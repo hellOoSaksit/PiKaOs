@@ -1,4 +1,4 @@
-/* PiKaOs — ES module (migrated from PiKaOs-Main/office-data.jsx). */
+/* PiKaOs — ES module (migrated from PiKaOs-Core/office-data.jsx). */
 
 /* ============================================================
    OFFICE DESIGNER — data: isometric geometry, furniture catalog,

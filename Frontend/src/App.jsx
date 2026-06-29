@@ -1,4 +1,4 @@
-/* PiKaOs — ES module (migrated from PiKaOs-Main/app.jsx). */
+/* PiKaOs — ES module (migrated from PiKaOs-Core/app.jsx). */
 import React from 'react';
 import { createPortal } from 'react-dom';
 const { useState, useEffect } = React;

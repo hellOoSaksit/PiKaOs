@@ -1,4 +1,4 @@
-/* PiKaOs — ES module (migrated from PiKaOs-Main/screens-sitemap.jsx).
+/* PiKaOs — ES module (migrated from PiKaOs-Core/screens-sitemap.jsx).
    หน้านี้ใช้ระบบ i18n แบบ key-based เต็มรูปแบบ — ทุกข้อความมาจาก t("key")
    (ไฟล์คำแปล: src/data/i18n/<lang>-<style>.json) ไม่มี hardcode ข้อความในโค้ด */
 import React from 'react';

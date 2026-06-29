@@ -1,4 +1,4 @@
-/* PiKaOs — ES module (migrated from PiKaOs-Main/screens-me.jsx). */
+/* PiKaOs — ES module (migrated from PiKaOs-Core/screens-me.jsx). */
 import React from 'react';
 const { useState } = React;
 import { ActivityRow, Btn, Empty, Meter, Panel, QuestCard, RankGem, StatusBadge } from '../components/components.jsx';

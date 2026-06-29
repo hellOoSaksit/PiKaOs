@@ -1,4 +1,4 @@
-/* PiKaOs — ES module (migrated from PiKaOs-Main/screens-main.jsx). */
+/* PiKaOs — ES module (migrated from PiKaOs-Core/screens-main.jsx). */
 import React from 'react';
 const { useState, useEffect, useRef } = React;
 import { ActivityRow, AgentCard, Btn, ChatMessage, FeatureTag, HelpNote, PageHead, Panel, QuestCard, StatTile, TypingDots } from '../components/components.jsx';

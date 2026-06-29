@@ -1,4 +1,4 @@
-/* PiKaOs — ES module (migrated from PiKaOs-Main/room-store.jsx). */
+/* PiKaOs — ES module (migrated from PiKaOs-Core/room-store.jsx). */
 import React from 'react';
 const { useState, useEffect, useRef } = React;
 import { FURN, objCells } from './room-tiles.jsx';

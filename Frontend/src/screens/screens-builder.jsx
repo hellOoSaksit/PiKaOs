@@ -1,4 +1,4 @@
-/* PiKaOs — ES module (migrated from PiKaOs-Main/screens-builder.jsx). */
+/* PiKaOs — ES module (migrated from PiKaOs-Core/screens-builder.jsx). */
 import React from 'react';
 const { useState, useRef } = React;
 import { addCharacter, addOption, addProfile, loadCharacters, loadCoreRules, loadOptions, loadProfiles, loadSkillDocs, processCharacterSheets, profileNameExists, removeCharacter, removeOption, removeProfile, saveCoreRules } from '../lib/characters.jsx';

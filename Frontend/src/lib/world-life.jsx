@@ -1,4 +1,4 @@
-/* PiKaOs — ES module (migrated from PiKaOs-Main/world-life.jsx). */
+/* PiKaOs — ES module (migrated from PiKaOs-Core/world-life.jsx). */
 
 
 /* ============================================================

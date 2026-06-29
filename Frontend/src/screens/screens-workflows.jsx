@@ -1,4 +1,4 @@
-/* PiKaOs — ES module (migrated from PiKaOs-Main/screens-workflows.jsx). */
+/* PiKaOs — ES module (migrated from PiKaOs-Core/screens-workflows.jsx). */
 import React from 'react';
 const { useState } = React;
 import { Btn, Empty, HelpNote, PageHead, Panel, StatTile } from '../components/components.jsx';

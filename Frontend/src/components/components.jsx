@@ -1,4 +1,4 @@
-/* PiKaOs — ES module (migrated from PiKaOs-Main/components.jsx). */
+/* PiKaOs — ES module (migrated from PiKaOs-Core/components.jsx). */
 import React from 'react';
 import { byId, statusTh } from '../data/data.jsx';
 import { CharacterSprite } from '../screens/screens-world.jsx';
