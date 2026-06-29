@@ -3,7 +3,7 @@ title: Plugin architecture — strict Core + Plugins contract (PiKaOs)
 type: architecture
 status: design
 keywords: [plugin, architecture, core, app, manifest, loader, event-bus, dependency-injection, contract-test, removability, import-linter, isolation, namespacing, migration]
-related: [./modularity.md, ./extraction-plan.md, ./repo-split-plan.md, ./system-design.md, ../plugin/README.md, ./versions.md, ./ports.md]
+related: [./modularity.md, ./extraction-plan.md, ./monorepo-consolidation.md, ./system-design.md, ../plugin/README.md, ./versions.md, ./ports.md]
 summary: >
   The enforceable Core + Plugins contract PiKaOs is migrating to, adopted from the new-project kit
   (the source of truth). Core = infrastructure only; the AI/agent runtime and every feature are
@@ -36,16 +36,21 @@ updated: 2026-06-29
 - **The AI runs on its own server, still part of Core.** `engine`'s heavy execution (the arq worker,
   `deploy/docker-compose.ai.yml`) is a **separate deploy tier** of Core — Core is split across servers, not
   split into a plugin. "AI on another server" = a deployment fact, not a plugin boundary.
-- **Full repo split** (D2, 2026-06-29): the umbrella holds **`PiKaOs-Core`** (rename of `PiKaOs-Core`,
-  includes `engine`), **`PiKaOs-App`** (new — the composition root), **`PiKaOs-Plugin/<id>/`** (every
-  *feature*), **`PiKaOs-Docs`**.
+- **Single monorepo** (D2 — **revised 2026-06-29**, supersedes the earlier "full repo split"): the kit is
+  itself **one git repo** with `core/`/`app/`/`plugins/` *folders*, and isolation is enforced by the CI
+  gates (import-linter · manifest · removal-isolation), **not** by repo boundaries — so separate git repos
+  bought overhead (cross-repo packaging, version drift) without isolation. `PiKaOs-Projects/` is therefore
+  **one repo**: `PiKaOs-Core/` (incl. `engine`), `PiKaOs-App/` (composition root), `PiKaOs-Plugin/<id>/`
+  *features*, and `PiKaOs-Docs/` are **folders** in it. The **own-app** plugins (Compare, RedirectMap) are
+  the only things that stay separate git repos (own remotes + deploy). See
+  [monorepo-consolidation.md](monorepo-consolidation.md) for the consolidation record + remaining steps (remote, CI move).
 - **Stack mapping:** the kit's `dependency-cruiser` (JS) → **`import-linter`** (Python) for the backend; the
   TS `index.ts` lifecycle → a Python plugin package exposing `register()/boot()/shutdown()/enable()/disable()`.
 
 ## 1. Target structure
 
 ```
-PiKaOs-Project/                     umbrella (thin git): CLAUDE.md · AGENTS.md · llms.txt
+PiKaOs-Projects/                    the monorepo root (one git repo): CLAUDE.md · AGENTS.md · llms.txt
 ├── PiKaOs-Core/                    base infra + agent-runtime platform — knows no FEATURE
 │   └── app/ { config · db · cache · crypto · deps · auth · rbac · storage · settings
 │              · plugin_loader · router · container(DI) · event_bus · main(framework)
@@ -238,10 +243,12 @@ Each phase leaves the system runnable + verifiable:
    `{id, version, state}` with **version read from the manifest** (§14, never hardcoded → versions.md) and
    state `active`/`disabled` (disabled plugins still listed). Route namespacing (§6) is now Loader-enforced:
    a manifest `routes` entry must carry the plugin's `/{id}` segment, so two plugins can't collide on a URL.
-5. **Repo split** — 🔵 **design ready, awaiting decision** ([repo-split-plan.md](repo-split-plan.md)): create
-   `PiKaOs-App` (composition root), make Core a library, move **features** to `PiKaOs-Plugin/<id>/` (engine
-   stays in Core; its arq worker stays a Core deploy tier). Gated on the cross-repo dependency/deploy model
-   (installable packages + entry-points vs workspace path deps) — **hard to reverse, so it needs sign-off**.
+5. **Monorepo consolidation** ✅ (2026-06-29, replaces the old "repo split") — D2 revised to a single repo
+   ([monorepo-consolidation.md](monorepo-consolidation.md)): `PiKaOs-Core`/`PiKaOs-Docs`/`PiKaOs-App` collapsed from
+   separate git repos into **folders** of `PiKaOs-Projects/` (history bundled + on the old remotes; code
+   byte-identical). Own-app plugins (Compare, RedirectMap) stay separate repos. The internal `core/`↔
+   `plugins/` folder move + the `PiKaOs-App` composition root remain (Phase 1b + below). Remaining: pick the
+   monorepo remote + move CI workflows to root `.github/` with `PiKaOs-Core/` path prefixes.
 6. **Frontend** — per-plugin frontend modules (pages/routes/i18n/state).
 
 ## 17. Design principles (the why)

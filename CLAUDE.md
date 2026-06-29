@@ -6,11 +6,16 @@ shares these rules. This is a **thin router**: durable always-on rules + a map i
 doc that owns each topic. Read it, then open **only** the doc your task needs (progressive
 disclosure) — don't load the whole knowledge base.
 
+> **One repo (hard rule).** `PiKaOs-Projects/` is a **single git monorepo** — `PiKaOs-Core/`,
+> `PiKaOs-Docs/`, `PiKaOs-App/` are plain **folders** (their old separate git repos were collapsed
+> in; plugin isolation is enforced by the CI gates, not by repo boundaries). The own-app plugins under
+> `PiKaOs-Plugin/` are the **only** things that stay separate git repos (own remotes + deploy).
+>
 > **Where things live (hard rule).** Project **knowledge → `docs/` only** (centralized in
-> [`PiKaOs-Docs/docs/`](PiKaOs-Docs/docs)). Each repo's **`README.md` is for GitHub** — what
-> the project is, for humans browsing the repo — **never** project knowledge. **This file is
-> the only CLAUDE.md** — don't re-create per-repo ones; Claude Code auto-loads this from any
-> sub-project by walking up to the umbrella root.
+> [`PiKaOs-Docs/docs/`](PiKaOs-Docs/docs)). Each project folder's **`README.md` is for GitHub** — what
+> the project is, for humans browsing it — **never** project knowledge. **This file is the only
+> CLAUDE.md** — don't re-create per-folder ones; Claude Code auto-loads this from any sub-folder by
+> walking up to the monorepo root.
 
 ---
 
