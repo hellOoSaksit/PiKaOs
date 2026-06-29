@@ -31,7 +31,7 @@ game-flavored UI (a “guild” metaphor) so non-engineers can participate.
 
 It is built as a **modular monolith** — one deployable today, but cut along bounded contexts so a
 single capability can be **extracted and shipped on its own**. The first realized extraction,
-[**Website Compare**](https://github.com/hellOoSaksit/PiKaOS-Standalone), proves the seam.
+[**Website Compare**](https://github.com/hellOoSaksit/PiKaOS-Plugin), proves the seam.
 
 ---
 
@@ -69,7 +69,7 @@ is **markdown-as-truth**); GraphQL; a heavyweight workflow engine (Celery/Tempor
 - **FR-RBAC** — every write route declares a required permission; effective permissions are resolved from role + per-user overrides and cached.
 - **FR-Engine** — submit an agent run; it executes on a worker, replay-safe, bounded by step/time/quota; cancellable.
 - **FR-Observe** — each run step is published live to subscribers of that quest over WebSocket.
-- **FR-Compare** — compare a UAT site against Production by sitemap coverage + deep content diff (its own dossier in the [standalone repo](https://github.com/hellOoSaksit/PiKaOS-Standalone)).
+- **FR-Compare** — compare a UAT site against Production by sitemap coverage + deep content diff (its own dossier in the [plugin repo](https://github.com/hellOoSaksit/PiKaOS-Plugin)).
 - **FR-i18n** — all UI strings are keyed; language + vocabulary “lexicon” are data-driven and hot-swappable.
 
 ### 2.6 Non-functional requirements
@@ -162,12 +162,12 @@ store); a vector index, if ever needed, is a rebuildable cache — never the sou
 ## 4. Architecture stance — modular monolith → extractable systems
 
 PiKaOs runs as **one deployable** but is cut so a department can take **only the capability it needs**.
-The seam is real, not aspirational: the **Compare** capability has been extracted into a standalone,
+The seam is real, not aspirational: the **Compare** capability has been extracted into a plugin,
 login-free, **stateless** app shipped from its own repo. This is the BA payoff of the SA discipline —
 lower footprint, faster local deployment, smaller attack surface.
 
-➡️ **[PiKaOS-Standalone — Website Compare](https://github.com/hellOoSaksit/PiKaOS-Standalone)** ·
-[download the latest release](https://github.com/hellOoSaksit/PiKaOS-Standalone/releases/latest)
+➡️ **[PiKaOS-Plugin — Website Compare](https://github.com/hellOoSaksit/PiKaOS-Plugin)** ·
+[download the latest release](https://github.com/hellOoSaksit/PiKaOS-Plugin/releases/latest)
 
 ---
 
@@ -214,7 +214,7 @@ docker compose -p pikaos-backend logs -f backend   # watch a service
 
 - ✅ **Foundation** — auth, server-side RBAC, i18n, Docker stack
 - ✅ **Engine (phase B)** — queued runner, replay-safe steps, live worklog, structured logging
-- ✅ **Compare** — coverage + deep diff; **extracted to a standalone app**
+- ✅ **Compare** — coverage + deep diff; **extracted to a plugin app**
 - 🟡 **Next** — real LLM-provider adapters (HERMES), knowledge ingestion, per-department delivery profiles
 
 ---
