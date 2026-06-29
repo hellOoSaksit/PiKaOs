@@ -1,4 +1,4 @@
-/* PiKaOs — ES module (migrated from PiKaOs/ui-modal.jsx). */
+/* PiKaOs — ES module (migrated from PiKaOs-Main/ui-modal.jsx). */
 import React from 'react';
 const { useState, useEffect } = React;
 

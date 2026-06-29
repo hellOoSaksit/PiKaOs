@@ -30,3 +30,9 @@ ENV BACKEND_URL=http://backend:8000
 ENV RESOLVER=127.0.0.11
 ENV NGINX_ENVSUBST_FILTER=BACKEND_URL|RESOLVER
 EXPOSE 80
+
+# Liveness probe (release-and-rollback.md §2): nginx is healthy once it serves the SPA entrypoint.
+# wget ships in nginx:alpine (busybox) — no extra package. Local-only, so the upstream API being
+# down doesn't fail the frontend's own health.
+HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=3 \
+    CMD wget -qO /dev/null http://localhost:80/ || exit 1

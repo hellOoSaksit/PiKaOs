@@ -1,4 +1,4 @@
-/* PiKaOs — ES module (migrated from PiKaOs/screens-rbac.jsx). */
+/* PiKaOs — ES module (migrated from PiKaOs-Main/screens-rbac.jsx). */
 import React from 'react';
 const { useState } = React;
 import { AgentCard, Avatar, Btn, Empty, HelpNote, Meter, PageHead, Panel, StatTile } from '../components/components.jsx';

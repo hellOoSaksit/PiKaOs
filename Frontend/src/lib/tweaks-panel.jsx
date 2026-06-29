@@ -1,4 +1,4 @@
-/* PiKaOs — ES module (migrated from PiKaOs/tweaks-panel.jsx). */
+/* PiKaOs — ES module (migrated from PiKaOs-Main/tweaks-panel.jsx). */
 import React from 'react';
 const { useState } = React;
 import { idx } from './room-store.jsx';

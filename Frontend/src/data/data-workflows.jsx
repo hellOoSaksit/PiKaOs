@@ -1,4 +1,4 @@
-/* PiKaOs — ES module (migrated from PiKaOs/data-workflows.jsx). */
+/* PiKaOs — ES module (migrated from PiKaOs-Main/data-workflows.jsx). */
 
 /* ============================================================
    WORKFLOWS / "โต๊ะปรุงเวท" (Activepieces) — mock data + run service.

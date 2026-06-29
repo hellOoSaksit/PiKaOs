@@ -1,4 +1,4 @@
-/* PiKaOs — ES module (migrated from PiKaOs/notify.jsx). */
+/* PiKaOs — ES module (migrated from PiKaOs-Main/notify.jsx). */
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';

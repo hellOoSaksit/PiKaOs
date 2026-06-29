@@ -1,4 +1,4 @@
-/* PiKaOs — ES module (migrated from PiKaOs/tweaks-app.jsx). */
+/* PiKaOs — ES module (migrated from PiKaOs-Main/tweaks-app.jsx). */
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 const ReactDOM = { createRoot };
