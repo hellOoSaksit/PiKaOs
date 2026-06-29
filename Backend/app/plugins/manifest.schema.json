@@ -1,0 +1,135 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://pikaos/architecture/manifest.schema.json",
+  "title": "Plugin manifest",
+  "description": "The declarative contract every plugin ships (system-design.md \u00a73). The Loader reads this BEFORE any plugin code runs, so discovery, load order, version compatibility, namespacing and security are enforced from it. Cross-field rules a JSON Schema cannot express (e.g. every permission/event/provided token must be prefixed with `id` \u2014 \u00a76) are validated by the Loader at boot; this schema enforces the structural shape.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "version",
+    "coreVersion"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Globally unique id \u2014 also the MANDATORY namespace prefix for every registered key (\u00a76).",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "description": "The plugin's own semver.",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "coreVersion": {
+      "type": "string",
+      "description": "Semver RANGE of the Core this plugin is compatible with (\u00a74); the Loader refuses to load a plugin whose range excludes the running Core.",
+      "minLength": 1
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "Plugin ids that MUST boot first (\u00a74). The Loader topologically sorts on these; a cycle is a hard boot failure.",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$"
+      },
+      "uniqueItems": true,
+      "default": []
+    },
+    "optionalDependencies": {
+      "type": "array",
+      "description": "Used if present, degraded-but-functional if absent.",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$"
+      },
+      "uniqueItems": true,
+      "default": []
+    },
+    "provides": {
+      "type": "array",
+      "description": "Namespaced DI tokens this plugin registers into the container (e.g. `inventory.StockService`).",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*\\.[A-Za-z][A-Za-z0-9]*$"
+      },
+      "uniqueItems": true,
+      "default": []
+    },
+    "consumes": {
+      "type": "array",
+      "description": "Namespaced contracts this plugin resolves via DI. Every entry must be `provide`d by Core or by a declared dependency (Loader-checked).",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*\\.[A-Za-z][A-Za-z0-9]*$"
+      },
+      "uniqueItems": true,
+      "default": []
+    },
+    "permissions": {
+      "type": "array",
+      "description": "Permission keys \u2014 all prefixed with `id` (\u00a76), e.g. `crm.lead.edit`.",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*\\.[a-z0-9.-]+$"
+      },
+      "uniqueItems": true,
+      "default": []
+    },
+    "routes": {
+      "type": "array",
+      "description": "Route prefixes this plugin owns \u2014 namespaced by id, e.g. `/crm/*`.",
+      "items": {
+        "type": "string",
+        "pattern": "^/"
+      },
+      "uniqueItems": true,
+      "default": []
+    },
+    "events": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Event names this plugin emits / listens to (Event Bus, \u00a75).",
+      "properties": {
+        "emits": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*\\.[a-z0-9.-]+$"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "listens": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*\\.[a-z0-9.-]+$"
+          },
+          "uniqueItems": true,
+          "default": []
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Validated config + feature flags (\u00a711).",
+      "properties": {
+        "schema": {
+          "type": "string",
+          "description": "Path to this plugin's config JSON Schema."
+        }
+      }
+    },
+    "migrations": {
+      "type": "string",
+      "description": "Path to this plugin's migrations; run in dependency order (\u00a74)."
+    }
+  }
+}

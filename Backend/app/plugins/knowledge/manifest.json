@@ -1,0 +1,13 @@
+{
+  "id": "knowledge",
+  "name": "Knowledge / RAG",
+  "version": "0.1.0",
+  "coreVersion": "^0.1.0",
+  "dependencies": [],
+  "provides": ["knowledge.Retriever"],
+  "consumes": ["core.User", "core.Storage"],
+  "permissions": ["knowledge.view", "knowledge.ingest"],
+  "routes": ["/api/knowledge"],
+  "events": { "emits": ["knowledge.ingested"], "listens": [] },
+  "migrations": "central (app/alembic — relocated per-plugin in a later phase)"
+}
