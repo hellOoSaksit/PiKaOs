@@ -6,10 +6,15 @@
 /PiKaOs-Docs/
 /PiKaOs-Plugin/
 
-# Claude Code local/user state (keep .claude/skills, drop the rest)
-.claude/*
-!.claude/skills/
-.claude/settings.local.json
+# Internal dev-rule / knowledge root files live in the PRIVATE PiKaOs-Docs repo (not public).
+# They're symlinked back here (CLAUDE.md → PiKaOs-Docs/CLAUDE.md, etc.) so Claude Code auto-load +
+# local tooling still work, but the symlinks must NOT be pushed to this public repo.
+/CLAUDE.md
+/AGENTS.md
+/llms.txt
+
+# Claude Code local/user state — all private (skills now live in PiKaOs-Docs/.claude/skills)
+.claude/
 
 # local tooling / MCP state (not shared)
 .mcp.json
