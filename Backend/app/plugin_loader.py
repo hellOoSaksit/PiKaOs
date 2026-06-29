@@ -163,3 +163,56 @@ def load_router(plugin_id: str) -> APIRouter:
     if router is None:
         raise ManifestError(f"plugin '{plugin_id}': package exports no `router`")
     return router
+
+
+# --- lifecycle: register() → boot() + job contribution (Phase 3, §5/§10) ----------------------------
+#
+# A plugin package MAY export, in addition to `router`:
+#   register(ctx)  — bind its provided contracts into ctx.container (NO cross-plugin calls yet, §10)
+#   boot(ctx)      — subscribe to events / wire listeners, in dependency order (§10)
+#   jobs           — a list of arq job callables the worker should run when this plugin is enabled
+# All optional: a pure-router plugin (like knowledge today for routes) needs none of them.
+
+
+@dataclass
+class PluginContext:
+    """What a plugin's register()/boot() receives — the Core seams it may use, never each other (§5).
+    `container` for DI, `events` for the bus, `session_factory` for DB sessions, `settings` for config."""
+
+    container: object
+    events: object
+    session_factory: object = None
+    settings: object = None
+
+
+def _import_enabled(enabled: set[str], manifests: dict[str, Manifest]):
+    """Yield (plugin_id, module) for the enabled plugins in topological order — the one place a plugin
+    package is imported. Dynamic (importlib) on purpose: Core never *statically* imports a plugin, so the
+    import-linter `Core ↛ plugins` gate stays clean (§15)."""
+    for pid in topo_order(enabled, manifests):
+        yield pid, importlib.import_module(f"app.plugins.{pid}")
+
+
+def collect_jobs(enabled: set[str], manifests: dict[str, Manifest]) -> list:
+    """The arq job callables contributed by the enabled plugins (their `jobs` attribute). Pure discovery
+    — imports the packages but runs no register()/boot(), so it is safe at worker import time."""
+    jobs: list = []
+    for _pid, mod in _import_enabled(enabled, manifests):
+        jobs.extend(getattr(mod, "jobs", ()))
+    return jobs
+
+
+def register_plugins(enabled: set[str], manifests: dict[str, Manifest], ctx: PluginContext) -> list[str]:
+    """Run the lifecycle for the enabled plugins (topological): `register()` ALL first (bind contracts),
+    then `boot()` ALL (wire listeners) — the kit's two-pass order so a plugin can resolve a sibling's
+    contract in boot() that was bound in any register() (§10). Returns the boot order for logging."""
+    loaded = list(_import_enabled(enabled, manifests))
+    for _pid, mod in loaded:
+        register = getattr(mod, "register", None)
+        if register is not None:
+            register(ctx)
+    for _pid, mod in loaded:
+        boot = getattr(mod, "boot", None)
+        if boot is not None:
+            boot(ctx)
+    return [pid for pid, _ in loaded]

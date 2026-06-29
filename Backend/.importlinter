@@ -4,8 +4,9 @@
 #
 # Two rules, both architectural invariants the Loader can't catch at import time:
 #   1. Core ↛ plugins   (§2.1) — the Base never reaches up into a feature; remove any plugin and
-#      Core still imports. The ONE exception is the engine (worker.py) running a knowledge job
-#      lazily — that coupling moves to DI / the Event Bus in Phase 3 (ignore_imports below).
+#      Core still imports. As of Phase 3 there are NO exceptions: the engine reaches the knowledge
+#      plugin only through the DI container (`knowledge.Retriever` contract) + the Event Bus, and the
+#      worker discovers plugin jobs via the Loader's dynamic import — zero static plugin imports.
 #   2. Plugin ↛ sibling plugin (§2.3) — features talk only through Core contracts, never each other.
 #      Add every new app.plugins.<id> to the independence contract as it lands.
 
@@ -19,6 +20,9 @@ source_modules =
     app.main
     app.worker
     app.config
+    app.contracts
+    app.container
+    app.events
     app.db
     app.deps
     app.models
@@ -34,12 +38,6 @@ source_modules =
     app.repositories
 forbidden_modules =
     app.plugins
-# Phase-3 debt: the engine (arq worker) still imports the knowledge plugin directly to run its
-# ingestion job + build the retriever. Phase 3 replaces these with a DI-resolved knowledge.Retriever
-# contract + Event Bus; until then they are the single, documented exception.
-ignore_imports =
-    app.worker -> app.plugins.knowledge.ingestion_service
-    app.worker -> app.plugins.knowledge.retriever
 
 [importlinter:contract:plugins-are-independent]
 name = Plugins must not import sibling plugins (§2.3)

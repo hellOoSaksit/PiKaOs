@@ -27,7 +27,7 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from .. import redis_client
 from ..config import settings
@@ -75,10 +75,13 @@ class ToolRegistry(Protocol):
     async def call(self, name: str, args: dict, *, idempotency_key: str) -> dict: ...
 
 
+@runtime_checkable
 class Retriever(Protocol):
     """Optional RAG source the engine injects at runtime — so the engine never imports the knowledge
-    plugin (modularity §2). A build without knowledge passes `retriever=None` → the agent runs without
-    retrieved context. The knowledge plugin's KnowledgeRetriever structurally matches this."""
+    plugin (plugin-architecture.md §5). A build without knowledge resolves the `knowledge.Retriever`
+    contract to None → the agent runs without retrieved context. A provider plugin binds an impl that
+    structurally matches this (the knowledge plugin's KnowledgeRetriever); the consumer-driven contract
+    test pins it (`runtime_checkable` so the test can assert the binding satisfies this interface)."""
     async def retrieve_context(self, db, *, owner_id, run_input: dict | None, k: int) -> str: ...
 
 

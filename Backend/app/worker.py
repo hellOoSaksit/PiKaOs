@@ -1,28 +1,29 @@
-"""arq worker entrypoint (B2).
+"""arq worker entrypoint (B2) — the engine's run loop, plus whatever jobs the enabled plugins contribute.
 
-Runs the agent-ops engine jobs out-of-process from the FastAPI web app — a crashed or slow
-job can't take the API down, and jobs run concurrently. Same image, different command
-(`arq app.worker.WorkerSettings`); see the `worker` service in deploy/docker-compose.ai.yml.
+Runs the agent-ops engine jobs out-of-process from the FastAPI web app — a crashed or slow job can't take
+the API down, and jobs run concurrently. Same image, different command (`arq app.worker.WorkerSettings`);
+see the `worker` service in deploy/docker-compose.ai.yml.
 
-The `agent_run` job (B3) runs one agent loop via services/agent_runner. The `ingest_document`
-job (E2) chunks + embeds an uploaded document into the RAG index. HERMES jobs
-(hermes_plan/advance/finalize) land in C3. The engine runtime (LLM provider + tool
-registry) is configured once on worker startup — stub in B4, real adapters in C1.
+This module is **Core only** — it imports no plugin. The engine job `agent_run` is Base; every *feature*
+job (e.g. knowledge's `ingest_document`) is contributed by its plugin's `jobs` list and discovered through
+the Loader (dynamic import). At startup the worker assembles the DI container + Event Bus, runs each enabled
+plugin's `register()/boot()`, and resolves the `knowledge.Retriever` contract for the engine — so the engine
+gets RAG when knowledge is enabled and `None` when it isn't, without ever importing the plugin (§5).
 """
 from __future__ import annotations
 
 import logging
-import uuid
 
 from arq import func
 from arq.connections import RedisSettings
 
-from . import modules
+from . import contracts, modules, plugin_loader
 from .config import settings
+from .container import Container
 from .db import SessionLocal
+from .events import EventBus
 from .logging_ctx import configure_worker_logging
 from .services import agent_runner
-from .services.embeddings import get_embedder  # Base shared infra (used by db/models/config too)
 from .services.engine_stubs import StubToolRegistry
 from .services.llm_config_service import ConfiguredLLMProvider
 
@@ -39,56 +40,36 @@ async def agent_run(ctx, run_id: str) -> str:
     return await agent_runner.run_job(run_id)
 
 
-async def ingest_document(ctx, doc_id: str) -> str:
-    """arq job: chunk + embed one document into the RAG index (E2). The embedder is resolved
-    from config per job (stub by default), so flipping `embed_provider` needs no code change.
-    When `ingest_summary_enabled` (E7 enrich B) the doc is also summarized via the 'summarize'
-    role — best-effort, off by default so ingest stays free/offline."""
-    from .plugins.knowledge import ingestion_service  # plugin import inside the gated job (Base stays clean)
-
-    embedder = get_embedder()
-    summarizer = ConfiguredLLMProvider(role="summarize") if settings.ingest_summary_enabled else None
-    async with SessionLocal() as db:
-        result = await ingestion_service.ingest_document(
-            db, embedder, uuid.UUID(doc_id), summarizer=summarizer
-        )
-    return result["status"]
-
-
 async def startup(ctx) -> None:
-    """Wire structured logging (B7) + the engine runtime once per worker. The LLM provider is
-    resolved from the DB (llm_connections) per call with a short cache, falling back to the
-    .env provider — so an admin's UI change applies without a restart. Tools stay stub until C5."""
+    """Wire structured logging (B7), assemble the plugin tier, and configure the engine runtime once per
+    worker. The DI container + Event Bus are built here (this worker is a composition root); each enabled
+    plugin's register()/boot() runs in dependency order, then the engine resolves its optional `Retriever`
+    contract from the container — present iff a provider plugin (knowledge) is enabled. The LLM provider is
+    resolved from the DB (llm_connections) per call with a short cache, env fallback; tools stay stub until C5."""
     configure_worker_logging()
-    # Inject RAG only when the knowledge plugin is active → the engine stays decoupled from knowledge
-    # (modularity §2). No knowledge plugin → retriever=None → the agent runs without retrieved context.
-    retriever = None
-    if modules.is_module_active("knowledge"):
-        from .plugins.knowledge.retriever import KnowledgeRetriever
 
-        retriever = KnowledgeRetriever()
+    container, bus = Container(), EventBus()
+    ctx["container"], ctx["bus"] = container, bus  # jobs read these off the arq context
+    enabled = modules.enabled_optional_modules()
+    booted = plugin_loader.register_plugins(enabled, modules.PLUGIN_MANIFESTS,
+                                            plugin_loader.PluginContext(container=container, events=bus,
+                                                                        session_factory=SessionLocal,
+                                                                        settings=settings))
+
+    # The engine consumes RAG only through the contract — never an import. Unresolved (no knowledge) → None.
+    retriever = container.resolve(contracts.RETRIEVER)
     agent_runner.set_engine_runtime(ConfiguredLLMProvider(), StubToolRegistry(), retriever=retriever)
     log.info("pikaos worker up — structured logging on · engine runtime: DB-configured LLM "
-             "(env fallback: %s) + stub tools · RAG retriever: %s",
-             settings.llm_provider, "on" if retriever else "off")
-
-
-# Jobs keyed by their module — loaded only when that module is active (modularity.md §2.5). `engine`
-# is part of the Base now, so `agent_run` always loads; `knowledge` is a plugin, so `ingest_document`
-# loads only when that plugin is enabled. `ping` is infra (always on).
-_MODULE_JOBS = {
-    "engine": [func(agent_run, keep_result=3600)],
-    "knowledge": [ingest_document],
-}
+             "(env fallback: %s) + stub tools · plugins booted: %s · RAG retriever: %s",
+             settings.llm_provider, booted or "(none)", "on" if retriever else "off")
 
 
 def _active_functions() -> list:
-    """The arq job set for this build: infra `ping` + the jobs of every enabled module."""
-    fns = [ping]
-    for name, jobs in _MODULE_JOBS.items():
-        if modules.is_module_active(name):
-            fns.extend(jobs)
-    return fns
+    """The arq job set for this build: infra `ping` + the engine `agent_run` (Base, always on) + the jobs
+    every enabled plugin contributes via its `jobs` list (collected through the Loader — no plugin import
+    here, §5). `agent_run` is keyed by run_id so arq dedups concurrent enqueues (resume replay-safety)."""
+    plugin_jobs = plugin_loader.collect_jobs(modules.enabled_optional_modules(), modules.PLUGIN_MANIFESTS)
+    return [ping, func(agent_run, keep_result=3600), *plugin_jobs]
 
 
 class WorkerSettings:
@@ -96,6 +77,4 @@ class WorkerSettings:
 
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
     on_startup = startup
-    # `agent_run` keyed by run_id → arq dedups concurrent enqueues of the same run, so a
-    # resume can't run twice in parallel (replay-safety belt over the per-step guards).
     functions = _active_functions()
