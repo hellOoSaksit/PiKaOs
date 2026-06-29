@@ -57,3 +57,15 @@ def test_base_only_binds_nothing_and_contributes_no_jobs():
 def test_enabled_knowledge_contributes_its_job():
     jobs = plugin_loader.collect_jobs({"knowledge"}, modules.PLUGIN_MANIFESTS)
     assert [j.__name__ for j in jobs] == ["ingest_document"]
+
+
+def test_route_must_be_namespaced_with_plugin_id():
+    """§6: a plugin's declared routes must carry its id segment, so two plugins can't collide on a URL."""
+    import pytest
+
+    good = {"id": "crm", "name": "CRM", "version": "0.1.0", "coreVersion": "*", "routes": ["/api/crm"]}
+    plugin_loader._validate("crm", good)  # ok — namespaced
+
+    bad = {**good, "routes": ["/api/leads"]}  # not namespaced with /crm
+    with pytest.raises(plugin_loader.ManifestError, match="namespaced"):
+        plugin_loader._validate("crm", bad)

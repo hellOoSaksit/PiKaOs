@@ -65,3 +65,15 @@ def test_base_only_drops_all_plugins(monkeypatch):
     loaded = modules.register_routers(base)
     assert set(loaded) == {"infra", "core", "engine"}
     assert "knowledge" not in loaded
+
+
+def test_plugin_states_report_manifest_version_and_active_disabled(monkeypatch):
+    # /health (§14): every discovered plugin appears with its MANIFEST version + active/disabled state.
+    monkeypatch.setattr(settings, "enabled_modules", "knowledge")
+    states = {s["id"]: s for s in modules.plugin_states()}
+    assert states["knowledge"]["state"] == "active"
+    assert states["knowledge"]["version"] == modules.PLUGIN_MANIFESTS["knowledge"].version
+
+    monkeypatch.setattr(settings, "enabled_modules", "")  # disabled, but still listed
+    states = {s["id"]: s for s in modules.plugin_states()}
+    assert states["knowledge"]["state"] == "disabled"

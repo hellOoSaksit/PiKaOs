@@ -76,6 +76,17 @@ def active_modules() -> list[Module]:
     return mods
 
 
+def plugin_states() -> list[dict]:
+    """Each discovered plugin's state for /health (§14): `active` when enabled this build, else `disabled`,
+    with its **version read from the manifest** (never hardcoded → ties to versions.md). Lists every
+    discovered plugin — a disabled one still appears, so an operator sees the full installable surface."""
+    enabled = enabled_optional_modules()
+    return [
+        {"id": pid, "version": mf.version, "state": "active" if pid in enabled else "disabled"}
+        for pid, mf in sorted(PLUGIN_MANIFESTS.items())
+    ]
+
+
 def register_routers(app: FastAPI) -> list[str]:
     """Include the routers of every active module on `app`. Returns the loaded module names (Base +
     enabled plugins, topological order) so startup can log exactly what this build serves."""

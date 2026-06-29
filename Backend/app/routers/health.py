@@ -5,10 +5,10 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import redis_client, storage
+from .. import modules, redis_client, storage
 from ..config import settings
 from ..db import get_db
-from ..schemas import HealthOut, VersionOut
+from ..schemas import HealthOut, PluginHealth, VersionOut
 
 router = APIRouter(prefix="/api", tags=["health"])
 
@@ -43,4 +43,6 @@ async def health(db: AsyncSession = Depends(get_db)) -> HealthOut:
         db=db_ok,
         redis=redis_ok,
         minio=minio_ok,
+        # Core + each plugin's state + manifest version (§14) — disabled plugins still listed.
+        plugins=[PluginHealth(**p) for p in modules.plugin_states()],
     )

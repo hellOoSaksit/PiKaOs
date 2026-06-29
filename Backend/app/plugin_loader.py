@@ -97,6 +97,12 @@ def _validate(folder: str, raw: dict) -> Manifest:
     for ev in raw.get("events", {}).get("emits", []):
         if not ev.startswith(prefix):
             raise ManifestError(f"plugin '{pid}': emitted event '{ev}' is not prefixed with '{prefix}'")
+    # §6 namespacing for routes: every declared path must carry the id as a segment (e.g. /api/knowledge),
+    # so two plugins can never collide on a URL prefix.
+    for route in raw.get("routes", []):
+        if f"/{pid}" not in route:
+            raise ManifestError(
+                f"plugin '{pid}': route '{route}' is not namespaced with '/{pid}' (§6)")
     return Manifest(
         id=pid, name=raw["name"], version=raw["version"], coreVersion=raw["coreVersion"],
         dependencies=tuple(raw.get("dependencies", [])),

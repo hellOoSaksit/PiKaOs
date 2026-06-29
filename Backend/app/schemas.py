@@ -67,6 +67,14 @@ class LoginResult(BaseModel):
     user: UserOut
 
 
+class PluginHealth(BaseModel):
+    """One plugin's state for /health (plugin-architecture.md §14). `version` comes from the plugin's
+    manifest (never hardcoded — ties to versions.md); `state` is active (enabled this build) or disabled."""
+    id: str
+    version: str
+    state: str         # active | disabled  (degraded reserved for boot-failure tracking)
+
+
 class HealthOut(BaseModel):
     status: str
     version: str       # app_version (versions.md registry — surfaced here per the SSOT rule)
@@ -74,6 +82,7 @@ class HealthOut(BaseModel):
     db: str
     redis: str
     minio: str
+    plugins: list[PluginHealth] = []   # Core + each plugin's state + manifest version (§14)
 
 
 class VersionOut(BaseModel):
