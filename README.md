@@ -83,6 +83,74 @@ cd PiKaOs/PiKaOs-Core
 # follow PiKaOs-Core/README.md to bring up the Docker Compose stacks
 ```
 
+## Development & Git workflow
+
+The project follows a **trunk-based** model: [`main`](https://github.com/hellOoSaksit/PiKaOs/tree/main) is
+always green and deployable; all work lands through small, reviewed pull requests.
+
+**Branching**
+
+```
+main ──●────●─────────●────●──►   protected · always green · always deployable
+        \              /
+         ●──●──●──────●            feat/<slug>   →  PR  →  squash-merge  →  delete
+```
+
+- Branch off `main` with a typed, kebab-case name: `feat/…`, `fix/…`, `docs/…`, `refactor/…`,
+  `chore/…`, `ci/…`, or `hotfix/…` — one focused change per branch.
+- No long-lived integration branch; integrate continuously via PRs.
+
+**`main` is protected** — direct pushes are reserved for emergencies; the normal path is a PR that:
+
+- ✅ passes **every CI check** (see below) and is **up to date** with `main`,
+- ✅ has all review conversations resolved,
+- 🔀 is merged with **squash** (one clean Conventional Commit per PR → linear history),
+- 🗑️ deletes its branch on merge.
+
+Force-pushes and deletion of `main` are blocked.
+
+**Commit convention** — [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): subject`
+
+| type | for |
+| --- | --- |
+| `feat` / `fix` | a feature / a bug fix |
+| `refactor` / `perf` / `test` | behavior-preserving change / speed / tests |
+| `docs` / `ci` / `build` / `chore` | docs / pipelines / build & deps / housekeeping |
+
+Subject in the imperative (≤ ~72 chars); the body explains **why**. **Never commit secrets** — only
+`*.example` placeholders; real values live in gitignored env files. When a change touches structure,
+behavior, a dependency, a port, or a version, update the relevant docs/registry **in the same commit**.
+
+**CI gates** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) — a PR is mergeable only when all pass:
+
+| Check | Enforces |
+| --- | --- |
+| **frontend** | `npm ci` → react-hooks lint → Vite build → component-first guard. |
+| **architecture** | The plugin-boundary gates — `import-linter` (Core ↛ plugins · plugin ↛ sibling) + manifest schema validation. |
+| **backend** | Full `pytest` on a live Docker stack (Postgres · Redis · MinIO + the API), incl. removal-isolation tests. |
+
+```bash
+git switch -c feat/<slug> main          # branch
+# … commit (Conventional Commits) …
+git push -u origin feat/<slug>
+gh pr create --fill --base main         # open PR → CI runs
+gh pr merge --squash --delete-branch    # merge once green
+```
+
+## Releases & versioning
+
+PiKaOs uses **[Semantic Versioning](https://semver.org/)**. The version has a **single source of truth** —
+`PiKaOs-Core/Backend/app/config.py → app_version` — surfaced at `/api/version`, `/api/health`, and in the
+OpenAPI title; never hardcode it elsewhere.
+
+A release is cut from a green `main`: bump `app_version`, tag `vMAJOR.MINOR.PATCH`, and publish
+[GitHub Releases](https://github.com/hellOoSaksit/PiKaOs/releases) with notes. Published tags are
+immutable — ship a new patch rather than moving one.
+
+```bash
+gh release create v0.2.0 --target main --title "PiKaOs v0.2.0 — <theme>" --notes-file notes.md --latest
+```
+
 ## Documentation
 
 Architecture, design decisions, and the engineering knowledge base are maintained in the **private**
