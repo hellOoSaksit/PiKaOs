@@ -2,15 +2,18 @@
 
 # PiKaOs
 
-**A Thai-first, multi-agent “agent-ops” platform** — run, observe, and govern fleets of AI agents
-with the discipline of production software, wrapped in a guild-flavored experience.
+### Operate fleets of AI agents — with the discipline of production software.
 
+A **self-hostable, Thai-first “agent-ops” platform**: run AI agents under real access control, reliable
+out-of-process execution, live step-by-step observability, hard cost limits, and a full audit trail —
+wrapped in a friendly **guild &amp; quests** experience so non-engineers can take part safely.
+
+[![Release](https://img.shields.io/github/v/release/hellOoSaksit/PiKaOs?label=release)](https://github.com/hellOoSaksit/PiKaOs/releases)
 [![CI](https://github.com/hellOoSaksit/PiKaOs/actions/workflows/ci.yml/badge.svg)](https://github.com/hellOoSaksit/PiKaOs/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.137-009688?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
-![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)
-![Postgres](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white)
 
@@ -18,147 +21,106 @@ with the discipline of production software, wrapped in a guild-flavored experien
 
 ---
 
-## Overview
+## Why PiKaOs?
 
-**PiKaOs** is a self-hostable platform for **operating AI agents** with the controls normally reserved
-for production systems: identity & access control, out-of-process queued execution, live per-step
-observability, quotas, and an auditable trail — presented through a **Thai-first**, game-flavored UI so
-non-engineers can take part safely.
+Adopting LLM agents quickly hits **operational** walls, not modeling ones:
 
-This repository is the **monorepo** for the platform. It is built on a **strict Core + Plugins**
-architecture: a small, stable core provides the infrastructure and the agent runtime, while every
-feature is a **removable plugin** that communicates only through published contracts — never by reaching
-into another plugin.
+> *Who is allowed to run what? How do we stop a runaway job from draining the budget? What did the agent
+> actually do, step by step? How do non-technical staff take part safely?*
+
+Off-the-shelf chat UIs answer none of these. **PiKaOs is the control plane that does** — it treats an agent
+run like a governed, observable, bounded production job, and makes the whole thing approachable for a
+Thai-speaking, non-technical team.
+
+## What it does
+
+| | Capability | What you get |
+| :--: | --- | --- |
+| 🛡️ | **Governed runs** | Server-side **RBAC** — every action is permission-checked against role grants ± per-user overrides. Nothing runs that the caller isn’t allowed to run. |
+| ⚙️ | **Reliable execution** | Runs are **queued and executed on a separate worker** (arq + Redis). A slow or crashed job can never take the API down. Each run is **replay-safe, cancellable**, and bounded. |
+| 📡 | **Live observability** | Every agent step streams to the UI over **WebSocket (~1s)** as a real-time *worklog*; structured logs are stamped with run / quest / agent IDs. |
+| 💰 | **Cost &amp; blast-radius control** | **Atomic per-user token quotas** + per-run step and wall-clock ceilings keep spend and damage bounded by design. |
+| 🧠 | **Knowledge / RAG** | A **markdown-as-truth** document store agents can retrieve from — durable, diff-able, no vector-DB lock-in. |
+| 🌐 | **Website Compare** | A stateless, **SSRF-guarded** tool that diffs a UAT site against production by sitemap coverage + deep content diff — shipped as its own app. |
+| 🧾 | **Audit trail** | A reviewable record of **who ran what, when, and with what effect**. |
+| 🇹🇭 | **Thai-first UX** | A role-aware, game-flavored **“guild &amp; quests”** interface; fully internationalized with zero hard-coded strings. |
+| 📦 | **Self-hostable** | The whole stack runs in **Docker**; individual capabilities can be extracted into lightweight, single-purpose deployments. |
+
+## How it works
+
+```mermaid
+flowchart LR
+  user([Operator / Admin]) -->|HTTPS · WebSocket| FE[React SPA]
+  FE -->|/api · /ws| BE[FastAPI service]
+  BE --> DB[(PostgreSQL)]
+  BE --> RDS[(Redis)]
+  BE --> OBJ[(MinIO / S3)]
+  BE -. enqueue .-> RDS
+  RDS -. job .-> WK[arq Worker]
+  WK -->|provider adapter| LLM{{LLM providers}}
+  WK --> DB
+```
+
+The React SPA talks to a **FastAPI** service for HTTP + WebSocket. Agent work is **enqueued to Redis** and
+run by a **separate `arq` worker** that calls the LLM providers — so the request path stays fast and the
+API stays up even when a job misbehaves. PostgreSQL holds the system of record; MinIO holds files; Redis
+backs the queue, the live worklog stream, and the permission cache.
 
 ## Architecture — Core + Plugins
 
-The boundary between the platform and its features is **enforced, not merely encouraged**. Every rule is
-a machine check in CI:
+PiKaOs ships as **one deployable**, but is cut along clean seams: a small, stable **Core** provides the
+infrastructure and the agent runtime, while every feature is a **removable plugin** that talks only through
+published contracts. The boundary is **enforced in CI**, not just encouraged:
 
-| Principle | How it is guaranteed |
+| Principle | How it’s guaranteed |
 | --- | --- |
-| **Core never depends on a feature** | `import-linter` contracts fail the build on any Core → plugin or plugin → sibling-plugin import. |
-| **Every plugin is removable** | A removal-isolation test boots the app with each plugin disabled and asserts the core and the others still run. |
-| **Plugins declare a contract** | Each plugin ships a `manifest.json` (id, version, dependencies, provided/consumed contracts, routes, events), schema-validated in CI. |
-| **Features talk through seams, not imports** | A dependency-injection container + an event bus connect plugins; cross-plugin calls resolve a declared contract. |
-| **The loader enforces order & compatibility** | Topological boot by declared dependencies, semantic-version compatibility checks, and namespacing — verified at startup. |
+| **Core never depends on a feature** | `import-linter` fails the build on any Core → plugin or plugin → sibling import. |
+| **Every plugin is removable** | A removal-isolation test boots the app with each plugin disabled and asserts the rest still runs. |
+| **Plugins declare a contract** | Each ships a schema-validated `manifest.json` (id, version, dependencies, contracts, routes, events). |
+| **Features connect through seams** | A dependency-injection container + an event bus — never direct imports. |
 
-The **agent runtime** (the engine: agent loop, worker jobs, and retrieval) lives in the core as the
-platform every plugin attaches to. The first feature plugin — **Knowledge / RAG** — demonstrates the
-contract model end to end.
+This is the engineering payoff of a **modular monolith**: low footprint today, and any capability can be
+**extracted and shipped on its own** tomorrow (as [Website Compare](https://github.com/hellOoSaksit/PiKaOs-Plugin) already is).
+
+## Tech stack
+
+**Backend** — FastAPI · async SQLAlchemy + Alembic · an [`arq`](https://arq-docs.helpmanual.io/) worker on
+Redis · PostgreSQL 16 · MinIO (S3).
+**Frontend** — React 18 + Vite · a zero-runtime-dependency component kit · Thai-first i18n.
+**Runtime** — Docker Compose, split into independent stacks (data · backend · AI worker · frontend).
 
 ## Repository layout
 
 | Path | Description |
 | --- | --- |
-| [`PiKaOs-Core/`](PiKaOs-Core) | The platform — `Backend/` (FastAPI · arq worker · plugin framework · agent engine), `Frontend/` (Vite + React), and `deploy/` (Docker Compose stacks). |
+| [`PiKaOs-Core/`](PiKaOs-Core) | The platform — `Backend/` (API · worker · plugin framework · agent engine), `Frontend/` (Vite + React), `deploy/` (Docker stacks). |
 | [`PiKaOs-App/`](PiKaOs-App) | Composition root — assembles the core with the enabled plugins and runs the full stack. |
 
-Related projects live in their own repositories:
-
-| Repository | Visibility | Purpose |
+| Related repository | Visibility | Purpose |
 | --- | --- | --- |
-| [**PiKaOs**](https://github.com/hellOoSaksit/PiKaOs) | Public | This monorepo — the platform (core + app). |
-| [**PiKaOs-Plugin**](https://github.com/hellOoSaksit/PiKaOs-Plugin) | Public | Stand-alone “own-app” plugins (e.g. Website Compare, Redirect Map) that ship and deploy independently. |
-| **PiKaOs-Docs** | Private | Internal design dossier, architecture decisions, and engineering knowledge base. |
-
-## Tech stack
-
-**Backend** — FastAPI, async SQLAlchemy + Alembic, an [`arq`](https://arq-docs.helpmanual.io/) worker on
-Redis, PostgreSQL, and S3-compatible object storage (MinIO).
-**Frontend** — React 18 + Vite, fully internationalized (Thai-first).
-**Runtime** — Docker Compose, split into independent stacks (data · backend · AI worker · frontend) for
-single-machine development or per-component deployment.
+| [PiKaOs-Plugin](https://github.com/hellOoSaksit/PiKaOs-Plugin) | Public | Stand-alone “own-app” plugins (Website Compare, Redirect Map). |
+| PiKaOs-Docs | Private | Internal design dossier &amp; engineering knowledge base. |
 
 ## Getting started
 
-The platform’s full setup, run instructions, and the complete **Business / System Analysis dossier** are
+The full setup, run scripts, and the complete **Business / System Analysis dossier** (with diagrams) live
 in the core README:
 
 ➡️ **[`PiKaOs-Core/README.md`](PiKaOs-Core/README.md)**
 
 ```bash
 git clone https://github.com/hellOoSaksit/PiKaOs.git
-cd PiKaOs/PiKaOs-Core
-# follow PiKaOs-Core/README.md to bring up the Docker Compose stacks
+cd PiKaOs/PiKaOs-Core      # then follow the README to bring up the Docker stacks
 ```
 
-## Development & Git workflow
+## Contributing
 
-The project follows a **trunk-based** model: [`main`](https://github.com/hellOoSaksit/PiKaOs/tree/main) is
-always green and deployable; all work lands through small, reviewed pull requests.
-
-**Branching**
-
-```
-main ──●────●─────────●────●──►   protected · always green · always deployable
-        \              /
-         ●──●──●──────●            feat/<slug>   →  PR  →  squash-merge  →  delete
-```
-
-- Branch off `main` with a typed, kebab-case name: `feat/…`, `fix/…`, `docs/…`, `refactor/…`,
-  `chore/…`, `ci/…`, or `hotfix/…` — one focused change per branch.
-- No long-lived integration branch; integrate continuously via PRs.
-
-**`main` is protected** — direct pushes are reserved for emergencies; the normal path is a PR that:
-
-- ✅ passes **every CI check** (see below) and is **up to date** with `main`,
-- ✅ has all review conversations resolved,
-- 🔀 is merged with **squash** (one clean Conventional Commit per PR → linear history),
-- 🗑️ deletes its branch on merge.
-
-Force-pushes and deletion of `main` are blocked.
-
-**Commit convention** — [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): subject`
-
-| type | for |
-| --- | --- |
-| `feat` / `fix` | a feature / a bug fix |
-| `refactor` / `perf` / `test` | behavior-preserving change / speed / tests |
-| `docs` / `ci` / `build` / `chore` | docs / pipelines / build & deps / housekeeping |
-
-Subject in the imperative (≤ ~72 chars); the body explains **why**. **Never commit secrets** — only
-`*.example` placeholders; real values live in gitignored env files. When a change touches structure,
-behavior, a dependency, a port, or a version, update the relevant docs/registry **in the same commit**.
-
-**CI gates** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) — a PR is mergeable only when all pass:
-
-| Check | Enforces |
-| --- | --- |
-| **frontend** | `npm ci` → react-hooks lint → Vite build → component-first guard. |
-| **architecture** | The plugin-boundary gates — `import-linter` (Core ↛ plugins · plugin ↛ sibling) + manifest schema validation. |
-| **backend** | Full `pytest` on a live Docker stack (Postgres · Redis · MinIO + the API), incl. removal-isolation tests. |
-
-```bash
-git switch -c feat/<slug> main          # branch
-# … commit (Conventional Commits) …
-git push -u origin feat/<slug>
-gh pr create --fill --base main         # open PR → CI runs
-gh pr merge --squash --delete-branch    # merge once green
-```
-
-## Releases & versioning
-
-PiKaOs uses **[Semantic Versioning](https://semver.org/)**. The version has a **single source of truth** —
-`PiKaOs-Core/Backend/app/config.py → app_version` — surfaced at `/api/version`, `/api/health`, and in the
-OpenAPI title; never hardcode it elsewhere.
-
-A release is cut from a green `main`: bump `app_version`, tag `vMAJOR.MINOR.PATCH`, and publish
-[GitHub Releases](https://github.com/hellOoSaksit/PiKaOs/releases) with notes. Published tags are
-immutable — ship a new patch rather than moving one.
-
-```bash
-gh release create v0.2.0 --target main --title "PiKaOs v0.2.0 — <theme>" --notes-file notes.md --latest
-```
-
-## Documentation
-
-Architecture, design decisions, and the engineering knowledge base are maintained in the **private**
-`PiKaOs-Docs` repository. This public README and the per-folder READMEs are the open entry points.
+`main` is protected and trunk-based: branch → pull request → green CI (`frontend` · `architecture` ·
+`backend`) → squash-merge. Commits follow [Conventional Commits](https://www.conventionalcommits.org/);
+versions are [SemVer](https://semver.org/) and published on the [releases page](https://github.com/hellOoSaksit/PiKaOs/releases).
 
 ---
 
 <div align="center">
-<sub>Built as a modular monolith — one platform today, cut along clean seams so any capability can be
-extracted and shipped on its own.</sub>
+<sub>Built as a modular monolith — one platform today, cut along clean seams so any capability can be extracted and shipped on its own.</sub>
 </div>
