@@ -16,7 +16,6 @@ import { MyDashboard } from './screens/screens-me.jsx';
 import { AuditLog, PermissionsCatalog, RolesPermissions, UserDetail, UserForm } from './screens/screens-rbac.jsx';
 import { AgentDrawer, Agents, Meeting, QuestBoard, QuestDrawer } from './screens/screens-secondary.jsx';
 import { SitemapAudit } from './screens/screens-sitemap.jsx';
-import { Compare } from './screens/screens-compare.jsx';
 import { ToolsManager } from './screens/screens-tools.jsx';
 import { ComponentLibrary } from './screens/screens-library.jsx';
 import { Workflows } from './screens/screens-workflows.jsx';
@@ -45,7 +44,6 @@ const ROUTE_META = {
   codex:   { icon: "📚", title: "บันทึกความรู้", en: "Codex" },
   search:  { icon: "🔍", title: "ค้นหาความรู้", en: "Recall" },
   sitemap: { icon: "🗺️", title: "ตรวจไซต์แมพ", en: "Sitemap Match" },
-  compare: { icon: "🔀", title: "เทียบเนื้อหา", en: "Compare Content" },
   mana:    { icon: "🔵", title: "มานา (Token)", en: "Mana" },
   treasury:{ icon: "💰", title: "คลังสมบัติ", en: "Treasury" },
   stats:   { icon: "📊", title: "สถิติการผจญภัย", en: "Chronicle" },
@@ -615,7 +613,6 @@ function App() {
       case "codex": return <Codex t={t} can={can} />;
       case "search": return <Recall lang={language} />;
       case "sitemap": return <SitemapAudit t={t} lang={language} can={can} actor={me.display_name || me.username || "ผู้ใช้"} />;
-      case "compare": return <Compare t={t} lang={language} />;
       case "mana": return <Mana S={S} t={t} />;
       case "treasury": return <Treasury t={t} />;
       case "stats": return <Chronicle S={S} t={t} />;

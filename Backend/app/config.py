@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # --- modules: Base + plugins (Modular Monolith — docs/architecture/modularity.md §2.5/§3) ---
     # Which PLUGINS this build loads ON TOP OF the Base. The **Base always loads** (infra + core +
-    # engine = the agent runtime); plugins (knowledge/compare/…) are opt-in so a clean/prod deploy is
+    # engine = the agent runtime); plugins (knowledge/…) are opt-in so a clean/prod deploy is
     # just the Base, ready for plugins later. Values: "" / unset = Base only (DEFAULT) · "*" = all
     # plugins (full build) · comma-list = those plugins. Dev runs the full build via ENABLED_MODULES=*
     # in Backend/.env so plugin code is exercised. See app/modules.py for the registry.
@@ -66,41 +66,6 @@ class Settings(BaseSettings):
     minio_secret_key: str = "pikaos-secret"
     minio_secure: bool = False
     minio_bucket: str = "pikaos"
-
-    # --- UAT vs Production sitemap comparison ---
-    # Per-request HTTP timeout when probing URLs. Kept modest so a few slow/dead
-    # hosts can't push total runtime past the dev-proxy timeout (Frontend/vite.config.js).
-    compare_timeout_seconds: float = 10.0
-    # Polite default # of URLs probed in parallel when a request doesn't specify
-    # `concurrency`. Kept modest so a real WAF/CDN-fronted site (Cloudflare etc.)
-    # doesn't rate-limit/drop our burst → false "unreachable"/404 noise. A request
-    # may ask for more via `concurrency`, but never above compare_max_concurrency.
-    compare_default_concurrency: int = 8
-    # Hard safety ceiling on simultaneous URL probes — a request can't exceed this.
-    compare_max_concurrency: int = 200
-    compare_max_urls: int = 2000            # safety cap on URLs pulled from a sitemap
-    # Transient-failure retries per probe (connect/read errors only — a WAF drops a
-    # few under load even at modest concurrency); 0 disables. Linear backoff.
-    compare_probe_retries: int = 1
-    compare_probe_backoff_seconds: float = 0.4
-    # --- deep mode (fetch full HTML + compare body/title/meta/images/links) ---
-    compare_deep_limit: int = 5             # default # of pages to deep-compare (deep is heavy + slow on
-                                            # WAF/CDN sites; start small, the user can raise it per run)
-    compare_deep_max_limit: int = 500       # hard ceiling on deep pages
-    compare_deep_concurrency: int = 8       # pages deep-compared in parallel (each = many sub-requests)
-    compare_deep_img_cap: int = 15          # max images probed per page
-    compare_deep_link_cap: int = 20         # max internal links probed per page
-    compare_body_sim_threshold: float = 0.98  # below this = body content differs
-    compare_deep_text_chars: int = 2000     # body text returned per side for the client-side diff
-    compare_deep_max_blocks: int = 150      # content blocks returned per side for the block-by-block diff
-
-    # --- SSRF guard (compare/audit fetch user-supplied URLs — the only outbound path) ---
-    # Reject URLs that resolve to private/loopback/link-local/reserved IPs. Keep ON in
-    # any shared/prod environment; turn off only for a trusted internal-only deployment.
-    compare_ssrf_block_private: bool = True
-    # Optional comma-separated host allowlist (exact host or ".suffix" match). Empty = any
-    # public host. Set this to lock compare to known domains.
-    compare_url_allowlist: str = ""
 
     # --- agent execution engine (B3 — services/agent_runner.run, run by the arq worker) ---
     # Hard cap on LLM+tool steps per run — a runaway agent can't loop forever / drain quota.
@@ -213,10 +178,6 @@ class Settings(BaseSettings):
     @property
     def cors_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
-
-    @property
-    def compare_allowlist(self) -> list[str]:
-        return [h.strip().lower() for h in self.compare_url_allowlist.split(",") if h.strip()]
 
     @property
     def is_production(self) -> bool:

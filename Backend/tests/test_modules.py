@@ -22,22 +22,22 @@ def test_star_enables_all_plugins_empty_is_base_only(monkeypatch):
 
 
 def test_allowlist_limits_optional(monkeypatch):
-    monkeypatch.setattr(settings, "enabled_modules", "compare")
-    assert modules.enabled_optional_modules() == {"compare"}
+    monkeypatch.setattr(settings, "enabled_modules", "knowledge")
+    assert modules.enabled_optional_modules() == {"knowledge"}
 
 
 def test_unknown_module_name_is_ignored(monkeypatch):
-    monkeypatch.setattr(settings, "enabled_modules", "compare, nope")
-    assert modules.enabled_optional_modules() == {"compare"}
+    monkeypatch.setattr(settings, "enabled_modules", "knowledge, nope")
+    assert modules.enabled_optional_modules() == {"knowledge"}
 
 
 def test_base_always_active_plugins_gated(monkeypatch):
-    monkeypatch.setattr(settings, "enabled_modules", "compare")  # only the compare plugin on
+    monkeypatch.setattr(settings, "enabled_modules", "knowledge")  # only the knowledge plugin on
     assert modules.is_module_active("infra")       # Base — ignores ENABLED_MODULES
     assert modules.is_module_active("core")
     assert modules.is_module_active("engine")      # engine is part of the Base now (always on)
-    assert modules.is_module_active("compare")     # enabled plugin
-    assert not modules.is_module_active("knowledge")  # plugin, not enabled
+    assert modules.is_module_active("knowledge")   # enabled plugin
+    assert not modules.is_module_active("nope")    # unknown name, never active
 
 
 def test_active_modules_is_base_only_when_empty(monkeypatch):
@@ -48,13 +48,13 @@ def test_active_modules_is_base_only_when_empty(monkeypatch):
 def test_register_routers_loads_only_active(monkeypatch):
     monkeypatch.setattr(settings, "enabled_modules", "*")
     full = FastAPI()
-    assert set(modules.register_routers(full)) == {"infra", "core", "engine", "knowledge", "compare"}
+    assert set(modules.register_routers(full)) == {"infra", "core", "engine", "knowledge"}
 
-    monkeypatch.setattr(settings, "enabled_modules", "compare")
+    monkeypatch.setattr(settings, "enabled_modules", "")  # Base only — knowledge plugs out
     slim = FastAPI()
     loaded = modules.register_routers(slim)
     # engine stays (Base); knowledge plugs out.
-    assert "compare" in loaded and "engine" in loaded and "knowledge" not in loaded
+    assert "engine" in loaded and "knowledge" not in loaded
     # dropping the knowledge plugin means fewer mounted routes — a real, observable plug-out.
     assert len(slim.routes) < len(full.routes)
 
@@ -64,4 +64,4 @@ def test_base_only_drops_all_plugins(monkeypatch):
     base = FastAPI()
     loaded = modules.register_routers(base)
     assert set(loaded) == {"infra", "core", "engine"}
-    assert "knowledge" not in loaded and "compare" not in loaded
+    assert "knowledge" not in loaded

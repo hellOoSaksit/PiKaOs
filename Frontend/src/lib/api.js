@@ -111,29 +111,6 @@ export async function forgotPassword(usernameOrEmail) {
   return raw("/auth/forgot-password", { method: "POST", auth: false, body: { usernameOrEmail } });
 }
 
-// --- UAT vs Production compare API ---
-// Each accepts an optional AbortSignal so the caller can cancel a long run; aborting
-// the fetch closes the connection, which the backend detects to stop its outbound work.
-// POST /api/compare → coverage of Production's sitemap URLs against UAT.
-export async function compareSites(body, signal) {
-  return raw("/compare", { method: "POST", body, signal });
-}
-
-// POST /api/compare/deep → deep-compare one small batch of page pairs (client streams sets).
-export async function compareDeep(body, signal) {
-  return raw("/compare/deep", { method: "POST", body, signal });
-}
-
-// POST /api/compare/plan → read the sitemap(s) → URL pairs to probe (fast, no probing).
-export async function coveragePlan(body, signal) {
-  return raw("/compare/plan", { method: "POST", body, signal });
-}
-
-// POST /api/compare/batch → probe one chunk of coverage pairs (client streams chunks).
-export async function coverageBatch(body, signal) {
-  return raw("/compare/batch", { method: "POST", body, signal });
-}
-
 // --- LLM provider config API (admin: which provider/model/key the engine uses — no-hardcode) ---
 // The API key is write-only: send it in the body to set/replace it; the server never returns it
 // (responses carry `api_key_set` only). Omit it on update to keep the stored key unchanged.

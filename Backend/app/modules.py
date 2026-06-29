@@ -1,9 +1,10 @@
 """Module registry — the seam that makes PiKaOs a pluggable Modular Monolith (modularity.md §2.5).
 
 A deployment loads only the modules in `ENABLED_MODULES`, so one department can run a lightweight
-build (e.g. just core + compare) without dragging the rest along. The **foundation** (infra + core:
+build (e.g. just core + knowledge) without dragging the rest along. The **foundation** (infra + core:
 health/identity/config/storage) always loads — every deployment needs it. The **optional** bounded
-contexts (engine, knowledge, compare) are switchable.
+contexts (engine, knowledge) are switchable. (compare now lives only as the PiKaOs-Compare own-app
+plugin — removed from main, extraction-plan.md §4.)
 
 The code is still flat (`app/routers`, not `app/modules/<name>/` yet — modularity.md §5 moves folders
 later, one module at a time). This registry is the single place that maps each module to the routers
@@ -19,7 +20,7 @@ from fastapi import APIRouter, FastAPI
 from .config import settings
 from .routers import auth, health, llm_config, settings_config, ws
 from .routers import storage as storage_router
-from .plugins import compare, knowledge  # plugin folders app/plugins/<name>/ (extraction-plan.md)
+from .plugins import knowledge  # plugin folders app/plugins/<name>/ (extraction-plan.md)
 
 
 @dataclass(frozen=True)
@@ -47,7 +48,6 @@ MODULES: tuple[Module, ...] = (
     Module("engine", routers=(ws.router,), optional=False),  # agent-ops runtime — part of the Base
     # --- Plugins: off unless listed in ENABLED_MODULES ("" = Base only, "*" = all) ---
     Module("knowledge", routers=(knowledge.router,)),  # codex / documents / RAG
-    Module("compare", routers=(compare.router,)),      # UAT vs Prod (also the PiKaOs-Compare plugin)
 )
 
 # Plugin names a deployment may switch on via ENABLED_MODULES (everything not in the Base).
