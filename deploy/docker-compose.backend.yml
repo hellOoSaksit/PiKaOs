@@ -30,3 +30,13 @@ services:
       - ../Backend/.env
       - ../.env.ai
     command: ["arq", "app.worker.WorkerSettings"]
+    # The worker shares the backend image (whose Dockerfile HEALTHCHECK probes /api/version) but runs
+    # no HTTP server — override with arq's own liveness: `arq --check` exits 0 only if the worker wrote
+    # a recent health record to Redis (release-and-rollback.md §2: every service reports health so the
+    # rolling update / auto-rollback can see it).
+    healthcheck:
+      test: ["CMD", "arq", "app.worker.WorkerSettings", "--check"]
+      interval: 15s
+      timeout: 5s
+      start_period: 40s
+      retries: 3

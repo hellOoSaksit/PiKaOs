@@ -13,7 +13,7 @@ dist-ssr
 
 # claude code local config / tooling (kept local, not published)
 # NOTE: no per-repo CLAUDE.md — the ONE shared router lives at the umbrella root
-# (../CLAUDE.md); rules there, knowledge in ../PiKaOs-docs/docs/.
+# (../CLAUDE.md); rules there, knowledge in ../PiKaOs-Docs/docs/.
 .claude/
 .mcp.json
 .playwright-mcp/
