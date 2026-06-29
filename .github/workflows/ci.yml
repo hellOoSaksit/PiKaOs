@@ -34,6 +34,26 @@ jobs:
             exit 1
           fi
 
+  # Static architecture gates (plugin-architecture.md §15) — no DB/stack needed, so this is fast.
+  # grimp/import-linter parse source (they don't import modules); the manifest check is pure jsonschema.
+  architecture:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'  # match the runtime image (Dockerfile: python:3.12-slim)
+          cache: pip
+          cache-dependency-path: Backend/requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - name: No forbidden imports (Core ↛ plugins · plugin ↛ sibling plugin, §2)
+        run: lint-imports
+      - name: Plugin manifests structurally valid (§3)
+        run: python scripts/check_manifests.py
+
   backend:
     runs-on: ubuntu-latest
     # The split stacks load gitignored .env files; seed CI with the tracked *.example (dev creds).
