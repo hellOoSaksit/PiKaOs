@@ -1,7 +1,0 @@
-/* PiKaOs Design System — global CSS entry (consumers link this one file).
-   @import list only — reaches every token + component-style file.
-   Order matters: kit first, then core tokens/primitives, then component/form styles
-   (app rules must win on shared class names — same order as the app's src/styles/index.css). */
-@import './Design System/css/pikaos-kit.css';
-@import './Design System/css/pikaos-core.css';
-@import './Design System/css/pikaos-components.css';

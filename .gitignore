@@ -1,7 +1,9 @@
-# Monorepo — this repo now holds PiKaOs-Core/ + PiKaOs-Docs/ + PiKaOs-App/ as plain folders
-# (their separate git repos were collapsed in here). Per-folder .gitignore files still apply
-# (node_modules, .env, __pycache__, dist, …). The own-app plugins under PiKaOs-Plugin/ stay
-# SEPARATE git repos (their own remotes + deploy), so they remain ignored here.
+# Public monorepo — holds PiKaOs-Core/ + PiKaOs-App/ as plain folders (their separate git repos
+# were collapsed in here). Per-folder .gitignore files still apply (node_modules, .env, __pycache__,
+# dist, …). These stay SEPARATE git repos (own remotes), so keep them ignored here:
+#   PiKaOs-Docs/   = PRIVATE (internal-only docs — must never land in this public repo)
+#   PiKaOs-Plugin/ = own-app plugins (Compare, RedirectMap), public, deploy separately
+/PiKaOs-Docs/
 /PiKaOs-Plugin/
 
 # Claude Code local/user state (keep .claude/skills, drop the rest)

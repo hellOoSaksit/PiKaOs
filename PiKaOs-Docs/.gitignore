@@ -1,8 +1,0 @@
-node_modules
-.DS_Store
-
-# secrets / env — never commit real env files (templates *.example stay tracked)
-.env
-.env.*
-!.env.example
-!*.env.example

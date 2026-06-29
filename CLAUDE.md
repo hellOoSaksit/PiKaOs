@@ -6,10 +6,11 @@ shares these rules. This is a **thin router**: durable always-on rules + a map i
 doc that owns each topic. Read it, then open **only** the doc your task needs (progressive
 disclosure) — don't load the whole knowledge base.
 
-> **One repo (hard rule).** `PiKaOs-Projects/` is a **single git monorepo** — `PiKaOs-Core/`,
-> `PiKaOs-Docs/`, `PiKaOs-App/` are plain **folders** (their old separate git repos were collapsed
-> in; plugin isolation is enforced by the CI gates, not by repo boundaries). The own-app plugins under
-> `PiKaOs-Plugin/` are the **only** things that stay separate git repos (own remotes + deploy).
+> **Repo layout (hard rule).** `PiKaOs-Projects/` is the **public monorepo** — `PiKaOs-Core/` and
+> `PiKaOs-App/` are plain **folders** in it (their old separate git repos were collapsed in; plugin
+> isolation is enforced by the CI gates, not by repo boundaries). Two things stay **separate git repos**,
+> gitignored + nested: **`PiKaOs-Docs/` is PRIVATE** (internal-only knowledge — never in the public repo),
+> and the **own-app plugins** under `PiKaOs-Plugin/` (Compare, RedirectMap) are public, own remotes + deploy.
 >
 > **Where things live (hard rule).** Project **knowledge → `docs/` only** (centralized in
 > [`PiKaOs-Docs/docs/`](PiKaOs-Docs/docs)). Each project folder's **`README.md` is for GitHub** — what
