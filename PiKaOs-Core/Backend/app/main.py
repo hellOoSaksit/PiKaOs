@@ -55,6 +55,10 @@ app.add_middleware(
 # Routers must mount at import time (before serving); the startup log of the result is in lifespan.
 _LOADED_MODULES = modules.register_routers(app)
 
+# Dependency inversion: Core's /health renders plugin state but must not import the App seam, so the
+# App composition hands it the provider here (read off `app.state`). Core ↛ App stays clean (§2.1).
+app.state.plugin_states = modules.plugin_states
+
 
 @app.get("/")
 async def root() -> dict:

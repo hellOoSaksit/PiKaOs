@@ -1,12 +1,11 @@
 """Health check — pings db, redis, minio."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import redis_client, storage
-from ... import modules  # composition seam (app/modules.py) — the plugin registry, lives above Core
 from ..config import settings
 from ..db import get_db
 from ..schemas import HealthOut, PluginHealth, VersionOut
@@ -24,7 +23,7 @@ async def version() -> VersionOut:
 
 
 @router.get("/health", response_model=HealthOut)
-async def health(db: AsyncSession = Depends(get_db)) -> HealthOut:
+async def health(request: Request, db: AsyncSession = Depends(get_db)) -> HealthOut:
     """Deep readiness — pings every dependency. Returns 200 with status "degraded" (not an error) when
     a dependency is down, so dashboards see the detail; use /version for liveness, not this."""
     try:
@@ -37,6 +36,11 @@ async def health(db: AsyncSession = Depends(get_db)) -> HealthOut:
     minio_ok = "ok" if storage.ping() else "down"
 
     overall = "ok" if db_ok == redis_ok == minio_ok == "ok" else "degraded"
+    # Each plugin's state + manifest version (§14) — disabled plugins still listed. Core (the Base)
+    # never imports the composition seam: the App layer registers `modules.plugin_states` on
+    # `app.state` at startup (DIP), so this stays an upward-facing detail Core merely *renders*.
+    states_provider = getattr(request.app.state, "plugin_states", None)
+    plugin_rows = states_provider() if states_provider is not None else []
     return HealthOut(
         status=overall,
         version=settings.app_version,
@@ -44,6 +48,5 @@ async def health(db: AsyncSession = Depends(get_db)) -> HealthOut:
         db=db_ok,
         redis=redis_ok,
         minio=minio_ok,
-        # Core + each plugin's state + manifest version (§14) — disabled plugins still listed.
-        plugins=[PluginHealth(**p) for p in modules.plugin_states()],
+        plugins=[PluginHealth(**p) for p in plugin_rows],
     )

@@ -9,6 +9,8 @@
 #      worker discovers plugin jobs via the Loader's dynamic import — zero static plugin imports.
 #   2. Plugin ↛ sibling plugin (§2.3) — features talk only through Core contracts, never each other.
 #      Add every new app.plugins.<id> to the independence contract as it lands.
+#   3. Core ↛ App composition (§2.1) — the Base never reaches up into the composition seam
+#      (main/worker/modules/plugin_loader = the PiKaOs-App layer). Inversions go through app.state / DI.
 
 [importlinter]
 root_package = app
@@ -26,6 +28,20 @@ source_modules =
     app.core
 forbidden_modules =
     app.plugins
+
+[importlinter:contract:core-must-not-import-app-composition]
+name = Core (Base) must not import the App composition seam (§2.1 — Core ↛ App)
+# The composition root (main/worker/modules/plugin_loader = the PiKaOs-App layer) wires Core + plugins
+# together; Core must never reach UP into it. The one prior breach — core/routers/health.py importing
+# `modules` for plugin_states() — was inverted via app.state (the App registers the provider at startup).
+type = forbidden
+source_modules =
+    app.core
+forbidden_modules =
+    app.main
+    app.worker
+    app.modules
+    app.plugin_loader
 
 [importlinter:contract:plugins-are-independent]
 name = Plugins must not import sibling plugins (§2.3)
