@@ -21,6 +21,17 @@
 .mcp.json.*
 .playwright-mcp/
 
+# UAT plugin code (P2). Real plugin folders live in PiKaOs-App/plugins/<id>/{frontend,backend}/ and are
+# composed into Core via symlink at test time only (App = local UAT — see link-plugins.sh). NEVER pushed:
+# Core must stay plugin-free so the public repo ships only the platform + the plugin seam.
+/PiKaOs-App/plugins/
+# Core keeps ONLY the seam files; the per-plugin folders beside them are gitignored symlinks into the above.
+/PiKaOs-Core/Frontend/src/plugins/*
+!/PiKaOs-Core/Frontend/src/plugins/index.jsx
+/PiKaOs-Core/Backend/app/plugins/*
+!/PiKaOs-Core/Backend/app/plugins/__init__.py
+!/PiKaOs-Core/Backend/app/plugins/manifest.schema.json
+
 # OS / editor junk
 .DS_Store
 Thumbs.db

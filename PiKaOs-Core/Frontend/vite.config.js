@@ -11,6 +11,12 @@ const PROXY_TARGET = process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8000';
 // PiKaOs — Vite + React
 export default defineConfig({
   plugins: [react()],
+  // Plugin folders under src/plugins/<id> are SYMLINKS into PiKaOs-App/plugins/<id>/frontend (the UAT
+  // compose seam — Core itself ships none of them). Without this, Vite resolves a symlinked module to its
+  // REAL path, so a plugin's `../../lib/foo.jsx` would resolve from PiKaOs-App/, not from src/. Keeping the
+  // symlink path makes those relative imports resolve from src/plugins/<id> exactly as the plugin is written.
+  // Safe here: node_modules is a flat install (no symlinks to dedup). (plugin-architecture.md §0, P2.)
+  resolve: { preserveSymlinks: true },
   server: {
     host: true,                                   // listen on 0.0.0.0 so the container's dev server is reachable from the host
     port: 5173,
