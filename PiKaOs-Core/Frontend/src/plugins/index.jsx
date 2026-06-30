@@ -6,12 +6,36 @@
    A plugin module default-exports a descriptor:
      { id, routes: [ { id, meta:{icon,title,en}, render(ctx) } ], nav: [ { group, items:[{id,icon,perm?}] } ] }
    `render(ctx)` receives the Core seams it asked for (t · can · language · …); the plugin owns the wiring
-   so Core never needs to know each screen's prop shape. */
-import knowledge from './knowledge/index.jsx';
-import world from './world/index.jsx';
+   so Core never needs to know each screen's prop shape.
+
+   DISCOVERY (P1): plugins are found by globbing `./<id>/index.jsx` — Core does not name them. Drop a
+   folder in (or symlink one from PiKaOs-App/plugins/, P2) and it ships; delete it and a Base-only build
+   carries none of it. So this file never changes per plugin, and Core builds with 0..N plugins present.
+   Load order is dependency-aware: a plugin listing `dependencies:[...]` loads after them (topo sort),
+   which is what lets a feature rely on a foundational plugin like `ai` (plugin-architecture.md §2.4 §6). */
+const _mods = import.meta.glob('./*/index.jsx', { eager: true });
+const _descriptors = Object.values(_mods).map(m => m && m.default).filter(Boolean);
+
+/* Topo-order by `dependencies` so a plugin loads after the ones it declares (e.g. knowledge after ai).
+   Cycles / missing deps degrade gracefully: anything unresolved is appended in discovery order. */
+function _orderByDeps(list) {
+  const byId = new Map(list.map(p => [p.id, p]));
+  const out = [], seen = new Set(), stack = new Set();
+  const visit = (p) => {
+    if (!p || seen.has(p.id)) return;
+    if (stack.has(p.id)) return;                 // cycle — bail, leave for the trailing append
+    stack.add(p.id);
+    for (const dep of p.dependencies || []) visit(byId.get(dep));
+    stack.delete(p.id);
+    if (!seen.has(p.id)) { seen.add(p.id); out.push(p); }
+  };
+  for (const p of list) visit(p);
+  for (const p of list) if (!seen.has(p.id)) { seen.add(p.id); out.push(p); }   // safety net
+  return out;
+}
 
 // The frontend plugins this build ships (mirror of the backend ENABLED_MODULES set).
-const PLUGINS = [knowledge, world];
+const PLUGINS = _orderByDeps(_descriptors);
 
 const _routes = {};
 for (const p of PLUGINS) for (const r of p.routes || []) _routes[r.id] = r;
