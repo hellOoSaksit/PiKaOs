@@ -10,7 +10,7 @@ import { getNavConfig, setNavConfig, getMySettings, setMySetting, getGlobalConfi
 import { applyGlobalConfig } from './lib/characters.jsx';
 import { Admin } from './screens/screens-admin.jsx';
 import { CharacterBuilder } from './screens/screens-builder.jsx';
-import { Chronicle, Codex, Mana, QuestLog, Recall, Settings, Treasury, Watchtower } from './screens/screens-extra.jsx';
+import { Chronicle, Mana, QuestLog, Settings, Treasury, Watchtower } from './screens/screens-extra.jsx';
 import { Login } from './screens/Login.jsx';
 import { MyDashboard } from './screens/screens-me.jsx';
 import { AuditLog, PermissionsCatalog, RolesPermissions, UserDetail, UserForm } from './screens/screens-rbac.jsx';
@@ -26,6 +26,7 @@ import { World } from './screens/screens-world.jsx';
 import { SAMPLE_CHARS, loadArchived, loadChars, randPos, saveArchived, saveChars } from './lib/store.jsx';
 import { UILoadingHost, UIModalHost } from './lib/ui-modal.jsx';
 import { makeT, DEFAULT_LANG, DEFAULT_STYLE, packById, defaultPack, defaultPackForLang, LEX_PACKS } from './lib/i18n.jsx';
+import { renderPluginRoute, PLUGIN_ROUTE_META } from './plugins/index.jsx';
 
 // ชุดเริ่มต้นตอนเปิดแอป = master ของ i18n (English + Formal — มาจาก flag isDefault* ในไฟล์ ไม่ hardcode)
 const I18N_DEFAULT_PACK = (LEX_PACKS.find(p => p.lang === DEFAULT_LANG && p.styleKey === DEFAULT_STYLE) || defaultPack() || {}).id || "english_pro";
@@ -41,8 +42,6 @@ const ROUTE_META = {
   quests:  { icon: "📜", title: "กระดานภารกิจ", en: "Quest Board" },
   world:   { icon: "🌍", title: "สถานะโลก", en: "World State" },
   meeting: { icon: "💬", title: "ห้องประชุม Agent", en: "Council" },
-  codex:   { icon: "📚", title: "บันทึกความรู้", en: "Codex" },
-  search:  { icon: "🔍", title: "ค้นหาความรู้", en: "Recall" },
   sitemap: { icon: "🗺️", title: "ตรวจไซต์แมพ", en: "Sitemap Match" },
   mana:    { icon: "🔵", title: "มานา (Token)", en: "Mana" },
   treasury:{ icon: "💰", title: "คลังสมบัติ", en: "Treasury" },
@@ -57,6 +56,7 @@ const ROUTE_META = {
   library: { icon: "🧩", title: "คลังคอมโพเนนต์", en: "Component Library" },
   history: { icon: "🗂️", title: "ประวัติภารกิจ", en: "Quest Log" },
   watch:   { icon: "🛡️", title: "ระบบเฝ้าระวัง", en: "Watchtower" },
+  ...PLUGIN_ROUTE_META,   // plugin routes contribute their own topbar metadata (Phase 6 seam)
 };
 
 const NAV_GROUP_KEY = { "ศูนย์บัญชาการ": "command", "ความรู้และความทรงจำ": "knowledge", "ทรัพยากร": "resources", "ผู้ดูแลกิลด์": "admin" };
@@ -610,8 +610,6 @@ function App() {
       case "quests": return <QuestBoard onQuest={setQuestSel} can={can} t={t} />;
       case "world": return <World onAgent={setAgentSel} S={S} can={can} t={t} />;
       case "meeting": return <Meeting S={S} t={t} />;
-      case "codex": return <Codex t={t} can={can} />;
-      case "search": return <Recall lang={language} />;
       case "sitemap": return <SitemapAudit t={t} lang={language} can={can} actor={me.display_name || me.username || "ผู้ใช้"} />;
       case "mana": return <Mana S={S} t={t} />;
       case "treasury": return <Treasury t={t} />;
@@ -627,7 +625,11 @@ function App() {
       case "library": return <ComponentLibrary onBack={() => go("settings")} t={t} />;
       case "history": return <QuestLog t={t} />;
       case "watch": return <Watchtower t={t} />;
-      default: return <MyDashboard Sys={Sys} onAgent={setAgentSel} onQuest={setQuestSel} />;
+      default: {
+        // a route owned by an enabled plugin (Phase 6 seam) — else fall back to the dashboard.
+        const pluginEl = renderPluginRoute(route, { t, can, language });
+        return pluginEl || <MyDashboard Sys={Sys} onAgent={setAgentSel} onQuest={setQuestSel} />;
+      }
     }
   })();
 

@@ -6,6 +6,7 @@
    (a single localStorage key, NOT keyed per user) so an admin's arrangement is what every user
    sees — same intent as the other admin config in this prototype. */
 import { NAV } from './data.jsx';
+import { PLUGIN_NAV } from '../plugins/index.jsx';
 
 const NAV_KEY = "guildos-nav-v1";
 export const MAX_DEPTH = 3;                 // Main(0) -> Sub(1) -> Sub(2)
@@ -23,7 +24,16 @@ function cloneItems(items) {
   }));
 }
 function defaultNav() {
-  return NAV.map(g => ({ group: g.group, items: cloneItems(g.items) }));
+  const base = NAV.map(g => ({ group: g.group, items: cloneItems(g.items) }));
+  // Phase 6 seam: each enabled frontend plugin contributes its own sidebar group/items — merged into a
+  // matching Base group (by name) or appended — so Core's NAV never hardcodes a feature's nav entry.
+  for (const pg of PLUGIN_NAV) {
+    const items = cloneItems(pg.items);
+    const g = base.find(b => b.group === pg.group);
+    if (g) g.items.push(...items);
+    else base.push({ group: pg.group, items });
+  }
+  return base;
 }
 
 /* ---- helpers ---- */

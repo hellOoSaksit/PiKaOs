@@ -128,10 +128,8 @@ const NAV = [
     { id: "workflows", icon: "⚗️", label: "โต๊ะปรุงเวท", en: "Workflows" },
     { id: "sitemap", icon: "🗺️", label: "ตรวจไซต์แมพ", en: "Sitemap Match" },
   ]},
-  { group: "ความรู้และความทรงจำ", items: [
-    { id: "codex", icon: "📚", label: "บันทึกความรู้", en: "Codex" },
-    { id: "search", icon: "🔍", label: "ค้นหาความรู้", en: "Recall" },
-  ]},
+  // "ความรู้และความทรงจำ" (codex · search) is now contributed by the knowledge plugin (Phase 6 seam,
+  // src/plugins/knowledge) and merged into the nav default by data-nav.defaultNav — not hardcoded here.
   { group: "ผู้ดูแลกิลด์", items: [
     { id: "admin", icon: "👥", label: "จัดการผู้ใช้", en: "User Management", perm: "user.view.any" },
     { id: "toolsmgr", icon: "🧰", label: "จัดการเครื่องมือ", en: "Tools", perm: "options.manage" },
