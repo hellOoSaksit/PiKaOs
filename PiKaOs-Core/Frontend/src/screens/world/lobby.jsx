@@ -5,7 +5,7 @@ const { useEffect, useRef } = React;
 import { roomAgents } from '../../lib/characters.jsx';
 import { Btn } from '../../components/components.jsx';
 import { fmtTok } from '../../data/data-users.jsx';
-import { QUESTS } from '../../data/data.jsx';
+import { TASKS } from '../../data/data.jsx';
 import { drawRoom } from '../../lib/room-tiles.jsx';
 import { ACTS, ROLE_ACTS } from '../../lib/world-life.jsx';
 import { wt } from './wt.js';
@@ -117,9 +117,9 @@ function OverviewTab({ rooms, chars, onOpen, query }) {
             <div className="ov-agents">
               {members.length === 0 ? <div className="muted" style={{ fontSize: 12, padding: "6px 2px" }}>{wt("world.ovNoAgent")}</div> :
                 members.slice(0, 5).map(c => {
-                  const actKey = ((typeof ROLE_ACTS !== "undefined" && ROLE_ACTS[c.classKey]) || ["thinking"])[0];
+                  const actKey = ((typeof ROLE_ACTS !== "undefined" && ROLE_ACTS[c.roleKey]) || ["thinking"])[0];
                   const act = (typeof ACTS !== "undefined" && ACTS[actKey]) || { icon: "💭", th: "กำลังคิด" };
-                  const quests = QUESTS.filter(q => q.party.includes(c.id) && q.status !== "done");
+                  const quests = TASKS.filter(q => q.party.includes(c.id) && q.status !== "done");
                   const left = quests.reduce((s, q) => s + Math.max(0, (q.steps || 0) - (q.stepDone || 0)), 0);
                   return (
                     <div key={c.id} className="ov-agent">

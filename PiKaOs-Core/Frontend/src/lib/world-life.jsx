@@ -37,7 +37,7 @@ const ROLE_ACTS = {
   analyst:    ["reading", "thinking", "searching"],
 };
 function pickActivity(char) {
-  const pool = ROLE_ACTS[char && char.classKey] || WORK_ACTS;
+  const pool = ROLE_ACTS[char && char.roleKey] || WORK_ACTS;
   return pool[(Math.random() * pool.length) | 0];
 }
 

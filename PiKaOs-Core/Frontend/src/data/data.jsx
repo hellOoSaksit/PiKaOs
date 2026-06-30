@@ -1,11 +1,11 @@
 /* PiKaOs — ES module (migrated from PiKaOs-Core/data.jsx). Pure data — no imports. */
 
 /* ============================================================
-   GUILD DATA — AI multi-agent system framed as an adventurer guild
+   ORG DATA — AI multi-agent system framed as an adventurer guild
    Powered by HERMES (the orchestrator / guild master)
    ============================================================ */
 
-const GUILD = {
+const ORG = {
   name: "PiKaOs",
   thaiName: "ระบบเอเจนต์อัจฉริยะ",
   master: "HERMES",
@@ -13,11 +13,11 @@ const GUILD = {
   hall: "ศูนย์ควบคุมกลาง · Central Spire",
 };
 
-// NOTE: the roster is now DYNAMIC (see store.jsx). `ADVENTURERS` is a live
+// NOTE: the roster is now DYNAMIC (see store.jsx). `AGENTS` is a live
 // getter over window.__chars, kept so existing screens keep working.
 
 // quest rank → reward weighting. status: active · queued · review · done · failed
-const QUESTS = [
+const TASKS = [
   {
     id: "q1042", rank: "A", title: "สร้างระบบยืนยันตัวตนแบบ OAuth2",
     desc: "ออกแบบและพัฒนา service สำหรับ login/refresh token พร้อมเอกสาร",
@@ -84,7 +84,7 @@ const ACTIVITY = [
 ];
 
 // mana (token) usage ledger
-const MANA = {
+const TOKENS = {
   balance: 48200,
   cap: 80000,
   spentToday: 12640,
@@ -165,31 +165,31 @@ const ROUTE_TITLE_FORMAL = {
 };
 
 const byId = (id) => (window.__charById || {})[id];
-const rankReward = { S: "สูงสุด", A: "สูง", B: "ปานกลาง", C: "ปกติ", D: "ต่ำ" };
-const statusTh = { on: "ปฏิบัติงาน", busy: "กำลังคิด", idle: "ว่าง", away: "ไม่อยู่" };
+const priorityLabel = { S: "สูงสุด", A: "สูง", B: "ปานกลาง", C: "ปกติ", D: "ต่ำ" };
+const statusLabel = { on: "ปฏิบัติงาน", busy: "กำลังคิด", idle: "ว่าง", away: "ไม่อยู่" };
 
 // live getter — reads whatever roster App currently holds
-Object.defineProperty(window, "ADVENTURERS", { configurable: true, get: () => window.__chars || [] });
+Object.defineProperty(window, "AGENTS", { configurable: true, get: () => window.__chars || [] });
 
 Object.assign(window, {
-  GUILD, QUESTS, CHAT, ACTIVITY, MANA, KNOWLEDGE, TREASURY, NAV,
+  ORG, TASKS, CHAT, ACTIVITY, TOKENS, KNOWLEDGE, TREASURY, NAV,
   NAV_GROUP_FORMAL, NAV_LABEL_FORMAL, ROUTE_TITLE_FORMAL,
-  byId, rankReward, statusTh,
+  byId, priorityLabel, statusLabel,
 });
 
 export {
   ACTIVITY,
   CHAT,
-  GUILD,
+  ORG,
   KNOWLEDGE,
-  MANA,
+  TOKENS,
   NAV,
   NAV_GROUP_FORMAL,
   NAV_LABEL_FORMAL,
-  QUESTS,
+  TASKS,
   ROUTE_TITLE_FORMAL,
   TREASURY,
   byId,
-  rankReward,
-  statusTh
+  priorityLabel,
+  statusLabel
 };

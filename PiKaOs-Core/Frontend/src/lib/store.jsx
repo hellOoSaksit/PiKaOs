@@ -29,7 +29,7 @@ function randPos() {
 let _idn = 100;
 function makeCharacter(input) {
   const rankXp = { S: 91, A: 80, B: 62, C: 45, D: 30 };
-  const opt = CLASS_OPTS.find(o => o.key === (input.classKey || "analyst")) || {};
+  const opt = CLASS_OPTS.find(o => o.key === (input.roleKey || "analyst")) || {};
   const c = {
     id: input.id || ("c" + (++_idn) + Date.now().toString(36).slice(-3)),
     name: input.name || "เอเจนต์นิรนาม",
@@ -41,7 +41,7 @@ function makeCharacter(input) {
     goal: input.goal || "",
     tools: input.tools || [],
     workflows: input.workflows || [],
-    classKey: input.classKey || "analyst",
+    roleKey: input.roleKey || "analyst",
     color: input.color || "#c7a14a",
     rank: input.rank || "C",
     model: input.model || "Hermes-3 · 8B",
@@ -53,7 +53,7 @@ function makeCharacter(input) {
     xp: input.xp ?? (rankXp[input.rank || "C"] || 40),
     quests: input.quests ?? Math.floor(Math.random() * 120),
     success: input.success ?? (88 + Math.floor(Math.random() * 11)),
-    icon: (CLASS_OPTS.find(o => o.key === (input.classKey || "analyst")) || {}).icon || "🎭",
+    icon: (CLASS_OPTS.find(o => o.key === (input.roleKey || "analyst")) || {}).icon || "🎭",
     classEn: opt.en || "Agent",
     classTh: input.position || opt.th || "เอเจนต์",
     specialty: input.specialty || (input.skills && input.skills[0]) || "ทั่วไป",
@@ -70,13 +70,13 @@ function makeCharacter(input) {
 // ---- Sample seed: the original six, now full character records (ids match quests/chat) ----
 const SAMPLE_CHARS = [
   makeCharacter({
-    id: "ceo", name: "CEO", classKey: "mage", color: "#c8a24a", rank: "S",
+    id: "ceo", name: "CEO", roleKey: "mage", color: "#c8a24a", rank: "S",
     position: "CEO", role: "Chief Executive · แจกจ่ายงาน", model: "Hermes-3 · 405B", status: "on",
     task: "แจกจ่ายและกำกับงานทุกห้อง", level: 40, mana: 99, hp: 100, xp: 99, quests: 999, success: 99,
     skills: ["มอบหมายงาน", "กำกับทีม", "จัดลำดับความสำคัญ"], locked: true,
   }),
   makeCharacter({
-    id: "a1", name: "อ้อย นักวิเคราะห์", classKey: "analyst", color: "#5b87b8", rank: "B",
+    id: "a1", name: "อ้อย นักวิเคราะห์", roleKey: "analyst", color: "#5b87b8", rank: "B",
     position: "ผู้สำรวจงาน", role: "Requirement Analyst", model: "Hermes-3 · 70B", status: "busy",
     task: "ถอดข้อกำหนดจากงาน #1042", level: 14, mana: 72, hp: 96, xp: 64, quests: 128, success: 94,
     desc: "นักวิเคราะห์ผู้เชี่ยวชาญการอ่านงานและแตกออกเป็นงานย่อยที่ทีมลงมือได้จริง",
@@ -85,7 +85,7 @@ const SAMPLE_CHARS = [
     rules: ["ถามให้ชัดก่อนเริ่มเสมอ", "ห้ามสันนิษฐานข้อกำหนดที่ไม่ได้ระบุ", "สรุปเป็นข้อ ๆ ที่ตรวจสอบได้"],
   }),
   makeCharacter({
-    id: "a2", name: "เขียน ผู้จัดทำเอกสาร", classKey: "scribe", color: "#9173c0", rank: "C",
+    id: "a2", name: "เขียน ผู้จัดทำเอกสาร", roleKey: "scribe", color: "#9173c0", rank: "C",
     position: "เอเจนต์เอกสาร", role: "Documentation", model: "Hermes-3 · 8B", status: "on",
     task: "ร่างเอกสาร API ภาคผนวก", level: 9, mana: 58, hp: 88, xp: 41, quests: 86, success: 91,
     desc: "ผู้จัดทำเอกสารขององค์กร เปลี่ยนงานเทคนิคให้เป็นเอกสารที่อ่านเข้าใจง่าย",
@@ -93,7 +93,7 @@ const SAMPLE_CHARS = [
     tools: ["file_read"], rules: ["เขียนให้คนนอกทีมเข้าใจ", "อ้างอิงแหล่งที่มาทุกครั้ง"],
   }),
   makeCharacter({
-    id: "a3", name: "ช่าง นักพัฒนา", classKey: "smith", color: "#c25563", rank: "A",
+    id: "a3", name: "ช่าง นักพัฒนา", roleKey: "smith", color: "#c25563", rank: "A",
     position: "เอเจนต์พัฒนา", role: "Implementation", model: "Hermes-3 · 70B", status: "on",
     task: "พัฒนาโมดูล auth-service", level: 22, mana: 81, hp: 92, xp: 78, quests: 240, success: 89,
     desc: "เอเจนต์พัฒนา แปลงแบบให้เป็นโค้ดที่ใช้งานได้จริง",
@@ -103,7 +103,7 @@ const SAMPLE_CHARS = [
     rules: ["เขียนเทสต์ควบคู่เสมอ", "ห้าม commit ความลับลงคลัง", "ทำตามสคีมาจากสถาปนิก"],
   }),
   makeCharacter({
-    id: "a4", name: "แผน สถาปนิกระบบ", classKey: "mage", color: "#5b87b8", rank: "A",
+    id: "a4", name: "แผน สถาปนิกระบบ", roleKey: "mage", color: "#5b87b8", rank: "A",
     position: "เอเจนต์สถาปนิกระบบ", role: "System Architect", model: "Hermes-3 · 70B", status: "busy",
     task: "ออกแบบสคีมาเหตุการณ์", level: 25, mana: 88, hp: 90, xp: 83, quests: 176, success: 96,
     desc: "เอเจนต์ผู้วางผังโครงสร้างทั้งหมดของระบบ ก่อนเริ่มพัฒนา",
@@ -112,7 +112,7 @@ const SAMPLE_CHARS = [
     rules: ["คิดเรื่องการขยายตัวก่อนเสมอ", "บันทึกการตัดสินใจเชิงสถาปัตยกรรมทุกครั้ง"],
   }),
   makeCharacter({
-    id: "a5", name: "ตรวจ ผู้ประกันคุณภาพ", classKey: "knight", color: "#7fa45a", rank: "B",
+    id: "a5", name: "ตรวจ ผู้ประกันคุณภาพ", roleKey: "knight", color: "#7fa45a", rank: "B",
     position: "เอเจนต์ตรวจสอบคุณภาพ", role: "Quality Assurance", model: "Hermes-3 · 8B", status: "idle",
     task: "รอผลการ build จากช่าง", level: 16, mana: 64, hp: 99, xp: 52, quests: 154, success: 93,
     desc: "เอเจนต์ตรวจสอบคุณภาพ ไม่ปล่อยให้ข้อบกพร่องหลุดผ่านระบบ",
@@ -121,7 +121,7 @@ const SAMPLE_CHARS = [
     rules: ["ทดสอบ edge case เสมอ", "รายงานทุกความล้มเหลวพร้อมขั้นตอนทำซ้ำ"],
   }),
   makeCharacter({
-    id: "a6", name: "ค้น นักวิจัย", classKey: "researcher", color: "#9173c0", rank: "S",
+    id: "a6", name: "ค้น นักวิจัย", roleKey: "researcher", color: "#9173c0", rank: "S",
     position: "เอเจนต์วิจัย", role: "Research Agent", model: "Hermes-3 · 405B", status: "busy",
     task: "สืบค้นคลังความรู้ · 12 แหล่ง", level: 31, mana: 93, hp: 86, xp: 91, quests: 312, success: 97,
     desc: "เอเจนต์ความรู้ สืบค้นและสังเคราะห์ข้อมูลจากทุกสารบบเพื่อสนับสนุนองค์กร",
@@ -138,12 +138,17 @@ function _ensureCeo(arr) {
   if (!arr.some(c => c.id === "ceo")) { const ceo = SAMPLE_CHARS.find(c => c.id === "ceo"); if (ceo) arr = [{ ...ceo, pos: randPos() }, ...arr]; }
   return arr.map(c => c.id === "ceo" ? { ...c, locked: true, position: c.position || "CEO" } : c);
 }
+// keep persisted rosters working across the classKey→roleKey rename: map the old field on load.
+function _migrateChar(c) {
+  if (c && c.classKey !== undefined && c.roleKey === undefined) { c.roleKey = c.classKey; delete c.classKey; }
+  return { ...c, pos: c.pos || randPos() };
+}
 function loadChars() {
   try {
     const raw = localStorage.getItem(CHAR_KEY);
     if (raw === null) return SAMPLE_CHARS.map(c => ({ ...c, pos: c.pos || randPos() }));  // first run → seed demo roster
     const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? _ensureCeo(arr.map(c => ({ ...c, pos: c.pos || randPos() }))) : SAMPLE_CHARS.map(c => ({ ...c, pos: c.pos || randPos() }));
+    return Array.isArray(arr) ? _ensureCeo(arr.map(_migrateChar)) : SAMPLE_CHARS.map(c => ({ ...c, pos: c.pos || randPos() }));
   } catch { return SAMPLE_CHARS.map(c => ({ ...c, pos: c.pos || randPos() })); }
 }
 function saveChars(arr) {
@@ -161,11 +166,11 @@ const GuildCtx = React.createContext(null);
    WORLD — MMO map data: zones, placeable items, seed, persistence
    ============================================================ */
 const ZONES = [
-  { id: "spire",  th: "ศูนย์ควบคุมกลาง", en: "Guild Spire",   x: 38, y: 39, w: 24, h: 23, color: "#c8a24a", biome: "safe",   desc: "ศูนย์บัญชาการ · จุดเริ่มต้น" },
-  { id: "forest", th: "โซนความรู้",  en: "Knowledge Wilds", x: 2,  y: 4,  w: 33, h: 38, color: "#5f8a4a", biome: "forest", desc: "แหล่งความรู้ · วิจัย" },
-  { id: "mines",  th: "โซนพัฒนา",  en: "Code Mines",     x: 65, y: 3,  w: 33, h: 40, color: "#a06a32", biome: "mine",   desc: "แหล่งพัฒนาโค้ด · ผลงาน" },
-  { id: "market", th: "ศูนย์ทรัพยากร",    en: "Mana Bazaar",    x: 3,  y: 60, w: 36, h: 36, color: "#4f79ad", biome: "water",  desc: "ทรัพยากร · โทเคน" },
-  { id: "arena",  th: "โซนทดสอบ",   en: "Trial Grounds",  x: 61, y: 57, w: 36, h: 39, color: "#b1452f", biome: "arena",  desc: "ทดสอบ · ตรวจหาข้อบกพร่อง" },
+  { id: "spire",  th: "ศูนย์ควบคุมกลาง", en: "Guild Spire",   x: 38, y: 39, w: 24, h: 23, color: "#c8a24a", terrain: "safe",   desc: "ศูนย์บัญชาการ · จุดเริ่มต้น" },
+  { id: "forest", th: "โซนความรู้",  en: "Knowledge Wilds", x: 2,  y: 4,  w: 33, h: 38, color: "#5f8a4a", terrain: "forest", desc: "แหล่งความรู้ · วิจัย" },
+  { id: "mines",  th: "โซนพัฒนา",  en: "Code Mines",     x: 65, y: 3,  w: 33, h: 40, color: "#a06a32", terrain: "mine",   desc: "แหล่งพัฒนาโค้ด · ผลงาน" },
+  { id: "market", th: "ศูนย์ทรัพยากร",    en: "Mana Bazaar",    x: 3,  y: 60, w: 36, h: 36, color: "#4f79ad", terrain: "water",  desc: "ทรัพยากร · โทเคน" },
+  { id: "arena",  th: "โซนทดสอบ",   en: "Trial Grounds",  x: 61, y: 57, w: 36, h: 39, color: "#b1452f", terrain: "arena",  desc: "ทดสอบ · ตรวจหาข้อบกพร่อง" },
 ];
 
 // group: farm | structure | marker

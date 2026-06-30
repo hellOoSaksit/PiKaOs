@@ -261,7 +261,7 @@ const PROFILES_SEED = [
     settings: { characterId: "ceo", position: "เอเจนต์วิจัย", role: "Research Agent", model: "Hermes-3 · 405B", apiKeyId: null, skills: ["ค้นคว้า", "สังเคราะห์"], tools: ["ค้นเว็บ", "อ่านไฟล์"], workflows: [], rules: ["อ้างอิงแหล่งที่มาเสมอ"], status: "busy", goal: "หาคำตอบที่ดีที่สุดจากหลักฐาน", desc: "สืบค้นและสังเคราะห์ข้อมูล" },
     docs: { "REFERENCE.md": "<h1>REFERENCE</h1><p>รายการแหล่งข้อมูลที่เชื่อถือ…</p>" } },
 ];
-const CEO_DEFAULTS = { name: "CEO", characterId: "ceo", classKey: "mage", color: "#c8a24a", rank: "S", position: "CEO", role: "Chief Executive · แจกจ่ายงาน", model: "Hermes-3 · 405B", apiKeyId: null, skills: ["มอบหมายงาน", "กำกับทีม", "จัดลำดับความสำคัญ"], tools: ["มอบหมายงาน", "ติดตามสถานะ"], workflows: [], rules: ["แจกจ่ายงานให้ตรงความสามารถของสมาชิก", "ติดตามความคืบหน้าทุกห้อง"], status: "on", goal: "กำกับและกระจายงานให้ทุกห้องเดินหน้า", desc: "ผู้บริหารสูงสุด แจกจ่ายและกำกับงานทุกห้อง" };
+const CEO_DEFAULTS = { name: "CEO", characterId: "ceo", roleKey: "mage", color: "#c8a24a", rank: "S", position: "CEO", role: "Chief Executive · แจกจ่ายงาน", model: "Hermes-3 · 405B", apiKeyId: null, skills: ["มอบหมายงาน", "กำกับทีม", "จัดลำดับความสำคัญ"], tools: ["มอบหมายงาน", "ติดตามสถานะ"], workflows: [], rules: ["แจกจ่ายงานให้ตรงความสามารถของสมาชิก", "ติดตามความคืบหน้าทุกห้อง"], status: "on", goal: "กำกับและกระจายงานให้ทุกห้องเดินหน้า", desc: "ผู้บริหารสูงสุด แจกจ่ายและกำกับงานทุกห้อง" };
 window.CEO_DEFAULTS = CEO_DEFAULTS;
 const PROFILES_LS = "guildos.profiles.v1";
 const PROFILES_RM_LS = "guildos.profiles.removed.v1";

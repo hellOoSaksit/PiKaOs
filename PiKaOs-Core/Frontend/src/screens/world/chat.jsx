@@ -4,14 +4,14 @@ import React from 'react';
 const { useState, useEffect, useRef } = React;
 import { roomAgents } from '../../lib/characters.jsx';
 import { FeatureTag } from '../../components/components.jsx';
-import { QUESTS } from '../../data/data.jsx';
+import { TASKS } from '../../data/data.jsx';
 import { ACTS, ROLE_ACTS } from '../../lib/world-life.jsx';
 
 /* ---- CEO summary (combined chat) + per-room chat helpers ---- */
 function _agentLine(c) {
-  const actKey = ((typeof ROLE_ACTS !== "undefined" && ROLE_ACTS[c.classKey]) || ["thinking"])[0];
+  const actKey = ((typeof ROLE_ACTS !== "undefined" && ROLE_ACTS[c.roleKey]) || ["thinking"])[0];
   const act = (typeof ACTS !== "undefined" && ACTS[actKey]) || { th: "กำลังคิด" };
-  const left = QUESTS.filter(q => q.party.includes(c.id) && q.status !== "done").reduce((s, q) => s + Math.max(0, (q.steps || 0) - (q.stepDone || 0)), 0);
+  const left = TASKS.filter(q => q.party.includes(c.id) && q.status !== "done").reduce((s, q) => s + Math.max(0, (q.steps || 0) - (q.stepDone || 0)), 0);
   return `${c.name.split(" ")[0]} (${act.th}${left ? `, เหลือ ${left} งาน` : ""})`;
 }
 function ceoContext(rooms, chars) {

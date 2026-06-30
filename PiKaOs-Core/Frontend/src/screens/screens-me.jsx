@@ -3,7 +3,7 @@ import React from 'react';
 const { useState } = React;
 import { ActivityRow, Btn, Empty, Meter, Panel, QuestCard, RankGem, StatusBadge } from '../components/components.jsx';
 import { PERMISSIONS, fmtTok, roleByKey, usagePct } from '../data/data-users.jsx';
-import { ACTIVITY, QUESTS, byId } from '../data/data.jsx';
+import { ACTIVITY, TASKS, byId } from '../data/data.jsx';
 import { RoleBadge } from './screens-admin.jsx';
 import { Recall } from './screens-extra.jsx';
 import { CharacterSprite, World } from './screens-world.jsx';
@@ -214,7 +214,7 @@ function MyDashboard({ Sys, onAgent, onQuest }) {
   const allChars = window.__chars || [];
   const myAgents = allChars; // agents are shared across the system — show all
   const myAgentIds = new Set(myAgents.map(a => a.id));
-  const myQuests = QUESTS.filter(q => myAgentIds.has(q.lead));
+  const myQuests = TASKS.filter(q => myAgentIds.has(q.lead));
   const activeQuests = myQuests.filter(q => q.status === "active" || q.status === "review");
   const doneThisWeek = myQuests.filter(q => q.status === "done").length;
   const onlineAgents = myAgents.filter(a => a.status === "on" || a.status === "busy").length;
@@ -293,7 +293,7 @@ function MyDashboard({ Sys, onAgent, onQuest }) {
                 <Empty icon="📜" title={T("No active quests", "ยังไม่มีงานที่กำลังทำ")} sub={T("Assign a quest to one of your agents", "มอบหมายงานให้ Agent ของคุณ")} />
               </Panel>}
 
-          <Panel title={T("My quests", "งานของฉัน")} en="MY QUESTS" icon="📜"
+          <Panel title={T("My quests", "งานของฉัน")} en="MY TASKS" icon="📜"
             right={<div className="tabs">{QTABS.map(t => (
               <button key={t.k} className={`tab ${qtab === t.k ? "active" : ""}`} onClick={() => setQtab(t.k)}>{T(t.en, t.th)}</button>
             ))}</div>}>

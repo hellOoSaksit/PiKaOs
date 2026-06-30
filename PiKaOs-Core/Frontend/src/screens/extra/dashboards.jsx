@@ -2,28 +2,28 @@
    Quest Log, and Watchtower (health checks). */
 import React from 'react';
 import { Avatar, Empty, Meter, PageHead, Panel, RankGem, StatTile } from '../../components/components.jsx';
-import { MANA, QUESTS, TREASURY, byId } from '../../data/data.jsx';
+import { TOKENS, TASKS, TREASURY, byId } from '../../data/data.jsx';
 
-/* ---------------- MANA ---------------- */
+/* ---------------- TOKENS ---------------- */
 function Mana({ S, t }) {
   const xt = (typeof t === "function") ? t : ((k) => k);
   const chars = S.chars;
-  const pctBalance = Math.round(MANA.balance / MANA.cap * 100);
+  const pctBalance = Math.round(TOKENS.balance / TOKENS.cap * 100);
   const totalMana = chars.reduce((s, c) => s + c.mana, 0) || 1;
   return (
     <div className="content-pad fade-in">
       <PageHead kicker={xt("mana.kicker")} title={xt("mana.title")} tag="demo"
         desc={xt("mana.desc")} />
       <div className="grid cols-4 stagger" style={{ marginBottom: 18 }}>
-        <StatTile label={xt("mana.balance")} value={(MANA.balance/1000).toFixed(1)} unit="K" delta={xt("mana.capPct", { n: pctBalance })} icon="🔵" />
-        <StatTile label={xt("mana.spentToday")} value={(MANA.spentToday/1000).toFixed(1)} unit="K" delta={xt("mana.vsYesterday")} deltaTone="down" icon="🔥" />
-        <StatTile label={xt("mana.spentWeek")} value={(MANA.spentWeek/1000).toFixed(1)} unit="K" icon="📅" />
-        <StatTile label={xt("mana.burnRate")} value={MANA.burnRate} unit={xt("mana.perHr")} delta={xt("mana.normal")} deltaTone="up" icon="⚡" />
+        <StatTile label={xt("mana.balance")} value={(TOKENS.balance/1000).toFixed(1)} unit="K" delta={xt("mana.capPct", { n: pctBalance })} icon="🔵" />
+        <StatTile label={xt("mana.spentToday")} value={(TOKENS.spentToday/1000).toFixed(1)} unit="K" delta={xt("mana.vsYesterday")} deltaTone="down" icon="🔥" />
+        <StatTile label={xt("mana.spentWeek")} value={(TOKENS.spentWeek/1000).toFixed(1)} unit="K" icon="📅" />
+        <StatTile label={xt("mana.burnRate")} value={TOKENS.burnRate} unit={xt("mana.perHr")} delta={xt("mana.normal")} deltaTone="up" icon="⚡" />
       </div>
       <div className="grid cols-2">
         <Panel title={xt("mana.capacity")} en="CAPACITY" icon="🔵">
           <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
-            <span className="muted" style={{ fontSize: 13 }}>{MANA.balance.toLocaleString()} / {MANA.cap.toLocaleString()} token</span>
+            <span className="muted" style={{ fontSize: 13 }}>{TOKENS.balance.toLocaleString()} / {TOKENS.cap.toLocaleString()} token</span>
             <span className="gold-text mono" style={{ fontSize: 13 }}>{pctBalance}%</span>
           </div>
           <Meter kind="mana" val={pctBalance} />
@@ -126,7 +126,7 @@ function Chronicle({ S, t }) {
 /* ---------------- QUEST LOG ---------------- */
 function QuestLog({ t }) {
   const xt = (typeof t === "function") ? t : ((k) => k);
-  const done = QUESTS.filter(q => q.status === "done").concat(QUESTS.filter(q => q.status !== "done"));
+  const done = TASKS.filter(q => q.status === "done").concat(TASKS.filter(q => q.status !== "done"));
   return (
     <div className="content-pad fade-in">
       <PageHead kicker={xt("qlog.kicker")} title={xt("qlog.title")} tag="demo"

@@ -1,6 +1,6 @@
 /* PiKaOs — ES module (migrated from PiKaOs-Core/components.jsx). */
 import React from 'react';
-import { byId, statusTh } from '../data/data.jsx';
+import { byId, statusLabel } from '../data/data.jsx';
 import { CharacterSprite } from '../screens/screens-world.jsx';
 
 /* ============================================================
@@ -24,7 +24,7 @@ function RankGem({ r }) { return <span className={`rank ${r}`}>{r}</span>; }
 
 function StatusBadge({ s }) {
   const map = { on: "on", busy: "busy", idle: "idle", away: "idle" };
-  return <span className={`badge ${map[s] || "idle"}`}><span className="dot" />{statusTh[s]}</span>;
+  return <span className={`badge ${map[s] || "idle"}`}><span className="dot" />{statusLabel[s]}</span>;
 }
 
 function Meter({ kind = "mana", val }) {

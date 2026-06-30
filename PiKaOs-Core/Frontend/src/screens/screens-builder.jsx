@@ -297,7 +297,7 @@ function CharacterBuilder({ initial, onSave, onClose, can, archived, onRestore, 
   const [doc, setDoc] = useState(null);
   const [f, setF] = useState(() => ({
     name: "", position: "", role: "", desc: "", goal: "",
-    classKey: "analyst", color: COLOR_OPTS[7], rank: "C", model: MODEL_OPTS[1], characterId: "ceo",
+    roleKey: "analyst", color: COLOR_OPTS[7], rank: "C", model: MODEL_OPTS[1], characterId: "ceo",
     status: "idle", skills: [], tools: [], rules: [""], apiKeyId: null, skillDocs: {},
     ...(initial || {}),
   }));
@@ -317,7 +317,7 @@ function CharacterBuilder({ initial, onSave, onClose, can, archived, onRestore, 
       if (!ok) return;
       const ex = loadProfiles().find(p => !p.seed && p.name.trim() === nm); if (ex) removeProfile(ex.id);
     }
-    const s = { characterId: f.characterId, position: f.position, role: f.role, model: f.model, apiKeyId: f.apiKeyId, skills: f.skills, tools: f.tools, workflows: f.workflows, rules: f.rules, skillDocs: f.skillDocs, color: f.color, classKey: f.classKey, status: f.status, goal: f.goal, desc: f.desc };
+    const s = { characterId: f.characterId, position: f.position, role: f.role, model: f.model, apiKeyId: f.apiKeyId, skills: f.skills, tools: f.tools, workflows: f.workflows, rules: f.rules, skillDocs: f.skillDocs, color: f.color, roleKey: f.roleKey, status: f.status, goal: f.goal, desc: f.desc };
     addProfile({ name: nm, settings: s, docs: {} }); setProfiles(loadProfiles());
   };
   const preview = makeCharacter({ ...f, rules: (f.rules || []).filter(Boolean) });

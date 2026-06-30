@@ -2,7 +2,7 @@
 import React from 'react';
 const { useState, useEffect, useRef } = React;
 import { ActivityRow, AgentCard, Btn, ChatMessage, FeatureTag, HelpNote, PageHead, Panel, QuestCard, StatTile, TypingDots } from '../components/components.jsx';
-import { ACTIVITY, CHAT, GUILD, MANA, QUESTS, byId } from '../data/data.jsx';
+import { ACTIVITY, CHAT, ORG, TOKENS, TASKS, byId } from '../data/data.jsx';
 import { CharacterSprite } from './screens-world.jsx';
 import { randPos } from '../lib/store.jsx';
 
@@ -136,17 +136,17 @@ function FloorMap({ chars, height = 220, big = false, onAgent }) {
 /* ---------------- ALERTS (overview) ---------------- */
 function AlertsPanel({ chars, go }) {
   const [dismissed, setDismissed] = useState([]);
-  const usedPct = Math.round((MANA.cap - MANA.balance) / MANA.cap * 100);
+  const usedPct = Math.round((TOKENS.cap - TOKENS.balance) / TOKENS.cap * 100);
   const base = [];
   if (usedPct >= 55) base.push({ id: "mana", sev: usedPct >= 80 ? "critical" : "warn", icon: "🔵",
-    title: "โทเคนใกล้เต็มเพดาน", detail: `ใช้ไปแล้ว ${usedPct}% ของเพดานวันนี้ · เผา ${MANA.burnRate}/ชม.`, time: "เมื่อสักครู่", to: "mana" });
-  const failed = QUESTS.filter(q => q.status === "failed").length;
+    title: "โทเคนใกล้เต็มเพดาน", detail: `ใช้ไปแล้ว ${usedPct}% ของเพดานวันนี้ · เผา ${TOKENS.burnRate}/ชม.`, time: "เมื่อสักครู่", to: "mana" });
+  const failed = TASKS.filter(q => q.status === "failed").length;
   if (failed) base.push({ id: "failed", sev: "critical", icon: "⚠️", title: "งานล้มเหลว",
     detail: `${failed} งานไม่สำเร็จ ต้องตรวจสอบ`, time: "5 นาที", to: "history" });
-  const queued = QUESTS.filter(q => q.status === "queued").length;
+  const queued = TASKS.filter(q => q.status === "queued").length;
   if (queued) base.push({ id: "queued", sev: "warn", icon: "📜", title: "งานรอเริ่มงาน",
     detail: `${queued} งานอยู่ในคิว ยังไม่ได้มอบหมาย`, time: "12 นาที", to: "quests" });
-  const review = QUESTS.filter(q => q.status === "review").length;
+  const review = TASKS.filter(q => q.status === "review").length;
   if (review) base.push({ id: "review", sev: "info", icon: "🔍", title: "รอตรวจผลงาน",
     detail: `${review} งานเสร็จแล้ว รอการตรวจรับ`, time: "20 นาที", to: "history" });
   const away = chars.filter(a => a.status === "away" || a.status === "idle").length;
@@ -178,13 +178,13 @@ function AlertsPanel({ chars, go }) {
   );
 }
 
-/* ---------------- GUILD HALL ---------------- */
+/* ---------------- ORG HALL ---------------- */
 function GuildHall({ onAgent, onQuest, go, S, can, t }) {
   const tx = t || ((k) => k);
   const chars = S.chars;
   const mayCreate = !can || can("agent.create");
   const online = chars.filter(a => a.status !== "away" && a.status !== "idle").length;
-  const activeQuests = QUESTS.filter(q => q.status === "active").length;
+  const activeQuests = TASKS.filter(q => q.status === "active").length;
   return (
     <div className="content-pad fade-in" data-no-lex>
       <PageHead
@@ -198,16 +198,16 @@ function GuildHall({ onAgent, onQuest, go, S, can, t }) {
       <div className="grid cols-4 stagger" style={{ marginBottom: 18 }}>
         <StatTile label={tx("hall.stat.activeWork")} value={activeQuests} unit={tx("common.unit.work")} icon="📜" />
         <StatTile label={tx("hall.stat.agentsActive")} value={`${online}/${chars.length}`} delta={chars.length ? tx("hall.delta.ready") : tx("hall.delta.noAgent")} icon="🎭" />
-        <StatTile label={tx("hall.stat.tokensLeft")} value={(MANA.balance/1000).toFixed(1)} unit={tx("common.unit.ktoken")} icon="🔵" />
+        <StatTile label={tx("hall.stat.tokensLeft")} value={(TOKENS.balance/1000).toFixed(1)} unit={tx("common.unit.ktoken")} icon="🔵" />
         <StatTile label={tx("hall.stat.avgSuccess")} value={chars.length ? Math.round(chars.reduce((s,c)=>s+(c.success||0),0)/chars.length) : 0} unit="%" icon="🏆" />
       </div>
 
       <div className="hall-grid">
         <div className="col" style={{ gap: 18 }}>
-          <Panel title={tx("hall.questBoard")} en="ACTIVE QUESTS" icon="📜"
+          <Panel title={tx("hall.questBoard")} en="ACTIVE TASKS" icon="📜"
             right={<Btn kind="ghost" sm onClick={() => go("quests")}>{tx("common.viewAll")}</Btn>}>
             <div className="list-rows">
-              {QUESTS.filter(q => q.status === "active" || q.status === "review").map(q => (
+              {TASKS.filter(q => q.status === "active" || q.status === "review").map(q => (
                 <QuestCard key={q.id} q={q} onClick={() => onQuest(q)} />
               ))}
             </div>

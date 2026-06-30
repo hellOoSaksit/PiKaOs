@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 const { useState, useEffect } = React;
 import { AUDIT_SEED, ROLES_SEED, ROLE_PERMS_SEED, USERS_SEED, USER_PERMS_SEED, fmtTok, loadU, resolvePerms, roleByKey, saveU, userById } from './data/data-users.jsx';
 import { TOOL_RUNS_SEED, WORKFLOWS_SEED, loadWF, saveWF } from './data/data-workflows.jsx';
-import { MANA, NAV, NAV_GROUP_FORMAL, NAV_LABEL_FORMAL, QUESTS, ROUTE_TITLE_FORMAL, byId } from './data/data.jsx';
+import { TOKENS, NAV, NAV_GROUP_FORMAL, NAV_LABEL_FORMAL, TASKS, ROUTE_TITLE_FORMAL, byId } from './data/data.jsx';
 import { loadNav, saveNav, mergeWithDefault } from './data/data-nav.jsx';
 import { getNavConfig, setNavConfig, getMySettings, setMySetting, getGlobalConfig, setGlobalConfig } from './lib/api.js';
 import { applyGlobalConfig } from './lib/characters.jsx';
@@ -343,11 +343,11 @@ function Topbar({ route, theme, setTheme, user, language, viewAs, t, me, roles, 
       {viewAs && <ViewAsControl viewAs={viewAs} />}
       <div className="tb-stat" data-no-lex>
         <span className="tbs-ico">🔵</span>
-        <span className="tbs-num">{(MANA.balance/1000).toFixed(1)}K</span>
+        <span className="tbs-num">{(TOKENS.balance/1000).toFixed(1)}K</span>
         <span className="tbs-lbl">{t("topbar.tokens")}</span>
       </div>
       {window.TodoBell
-        ? <window.TodoBell t={t} formal={false} activeCount={QUESTS.filter(q => q.status === "active").length} route={route} />
+        ? <window.TodoBell t={t} formal={false} activeCount={TASKS.filter(q => q.status === "active").length} route={route} />
         : <div className="tb-stat">
             <span className="tbs-ico">📜</span>
             <span className="tbs-lbl">{t("topbar.tasks")}</span>

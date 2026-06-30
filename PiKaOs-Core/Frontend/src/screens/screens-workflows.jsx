@@ -3,7 +3,7 @@ import React from 'react';
 const { useState } = React;
 import { Btn, Empty, HelpNote, PageHead, Panel, StatTile } from '../components/components.jsx';
 import { WF_STATUS, WF_TRIGGER, simulateRun, wfById } from '../data/data-workflows.jsx';
-import { QUESTS } from '../data/data.jsx';
+import { TASKS } from '../data/data.jsx';
 import { Field } from './screens-builder.jsx';
 import { Select } from '../components/ui/Dropdown.jsx';
 
@@ -23,7 +23,7 @@ function WfStatusBadge({ status, T }) {
 
 function agentName(id) { const a = (window.__chars || []).find(c => c.id === id); return a ? a.name.split(" ")[0] : null; }
 function agentIcon(id) { const a = (window.__chars || []).find(c => c.id === id); return a ? a.icon : "🤖"; }
-function questTitle(id) { const q = (typeof QUESTS !== "undefined" ? QUESTS : []).find(x => x.id === id); return q ? q.title : null; }
+function questTitle(id) { const q = (typeof TASKS !== "undefined" ? TASKS : []).find(x => x.id === id); return q ? q.title : null; }
 
 /* ---------------- RUN MODAL ---------------- */
 function RunModal({ Sys, wf, onClose }) {
