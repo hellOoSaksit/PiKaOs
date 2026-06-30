@@ -21,11 +21,13 @@
 .mcp.json.*
 .playwright-mcp/
 
-# UAT plugin code (P2). Real plugin folders live in PiKaOs-App/plugins/<id>/{frontend,backend}/ and are
-# composed into Core via symlink at test time only (App = local UAT — see link-plugins.sh). NEVER pushed:
-# Core must stay plugin-free so the public repo ships only the platform + the plugin seam.
-/PiKaOs-App/plugins/
-# Core keeps ONLY the seam files; the per-plugin folders beside them are gitignored symlinks into the above.
+# PiKaOs-App = local UAT harness — composes Core + plugins for testing, NEVER pushed (user decision):
+# the whole folder is gitignored (plugin code under plugins/<id>/, the symlink-compose script, the UAT
+# docker-compose). Core stays the only pushed surface and ships ZERO plugin code. The architecture itself
+# is documented in PiKaOs-Docs + Core's README, not via tracked files here.
+/PiKaOs-App/
+# Core keeps ONLY the plugin SEAM files; the per-plugin folders beside them are gitignored symlinks
+# into PiKaOs-App/plugins/ (created by link-plugins.sh).
 /PiKaOs-Core/Frontend/src/plugins/*
 !/PiKaOs-Core/Frontend/src/plugins/index.jsx
 /PiKaOs-Core/Backend/app/plugins/*
