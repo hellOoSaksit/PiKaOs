@@ -253,7 +253,7 @@ class UserPerm(Base):
 
 # --- Engine module (system-design §7; FK/index per risk-mitigation §4.4) ---
 # Schema source of truth = migration 0001_baseline (organized by module — modularity.md).
-# subtasks/tools_config/notifications are deferred to their phase (HERMES/tools/notify, phase C).
+# subtasks/tools_config/notifications are deferred to their phase (orchestrator/tools/notify, phase C).
 
 
 class Department(Base):
@@ -342,7 +342,7 @@ class Quest(Base):
 
 
 class Run(Base):
-    """An execution run — kind 'agent' (the §4 loop) or 'orchestration' (HERMES)."""
+    """An execution run — kind 'agent' (the §4 loop) or 'orchestration' (orchestrator)."""
 
     __tablename__ = "runs"
 
