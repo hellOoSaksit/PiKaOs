@@ -39,7 +39,9 @@ services:
       EMBED_BASE_URL: http://ollama:11434
     extra_hosts:
       - "host.docker.internal:host-gateway"   # resolve host.docker.internal on Linux/CI too
-    command: ["arq", "app.worker.WorkerSettings"]
+    # worker-entrypoint resolves the plugin registry → ENABLED_MODULES (a plugin disabled in the install
+    # UI also stops its jobs here), then execs arq. (plugin-lifecycle-ui §7)
+    command: ["bash", "worker-entrypoint.sh"]
     # This worker uses the backend image, whose Dockerfile HEALTHCHECK probes /api/version — but a
     # worker runs no HTTP server, so that probe can never pass. Override with arq's own liveness:
     # `arq --check` exits 0 only when the worker wrote a recent health record to Redis. MUST mirror the
