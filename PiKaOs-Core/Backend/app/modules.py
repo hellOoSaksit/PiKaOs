@@ -17,7 +17,7 @@ from fastapi import APIRouter, FastAPI
 
 from . import plugin_loader
 from .core.config import settings
-from .core.routers import auth, health, llm_config, settings_config, ws
+from .core.routers import auth, health, llm_config, plugins, settings_config, ws
 from .core.routers import storage as storage_router
 
 log = logging.getLogger("pikaos.plugins")
@@ -44,7 +44,7 @@ BASE_MODULES: tuple[Module, ...] = (
     Module(
         "core",  # identity / access / system config every plugin relies on
         routers=(auth.router, llm_config.router, llm_config.roles_router, storage_router.router,
-                 settings_config.router),
+                 settings_config.router, plugins.router),
         optional=False,
     ),
     Module("engine", routers=(ws.router,), optional=False),  # agent-ops runtime — part of Core

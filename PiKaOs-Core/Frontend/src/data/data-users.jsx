@@ -39,6 +39,7 @@ const PERMISSIONS = [
   { key: "llm.manage",       group: "Admin",     th: "ตั้งค่า LLM/โมเดล (provider/API หรือ Local)", en: "Manage LLM provider config" },
   { key: "llm.assign",       group: "Admin",     th: "มอบหมายโมเดลให้ระบบ (engine/search/summarize)", en: "Assign LLM to system roles" },
   { key: "infra.manage",     group: "Admin",     th: "ดู/ทดสอบการเชื่อมต่อ Storage/ระบบ", en: "View/test infrastructure connections" },
+  { key: "plugins.manage",   group: "Admin",     th: "ติดตั้ง/เปิด-ปิด/ถอนปลั๊กอิน",      en: "Install / enable / uninstall plugins" },
 ];
 const PERM_KEYS = PERMISSIONS.map(p => p.key);
 

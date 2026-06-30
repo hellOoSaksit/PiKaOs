@@ -65,6 +65,7 @@ SEED_PERMISSIONS = [
     ("llm.assign", "Admin", "มอบหมายโมเดลให้ระบบ (engine/search/summarize)", "Assign LLM to system roles"),
     ("infra.manage", "Admin", "ดู/ทดสอบการเชื่อมต่อ Storage/ระบบภายนอก", "View/test infrastructure connections"),
     ("telegram.manage", "Admin", "ตั้งค่าบอท Telegram (เชื่อมต่อ/webhook)", "Manage Telegram bot connection"),
+    ("plugins.manage", "Admin", "ติดตั้ง/เปิด-ปิด/ถอนปลั๊กอิน", "Install / enable / uninstall plugins"),
 ]
 _PERM_KEYS = [p[0] for p in SEED_PERMISSIONS]
 
