@@ -6,7 +6,6 @@ import { PERMISSIONS, fmtTok, roleByKey, usagePct } from '../data/data-users.jsx
 import { ACTIVITY, TASKS, byId } from '../data/data.jsx';
 import { RoleBadge } from './screens-admin.jsx';
 import { CharacterSprite } from '../components/CharacterSprite.jsx';
-import { World } from './screens-world.jsx';
 
 /* ============================================================
    MY DASHBOARD (/me) — the signed-in user's personal workspace:

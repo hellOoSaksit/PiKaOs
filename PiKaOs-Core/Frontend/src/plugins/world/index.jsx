@@ -13,12 +13,13 @@
    it draws with already live in src/components/ (lifted out of the world barrel in Phase 0), so this
    plugin only consumes Core — never the reverse.
 
-   Screens still physically live under ../../screens/world/ and are imported via the barrel; relocating
-   them into this folder + a per-plugin i18n pack + lazy code-split is the mechanical Phase 6b follow-up
-   (same staging the knowledge plugin uses). */
+   The screens now physically live in this folder (World.jsx + build/chat/lobby/room-aside/sessions/
+   exports/wt), relocated out of screens/world/ in Phase 6b; the old screens-world barrel was deleted
+   (its only consumer was this descriptor; its window globals had no readers). A per-plugin i18n pack +
+   lazy code-split remain as later refinements. */
 import React from 'react';
 
-import { World } from '../../screens/screens-world.jsx';
+import { World } from './World.jsx';
 
 const renderWorld = (ctx) => <World onAgent={ctx.onAgent} S={ctx.S} can={ctx.can} t={ctx.t} />;
 

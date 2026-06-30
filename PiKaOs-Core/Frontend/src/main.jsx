@@ -17,7 +17,6 @@ import './components/components.jsx';
 import './screens/screens-main.jsx';
 import './screens/screens-secondary.jsx';
 import './screens/screens-extra.jsx';
-import './screens/screens-world.jsx';
 import './screens/screens-admin.jsx';
 import './screens/screens-builder.jsx';
 import './screens/screens-rbac.jsx';
