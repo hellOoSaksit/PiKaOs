@@ -80,7 +80,7 @@ function QuestBoard({ onQuest, can, t }) {
     setTimeout(() => {
       const nx = works.map(x => x.id === w.id ? { ...x, status: "done", step: total, doneTs: Date.now() } : x);
       setWorks(nx); saveWorks(nx);
-      if (!aiDone) { try { const rm = rooms.find(r => r.id === w.roomId); window.pushNotify && window.pushNotify({ from: "HERMES · ระบบ", roomId: w.roomId, taskTitle: w.title, question: `งาน “${w.title}” ถูกปิดก่อน AI ทำเสร็จ (${step}/${total} ขั้นตอน) — ตรวจงานที่ค้าง หรือกด Recall เพื่อดึงกลับมาทำต่อได้` }); } catch (e) { } }
+      if (!aiDone) { try { const rm = rooms.find(r => r.id === w.roomId); window.pushNotify && window.pushNotify({ from: "ผู้ควบคุมกลาง · ระบบ", roomId: w.roomId, taskTitle: w.title, question: `งาน “${w.title}” ถูกปิดก่อน AI ทำเสร็จ (${step}/${total} ขั้นตอน) — ตรวจงานที่ค้าง หรือกด Recall เพื่อดึงกลับมาทำต่อได้` }); } catch (e) { } }
       h && h.close();
     }, 650);
   };
@@ -90,7 +90,7 @@ function QuestBoard({ onQuest, can, t }) {
     setTimeout(() => {
       const nx = works.map(x => x.id === w.id ? { ...x, status: "active", step: Math.max(1, total - 3), doneTs: null, recalled: true } : x);
       setWorks(nx); saveWorks(nx);
-      try { const rm = rooms.find(r => r.id === w.roomId); window.pushNotify && window.pushNotify({ from: "HERMES · ระบบ", roomId: w.roomId, taskTitle: w.title, question: `ดึงงาน “${w.title}” กลับเข้าคิวให้ AI ทำต่อแล้ว — สถานะกลับเป็น ‘กำลังลุย’` }); } catch (e) { }
+      try { const rm = rooms.find(r => r.id === w.roomId); window.pushNotify && window.pushNotify({ from: "ผู้ควบคุมกลาง · ระบบ", roomId: w.roomId, taskTitle: w.title, question: `ดึงงาน “${w.title}” กลับเข้าคิวให้ AI ทำต่อแล้ว — สถานะกลับเป็น ‘กำลังลุย’` }); } catch (e) { }
       h && h.close();
     }, 700);
   };
@@ -121,7 +121,7 @@ function QuestBoard({ onQuest, can, t }) {
     const task = { id, uuid, code, roomNo, title: t, roomId: rid, createdRoom: roomChoice.mode === "new", detailDoc: "work:" + id + ":detail", worklogDoc: "work:" + id + ":worklog", briefMd, worklogMd, created };
     const nx = [task, ...works]; setWorks(nx); saveWorks(nx);
     draftId.current = "d" + Date.now().toString(36);
-    try { window.pushNotify && window.pushNotify({ from: "HERMES · ระบบ", roomId: rid, taskTitle: t, question: `สร้างงาน “${t}” และ${roomChoice.mode === "new" ? `ห้อง “${rmName}”` : "ผูกเข้าห้อง"}แล้ว — รหัส ${code} · ไฟล์ ${code}-brief.md / ${code}-worklog.md พร้อมห้องทำงานของ AI` }); } catch (e) { }
+    try { window.pushNotify && window.pushNotify({ from: "ผู้ควบคุมกลาง · ระบบ", roomId: rid, taskTitle: t, question: `สร้างงาน “${t}” และ${roomChoice.mode === "new" ? `ห้อง “${rmName}”` : "ผูกเข้าห้อง"}แล้ว — รหัส ${code} · ไฟล์ ${code}-brief.md / ${code}-worklog.md พร้อมห้องทำงานของ AI` }); } catch (e) { }
     h && h.close();
   };
   // worklog seed for older tasks that don't have one yet

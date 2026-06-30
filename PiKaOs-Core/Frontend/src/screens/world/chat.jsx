@@ -1,5 +1,5 @@
 /* PiKaOs — WORLD chat: CEO summary helpers, per-room chat, and the
-   full-tab HERMES/PiKaChat. */
+   full-tab Orchestrator/PiKaChat. */
 import React from 'react';
 const { useState, useEffect, useRef } = React;
 import { roomAgents } from '../../lib/characters.jsx';
@@ -133,7 +133,7 @@ function RoomChat({ room, roomChars }) {
   );
 }
 
-/* ---------------- HERMES chat (full tab) ---------------- */
+/* ---------------- Orchestrator chat (full tab) ---------------- */
 function HermesChat({ rooms, chars }) {
   const [msgs, setMsgs] = useState([{ who: "ai", text: "ผมคือ ระบบแชตรวมทุกห้องครับ — ถามได้ว่าแต่ละห้องทำอะไรถึงไหนแล้ว ใช้ token ไปเท่าไหร่ หรือใครอยู่ห้องไหน" }]);
   const [draft, setDraft] = useState(""); const [busy, setBusy] = useState(false);

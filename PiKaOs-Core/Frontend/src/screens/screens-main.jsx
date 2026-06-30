@@ -45,7 +45,7 @@ function LiveChat({ seed = CHAT, compact = false }) {
 
   const send = () => {
     if (!draft.trim()) return;
-    setMsgs((m) => [...m, { id: "u" + Date.now(), who: "HERMES", role: "master", kind: "system", text: draft, time: nowTime() }]);
+    setMsgs((m) => [...m, { id: "u" + Date.now(), who: "ผู้ควบคุมกลาง", role: "master", kind: "system", text: draft, time: nowTime() }]);
     setDraft("");
   };
 

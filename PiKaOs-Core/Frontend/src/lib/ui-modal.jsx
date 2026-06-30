@@ -81,7 +81,7 @@ Object.assign(window, { UIModalHost });
 /* ============================================================
    UI LOADING — imperative popup loader (module).
      const h = uiLoading("กำลังบันทึก…");   // or { title, message }
-     h.update("กำลังส่งให้ HERMES…");        // change text
+     h.update("กำลังส่งให้ ผู้ควบคุมกลาง…");        // change text
      h.close();                              // dismiss
    Mount <UILoadingHost /> once near the app root.
    ============================================================ */

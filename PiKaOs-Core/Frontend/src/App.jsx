@@ -491,7 +491,7 @@ function App() {
     try { document.body.classList.remove("nav-open"); } catch (e) { }
     setRoute(r);
     document.querySelector(".content")?.scrollTo(0, 0);
-    if (r === "search") { const h = window.uiLoading && window.uiLoading({ title: "กำลังเชื่อมต่อคลังความรู้…", message: "HERMES Recall" }); setTimeout(() => h && h.close(), 820); }
+    if (r === "search") { const h = window.uiLoading && window.uiLoading({ title: "กำลังเชื่อมต่อคลังความรู้…", message: "ผู้ควบคุมกลาง Recall" }); setTimeout(() => h && h.close(), 820); }
   };
   window.__guildGo = go;
 

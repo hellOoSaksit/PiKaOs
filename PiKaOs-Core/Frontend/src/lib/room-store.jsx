@@ -31,7 +31,7 @@ function blankRoom(name, fill = 1, extra = {}) {
 
 /* ---- the furnished demo room (showcases the system) ---- */
 function demoRoom() {
-  const r = blankRoom("ออฟฟิศกลาง · Hermes HQ", 1, { dept: "ศูนย์กลาง", ceo: "HERMES" });
+  const r = blankRoom("ออฟฟิศกลาง · Hermes HQ", 1, { dept: "ศูนย์กลาง", ceo: "ผู้ควบคุมกลาง" });
   const w = r.w, h = r.h;                                  // 44×28 — layout is w/h-relative
   const setF = (x, y, v) => { if (x > 0 && y > 0 && x < w - 1 && y < h - 1) r.floor[idx(x, y, w)] = v; };
   const setS = (x, y, v) => { if (x >= 0 && y >= 0 && x < w && y < h) r.struct[idx(x, y, w)] = v; };

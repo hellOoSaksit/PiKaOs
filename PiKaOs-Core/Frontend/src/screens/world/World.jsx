@@ -1,7 +1,7 @@
 /* PiKaOs — WORLD top-level screen (tabs: rooms · templates · overview · chat).
    Pick a room card → enter a Sims-style top-down room you can decorate.
    Guild agents wander and sit at chairs to feel alive. Layouts autosave to
-   localStorage. HERMES/PiKaChat rides along. */
+   localStorage. Orchestrator/PiKaChat rides along. */
 import React from 'react';
 const { useState, useEffect } = React;
 import { roomAgents } from '../../lib/characters.jsx';

@@ -13,7 +13,7 @@ function exportSeed(roomId) {
   const now = Date.now();
   return [
     { id: "ex_" + roomId + "_1", name: "agent-report", type: "xlsx", size: "24 KB", by: "นักวิเคราะห์", ts: now - 3600e3 },
-    { id: "ex_" + roomId + "_2", name: "task-result", type: "json", size: "3 KB", by: "HERMES", ts: now - 7200e3 },
+    { id: "ex_" + roomId + "_2", name: "task-result", type: "json", size: "3 KB", by: "ผู้ควบคุมกลาง", ts: now - 7200e3 },
     { id: "ex_" + roomId + "_3", name: "data-summary", type: "csv", size: "8 KB", by: "เก็บข้อมูล", ts: now - 86400e3 },
   ];
 }
@@ -43,7 +43,7 @@ function RoomExports({ room }) {
   const simulate = () => {
     const types = Object.keys(EXPORT_TYPES); const type = types[Math.floor(Math.random() * types.length)];
     const names = ["agent-report", "analysis", "dataset", "summary", "result", "metrics"];
-    const e = { id: "ex" + Date.now(), name: names[Math.floor(Math.random() * names.length)] + "-" + (Math.floor(Math.random() * 900) + 100), type, size: (Math.floor(Math.random() * 40) + 2) + " KB", by: ["นักวิเคราะห์", "เก็บข้อมูล", "HERMES", "นักวิจัย"][Math.floor(Math.random() * 4)], ts: Date.now() };
+    const e = { id: "ex" + Date.now(), name: names[Math.floor(Math.random() * names.length)] + "-" + (Math.floor(Math.random() * 900) + 100), type, size: (Math.floor(Math.random() * 40) + 2) + " KB", by: ["นักวิเคราะห์", "เก็บข้อมูล", "ผู้ควบคุมกลาง", "นักวิจัย"][Math.floor(Math.random() * 4)], ts: Date.now() };
     const nx = [e, ...exps]; setExps(nx); saveExports(room.id, nx);
   };
   const removeExp = (id) => { const nx = exps.filter(x => x.id !== id); setExps(nx); saveExports(room.id, nx); };

@@ -82,7 +82,7 @@ async function askHermes(query, ranked, lang) {
       const langLine = lang === "en"
         ? "Answer in English, concise (max 4 sentences). Cite sources inline like [1], [2] referring to the numbered context."
         : "ตอบเป็นภาษาไทยกระชับ ไม่เกิน 4 ประโยค อ้างอิงแหล่งแบบ [1], [2] ตามหมายเลขบริบทที่ให้";
-      const sys = "You are HERMES, the guild librarian. Only use the provided context. If nothing matches, say so. " + langLine + "\n\nContext:\n" + context;
+      const sys = "You are Orchestrator, the guild librarian. Only use the provided context. If nothing matches, say so. " + langLine + "\n\nContext:\n" + context;
       const reply = await window.claude.complete(sys + "\n\nQuestion: " + query);
       if (reply && reply.trim()) return reply.trim();
     }
@@ -197,8 +197,8 @@ function Recall({ lang }) {
   return (
     <div className="content-pad fade-in">
       <PageHead kicker={T("Knowledge · Recall", "ความรู้ · Recall")} title={T("Recall", "ค้นหาความรู้")} tag="live"
-        desc={T("Ask the guild's knowledge base in plain language — HERMES retrieves the most relevant documents and answers with citations.",
-                "ถามคลังความรู้ด้วยภาษาธรรมดา — HERMES จะค้นเอกสารที่เกี่ยวข้องที่สุดแล้วตอบพร้อมอ้างอิง")} />
+        desc={T("Ask the guild's knowledge base in plain language — Orchestrator retrieves the most relevant documents and answers with citations.",
+                "ถามคลังความรู้ด้วยภาษาธรรมดา — ผู้ควบคุมกลาง จะค้นเอกสารที่เกี่ยวข้องที่สุดแล้วตอบพร้อมอ้างอิง")} />
       <HelpNote tag="live">{T("It runs a hybrid search over your Codex notes (keyword + meaning), then synthesizes an answer. Click any [number] in the answer to jump to its source document.",
         "ระบบค้นแบบ hybrid จากบันทึกในหน้า Codex (คำสำคัญ + ความหมาย) แล้วสรุปคำตอบ · กดเลข [n] ในคำตอบเพื่อไปยังเอกสารต้นทาง")}</HelpNote>
 
@@ -230,15 +230,15 @@ function Recall({ lang }) {
 
       <div className="grid" style={{ gridTemplateColumns: "1fr 360px", gap: 16, alignItems: "start" }}>
         {/* ---- answer + citations ---- */}
-        <Panel title={T("HERMES answer", "คำตอบจาก HERMES")} en="SYNTHESIS" icon="⚜" right={<FeatureTag kind="live" />}>
+        <Panel title={T("Orchestrator answer", "คำตอบจาก ผู้ควบคุมกลาง")} en="SYNTHESIS" icon="⚜" right={<FeatureTag kind="live" />}>
           {phase === "retrieving" ? (
             <div className="row" style={{ gap: 10, color: "var(--ink-2)" }}>
               <span className="typing-bubble" style={{ display: "inline-flex" }}><span /><span /><span /></span>
-              {T("HERMES is retrieving and reading the codex…", "HERMES กำลังค้นและอ่านคลังความรู้…")}
+              {T("Orchestrator is retrieving and reading the codex…", "ผู้ควบคุมกลาง กำลังค้นและอ่านคลังความรู้…")}
             </div>
           ) : (phase === "streaming" || phase === "done") ? (
             <div style={{ fontSize: 14, lineHeight: 1.8, color: "var(--ink)" }}>
-              <div className="row" style={{ gap: 9, marginBottom: 10 }}><span className="wchat-crest">⚜</span><span className="mono gold-text" style={{ fontSize: 12 }}>HERMES</span></div>
+              <div className="row" style={{ gap: 9, marginBottom: 10 }}><span className="wchat-crest">⚜</span><span className="mono gold-text" style={{ fontSize: 12 }}>ผู้ควบคุมกลาง</span></div>
               <AnswerBody text={answer} results={results} onCite={setSel} streaming={phase === "streaming"} />
               {phase === "done" && results && results.length > 0 && (
                 <div className="citations">

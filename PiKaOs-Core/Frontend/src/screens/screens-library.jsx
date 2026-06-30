@@ -197,7 +197,7 @@ function LibraryBody({ onBack, t }) {
   ];
   const NOTIF_ITEMS = [
     { id: 1, unread: true, av: "❓", avTone: "gold", actor: tx("lib.ni.1.actor"), text: tx("lib.ni.1.text"), time: tx("lib.ni.1.time"), action: "accept-decline" },
-    { id: 2, unread: true, av: "🤖", avTone: "neutral", actor: "HERMES", text: tx("lib.ni.2.text"), time: tx("lib.ni.2.time") },
+    { id: 2, unread: true, av: "🤖", avTone: "neutral", actor: "ผู้ควบคุมกลาง", text: tx("lib.ni.2.text"), time: tx("lib.ni.2.time") },
     { id: 3, unread: false, av: "✓", avTone: "ok", actor: tx("lib.ni.3.actor"), text: tx("lib.ni.3.text"), time: tx("lib.ni.3.time") },
   ];
   const SP_TITLE = { success: tx("lib.sp.successTitle"), error: tx("lib.sp.errorTitle"), warning: tx("lib.sp.warningTitle"), info: tx("lib.sp.infoTitle"), confirm: tx("lib.sp.confirmTitle") };

@@ -2,13 +2,13 @@
 
 /* ============================================================
    ORG DATA — AI multi-agent system framed as an adventurer guild
-   Powered by HERMES (the orchestrator / guild master)
+   Powered by Orchestrator (the orchestrator / guild master)
    ============================================================ */
 
 const ORG = {
   name: "PiKaOs",
   thaiName: "ระบบเอเจนต์อัจฉริยะ",
-  master: "HERMES",
+  master: "ผู้ควบคุมกลาง",
   rank: "A",
   hall: "ศูนย์ควบคุมกลาง · Central Spire",
 };
@@ -64,11 +64,11 @@ const TASKS = [
 
 // guild chat — multi-agent conversation in the meeting hall
 const CHAT = [
-  { id: "c1", who: "HERMES", role: "master", text: "เปิดห้องประชุมกลางสำหรับงาน #1042 — ระบบยืนยันตัวตน เริ่มมอบหมายงานได้", time: "09:02", kind: "system" },
+  { id: "c1", who: "ผู้ควบคุมกลาง", role: "master", text: "เปิดห้องประชุมกลางสำหรับงาน #1042 — ระบบยืนยันตัวตน เริ่มมอบหมายงานได้", time: "09:02", kind: "system" },
   { id: "c2", who: "a4", text: "รับงานออกแบบสคีมา token แล้ว จะใช้ rotating refresh token อายุ 7 วัน", time: "09:03" },
   { id: "c3", who: "a3", text: "เข้าใจแล้ว ผมจะเริ่มพัฒนาโมดูล auth-service ตามสคีมาที่กำหนด", time: "09:05" },
   { id: "c4", who: "a1", text: "ข้อกำหนดเดิมระบุให้รองรับ social login ด้วย — เพิ่มเป็นงานย่อยไหม?", time: "09:06" },
-  { id: "c5", who: "HERMES", role: "master", text: "อนุมัติ แตกเป็นงานย่อย #1042-b มอบให้ช่าง ตีโค้ด เพิ่ม provider", time: "09:07", kind: "system" },
+  { id: "c5", who: "ผู้ควบคุมกลาง", role: "master", text: "อนุมัติ แตกเป็นงานย่อย #1042-b มอบให้ช่าง ตีโค้ด เพิ่ม provider", time: "09:07", kind: "system" },
   { id: "c6", who: "a2", text: "ผมจะร่างเอกสาร flow ควบคู่ไปด้วย เผื่อไว้ให้เอเจนต์ใหม่อ่าน", time: "09:09" },
   { id: "c7", who: "a3", text: "พัฒนาเสร็จ 4 จาก 7 ขั้น — endpoint /token ใช้งานได้แล้ว กำลังเขียน test", time: "09:14", attach: "auth-service · +312 บรรทัด" },
 ];

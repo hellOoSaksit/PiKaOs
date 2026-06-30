@@ -241,7 +241,7 @@ export function Login({ onLogin, t, language, onLang }) {
 
           {!isForgot && (
             <div className="login-master">
-              <span className="pulse-dot" /> {t("login.poweredBy")} <span className="gold-text mono">HERMES</span> · PiKaOs v0.2
+              <span className="pulse-dot" /> {t("login.poweredBy")} <span className="gold-text mono">ผู้ควบคุมกลาง</span> · PiKaOs v0.2
             </div>
           )}
         </form>
