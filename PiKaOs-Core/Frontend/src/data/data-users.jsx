@@ -1,4 +1,5 @@
 /* PiKaOs — ES module (migrated from PiKaOs-Core/data-users.jsx). */
+import { PLUGIN_PERMISSIONS } from '../plugins/index.jsx';
 
 /* ============================================================
    USERS / RBAC / AUDIT — real people who log in (distinct from agents).
@@ -6,8 +7,13 @@
    edits (role, quota, suspend, permission overrides) survive reload.
    ============================================================ */
 
-/* ---- permission catalog (seed, fixed) ---- */
-const PERMISSIONS = [
+/* ---- KERNEL/CORE permission catalog ----
+   Only the perms Core itself owns. Feature-plugin perms (codex.* → knowledge, room.* → world, …) are NO
+   LONGER listed here: each plugin declares its own in its descriptor (`permissions`), and the effective
+   catalog below merges them in. So installing a plugin adds its perms (RBAC screen + admin grant) and
+   removing it drops them — no edit to this file (plugin-architecture §0, dynamic permissions). `workflow.
+   manage` stays for now because Workflows isn't a plugin yet (moves to its descriptor in P5). */
+const CORE_PERMISSIONS = [
   { key: "agent.create",     group: "Agents",    th: "สร้าง Agent",            en: "Create agents" },
   { key: "agent.appearance", group: "Agents",    th: "แก้รูปลักษณ์/คลาส Agent", en: "Edit appearance & class" },
   { key: "character.manage", group: "Agents",    th: "เพิ่ม/จัดการการ์ดตัวละคร", en: "Manage character cards" },
@@ -19,17 +25,7 @@ const PERMISSIONS = [
   { key: "agent.delete.any", group: "Agents",    th: "ลบ Agent ของผู้อื่น",    en: "Delete any agent" },
   { key: "task.run",        group: "Work",      th: "สั่งรันงาน/งาน",        en: "Run quests" },
   { key: "task.delete",      group: "Work",      th: "ลบงาน (Task)",           en: "Delete tasks" },
-  { key: "codex.view",       group: "Knowledge", th: "ดู/ค้นหาคลังความรู้",     en: "View & search codex" },
-  { key: "codex.manage",     group: "Knowledge", th: "อัปโหลด/จัดการเนื้อหาคลังความรู้", en: "Upload & manage codex content" },
-  { key: "codex.delete",     group: "Knowledge", th: "ลบเอกสารในคลังความรู้",   en: "Delete codex documents" },
   { key: "workflow.manage",  group: "Workflows", th: "จัดการ workflow",        en: "Manage workflows" },
-  { key: "room.build",      group: "Room",      th: "เปิดโหมดสร้างห้อง",      en: "Open build mode" },
-  { key: "room.place",      group: "Room",      th: "วางของ/เฟอร์นิเจอร์",   en: "Place items" },
-  { key: "room.move",       group: "Room",      th: "แก้ไขตำแหน่ง/รื้อของ",  en: "Edit positions" },
-  { key: "room.reset",      group: "Room",      th: "รีเซตห้องเป็นค่าเริ่มต้น", en: "Reset room layout" },
-  { key: "room.create",     group: "Room",      th: "สร้างห้องใหม่",          en: "Create rooms" },
-  { key: "room.template",   group: "Room",      th: "สร้าง/บันทึกเทมเพลตห้อง", en: "Create room templates" },
-  { key: "room.delete",     group: "Room",      th: "ลบห้อง",               en: "Delete rooms" },
   { key: "token.manage",     group: "Admin",     th: "ตั้งโควตาโทเคน",         en: "Manage token quota" },
   { key: "user.view.any",    group: "Admin",     th: "ดูข้อมูลสมาชิก",          en: "View any user" },
   { key: "user.manage",      group: "Admin",     th: "จัดการสมาชิก",            en: "Manage users" },
@@ -41,6 +37,8 @@ const PERMISSIONS = [
   { key: "infra.manage",     group: "Admin",     th: "ดู/ทดสอบการเชื่อมต่อ Storage/ระบบ", en: "View/test infrastructure connections" },
   { key: "plugins.manage",   group: "Admin",     th: "ติดตั้ง/เปิด-ปิด/ถอนปลั๊กอิน",      en: "Install / enable / uninstall plugins" },
 ];
+/* effective catalog = kernel perms + perms contributed by every installed plugin (dynamic, §0). */
+const PERMISSIONS = [...CORE_PERMISSIONS, ...PLUGIN_PERMISSIONS];
 const PERM_KEYS = PERMISSIONS.map(p => p.key);
 
 /* ---- roles (admin can add more; the 4 below are system roles) ---- */

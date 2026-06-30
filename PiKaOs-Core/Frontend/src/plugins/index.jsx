@@ -53,3 +53,8 @@ export const PLUGIN_ROUTE_META = Object.fromEntries(
 
 /** Sidebar groups/items each plugin contributes — merged into the nav default (data-nav.js). */
 export const PLUGIN_NAV = PLUGINS.flatMap(p => p.nav || []);
+
+/** RBAC permission descriptors ({key,group,th,en}) each plugin OWNS — merged onto the Core/kernel catalog
+ *  so the RBAC screen + admin grant show exactly the perms of the installed plugins (plugin-architecture
+ *  §0, dynamic permissions). A Base-only build carries none of them (the fix for the plugin-perm residue). */
+export const PLUGIN_PERMISSIONS = PLUGINS.flatMap(p => p.permissions || []);
