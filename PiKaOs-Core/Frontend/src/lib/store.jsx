@@ -103,7 +103,7 @@ const SAMPLE_CHARS = [
     rules: ["เขียนเทสต์ควบคู่เสมอ", "ห้าม commit ความลับลงคลัง", "ทำตามสคีมาจากสถาปนิก"],
   }),
   makeCharacter({
-    id: "a4", name: "มนต์ สถาปนิกระบบ", classKey: "mage", color: "#5b87b8", rank: "A",
+    id: "a4", name: "แผน สถาปนิกระบบ", classKey: "mage", color: "#5b87b8", rank: "A",
     position: "เอเจนต์สถาปนิกระบบ", role: "System Architect", model: "Hermes-3 · 70B", status: "busy",
     task: "ออกแบบสคีมาเหตุการณ์", level: 25, mana: 88, hp: 90, xp: 83, quests: 176, success: 96,
     desc: "เอเจนต์ผู้วางผังโครงสร้างทั้งหมดของระบบ ก่อนเริ่มพัฒนา",
@@ -161,29 +161,29 @@ const GuildCtx = React.createContext(null);
    WORLD — MMO map data: zones, placeable items, seed, persistence
    ============================================================ */
 const ZONES = [
-  { id: "spire",  th: "ศูนย์ควบคุมกลาง", en: "Guild Spire",   x: 38, y: 39, w: 24, h: 23, color: "#c8a24a", biome: "safe",   desc: "ฐานบัญชาการ · จุดเกิด" },
-  { id: "forest", th: "ป่าความรู้",  en: "Knowledge Wilds", x: 2,  y: 4,  w: 33, h: 38, color: "#5f8a4a", biome: "forest", desc: "ฟาร์มความรู้ · วิจัย" },
-  { id: "mines",  th: "เหมืองโค้ด",  en: "Code Mines",     x: 65, y: 3,  w: 33, h: 40, color: "#a06a32", biome: "mine",   desc: "ฟาร์มโค้ด · สิ่งประดิษฐ์" },
-  { id: "market", th: "ตลาดโทเคน",    en: "Mana Bazaar",    x: 3,  y: 60, w: 36, h: 36, color: "#4f79ad", biome: "water",  desc: "ทรัพยากร · โทเคน" },
-  { id: "arena",  th: "สนามทดสอบ",   en: "Trial Grounds",  x: 61, y: 57, w: 36, h: 39, color: "#b1452f", biome: "arena",  desc: "ทดสอบ · ล่าบั๊ก" },
+  { id: "spire",  th: "ศูนย์ควบคุมกลาง", en: "Guild Spire",   x: 38, y: 39, w: 24, h: 23, color: "#c8a24a", biome: "safe",   desc: "ศูนย์บัญชาการ · จุดเริ่มต้น" },
+  { id: "forest", th: "โซนความรู้",  en: "Knowledge Wilds", x: 2,  y: 4,  w: 33, h: 38, color: "#5f8a4a", biome: "forest", desc: "แหล่งความรู้ · วิจัย" },
+  { id: "mines",  th: "โซนพัฒนา",  en: "Code Mines",     x: 65, y: 3,  w: 33, h: 40, color: "#a06a32", biome: "mine",   desc: "แหล่งพัฒนาโค้ด · ผลงาน" },
+  { id: "market", th: "ศูนย์ทรัพยากร",    en: "Mana Bazaar",    x: 3,  y: 60, w: 36, h: 36, color: "#4f79ad", biome: "water",  desc: "ทรัพยากร · โทเคน" },
+  { id: "arena",  th: "โซนทดสอบ",   en: "Trial Grounds",  x: 61, y: 57, w: 36, h: 39, color: "#b1452f", biome: "arena",  desc: "ทดสอบ · ตรวจหาข้อบกพร่อง" },
 ];
 
 // group: farm | structure | marker
 const PLACEABLES = [
-  { type: "mana_crystal",   icon: "🔷", th: "คริสตัลโทเคน",   group: "farm", farm: true, yield: "+โทเคน" },
-  { type: "knowledge_tree", icon: "🌳", th: "ต้นความรู้",     group: "farm", farm: true, yield: "+ความรู้" },
-  { type: "code_ore",       icon: "💎", th: "แร่โค้ด",        group: "farm", farm: true, yield: "+สิ่งประดิษฐ์" },
-  { type: "data_node",      icon: "🍄", th: "เห็ดข้อมูล",     group: "farm", farm: true, yield: "+ข้อมูล" },
-  { type: "tower",          icon: "🗼", th: "หอสังเกตการณ์",  group: "structure" },
-  { type: "storage",        icon: "📦", th: "งบประมาณ",     group: "structure" },
-  { type: "portal",         icon: "🌀", th: "พอร์ทัล",        group: "structure" },
+  { type: "mana_crystal",   icon: "🔷", th: "แหล่งโทเคน",     group: "farm", farm: true, yield: "+โทเคน" },
+  { type: "knowledge_tree", icon: "🌳", th: "แหล่งความรู้",    group: "farm", farm: true, yield: "+ความรู้" },
+  { type: "code_ore",       icon: "💎", th: "แหล่งโค้ด",       group: "farm", farm: true, yield: "+ผลงาน" },
+  { type: "data_node",      icon: "🍄", th: "จุดข้อมูล",       group: "farm", farm: true, yield: "+ข้อมูล" },
+  { type: "tower",          icon: "🗼", th: "จุดสังเกตการณ์",  group: "structure" },
+  { type: "storage",        icon: "📦", th: "ที่จัดเก็บ",      group: "structure" },
+  { type: "portal",         icon: "🌀", th: "ทางลัด",          group: "structure" },
   { type: "anvil",          icon: "⚒️", th: "โซนพัฒนา",        group: "structure" },
-  { type: "library",        icon: "📚", th: "หอสมุด",         group: "structure" },
-  { type: "campfire",       icon: "🔥", th: "กองไฟพัก",       group: "structure" },
-  { type: "banner",         icon: "🚩", th: "สัญลักษณ์องค์กร",        group: "marker" },
-  { type: "boss",           icon: "💀", th: "จุดบอส",         group: "marker" },
-  { type: "chest",          icon: "🎁", th: "หีบสมบัติ",      group: "marker" },
-  { type: "rock",           icon: "🪨", th: "ก้อนหิน",        group: "marker" },
+  { type: "library",        icon: "📚", th: "คลังเอกสาร",      group: "structure" },
+  { type: "campfire",       icon: "🔥", th: "จุดพัก",          group: "structure" },
+  { type: "banner",         icon: "🚩", th: "สัญลักษณ์องค์กร",  group: "marker" },
+  { type: "boss",           icon: "💀", th: "งานสำคัญ",        group: "marker" },
+  { type: "chest",          icon: "🎁", th: "กล่องผลลัพธ์",    group: "marker" },
+  { type: "rock",           icon: "🪨", th: "ก้อนหิน",         group: "marker" },
 ];
 const placeableOf = (t) => PLACEABLES.find(p => p.type === t) || { icon: "❓", th: t };
 
