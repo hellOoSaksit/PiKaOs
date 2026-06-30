@@ -4,7 +4,7 @@
    Props are unchanged ({charId, walking, h, flip, style}); `seed` (optional)
    gives per-agent variety when many agents share one characterId. */
 import React from 'react';
-import { hashStr, variantOf } from '../../lib/avatar-style.js';
+import { hashStr, variantOf } from '../lib/avatar-style.js';
 
 function CharacterSprite({ charId, walking, h = 40, flip = false, style, seed }) {
   const v = variantOf(seed || charId || "ceo");
@@ -78,5 +78,9 @@ function CharacterSprite({ charId, walking, h = 40, flip = false, style, seed })
     </span>
   );
 }
+
+// Some Base screens render `window.CharacterSprite ? <CharacterSprite/> : <fallback/>` as a
+// load guard; publish it on import so that guard stays truthy now the barrel no longer does it.
+if (typeof window !== "undefined") window.CharacterSprite = CharacterSprite;
 
 export { CharacterSprite };

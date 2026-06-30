@@ -28,7 +28,7 @@ import LoadingPopup from '../components/ui/LoadingPopup.jsx';
 import Notifications from '../components/ui/Notifications.jsx';
 import Letters3D from '../components/ui/Letters3D.jsx';
 import SaveBar from '../components/ui/SaveBar.jsx';
-import { RichBody } from './screens-world.jsx';
+import { RichBody } from '../components/doc-editor.jsx';
 
 function copyText(text, done) {
   try { navigator.clipboard.writeText(text).then(done, done); } catch (e) { done && done(); }
@@ -96,7 +96,7 @@ const SNIP = {
   notif: { comp: "ui/Notifications", code: `import Notifications from 'components/ui/Notifications'\n\n<Notifications items={items} />\n// item: { id, unread, av, avTone, actor, text, time, action }\n// action: 'accept-decline' adds Accept/Decline buttons` },
   toolRows: { comp: "class .tool-row  (markup pattern)", code: `<div className="tool-row">          {/* add .off when disabled */}\n  <span className="tool-ic">🔌</span>\n  <div className="tool-bd">\n    <div className="tool-name">MCP · Knowledge base</div>\n    <div className="tool-meta mono">endpoint: https://host/mcp</div>\n  </div>\n  <button className="chip-act">✎</button>\n  <button className="chip-act danger">✕</button>\n</div>` },
   skill: { comp: "class .opt-chip / .opt-chip.on / .manage", code: `<div className="opt-chips">\n  <button className="opt-chip on">Analysis 📄</button>\n  <button className="opt-chip">Coding 📄</button>\n  <span className="opt-chip manage">System design 📄\n    <button className="chip-act">✎</button>\n    <button className="chip-act danger">✕</button>\n  </span>\n</div>` },
-  rich: { comp: "RichBody (from screens-world)", code: `import { RichBody } from 'screens/screens-world'\n\n<RichBody value={html} onChange={setHtml} placeholder="…" />\n// tiptap editor — used for every Body field (SKILL.md, Codex)` },
+  rich: { comp: "RichBody (from components/doc-editor)", code: `import { RichBody } from 'components/doc-editor'\n\n<RichBody value={html} onChange={setHtml} placeholder="…" />\n// tiptap editor — used for every Body field (SKILL.md, Codex)` },
   overlays: { comp: "window.uiConfirm · uiLoading · pushNotify", code: `// global app overlays (no import — mounted by the shell)\nconst ok = await window.uiConfirm({ title:'…', message:'…', confirmText:'…', danger:true });\nconst h = window.uiLoading({ title:'…', message:'…' });  h.close();\nwindow.pushNotify({ from:'…', question:'…', taskTitle:'…' });` },
   saveBar: { comp: "ui/SaveBar", code: `import SaveBar from 'components/ui/SaveBar'\n\n<SaveBar count={n} onSave={fn} onCancel={fn}\n  saveLabel="Save" cancelLabel="Cancel" label="…" />\n// floats in when count > 0` },
 };

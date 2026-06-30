@@ -4,7 +4,7 @@ import React from 'react';
 const { useState } = React;
 import { Select } from '../../components/ui/Dropdown.jsx';
 import { wt } from './wt.js';
-import { DOC_SEED } from './doc.jsx';
+import { DOC_SEED } from '../../components/doc-editor.jsx';
 import { RoomChat } from './chat.jsx';
 import { RoomSessions } from './sessions.jsx';
 import { RoomExports } from './exports.jsx';

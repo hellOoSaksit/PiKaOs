@@ -3,7 +3,7 @@ import React from 'react';
 const { useState, useEffect, useRef } = React;
 import { ActivityRow, AgentCard, Btn, ChatMessage, FeatureTag, HelpNote, PageHead, Panel, QuestCard, StatTile, TypingDots } from '../components/components.jsx';
 import { ACTIVITY, CHAT, ORG, TOKENS, TASKS, byId } from '../data/data.jsx';
-import { CharacterSprite } from './screens-world.jsx';
+import { CharacterSprite } from '../components/CharacterSprite.jsx';
 import { randPos } from '../lib/store.jsx';
 
 /* ============================================================

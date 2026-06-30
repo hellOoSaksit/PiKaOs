@@ -11,7 +11,7 @@ import { variantOf } from '../../lib/avatar-style.js';
 import { ACTS, Sound, advanceActivity, pickActivity, spawnSubs, tickSubs } from '../../lib/world-life.jsx';
 import Segmented from '../../components/ui/Segmented.jsx';
 import { wt } from './wt.js';
-import { CharacterSprite } from './CharacterSprite.jsx';
+import { CharacterSprite } from '../../components/CharacterSprite.jsx';
 import { RoomAside } from './room-aside.jsx';
 
 /* ---------------- living agents (walk everywhere — no teleport) ----------------

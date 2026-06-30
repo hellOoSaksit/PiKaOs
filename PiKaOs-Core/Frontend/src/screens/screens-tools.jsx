@@ -11,7 +11,7 @@ import { Select } from '../components/ui/Dropdown.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import Switch from '../components/ui/Switch.jsx';
 import { TOOL_TYPES, addOption, loadOptions, loadSkillDocs, loadToolCfgs, removeOption, saveSkillDocs, saveToolCfgs } from '../lib/characters.jsx';
-import { RichBody } from './screens-world.jsx';
+import { RichBody } from '../components/doc-editor.jsx';
 
 const typeOf = (k) => TOOL_TYPES.find(t => t.key === k) || TOOL_TYPES[TOOL_TYPES.length - 1];
 /* รองรับทั้ง spec แบบ object และ tuple [key,label,ph] เดิม */

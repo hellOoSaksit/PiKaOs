@@ -6,7 +6,8 @@ import { Btn, StatusBadge } from '../components/components.jsx';
 import { Select } from '../components/ui/Dropdown.jsx';
 import { idx } from '../lib/room-store.jsx';
 import { Workflows } from './screens-workflows.jsx';
-import { CharacterSprite, DOC_SEED, DocEditor, RichBody } from './screens-world.jsx';
+import { CharacterSprite } from '../components/CharacterSprite.jsx';
+import { DOC_SEED, DocEditor, RichBody } from '../components/doc-editor.jsx';
 import { CLASS_OPTS, COLOR_OPTS } from '../lib/sprites.jsx';
 import { MODEL_OPTS, STATUS_OPTS, makeCharacter } from '../lib/store.jsx';
 

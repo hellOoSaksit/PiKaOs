@@ -1,7 +1,7 @@
 /* PiKaOs — AGENTS / ROSTER: the agent grid + empty state + create entry points. */
 import React from 'react';
 import { Btn, HelpNote, PageHead, Panel, StatusBadge } from '../../components/components.jsx';
-import { CharacterSprite } from '../screens-world.jsx';
+import { CharacterSprite } from '../../components/CharacterSprite.jsx';
 
 /* ---------------- AGENTS / ROSTER ---------------- */
 function Agents({ onAgent, S, can, t }) {

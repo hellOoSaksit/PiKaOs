@@ -2,7 +2,7 @@
 import React from 'react';
 import { Btn, RankGem, StatusBadge } from '../../components/components.jsx';
 import { byId } from '../../data/data.jsx';
-import { CharacterSprite } from '../screens-world.jsx';
+import { CharacterSprite } from '../../components/CharacterSprite.jsx';
 import { st, setSt } from './st.js';
 
 /* ---------------- QUEST DRAWER ---------------- */

@@ -4,7 +4,7 @@ import React from 'react';
 const { useState, useRef } = React;
 import { Btn, Empty, PageHead } from '../../components/components.jsx';
 import { Select } from '../../components/ui/Dropdown.jsx';
-import { DocEditor } from '../screens-world.jsx';
+import { DocEditor } from '../../components/doc-editor.jsx';
 import { st, setSt } from './st.js';
 import {
   loadWorks, saveWorks, taskTotal, taskStep, genUUID, genTaskCode,

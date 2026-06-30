@@ -3,7 +3,7 @@
 import React from 'react';
 import { loadCoreRules } from '../../lib/characters.jsx';
 import { Avatar, Btn, StatusBadge } from '../../components/components.jsx';
-import { CharacterSprite } from '../screens-world.jsx';
+import { CharacterSprite } from '../../components/CharacterSprite.jsx';
 import { st, setSt } from './st.js';
 
 /* ---------------- AGENT DRAWER ---------------- */

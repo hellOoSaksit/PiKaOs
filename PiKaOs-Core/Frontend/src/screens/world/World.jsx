@@ -10,7 +10,7 @@ import { Select } from '../../components/ui/Dropdown.jsx';
 import { templateFromRoom, useRooms, useTemplates } from '../../lib/room-store.jsx';
 import { wt, setWt } from './wt.js';
 import { RoomView } from './build.jsx';
-import { DocEditor } from './doc.jsx';
+import { DocEditor } from '../../components/doc-editor.jsx';
 import { RoomPicker, TemplatesTab, OverviewTab } from './lobby.jsx';
 import { HermesChat } from './chat.jsx';
 

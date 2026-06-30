@@ -1,7 +1,7 @@
 /* PiKaOs — ES module (migrated from PiKaOs-Core/components.jsx). */
 import React from 'react';
 import { byId, statusLabel } from '../data/data.jsx';
-import { CharacterSprite } from '../screens/screens-world.jsx';
+import { CharacterSprite } from './CharacterSprite.jsx';
 
 /* ============================================================
    SHARED UI PRIMITIVES
