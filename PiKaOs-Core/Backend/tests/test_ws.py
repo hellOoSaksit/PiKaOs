@@ -2,7 +2,7 @@
 
 Network-free: drives `ws._authenticate` with a one-shot fake socket and a monkeypatched
 deny-list. Proves the token is taken from the first frame (not the URL), bad/expired/denied
-tokens are rejected, and quest authz is denied until phase B.
+tokens are rejected, and task authz is denied until phase B.
 
     docker compose exec backend pytest tests/test_ws.py
 """
@@ -41,7 +41,7 @@ async def test_first_message_auth_accepts_valid_token(allow_denylist):
 
 
 async def test_rejects_when_first_frame_is_not_auth(allow_denylist):
-    ws = _OneShotWS(json.dumps({"type": "subscribe", "quest_id": "q1"}))
+    ws = _OneShotWS(json.dumps({"type": "subscribe", "task_id": "q1"}))
     assert await wsmod._authenticate(ws) is None
 
 
@@ -65,7 +65,7 @@ async def test_rejects_denylisted_token(monkeypatch):
     assert await wsmod._authenticate(ws) is None
 
 
-async def test_quest_authz_denies_malformed_ids():
-    # B5: _can_view_quest now runs real authz (quest_service.can_view); non-UUID ids are
-    # rejected before any DB hit. Owner/department/admin grants are covered in test_quest_stream.
-    assert await wsmod._can_view_quest("u1", "q1") is False
+async def test_task_authz_denies_malformed_ids():
+    # B5: _can_view_task now runs real authz (task_service.can_view); non-UUID ids are
+    # rejected before any DB hit. Owner/department/admin grants are covered in test_task_stream.
+    assert await wsmod._can_view_task("u1", "q1") is False

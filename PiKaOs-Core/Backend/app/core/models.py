@@ -321,8 +321,8 @@ class Agent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
-class Quest(Base):
-    __tablename__ = "quests"
+class Task(Base):
+    __tablename__ = "tasks"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title: Mapped[str] = mapped_column(String(255), nullable=False, default="")
@@ -354,8 +354,8 @@ class Run(Base):
     agent_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("agents.id", ondelete="SET NULL"), nullable=True
     )
-    quest_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("quests.id", ondelete="SET NULL"), nullable=True
+    task_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True
     )
     room_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("rooms.id", ondelete="SET NULL"), nullable=True
@@ -439,7 +439,7 @@ class TelegramConnection(Base):
 class TelegramLink(Base):
     """The trust anchor — binds a Telegram identity to a PiKaOs user. Every inbound message resolves
     `tg_user_id` to this row; **all** permission/quota checks then run against `user_id` (the same
-    RBAC the web app uses). No row → the bot only answers /start and /link. `quest_id` is the
+    RBAC the web app uses). No row → the bot only answers /start and /link. `task_id` is the
     persistent conversation thread (lazily created so context survives across messages)."""
 
     __tablename__ = "telegram_links"
@@ -450,8 +450,8 @@ class TelegramLink(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    quest_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("quests.id", ondelete="SET NULL"), nullable=True
+    task_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

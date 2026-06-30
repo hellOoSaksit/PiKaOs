@@ -18,7 +18,7 @@ from fastapi import HTTPException
 from app.core import deps
 from app.core.services.rbac_service import resolve_perms
 
-CATALOG = {"agent.create", "quest.run", "audit.view", "user.manage", "room.build"}
+CATALOG = {"agent.create", "task.run", "audit.view", "user.manage", "room.build"}
 
 
 # --- resolve_perms (pure) --------------------------------------------------
@@ -29,16 +29,16 @@ def test_admin_gets_entire_catalog():
 
 
 def test_role_perms_passthrough():
-    assert resolve_perms("member", {"agent.create", "quest.run"}, {}, set()) == {"agent.create", "quest.run"}
+    assert resolve_perms("member", {"agent.create", "task.run"}, {}, set()) == {"agent.create", "task.run"}
 
 
 def test_grant_adds_beyond_role():
-    out = resolve_perms("member", {"quest.run"}, {"audit.view": True}, set())
-    assert out == {"quest.run", "audit.view"}
+    out = resolve_perms("member", {"task.run"}, {"audit.view": True}, set())
+    assert out == {"task.run", "audit.view"}
 
 
 def test_deny_wins_over_role():
-    out = resolve_perms("member", {"quest.run", "agent.create"}, {"quest.run": False}, set())
+    out = resolve_perms("member", {"task.run", "agent.create"}, {"task.run": False}, set())
     assert out == {"agent.create"}
 
 
@@ -59,7 +59,7 @@ def _run_checker(perm: str, effective: set[str], monkeypatch):
 
 
 def test_require_perm_allows_when_held(monkeypatch):
-    user = _run_checker("agent.create", {"agent.create", "quest.run"}, monkeypatch)
+    user = _run_checker("agent.create", {"agent.create", "task.run"}, monkeypatch)
     assert user.role == "member"
 
 

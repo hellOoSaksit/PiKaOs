@@ -6,9 +6,9 @@ proxy/access logs. The client connects to /ws, then its FIRST frame must be
 closed 4401. After auth the socket subscribes to its own user channel (``pikaos:user:<id>``);
 the old scaffold relayed one global channel to every logged-in user (cross-user leak).
 
-Quest streaming (``{"type":"subscribe","quest_id":...}``) is live (B5): the socket is
-authorized via ``quest_service.can_view`` (owner / department member / admin), subscribed to
-Redis ``quest:<id>`` where the runner publishes one event per step, and sent a snapshot of
+Task streaming (``{"type":"subscribe","task_id":...}``) is live (B5): the socket is
+authorized via ``task_service.can_view`` (owner / department member / admin), subscribed to
+Redis ``task:<id>`` where the runner publishes one event per step, and sent a snapshot of
 recent runs+steps so a mid-run page open loses nothing. ``{"type":"backfill","run_id",
 "after_seq"}`` fills a gap the client detects via each event's ``(run_id, seq)``
 (system-design §6 · risk-mitigation §3 ค–ง).
@@ -23,13 +23,13 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from .. import redis_client, security
 from ..db import SessionLocal
-from ..services import quest_service
+from ..services import task_service
 
 router = APIRouter()
 
 AUTH_TIMEOUT = 5.0                       # seconds to send the first {"type":"auth"} frame
 _USER_CHANNEL = "pikaos:user:{}"
-_QUEST_CHANNEL = "quest:{}"
+_TASK_CHANNEL = "task:{}"
 
 
 async def _authenticate(websocket: WebSocket) -> str | None:
@@ -56,9 +56,9 @@ async def _authenticate(websocket: WebSocket) -> str | None:
     return user_id
 
 
-async def _can_view_quest(user_id: str, quest_id: str) -> bool:
+async def _can_view_task(user_id: str, task_id: str) -> bool:
     async with SessionLocal() as db:
-        return await quest_service.can_view(db, user_id, quest_id)
+        return await task_service.can_view(db, user_id, task_id)
 
 
 @router.websocket("/ws")
@@ -89,32 +89,32 @@ async def ws_endpoint(websocket: WebSocket) -> None:
                 continue
             kind = msg.get("type")
             if kind == "subscribe":
-                quest_id = str(msg.get("quest_id", ""))
-                if quest_id and await _can_view_quest(user_id, quest_id):
-                    ch = _QUEST_CHANNEL.format(quest_id)
+                task_id = str(msg.get("task_id", ""))
+                if task_id and await _can_view_task(user_id, task_id):
+                    ch = _TASK_CHANNEL.format(task_id)
                     channels.add(ch)
                     # Subscribe BEFORE the snapshot so no event published in the gap is missed;
                     # the client dedups by (run_id, seq) if the snapshot and a live event overlap.
                     await pubsub.subscribe(ch)
-                    await websocket.send_json({"type": "subscribed", "quest_id": quest_id})
+                    await websocket.send_json({"type": "subscribed", "task_id": task_id})
                     async with SessionLocal() as db:
-                        await websocket.send_json(await quest_service.snapshot(db, quest_id))
+                        await websocket.send_json(await task_service.snapshot(db, task_id))
                 else:
-                    await websocket.send_json({"type": "error", "reason": "forbidden", "quest_id": quest_id})
+                    await websocket.send_json({"type": "error", "reason": "forbidden", "task_id": task_id})
             elif kind == "unsubscribe":
-                quest_id = str(msg.get("quest_id", ""))
-                ch = _QUEST_CHANNEL.format(quest_id)
+                task_id = str(msg.get("task_id", ""))
+                ch = _TASK_CHANNEL.format(task_id)
                 if ch in channels:
                     channels.discard(ch)
                     await pubsub.unsubscribe(ch)
-                    await websocket.send_json({"type": "unsubscribed", "quest_id": quest_id})
+                    await websocket.send_json({"type": "unsubscribed", "task_id": task_id})
             elif kind == "backfill":
                 # Gap recovery: client asks for steps of a run it's authorized to see, after a seq.
                 run_id, after_seq = str(msg.get("run_id", "")), int(msg.get("after_seq", -1))
-                quest_id = str(msg.get("quest_id", ""))
-                if run_id and quest_id and _QUEST_CHANNEL.format(quest_id) in channels:
+                task_id = str(msg.get("task_id", ""))
+                if run_id and task_id and _TASK_CHANNEL.format(task_id) in channels:
                     async with SessionLocal() as db:
-                        await websocket.send_json(await quest_service.backfill(db, quest_id, run_id, after_seq))
+                        await websocket.send_json(await task_service.backfill(db, task_id, run_id, after_seq))
             # any other frame is ignored — no global echo (that was the cross-user leak)
     except WebSocketDisconnect:
         pass

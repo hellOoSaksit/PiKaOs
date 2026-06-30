@@ -6,7 +6,7 @@ These are the phase-B acceptance gates (improvement-plan §B):
 * kill the worker mid LLM step → resume reconstructs the conversation from run_steps and
   continues from the last step (replay-safe), with no duplicate step;
 * quota on the line → the second run fails `quota_exceeded` and users.used == Σ run_steps.tokens;
-* a quest opened mid-flight → snapshot reconstructs the full worklog timeline.
+* a task opened mid-flight → snapshot reconstructs the full worklog timeline.
 
 A real worker crash is simulated with `_Crash(BaseException)`: the runner's tool/LLM guards
 are `except Exception`, so a BaseException escapes them exactly like a process dying mid-step,
@@ -15,7 +15,7 @@ leaving the half-written state (a `pending` tool step, or no step at all) for re
 The runner is driven directly against a fresh engine (the local-engine technique — dodges the
 module-engine event-loop issue) with `db_factory` + injected provider/tools. Redis/event I/O is
 patched out so these tests isolate the *Postgres* correctness B6 is about; the event stream is
-covered in test_quest_stream + the B5 pubsub smoke.
+covered in test_task_stream + the B5 pubsub smoke.
 
     docker compose exec backend pytest tests/test_engine_resume.py
 """
@@ -28,11 +28,11 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import settings
-from app.core.models import Agent, Quest, Run, User
+from app.core.models import Agent, Task, Run, User
 from app.core.repositories import runs as runs_repo
 from app.core.repositories import stub_tools as stub_repo
 from app.core.repositories import users as users_repo
-from app.core.services import agent_runner, quest_service
+from app.core.services import agent_runner, task_service
 from app.core.services.agent_runner import EFFECT_READ, EFFECT_SIDE_EFFECT, LLMResult
 
 
@@ -123,23 +123,23 @@ def _run(coro):
     return asyncio.run(main())
 
 
-async def _make_run(Session, *, quest_id=None, agent_id=None) -> uuid.UUID:
+async def _make_run(Session, *, task_id=None, agent_id=None) -> uuid.UUID:
     rid = uuid.uuid4()
     async with Session() as db:
-        db.add(Run(id=rid, quest_id=quest_id, agent_id=agent_id, status="queued",
+        db.add(Run(id=rid, task_id=task_id, agent_id=agent_id, status="queued",
                    input={"messages": [{"role": "user", "content": "go"}]}))
         await db.commit()
     return rid
 
 
-async def _cleanup(Session, *, runs=(), agents=(), quests=(), users=()):
+async def _cleanup(Session, *, runs=(), agents=(), tasks=(), users=()):
     async with Session() as db:                                # deleting a run cascades steps + stub writes
         for r in runs:
             await db.execute(delete(Run).where(Run.id == r))
         for a in agents:
             await db.execute(delete(Agent).where(Agent.id == a))
-        for q in quests:
-            await db.execute(delete(Quest).where(Quest.id == q))
+        for q in tasks:
+            await db.execute(delete(Task).where(Task.id == q))
         for u in users:
             await db.execute(delete(User).where(User.id == u))
         await db.commit()
@@ -248,14 +248,14 @@ def test_snapshot_reconstructs_full_timeline(monkeypatch):
     async def body(Session):
         qid = uuid.uuid4()
         async with Session() as db:
-            db.add(Quest(id=qid, title="t", status="open"))
+            db.add(Task(id=qid, title="t", status="open"))
             await db.commit()
-        rid = await _make_run(Session, quest_id=qid)
+        rid = await _make_run(Session, task_id=qid)
         provider = IntProvider([{"tool": "echo", "tokens": 3}, {"text": "done", "tokens": 2}])
         await agent_runner.run(rid, provider=provider, tools=ITool(Session, {"echo": EFFECT_READ}), db_factory=Session)
         async with Session() as db:
-            snap = await quest_service.snapshot(db, str(qid))
-        await _cleanup(Session, runs=[rid], quests=[qid])
+            snap = await task_service.snapshot(db, str(qid))
+        await _cleanup(Session, runs=[rid], tasks=[qid])
         return snap
 
     snap = _run(body)

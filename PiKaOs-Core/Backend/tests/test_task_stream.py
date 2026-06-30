@@ -1,12 +1,12 @@
 """Tests for the live worklog stream (B5) — event serialization, best-effort publish,
-quest-view authz, and the backfill cross-quest guard.
+task-view authz, and the backfill cross-task guard.
 
 * serialize/cap + best-effort publish: pure / monkeypatched (no DB).
 * authz + backfill: real schema via a fresh engine inside asyncio.run (the local-engine
   technique from test_engine_stubs, dodging the module-engine loop issue). The full
   subscribe→snapshot→live-event path over a real socket is exercised by the B6 harness.
 
-    docker compose exec backend pytest tests/test_quest_stream.py
+    docker compose exec backend pytest tests/test_task_stream.py
 """
 from __future__ import annotations
 
@@ -19,8 +19,8 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import settings
-from app.core.models import Department, Quest, User, UserDepartment
-from app.core.services import events, quest_service
+from app.core.models import Department, Task, User, UserDepartment
+from app.core.services import events, task_service
 
 
 # --- serialize / cap (pure) -------------------------------------------------
@@ -56,7 +56,7 @@ def test_publish_is_best_effort_on_redis_outage(monkeypatch):
         id=uuid.uuid4(), run_id=uuid.uuid4(), seq=0, kind="llm", status="done", role=None, tokens=0, content=None)))
 
 
-def test_publish_skips_when_no_quest(monkeypatch):
+def test_publish_skips_when_no_task(monkeypatch):
     published = []
 
     class _Rec:
@@ -65,7 +65,7 @@ def test_publish_skips_when_no_quest(monkeypatch):
 
     monkeypatch.setattr(events, "redis", _Rec())
     asyncio.run(events.publish_run(None, uuid.uuid4(), "done"))
-    assert published == []  # a run with no quest streams nowhere
+    assert published == []  # a run with no task streams nowhere
 
 
 # --- authz + backfill (real DB) ---------------------------------------------
@@ -97,17 +97,17 @@ def test_can_view_owner_admin_and_denies_outsider():
     async def scen(db, Session):
         db.add_all([owner, outsider, admin])
         await db.flush()  # parents before the FK child (no ORM relationship to auto-order)
-        db.add(Quest(id=qid, title="t", created_by=owner.id))
+        db.add(Task(id=qid, title="t", created_by=owner.id))
         await db.commit()
         try:
             return (
-                await quest_service.can_view(db, str(owner.id), str(qid)),     # owner → True
-                await quest_service.can_view(db, str(admin.id), str(qid)),     # admin → True
-                await quest_service.can_view(db, str(outsider.id), str(qid)),  # outsider → False
-                await quest_service.can_view(db, str(owner.id), str(uuid.uuid4())),  # missing quest → False
+                await task_service.can_view(db, str(owner.id), str(qid)),     # owner → True
+                await task_service.can_view(db, str(admin.id), str(qid)),     # admin → True
+                await task_service.can_view(db, str(outsider.id), str(qid)),  # outsider → False
+                await task_service.can_view(db, str(owner.id), str(uuid.uuid4())),  # missing task → False
             )
         finally:
-            await db.execute(delete(Quest).where(Quest.id == qid))
+            await db.execute(delete(Task).where(Task.id == qid))
             await db.execute(delete(User).where(User.id.in_([owner.id, outsider.id, admin.id])))
             await db.commit()
 
@@ -125,16 +125,16 @@ def test_can_view_department_member():
         await db.flush()  # users + department before their FK children
         db.add_all([
             UserDepartment(user_id=member.id, department_id=dept),
-            Quest(id=qid, title="t", created_by=other.id, department_id=dept),  # owned by other, in member's dept
+            Task(id=qid, title="t", created_by=other.id, department_id=dept),  # owned by other, in member's dept
         ])
         await db.commit()
         try:
             return (
-                await quest_service.can_view(db, str(member.id), str(qid)),  # dept member → True
-                await quest_service.can_view(db, str(other.id), str(qid)),   # owner → True
+                await task_service.can_view(db, str(member.id), str(qid)),  # dept member → True
+                await task_service.can_view(db, str(other.id), str(qid)),   # owner → True
             )
         finally:
-            await db.execute(delete(Quest).where(Quest.id == qid))
+            await db.execute(delete(Task).where(Task.id == qid))
             await db.execute(delete(UserDepartment).where(UserDepartment.department_id == dept))
             await db.execute(delete(Department).where(Department.id == dept))
             await db.execute(delete(User).where(User.id.in_([member.id, other.id])))
@@ -151,21 +151,21 @@ def test_backfill_rejects_foreign_run():
 
     async def scen(db, Session):
         db.add(owner)
-        await db.flush()  # owner before the quests that reference it
-        db.add_all([Quest(id=qa, title="a", created_by=owner.id), Quest(id=qb, title="b", created_by=owner.id)])
-        await db.flush()  # quests before the run that references one
-        run_a = Run(id=uuid.uuid4(), quest_id=qa, status="done")
+        await db.flush()  # owner before the tasks that reference it
+        db.add_all([Task(id=qa, title="a", created_by=owner.id), Task(id=qb, title="b", created_by=owner.id)])
+        await db.flush()  # tasks before the run that references one
+        run_a = Run(id=uuid.uuid4(), task_id=qa, status="done")
         db.add(run_a)
         await db.commit()
         try:
-            # asking for run_a's steps but claiming quest B → guarded to empty
-            foreign = await quest_service.backfill(db, str(qb), str(run_a.id), -1)
-            # same run under its real quest → allowed (no steps here, but not rejected)
-            native = await quest_service.backfill(db, str(qa), str(run_a.id), -1)
+            # asking for run_a's steps but claiming task B → guarded to empty
+            foreign = await task_service.backfill(db, str(qb), str(run_a.id), -1)
+            # same run under its real task → allowed (no steps here, but not rejected)
+            native = await task_service.backfill(db, str(qa), str(run_a.id), -1)
             return foreign["steps"], native
         finally:
             await db.execute(delete(Run).where(Run.id == run_a.id))
-            await db.execute(delete(Quest).where(Quest.id.in_([qa, qb])))
+            await db.execute(delete(Task).where(Task.id.in_([qa, qb])))
             await db.execute(delete(User).where(User.id == owner.id))
             await db.commit()
 

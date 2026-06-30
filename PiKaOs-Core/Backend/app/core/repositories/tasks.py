@@ -1,6 +1,6 @@
-"""Quest + quest-scoped run/step queries (read side of the live worklog stream, B5).
+"""Task + task-scoped run/step queries (read side of the live worklog stream, B5).
 
-All SQL for the WS quest stream lives here (layering §2.1); the WS router calls the quest
+All SQL for the WS task stream lives here (layering §2.1); the WS router calls the task
 service, which calls these.
 """
 from __future__ import annotations
@@ -10,11 +10,11 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import Quest, Run, RunStep, UserDepartment
+from ..models import Task, Run, RunStep, UserDepartment
 
 
-async def get_quest(db: AsyncSession, quest_id: uuid.UUID) -> Quest | None:
-    return await db.get(Quest, quest_id)
+async def get_task(db: AsyncSession, task_id: uuid.UUID) -> Task | None:
+    return await db.get(Task, task_id)
 
 
 async def user_in_department(db: AsyncSession, user_id: uuid.UUID, department_id: uuid.UUID) -> bool:
@@ -24,18 +24,18 @@ async def user_in_department(db: AsyncSession, user_id: uuid.UUID, department_id
     return (await db.execute(stmt)).first() is not None
 
 
-async def run_states_for_quest(db: AsyncSession, quest_id: uuid.UUID) -> list[tuple[uuid.UUID, str]]:
-    """(run_id, status) for every run under a quest — the snapshot's run list."""
-    stmt = select(Run.id, Run.status).where(Run.quest_id == quest_id).order_by(Run.created_at)
+async def run_states_for_task(db: AsyncSession, task_id: uuid.UUID) -> list[tuple[uuid.UUID, str]]:
+    """(run_id, status) for every run under a task — the snapshot's run list."""
+    stmt = select(Run.id, Run.status).where(Run.task_id == task_id).order_by(Run.created_at)
     return [(r[0], r[1]) for r in (await db.execute(stmt)).all()]
 
 
-async def recent_steps_for_quest(db: AsyncSession, quest_id: uuid.UUID, limit: int = 200) -> list[RunStep]:
-    """Worklog steps across the quest's runs, oldest→newest (capped). Snapshot on subscribe."""
+async def recent_steps_for_task(db: AsyncSession, task_id: uuid.UUID, limit: int = 200) -> list[RunStep]:
+    """Worklog steps across the task's runs, oldest→newest (capped). Snapshot on subscribe."""
     stmt = (
         select(RunStep)
         .join(Run, RunStep.run_id == Run.id)
-        .where(Run.quest_id == quest_id)
+        .where(Run.task_id == task_id)
         .order_by(Run.created_at, RunStep.seq)
         .limit(limit)
     )

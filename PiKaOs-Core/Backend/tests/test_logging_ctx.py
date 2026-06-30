@@ -1,7 +1,7 @@
 """Tests for engine structured-logging context (B7).
 
 Pure (no DB/worker): the contextvar binding + the logging Filter that stamps every record
-with run_id/parent_run_id/quest_id/agent_id. Proves unbound records default to '-', bound
+with run_id/parent_run_id/task_id/agent_id. Proves unbound records default to '-', bound
 records carry the ids, merges accumulate, and reset restores cleanly (no leak between jobs).
 
     docker compose exec backend pytest tests/test_logging_ctx.py
@@ -24,14 +24,14 @@ def _stamp(record: logging.LogRecord) -> logging.LogRecord:
 
 def test_unbound_defaults_to_dash():
     r = _stamp(_record())
-    assert r.run_id == "-" and r.parent_run_id == "-" and r.quest_id == "-" and r.agent_id == "-"
+    assert r.run_id == "-" and r.parent_run_id == "-" and r.task_id == "-" and r.agent_id == "-"
 
 
 def test_bind_populates_then_reset_restores():
-    token = bind_run(run_id="r1", quest_id="q1")
+    token = bind_run(run_id="r1", task_id="q1")
     try:
         r = _stamp(_record())
-        assert r.run_id == "r1" and r.quest_id == "q1"
+        assert r.run_id == "r1" and r.task_id == "q1"
         assert r.parent_run_id == "-" and r.agent_id == "-"  # only what was bound
     finally:
         reset_run(token)
@@ -40,10 +40,10 @@ def test_bind_populates_then_reset_restores():
 
 def test_bind_merges_and_ignores_none_and_unknown():
     t1 = bind_run(run_id="r1")
-    t2 = bind_run(quest_id="q1", parent_run_id=None, bogus="x")  # None + unknown key ignored
+    t2 = bind_run(task_id="q1", parent_run_id=None, bogus="x")  # None + unknown key ignored
     try:
         r = _stamp(_record())
-        assert r.run_id == "r1" and r.quest_id == "q1"  # merged across binds
+        assert r.run_id == "r1" and r.task_id == "q1"  # merged across binds
         assert r.parent_run_id == "-" and not hasattr(r, "bogus")
     finally:
         reset_run(t2)
