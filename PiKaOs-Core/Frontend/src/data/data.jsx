@@ -124,7 +124,8 @@ const NAV = [
     { id: "me", icon: "🧭", label: "แดชบอร์ดของฉัน", en: "My Dashboard" },
     { id: "agents", icon: "🎭", label: "ห้อง Agent", en: "Adventurers" },
     { id: "quests", icon: "📜", label: "กระดานงาน", en: "Quest Board", tag: "4" },
-    { id: "world", icon: "🌍", label: "สถานะโลก", en: "World State" },
+    // "world" (World State) is now contributed by the world plugin (Phase 6 seam, src/plugins/world)
+    // and merged into this group by data-nav.defaultNav — not hardcoded here.
     { id: "workflows", icon: "⚗️", label: "เวิร์กโฟลว์", en: "Workflows" },
     { id: "sitemap", icon: "🗺️", label: "ตรวจไซต์แมพ", en: "Sitemap Match" },
   ]},

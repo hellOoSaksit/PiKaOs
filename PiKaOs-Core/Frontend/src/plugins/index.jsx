@@ -8,9 +8,10 @@
    `render(ctx)` receives the Core seams it asked for (t · can · language · …); the plugin owns the wiring
    so Core never needs to know each screen's prop shape. */
 import knowledge from './knowledge/index.jsx';
+import world from './world/index.jsx';
 
 // The frontend plugins this build ships (mirror of the backend ENABLED_MODULES set).
-const PLUGINS = [knowledge];
+const PLUGINS = [knowledge, world];
 
 const _routes = {};
 for (const p of PLUGINS) for (const r of p.routes || []) _routes[r.id] = r;

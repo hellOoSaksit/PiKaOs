@@ -22,7 +22,6 @@ import { Workflows } from './screens/screens-workflows.jsx';
 import { useAuth } from './lib/auth.jsx';
 import { Menu } from './components/ui/Dropdown.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
-import { World } from './screens/screens-world.jsx';
 import { SAMPLE_CHARS, loadArchived, loadChars, randPos, saveArchived, saveChars } from './lib/store.jsx';
 import { UILoadingHost, UIModalHost } from './lib/ui-modal.jsx';
 import { makeT, DEFAULT_LANG, DEFAULT_STYLE, packById, defaultPack, defaultPackForLang, LEX_PACKS } from './lib/i18n.jsx';
@@ -37,10 +36,8 @@ const I18N_DEFAULT_PACK = (LEX_PACKS.find(p => p.lang === DEFAULT_LANG && p.styl
 
 const ROUTE_META = {
   me:      { icon: "🧭", title: "แดชบอร์ดของฉัน", en: "My Dashboard" },
-  hall:    { icon: "🏰", title: "ภาพรวมระบบ", en: "Guild Hall" },
   agents:  { icon: "🎭", title: "เหล่าเอเจนต์", en: "Adventurers" },
   quests:  { icon: "📜", title: "กระดานงาน", en: "Quest Board" },
-  world:   { icon: "🌍", title: "สถานะโลก", en: "World State" },
   meeting: { icon: "💬", title: "ห้องประชุม Agent", en: "Council" },
   sitemap: { icon: "🗺️", title: "ตรวจไซต์แมพ", en: "Sitemap Match" },
   mana:    { icon: "🔵", title: "โทเคน (Token)", en: "Mana" },
@@ -327,7 +324,7 @@ function ViewAsBanner({ user, roles, onExit, t, T }) {
 }
 
 function Topbar({ route, theme, setTheme, user, language, viewAs, t, me, roles, onSignOut, onSaveProfile }) {
-  const m = ROUTE_META[route] || ROUTE_META.hall;
+  const m = ROUTE_META[route] || ROUTE_META.me;   // me is always Base — safe fallback if a plugin (e.g. world→hall) is disabled
   const title = t("route." + route + ".title");
   const live = route === "hall" || route === "meeting" || route === "world";
   const tEn = makeT("en", "formal");
@@ -605,10 +602,8 @@ function App() {
     const guard = (perm, el) => can(perm) ? el : <MyDashboard Sys={Sys} onAgent={setAgentSel} onQuest={setQuestSel} />;
     switch (route) {
       case "me": return <MyDashboard Sys={Sys} onAgent={setAgentSel} onQuest={setQuestSel} />;
-      case "hall": return <World onAgent={setAgentSel} S={S} can={can} t={t} />;
       case "agents": return <Agents onAgent={setAgentSel} S={S} can={can} t={t} />;
       case "quests": return <QuestBoard onQuest={setQuestSel} can={can} t={t} />;
-      case "world": return <World onAgent={setAgentSel} S={S} can={can} t={t} />;
       case "meeting": return <Meeting S={S} t={t} />;
       case "sitemap": return <SitemapAudit t={t} lang={language} can={can} actor={me.display_name || me.username || "ผู้ใช้"} />;
       case "mana": return <Mana S={S} t={t} />;
@@ -627,7 +622,7 @@ function App() {
       case "watch": return <Watchtower t={t} />;
       default: {
         // a route owned by an enabled plugin (Phase 6 seam) — else fall back to the dashboard.
-        const pluginEl = renderPluginRoute(route, { t, can, language });
+        const pluginEl = renderPluginRoute(route, { t, can, language, S, onAgent: setAgentSel });
         return pluginEl || <MyDashboard Sys={Sys} onAgent={setAgentSel} onQuest={setQuestSel} />;
       }
     }
