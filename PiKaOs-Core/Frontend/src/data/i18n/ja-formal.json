@@ -30,21 +30,15 @@
     "common.viewAll": "すべて表示 →",
     "common.unit.work": "タスク",
     "common.unit.ktoken": "Kトークン",
-
     "topbar.tasks": "タスク",
     "topbar.tokens": "トークン",
     "topbar.viewAs": "ユーザー視点",
-
     "theme.day": "ライト",
     "theme.night": "ダーク",
-
     "nav.me": "マイダッシュボード",
     "nav.agents": "エージェント",
     "nav.quests": "タスクボード",
-    "nav.world": "ワールド状態",
     "nav.workflows": "ワークフロー",
-    "nav.codex": "ナレッジ",
-    "nav.search": "検索",
     "nav.sitemap": "サイトマップ照合",
     "nav.mana": "トークン",
     "nav.treasury": "予算",
@@ -58,15 +52,11 @@
     "nav.settings": "設定",
     "nav.history": "タスク履歴",
     "nav.watch": "モニタリング",
-
     "route.me.title": "マイダッシュボード",
     "route.hall.title": "概要",
     "route.agents.title": "エージェント",
     "route.quests.title": "タスクボード",
-    "route.world.title": "ワールド状態",
     "route.meeting.title": "ミーティング",
-    "route.codex.title": "ナレッジ",
-    "route.search.title": "検索",
     "route.sitemap.title": "サイトマップ照合",
     "route.mana.title": "トークン",
     "route.treasury.title": "予算",
@@ -83,17 +73,10 @@
     "route.library.title": "コンポーネントライブラリ",
     "route.history.title": "タスク履歴",
     "route.watch.title": "モニタリング",
-
     "viewas.enter": "ユーザー視点で表示…",
     "viewas.hint": "他のメンバーに見える画面をそのままプレビューします",
     "viewas.banner": "プレビュー中:",
     "viewas.exit": "プレビュー終了",
-
-    "world.tab.rooms": "🏠 すべての部屋",
-    "world.tab.templates": "🧰 テンプレート",
-    "world.tab.overview": "📊 概要",
-    "world.tab.chat": "👔 グループチャット（全部屋）",
-
     "settings.model": "🤖 AIモデル",
     "settings.model.hint": "マッチング・分析を支援するモデル",
     "settings.modelOpt.none": "AIなし（ルールベース）",
@@ -109,7 +92,6 @@
     "settings.apiKey": "🔑 APIキー",
     "settings.apiKey.hint": "Cloud API / MCP 用",
     "settings.apiKeyPh": "（あれば）",
-
     "login.tagline": "続行するにはサインイン",
     "login.title": "サインイン",
     "login.reset.title": "パスワードをリセット",

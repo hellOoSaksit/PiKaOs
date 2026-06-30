@@ -13,9 +13,19 @@
    default ทั้งภาษาและ lexicon มาจาก flag isDefaultLanguage/isDefaultLexicon ในไฟล์ (English + Formal) — ไม่ hardcode */
 import React from 'react';
 
-/* ---- scan localization files (Vite glob — the preview bundler inlines this) ---- */
+/* ---- scan localization files (Vite glob — the preview bundler inlines this) ----
+   Two sources, both auto-discovered:
+     • Core/Base packs        ../data/i18n/<lang>-<lexicon>.json   (carry meta + default flags)
+     • per-PLUGIN packs       ../plugins/<id>/i18n/<lang>-<lexicon>.json   (translations only)
+   A plugin pack only needs { languageCode, lexiconCode, translations } — its keys are MERGED onto
+   the matching Base pack at load. Remove a plugin (delete its folder) and its i18n simply isn't
+   discovered, so a Base-only build carries none of the plugin's strings — same removability the
+   route/nav seam gives, now for translations too (plugin-architecture.md §6, Phase 6b). */
 const _i18nModules = import.meta.glob('../data/i18n/*.json', { eager: true });
-const _i18nFiles = Object.values(_i18nModules).map(m => (m && m.default) ? m.default : m).filter(Boolean);
+const _pluginI18nModules = import.meta.glob('../plugins/*/i18n/*.json', { eager: true });
+const _unwrap = (mods) => Object.values(mods).map(m => (m && m.default) ? m.default : m).filter(Boolean);
+const _i18nFiles = _unwrap(_i18nModules);
+const _pluginI18nFiles = _unwrap(_pluginI18nModules);
 
 /* ---- registry I18N_PACKS[languageCode][lexiconCode] = translations ---- */
 const I18N_PACKS = {};
@@ -31,6 +41,14 @@ for (const f of _i18nFiles) {
   _lexName[lang + ":" + lex] = f.lexiconName || lex;
   if (f.isDefaultLanguage) DEFAULT_LANG = lang;
   if (f.isDefaultLanguage && f.isDefaultLexicon) DEFAULT_STYLE = lex;   // master = en + formal
+}
+
+// Merge each enabled plugin's keys onto the matching Base pack (Base packs already created above).
+for (const f of _pluginI18nFiles) {
+  const lang = f.languageCode, lex = f.lexiconCode;
+  if (!lang || !lex || !f.translations) continue;
+  const byLang = (I18N_PACKS[lang] = I18N_PACKS[lang] || {});
+  byLang[lex] = Object.assign(byLang[lex] || {}, f.translations);
 }
 DEFAULT_LANG = DEFAULT_LANG || Object.keys(I18N_PACKS)[0] || "en";
 DEFAULT_STYLE = DEFAULT_STYLE || Object.keys(I18N_PACKS[DEFAULT_LANG] || {})[0] || "formal";
