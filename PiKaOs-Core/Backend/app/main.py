@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import modules
-from .config import settings
+from .core.config import settings
 
 # uvicorn configures this logger with a handler, so the line actually prints in the web log
 # (a bare "pikaos.app" logger would propagate to a root with no INFO handler and be swallowed).
@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
 
     # ensure the MinIO bucket exists on boot (best-effort)
     try:
-        from . import storage
+        from .core import storage
 
         storage.ensure_bucket()
     except Exception as exc:  # pragma: no cover - infra not ready yet

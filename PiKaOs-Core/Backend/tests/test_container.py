@@ -1,7 +1,7 @@
 """DI container unit tests (plugin-architecture.md §5). Pure — no DB, sync."""
 from __future__ import annotations
 
-from app.container import Container
+from app.core.container import Container
 
 
 def test_bind_instance_and_resolve():

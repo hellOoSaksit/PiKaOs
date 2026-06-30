@@ -12,8 +12,8 @@ import json
 
 import pytest
 
-from app import redis_client, security
-from app.routers import ws as wsmod
+from app.core import redis_client, security
+from app.core.routers import ws as wsmod
 
 
 class _OneShotWS:

@@ -14,7 +14,7 @@ import os
 import httpx
 import pytest
 
-from app.config import settings
+from app.core.config import settings
 
 BASE = os.environ.get("TEST_BASE_URL", "http://localhost:8000")
 PW = settings.seed_password

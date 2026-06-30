@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 from redis.exceptions import ConnectionError as RedisConnectionError
 
-from app import redis_client
+from app.core import redis_client
 
 
 class _DeadRedis:

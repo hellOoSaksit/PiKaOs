@@ -17,15 +17,16 @@ import logging
 from arq import func
 from arq.connections import RedisSettings
 
-from . import contracts, modules, plugin_loader
-from .config import settings
-from .container import Container
-from .db import SessionLocal
-from .events import EventBus
-from .logging_ctx import configure_worker_logging
-from .services import agent_runner
-from .services.engine_stubs import StubToolRegistry
-from .services.llm_config_service import ConfiguredLLMProvider
+from . import modules, plugin_loader
+from .core import contracts
+from .core.config import settings
+from .core.container import Container
+from .core.db import SessionLocal
+from .core.events import EventBus
+from .core.logging_ctx import configure_worker_logging
+from .core.services import agent_runner
+from .core.services.engine_stubs import StubToolRegistry
+from .core.services.llm_config_service import ConfiguredLLMProvider
 
 log = logging.getLogger("pikaos.worker")
 

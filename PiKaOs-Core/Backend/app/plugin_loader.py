@@ -20,7 +20,7 @@ from pathlib import Path
 
 from fastapi import APIRouter
 
-from .config import settings
+from .core.config import settings
 
 PLUGINS_DIR = Path(__file__).parent / "plugins"
 _ID_RE = re.compile(r"^[a-z][a-z0-9-]*$")

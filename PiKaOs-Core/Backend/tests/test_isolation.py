@@ -13,7 +13,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from app import modules
-from app.config import settings
+from app.core.config import settings
 
 BASE_PATH = "/api/health"            # infra (Base) — must exist in every build
 KNOWLEDGE_PREFIX = "/api/knowledge"  # the knowledge plugin's namespaced routes

@@ -7,10 +7,10 @@ from __future__ import annotations
 
 import uuid
 
-from ...config import settings
-from ...db import SessionLocal
-from ...services.embeddings import get_embedder  # Base shared infra (used by db/models/config too)
-from ...services.llm_config_service import ConfiguredLLMProvider
+from ...core.config import settings
+from ...core.db import SessionLocal
+from ...core.services.embeddings import get_embedder  # Base shared infra (used by db/models/config too)
+from ...core.services.llm_config_service import ConfiguredLLMProvider
 from . import ingestion_service
 
 

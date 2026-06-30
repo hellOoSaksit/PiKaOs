@@ -16,26 +16,14 @@ root_package = app
 [importlinter:contract:core-must-not-import-plugins]
 name = Core (Base) must not import any plugin (§2.1)
 type = forbidden
+# app.core = the whole Base subpackage (Phase 1b moved infra + the core/engine layers under app/core/);
+# app.{main,worker,modules,plugin_loader} = the composition seam at the app root (the future PiKaOs-App).
 source_modules =
     app.main
     app.worker
-    app.config
-    app.contracts
-    app.container
-    app.events
-    app.db
-    app.deps
-    app.models
-    app.schemas
-    app.storage
-    app.crypto
-    app.security
-    app.queue
-    app.redis_client
-    app.logging_ctx
-    app.routers
-    app.services
-    app.repositories
+    app.modules
+    app.plugin_loader
+    app.core
 forbidden_modules =
     app.plugins
 

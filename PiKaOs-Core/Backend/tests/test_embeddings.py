@@ -13,8 +13,8 @@ import math
 
 import httpx
 
-from app.config import settings
-from app.services.embeddings import OllamaEmbedder, StubEmbedder, get_embedder
+from app.core.config import settings
+from app.core.services.embeddings import OllamaEmbedder, StubEmbedder, get_embedder
 
 
 # --- StubEmbedder -----------------------------------------------------------

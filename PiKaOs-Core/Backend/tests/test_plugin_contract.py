@@ -15,10 +15,11 @@ from __future__ import annotations
 
 import inspect
 
-from app import contracts, modules, plugin_loader
-from app.container import Container
-from app.events import EventBus
-from app.services.agent_runner import Retriever
+from app import modules, plugin_loader
+from app.core import contracts
+from app.core.container import Container
+from app.core.events import EventBus
+from app.core.services.agent_runner import Retriever
 
 
 def _ctx() -> plugin_loader.PluginContext:

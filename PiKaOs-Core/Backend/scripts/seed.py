@@ -13,10 +13,10 @@ import asyncio
 
 from sqlalchemy import select
 
-from app.config import settings
-from app.db import SessionLocal
-from app.models import Permission, Role, RolePerm, User, UserPerm
-from app.security import hash_password
+from app.core.config import settings
+from app.core.db import SessionLocal
+from app.core.models import Permission, Role, RolePerm, User, UserPerm
+from app.core.security import hash_password
 
 SEED_USERS = [
     dict(username="somchai", display="สมชาย วีรกุล", email="somchai@guildos.io", role="admin",   status="active",    quota=500000, period="weekly",  used=318400, avatar="🧙"),

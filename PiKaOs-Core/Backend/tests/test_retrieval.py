@@ -14,14 +14,14 @@ import uuid
 from sqlalchemy import delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.config import settings
-from app.db import register_pgvector
-from app.models import Department, Document, User, UserDepartment
+from app.core.config import settings
+from app.core.db import register_pgvector
+from app.core.models import Department, Document, User, UserDepartment
 from app.plugins.knowledge import doc_chunks as chunks_repo
 from app.plugins.knowledge import documents as docs_repo
-from app.security import hash_password
+from app.core.security import hash_password
 from app.plugins.knowledge import retrieval_service as rs
-from app.services.embeddings import StubEmbedder
+from app.core.services.embeddings import StubEmbedder
 
 
 # --- pure helpers ---------------------------------------------------------

@@ -20,12 +20,12 @@ import logging
 
 import uuid
 
-from ... import storage
-from ...config import settings
+from ...core import storage
+from ...core.config import settings
 from . import doc_chunks as chunks_repo
 from . import documents as docs_repo
 from . import chunking, converters, summarize_service
-from ...services.embeddings import Embedder
+from ...core.services.embeddings import Embedder
 
 log = logging.getLogger("pikaos.engine.ingest")
 

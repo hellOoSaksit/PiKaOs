@@ -18,9 +18,9 @@ from redis.exceptions import RedisError
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.config import settings
-from app.models import Department, Quest, User, UserDepartment
-from app.services import events, quest_service
+from app.core.config import settings
+from app.core.models import Department, Quest, User, UserDepartment
+from app.core.services import events, quest_service
 
 
 # --- serialize / cap (pure) -------------------------------------------------
@@ -147,7 +147,7 @@ def test_can_view_department_member():
 def test_backfill_rejects_foreign_run():
     owner = _user()
     qa, qb = uuid.uuid4(), uuid.uuid4()
-    from app.models import Run
+    from app.core.models import Run
 
     async def scen(db, Session):
         db.add(owner)

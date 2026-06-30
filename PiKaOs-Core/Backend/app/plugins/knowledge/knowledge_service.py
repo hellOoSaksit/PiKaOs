@@ -18,11 +18,11 @@ import asyncio
 import re
 import uuid
 
-from ... import storage
-from ...models import Document, User
+from ...core import storage
+from ...core.models import Document, User
 from . import doc_chunks as chunks_repo
 from . import documents as docs_repo
-from ...services.embeddings import Embedder
+from ...core.services.embeddings import Embedder
 
 
 class NotFound(Exception):

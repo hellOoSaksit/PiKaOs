@@ -10,7 +10,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from app import modules
-from app.config import settings
+from app.core.config import settings
 
 
 def test_star_enables_all_plugins_empty_is_base_only(monkeypatch):

@@ -7,7 +7,7 @@ no server or network.
 """
 from __future__ import annotations
 
-from app.config import Settings
+from app.core.config import Settings
 
 _SAFE = dict(
     jwt_secret="a-strong-unique-secret-value-123456",

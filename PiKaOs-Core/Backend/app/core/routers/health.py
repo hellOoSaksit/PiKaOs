@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import modules, redis_client, storage
+from .. import redis_client, storage
+from ... import modules  # composition seam (app/modules.py) — the plugin registry, lives above Core
 from ..config import settings
 from ..db import get_db
 from ..schemas import HealthOut, PluginHealth, VersionOut

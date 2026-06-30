@@ -12,7 +12,7 @@ import json
 
 import httpx
 
-from app.services.llm_anthropic import (
+from app.core.services.llm_anthropic import (
     AnthropicProvider,
     parse_anthropic_response,
     to_anthropic,

@@ -15,9 +15,9 @@ from dataclasses import dataclass
 from fastapi import APIRouter, FastAPI
 
 from . import plugin_loader
-from .config import settings
-from .routers import auth, health, llm_config, settings_config, ws
-from .routers import storage as storage_router
+from .core.config import settings
+from .core.routers import auth, health, llm_config, settings_config, ws
+from .core.routers import storage as storage_router
 
 
 @dataclass(frozen=True)

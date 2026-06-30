@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 
-from app.logging_ctx import RunContextFilter, bind_run, configure_worker_logging, reset_run
+from app.core.logging_ctx import RunContextFilter, bind_run, configure_worker_logging, reset_run
 
 
 def _record() -> logging.LogRecord:

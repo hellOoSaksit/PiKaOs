@@ -27,13 +27,13 @@ import uuid
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.config import settings
-from app.models import Agent, Quest, Run, User
-from app.repositories import runs as runs_repo
-from app.repositories import stub_tools as stub_repo
-from app.repositories import users as users_repo
-from app.services import agent_runner, quest_service
-from app.services.agent_runner import EFFECT_READ, EFFECT_SIDE_EFFECT, LLMResult
+from app.core.config import settings
+from app.core.models import Agent, Quest, Run, User
+from app.core.repositories import runs as runs_repo
+from app.core.repositories import stub_tools as stub_repo
+from app.core.repositories import users as users_repo
+from app.core.services import agent_runner, quest_service
+from app.core.services.agent_runner import EFFECT_READ, EFFECT_SIDE_EFFECT, LLMResult
 
 
 class _Crash(BaseException):

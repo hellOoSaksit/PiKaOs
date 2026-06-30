@@ -10,9 +10,9 @@ import uuid
 from sqlalchemy import delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.config import settings
-from app.models import User, UserSetting
-from app.repositories import user_settings as repo
+from app.core.config import settings
+from app.core.models import User, UserSetting
+from app.core.repositories import user_settings as repo
 
 
 def test_user_settings_scoped_per_user_and_upsert():

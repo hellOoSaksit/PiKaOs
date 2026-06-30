@@ -1,7 +1,7 @@
 """Event Bus unit tests (plugin-architecture.md §5/§8). Pure — no DB. (asyncio_mode=auto, no decorator.)"""
 from __future__ import annotations
 
-from app.events import EventBus
+from app.core.events import EventBus
 
 
 async def test_subscribers_receive_in_registration_order():

@@ -15,8 +15,8 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from app import deps
-from app.services.rbac_service import resolve_perms
+from app.core import deps
+from app.core.services.rbac_service import resolve_perms
 
 CATALOG = {"agent.create", "quest.run", "audit.view", "user.manage", "room.build"}
 

@@ -22,7 +22,7 @@ def register(ctx) -> None:
     """Bind this plugin's provided contract — `knowledge.Retriever` (manifest `provides`) — into the DI
     container. The engine resolves it at worker startup; neither side imports the other (§5). Imported
     lazily so merely listing the plugin never drags the impl in until it's actually wired."""
-    from ...contracts import RETRIEVER
+    from ...core.contracts import RETRIEVER
     from .retriever import KnowledgeRetriever
 
     ctx.container.bind(RETRIEVER, KnowledgeRetriever())
