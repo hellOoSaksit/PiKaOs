@@ -138,6 +138,7 @@ const NAV = [
       { id: "roles", icon: "🔑", label: "บทบาทและสิทธิ์", en: "Roles & Access", perm: "role.manage" },
     ]},
     { id: "audit", icon: "📋", label: "บันทึกการตรวจสอบ", en: "Audit Log", perm: "audit.view" },
+    { id: "modules", icon: "🧩", label: "โมดูล / ปลั๊กอิน", en: "Modules / Plugins", perm: "plugins.manage" },
     { id: "settings", icon: "⚙️", label: "ตั้งค่าระบบ", en: "Settings" },
     { id: "history", icon: "🗂️", label: "ประวัติงาน", en: "Quest Log" },
     { id: "watch", icon: "🛡️", label: "ระบบเฝ้าระวัง", en: "Watchtower" },

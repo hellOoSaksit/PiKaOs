@@ -13,6 +13,7 @@ import { CharacterBuilder } from './screens/screens-builder.jsx';
 import { Chronicle, Mana, QuestLog, Settings, Treasury, Watchtower } from './screens/screens-extra.jsx';
 import { Login } from './screens/Login.jsx';
 import { MyDashboard } from './screens/screens-me.jsx';
+import { PluginsManager } from './screens/screens-plugins.jsx';
 import { AuditLog, PermissionsCatalog, RolesPermissions, UserDetail, UserForm } from './screens/screens-rbac.jsx';
 import { AgentDrawer, Agents, Meeting, QuestBoard, QuestDrawer } from './screens/screens-secondary.jsx';
 import { SitemapAudit } from './screens/screens-sitemap.jsx';
@@ -48,6 +49,7 @@ const ROUTE_META = {
   roles:   { icon: "🔑", title: "บทบาทและสิทธิ์", en: "Roles & Access" },
   workflows: { icon: "⚗️", title: "เวิร์กโฟลว์", en: "Workflows" },
   audit:   { icon: "📋", title: "บันทึกการตรวจสอบ", en: "Audit Log" },
+  modules: { icon: "🧩", title: "โมดูล / ปลั๊กอิน", en: "Modules / Plugins" },
   userDetail: { icon: "👤", title: "ข้อมูลสมาชิก", en: "User" },
   settings:{ icon: "⚙️", title: "ตั้งค่าระบบ", en: "Settings" },
   library: { icon: "🧩", title: "คลังคอมโพเนนต์", en: "Component Library" },
@@ -615,6 +617,7 @@ function App() {
       case "roles": return guard("role.manage", <RolesPermissions Sys={Sys} />);
       case "permissions": return guard("user.view.any", <PermissionsCatalog Sys={Sys} />);
       case "audit": return guard("audit.view", <AuditLog Sys={Sys} />);
+      case "modules": return guard("plugins.manage", <PluginsManager Sys={Sys} />);
       case "workflows": return <Workflows Sys={Sys} />;
       case "settings": return <Settings theme={theme} setTheme={setTheme} lex={lex} setLex={setLex} pickLanguage={pickLanguage} language={language} formal={formal} go={go} t={t} />;
       case "library": return <ComponentLibrary onBack={() => go("settings")} t={t} />;

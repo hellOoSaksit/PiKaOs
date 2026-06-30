@@ -180,3 +180,12 @@ export async function setMySetting(key, value) { return raw(`/settings/me/${key}
 // --- global config blobs (Tools/system settings; same for everyone) ---
 export async function getGlobalConfig(key) { return raw(`/settings/global/${key}`); }                           // { value }
 export async function setGlobalConfig(key, value) { return raw(`/settings/global/${key}`, { method: "PUT", body: { value } }); }  // options.manage
+
+// --- plugins (the install / Modules screen — reads are any authenticated user; mutations need
+// plugins.manage). Mutations return { plugins:[...], restart_required } (restart-to-apply). ---
+export async function listPlugins() { return raw("/plugins"); }
+export async function pluginInstallPlan(id) { return raw(`/plugins/${id}/install-plan`); }                       // {target,order,already_installed,to_install}
+export async function installPlugin(id) { return raw(`/plugins/${id}/install`, { method: "POST" }); }
+export async function enablePlugin(id) { return raw(`/plugins/${id}/enable`, { method: "POST" }); }
+export async function disablePlugin(id) { return raw(`/plugins/${id}/disable`, { method: "POST" }); }
+export async function uninstallPlugin(id) { return raw(`/plugins/${id}`, { method: "DELETE" }); }
