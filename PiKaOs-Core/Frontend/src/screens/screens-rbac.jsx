@@ -8,7 +8,6 @@ import SaveBar from '../components/ui/SaveBar.jsx';
 import { ACTION_META, PERMISSIONS, fmtTok, ownerOf, resolvePerms, roleByKey, usagePct, userById } from '../data/data-users.jsx';
 import { Admin, RoleBadge, StatusPill } from './screens-admin.jsx';
 import { Field } from './screens-builder.jsx';
-import { Codex, Recall } from './screens-extra.jsx';
 import { Agents } from './screens-secondary.jsx';
 
 /* ============================================================

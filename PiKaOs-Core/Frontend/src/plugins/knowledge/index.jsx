@@ -5,15 +5,14 @@
    hardcodes Codex/Recall into App.jsx or data.jsx. Each `render(ctx)` is handed only the Core seams the
    screen needs (t · can · language); the plugin owns the prop wiring.
 
-   Screens still physically live under ../../screens/extra/ and are imported statically — relocating them
-   into this folder (with the plugin's own i18n keys) plus lazy code-splitting is the mechanical Phase 6b
-   follow-up, exactly as the backend split the Loader seam (Phase 1) from the physical core/ move (1b).
-   (Lazy-loading buys a separate chunk only once the Base screens that still embed these components —
-   MyDashboard's Recall, the RBAC screen's Codex/Recall — consume them through the seam too, in 6b.) */
+   The screens now physically live in this folder (codex.jsx · recall.jsx), relocated out of
+   screens/extra/ in Phase 6b. The dead Codex/Recall imports the Base screens (MyDashboard, RBAC)
+   used to carry were dropped at the same time, so nothing in Core reaches into this plugin. A
+   per-plugin i18n pack + lazy code-split remain as later refinements. */
 import React from 'react';
 
-import { Codex } from '../../screens/extra/codex.jsx';
-import { Recall } from '../../screens/extra/recall.jsx';
+import { Codex } from './codex.jsx';
+import { Recall } from './recall.jsx';
 
 export default {
   id: 'knowledge',

@@ -5,7 +5,7 @@ const { useState, useEffect, useRef } = React;
 import { Btn, Empty, HelpNote, PageHead, Panel } from '../../components/components.jsx';
 import { deleteDocument, getDocument, listDocuments, reindexKnowledge, searchKnowledge, uploadDocument } from '../../lib/api.js';
 import { KNOWLEDGE, byId } from '../../data/data.jsx';
-import { Field, Segmented, TagInput } from '../screens-builder.jsx';
+import { Field, Segmented, TagInput } from '../../screens/screens-builder.jsx';
 import { RichBody } from '../../components/doc-editor.jsx';
 
 /* ---------------- CODEX (knowledge) — fully working ---------------- */

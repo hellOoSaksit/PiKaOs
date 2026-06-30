@@ -5,7 +5,6 @@ import { ActivityRow, Btn, Empty, Meter, Panel, QuestCard, RankGem, StatusBadge 
 import { PERMISSIONS, fmtTok, roleByKey, usagePct } from '../data/data-users.jsx';
 import { ACTIVITY, TASKS, byId } from '../data/data.jsx';
 import { RoleBadge } from './screens-admin.jsx';
-import { Recall } from './screens-extra.jsx';
 import { CharacterSprite } from '../components/CharacterSprite.jsx';
 import { World } from './screens-world.jsx';
 
