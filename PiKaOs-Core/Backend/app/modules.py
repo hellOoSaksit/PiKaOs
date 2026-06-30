@@ -10,6 +10,7 @@ the stable public API (`enabled_optional_modules` · `is_module_active` · `acti
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from fastapi import APIRouter, FastAPI
@@ -18,6 +19,13 @@ from . import plugin_loader
 from .core.config import settings
 from .core.routers import auth, health, llm_config, settings_config, ws
 from .core.routers import storage as storage_router
+
+log = logging.getLogger("pikaos.plugins")
+
+# Plugins that were enabled but whose router failed to import/mount in THIS process (§8 fault boundary):
+# Core + the other plugins still serve; /health reports these as "degraded" (§14). Refreshed on every
+# active_modules() call so it always reflects the routers this build actually mounted.
+_DEGRADED: dict[str, str] = {}
 
 
 @dataclass(frozen=True)
@@ -69,20 +77,38 @@ def is_module_active(name: str) -> bool:
 
 def active_modules() -> list[Module]:
     """Modules this build loads: the whole Base + the enabled plugins in **topological order** (each
-    after its dependencies). Plugin routers are imported here — a disabled plugin is never imported."""
+    after its dependencies). Plugin routers are imported here — a disabled plugin is never imported.
+
+    **Fault-isolated (§8):** if an enabled plugin's router fails to import/mount, it is caught, logged,
+    and marked **degraded** — Core and every other plugin still load, with that plugin's routes absent.
+    A broken feature must never take the whole API down."""
+    _DEGRADED.clear()
     mods = list(BASE_MODULES)
     for pid in plugin_loader.topo_order(enabled_optional_modules(), PLUGIN_MANIFESTS):
-        mods.append(Module(name=pid, routers=(plugin_loader.load_router(pid),)))
+        try:
+            mods.append(Module(name=pid, routers=(plugin_loader.load_router(pid),)))
+        except Exception as exc:  # §8 boundary — a bad plugin is degraded, not fatal
+            _DEGRADED[pid] = str(exc)
+            log.exception("plugin '%s' router failed to load — marking degraded, Core continues", pid)
     return mods
 
 
+def _state_of(pid: str, enabled: set[str]) -> str:
+    """A plugin's /health state (§14): **degraded** if it was enabled but failed to mount (§8),
+    **active** if enabled and healthy, else **disabled**."""
+    if pid in _DEGRADED:
+        return "degraded"
+    return "active" if pid in enabled else "disabled"
+
+
 def plugin_states() -> list[dict]:
-    """Each discovered plugin's state for /health (§14): `active` when enabled this build, else `disabled`,
-    with its **version read from the manifest** (never hardcoded → ties to versions.md). Lists every
-    discovered plugin — a disabled one still appears, so an operator sees the full installable surface."""
+    """Each discovered plugin's state for /health (§14): `active` (enabled + healthy) · `degraded`
+    (enabled but its router failed to load, §8) · `disabled` (not enabled this build), with its
+    **version read from the manifest** (never hardcoded → ties to versions.md). Lists every discovered
+    plugin — a disabled one still appears, so an operator sees the full installable surface."""
     enabled = enabled_optional_modules()
     return [
-        {"id": pid, "version": mf.version, "state": "active" if pid in enabled else "disabled"}
+        {"id": pid, "version": mf.version, "state": _state_of(pid, enabled)}
         for pid, mf in sorted(PLUGIN_MANIFESTS.items())
     ]
 

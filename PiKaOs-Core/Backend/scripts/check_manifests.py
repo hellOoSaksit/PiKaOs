@@ -45,6 +45,19 @@ def main() -> int:
             errors.append(f"{folder}: {loc}: {err.message}")
         if raw.get("id") not in (None, folder):
             errors.append(f"{folder}: id '{raw.get('id')}' must equal its folder name")
+        # §11: a declared config schema must exist + itself be a valid Draft-07 JSON Schema.
+        config_schema = (raw.get("config") or {}).get("schema")
+        if config_schema:
+            schema_file = mf.parent / config_schema.lstrip("./")
+            if not schema_file.is_file():
+                errors.append(f"{folder}: config.schema '{config_schema}' not found")
+            else:
+                try:
+                    Draft7Validator.check_schema(json.loads(schema_file.read_text(encoding="utf-8")))
+                except json.JSONDecodeError as e:
+                    errors.append(f"{folder}: config schema is not valid JSON — {e}")
+                except Exception as e:  # jsonschema.SchemaError
+                    errors.append(f"{folder}: config schema is not a valid JSON Schema — {e}")
 
     if errors:
         print(f"✗ {len(errors)} manifest error(s):", file=sys.stderr)

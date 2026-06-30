@@ -14,13 +14,16 @@ from __future__ import annotations
 
 import importlib
 import json
+import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from fastapi import APIRouter
 
 from .core.config import settings
+
+log = logging.getLogger("pikaos.plugins")
 
 PLUGINS_DIR = Path(__file__).parent / "plugins"
 _ID_RE = re.compile(r"^[a-z][a-z0-9-]*$")
@@ -38,10 +41,13 @@ class Manifest:
     version: str
     coreVersion: str
     dependencies: tuple[str, ...] = ()
+    optional_dependencies: tuple[str, ...] = ()
     provides: tuple[str, ...] = ()
     consumes: tuple[str, ...] = ()
     permissions: tuple[str, ...] = ()
     routes: tuple[str, ...] = ()
+    config_schema: str | None = None   # relative path to the plugin's config.schema.json (§11), if any
+    migrations: str | None = None
     raw: dict = field(default_factory=dict)
 
 
@@ -103,11 +109,24 @@ def _validate(folder: str, raw: dict) -> Manifest:
         if f"/{pid}" not in route:
             raise ManifestError(
                 f"plugin '{pid}': route '{route}' is not namespaced with '/{pid}' (§6)")
+    # §11: a declared config schema must exist and be valid JSON — fail fast rather than boot a plugin
+    # whose config contract is missing/broken (full value-validation is the CI gate where jsonschema lives).
+    config_schema = (raw.get("config") or {}).get("schema")
+    if config_schema:
+        schema_path = PLUGINS_DIR / folder / config_schema.lstrip("./")
+        if not schema_path.is_file():
+            raise ManifestError(f"plugin '{pid}': config schema '{config_schema}' not found")
+        try:
+            json.loads(schema_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            raise ManifestError(f"plugin '{pid}': config schema '{config_schema}' is not valid JSON — {e}") from e
     return Manifest(
         id=pid, name=raw["name"], version=raw["version"], coreVersion=raw["coreVersion"],
         dependencies=tuple(raw.get("dependencies", [])),
+        optional_dependencies=tuple(raw.get("optionalDependencies", [])),
         provides=tuple(raw.get("provides", [])), consumes=tuple(raw.get("consumes", [])),
         permissions=tuple(raw.get("permissions", [])), routes=tuple(raw.get("routes", [])),
+        config_schema=config_schema, migrations=raw.get("migrations"),
         raw=raw,
     )
 
@@ -176,19 +195,35 @@ def load_router(plugin_id: str) -> APIRouter:
 # A plugin package MAY export, in addition to `router`:
 #   register(ctx)  — bind its provided contracts into ctx.container (NO cross-plugin calls yet, §10)
 #   boot(ctx)      — subscribe to events / wire listeners, in dependency order (§10)
+#   shutdown(ctx)  — release / flush / deregister, in REVERSE dependency order (§10)
 #   jobs           — a list of arq job callables the worker should run when this plugin is enabled
-# All optional: a pure-router plugin (like knowledge today for routes) needs none of them.
+# All optional: a pure-router plugin (like knowledge today for routes) needs none of them. Every
+# lifecycle call is fault-isolated (§8): a raised exception marks that plugin degraded, never the rest.
 
 
 @dataclass
 class PluginContext:
-    """What a plugin's register()/boot() receives — the Core seams it may use, never each other (§5).
-    `container` for DI, `events` for the bus, `session_factory` for DB sessions, `settings` for config."""
+    """What a plugin's register()/boot()/shutdown() receives — the Core seams it may use, never each
+    other (§5). `container` for DI, `events` for the bus, `session_factory` for DB sessions, `settings`
+    for global config, and `config` = this plugin's own schema-defaulted config block (§11)."""
 
     container: object
     events: object
     session_factory: object = None
     settings: object = None
+    config: dict = field(default_factory=dict)
+
+
+def load_config(manifest: Manifest) -> dict:
+    """This plugin's effective config (§11) = the defaults declared in its `config.schema.json`. Dep-free:
+    reads the top-level `properties.*.default` from the schema (full JSON-Schema *value* validation stays a
+    CI gate, where `jsonschema` is available). No schema declared → `{}`. Config-driven, never hardcoded."""
+    if not manifest.config_schema:
+        return {}
+    path = PLUGINS_DIR / manifest.id / manifest.config_schema.lstrip("./")
+    schema = json.loads(path.read_text(encoding="utf-8"))
+    props = schema.get("properties", {})
+    return {k: v["default"] for k, v in props.items() if isinstance(v, dict) and "default" in v}
 
 
 def _import_enabled(enabled: set[str], manifests: dict[str, Manifest]):
@@ -208,17 +243,69 @@ def collect_jobs(enabled: set[str], manifests: dict[str, Manifest]) -> list:
     return jobs
 
 
-def register_plugins(enabled: set[str], manifests: dict[str, Manifest], ctx: PluginContext) -> list[str]:
+@dataclass
+class LifecycleResult:
+    """Outcome of running the plugin lifecycle. `booted` = plugins whose register()+boot() both
+    succeeded; `degraded` = {plugin id: reason} for those a lifecycle call raised on — the §8 fault
+    boundary keeps one bad plugin from taking down the worker or its siblings."""
+
+    booted: list[str]
+    degraded: dict[str, str]
+
+
+def register_plugins(enabled: set[str], manifests: dict[str, Manifest], ctx: PluginContext) -> LifecycleResult:
     """Run the lifecycle for the enabled plugins (topological): `register()` ALL first (bind contracts),
     then `boot()` ALL (wire listeners) — the kit's two-pass order so a plugin can resolve a sibling's
-    contract in boot() that was bound in any register() (§10). Returns the boot order for logging."""
+    contract in boot() that was bound in any register() (§10).
+
+    **Fault-isolated (§8):** each lifecycle call runs inside a boundary — an exception is caught, logged
+    with the plugin id, and the plugin is marked **degraded** (skipped in the boot pass if its register
+    failed). One plugin's failure never aborts the others' wiring or crashes the worker."""
     loaded = list(_import_enabled(enabled, manifests))
-    for _pid, mod in loaded:
+    degraded: dict[str, str] = {}
+    # each plugin's register/boot sees its own schema-defaulted config block via ctx.config (§11)
+    pctx = {pid: replace(ctx, config=load_config(manifests[pid])) for pid, _ in loaded}
+
+    registered: list[tuple[str, object]] = []
+    for pid, mod in loaded:
         register = getattr(mod, "register", None)
-        if register is not None:
-            register(ctx)
-    for _pid, mod in loaded:
+        if register is None:
+            registered.append((pid, mod))
+            continue
+        try:
+            register(pctx[pid])
+            registered.append((pid, mod))
+        except Exception as exc:  # §8 boundary — never let one plugin abort the others
+            degraded[pid] = f"register: {exc}"
+            log.exception("plugin '%s' register() failed — marking degraded", pid)
+
+    booted: list[str] = []
+    for pid, mod in registered:
         boot = getattr(mod, "boot", None)
         if boot is not None:
-            boot(ctx)
-    return [pid for pid, _ in loaded]
+            try:
+                boot(pctx[pid])
+            except Exception as exc:
+                degraded[pid] = f"boot: {exc}"
+                log.exception("plugin '%s' boot() failed — marking degraded", pid)
+                continue
+        booted.append(pid)
+
+    return LifecycleResult(booted=booted, degraded=degraded)
+
+
+def shutdown_plugins(enabled: set[str], manifests: dict[str, Manifest], ctx: PluginContext) -> dict[str, str]:
+    """Run each enabled plugin's optional `shutdown()` in **reverse dependency order** (§10) — release
+    resources / deregister, so a dependant tears down before the contract it relied on. Fault-isolated
+    like register/boot: a failing shutdown is logged and never blocks the others. Returns {id: error}."""
+    errors: dict[str, str] = {}
+    for pid in reversed(topo_order(enabled, manifests)):
+        try:
+            mod = importlib.import_module(f"app.plugins.{pid}")
+            fn = getattr(mod, "shutdown", None)
+            if fn is not None:
+                fn(replace(ctx, config=load_config(manifests[pid])))
+        except Exception as exc:
+            errors[pid] = str(exc)
+            log.exception("plugin '%s' shutdown() failed", pid)
+    return errors

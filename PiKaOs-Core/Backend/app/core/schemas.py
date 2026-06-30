@@ -69,10 +69,10 @@ class LoginResult(BaseModel):
 
 class PluginHealth(BaseModel):
     """One plugin's state for /health (plugin-architecture.md §14). `version` comes from the plugin's
-    manifest (never hardcoded — ties to versions.md); `state` is active (enabled this build) or disabled."""
+    manifest (never hardcoded — ties to versions.md); `state` is active · degraded · disabled."""
     id: str
     version: str
-    state: str         # active | disabled  (degraded reserved for boot-failure tracking)
+    state: str         # active | degraded (enabled but its router failed to mount, §8) | disabled
 
 
 class HealthOut(BaseModel):

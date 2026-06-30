@@ -52,17 +52,36 @@ async def startup(ctx) -> None:
     container, bus = Container(), EventBus()
     ctx["container"], ctx["bus"] = container, bus  # jobs read these off the arq context
     enabled = modules.enabled_optional_modules()
-    booted = plugin_loader.register_plugins(enabled, modules.PLUGIN_MANIFESTS,
+    result = plugin_loader.register_plugins(enabled, modules.PLUGIN_MANIFESTS,
                                             plugin_loader.PluginContext(container=container, events=bus,
                                                                         session_factory=SessionLocal,
                                                                         settings=settings))
+    if result.degraded:  # §8 — a plugin whose register/boot raised; the worker stays up
+        log.warning("plugins degraded (lifecycle failed, others unaffected): %s", result.degraded)
 
     # The engine consumes RAG only through the contract — never an import. Unresolved (no knowledge) → None.
     retriever = container.resolve(contracts.RETRIEVER)
     agent_runner.set_engine_runtime(ConfiguredLLMProvider(), StubToolRegistry(), retriever=retriever)
     log.info("pikaos worker up — structured logging on · engine runtime: DB-configured LLM "
-             "(env fallback: %s) + stub tools · plugins booted: %s · RAG retriever: %s",
-             settings.llm_provider, booted or "(none)", "on" if retriever else "off")
+             "(env fallback: %s) + stub tools · plugins booted: %s · degraded: %s · RAG retriever: %s",
+             settings.llm_provider, result.booted or "(none)", result.degraded or "(none)",
+             "on" if retriever else "off")
+
+
+async def shutdown(ctx) -> None:
+    """Tear the plugin tier down in reverse dependency order (§10) when the worker stops — fault-isolated,
+    so a misbehaving shutdown() never blocks the rest. Rebuilds the PluginContext from the container + bus
+    stashed on the arq context at startup."""
+    container, bus = ctx.get("container"), ctx.get("bus")
+    if container is None:  # startup never completed — nothing to tear down
+        return
+    enabled = modules.enabled_optional_modules()
+    errors = plugin_loader.shutdown_plugins(enabled, modules.PLUGIN_MANIFESTS,
+                                            plugin_loader.PluginContext(container=container, events=bus,
+                                                                        session_factory=SessionLocal,
+                                                                        settings=settings))
+    if errors:
+        log.warning("plugin shutdown errors (ignored): %s", errors)
 
 
 def _active_functions() -> list:
@@ -78,4 +97,5 @@ class WorkerSettings:
 
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
     on_startup = startup
+    on_shutdown = shutdown
     functions = _active_functions()
