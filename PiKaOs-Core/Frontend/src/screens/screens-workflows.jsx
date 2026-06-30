@@ -8,7 +8,7 @@ import { Field } from './screens-builder.jsx';
 import { Select } from '../components/ui/Dropdown.jsx';
 
 /* ============================================================
-   WORKFLOWS · "โต๊ะปรุงเวท" (Activepieces) — §4.7
+   WORKFLOWS · "เวิร์กโฟลว์" (Activepieces) — §4.7
    - workflow list (enable/disable, run)
    - run modal: builds a form from input_schema → simulated webhook → tool_run
    - tool_runs history: status, input/output/error, filter by agent/quest/status
@@ -131,7 +131,7 @@ function BuilderCanvas({ Sys, wf, onClose }) {
         <div className="builder-head" style={{ padding: "16px 20px", borderBottom: "1px solid var(--line)" }}>
           <span className="ph-icon" style={{ fontSize: 20 }}>{wf.icon}</span>
           <div>
-            <div className="kicker">{T("Spellcraft table · embedded editor", "โต๊ะปรุงเวท · ตัวแก้ไขฝังตัว")}</div>
+            <div className="kicker">{T("Spellcraft table · embedded editor", "เวิร์กโฟลว์ · ตัวแก้ไขฝังตัว")}</div>
             <h2 style={{ fontFamily: "var(--font-head)", fontSize: 19, margin: "2px 0 0", color: "var(--ink)" }}>{T(wf.nameEn, wf.name)}</h2>
           </div>
           <button className="drawer-close" onClick={onClose} style={{ marginLeft: "auto" }}>✕</button>
@@ -229,13 +229,13 @@ function Workflows({ Sys }) {
 
   return (
     <div className="content-pad fade-in">
-      <PageHead kicker={T("Automation · Workflows", "ระบบอัตโนมัติ · เวิร์กโฟลว์")} title={T("Workflows", "โต๊ะปรุงเวท")} tag="local"
+      <PageHead kicker={T("Automation · Workflows", "ระบบอัตโนมัติ · เวิร์กโฟลว์")} title={T("Workflows", "เวิร์กโฟลว์")} tag="local"
         desc={T("Reusable automations agents can cast — built in Activepieces, triggered by webhook, schedule or an agent. Every run is logged below.",
                 "ชุดงานอัตโนมัติที่ agent เรียกใช้ได้ — สร้างด้วย Activepieces ทริกเกอร์ผ่าน webhook ตามเวลา หรือให้ agent เรียก · ทุกการรันถูกบันทึกด้านล่าง")}
         actions={manage ? <Btn kind="gold" sm icon="➕" onClick={() => setBuildWf(workflows[0])}>{T("New workflow", "สร้างเวิร์กโฟลว์")}</Btn> : <span className="perm-hint mono">{T("run only", "รันได้อย่างเดียว")}</span>} />
 
       <HelpNote tag="local">{T("Toggle a workflow on/off, run it with inputs (a tool_run is recorded), or open the spellcraft table to view its step graph. Runs and toggles are saved on your device.",
-        "เปิด/ปิดเวิร์กโฟลว์ รันพร้อมป้อนข้อมูล (จะบันทึกเป็น tool_run) หรือเปิดโต๊ะปรุงเวทเพื่อดูผังขั้นตอน · การรันและสถานะถูกบันทึกในเครื่อง")}</HelpNote>
+        "เปิด/ปิดเวิร์กโฟลว์ รันพร้อมป้อนข้อมูล (จะบันทึกเป็น tool_run) หรือเปิดเวิร์กโฟลว์เพื่อดูผังขั้นตอน · การรันและสถานะถูกบันทึกในเครื่อง")}</HelpNote>
 
       <div className="grid cols-4 stagger" style={{ margin: "16px 0 18px" }}>
         <StatTile label={T("Workflows", "เวิร์กโฟลว์")} value={workflows.length} unit={T("flows", "ชุด")} icon="⚗️" />

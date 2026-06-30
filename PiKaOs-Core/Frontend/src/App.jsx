@@ -37,29 +37,29 @@ const I18N_DEFAULT_PACK = (LEX_PACKS.find(p => p.lang === DEFAULT_LANG && p.styl
 
 const ROUTE_META = {
   me:      { icon: "🧭", title: "แดชบอร์ดของฉัน", en: "My Dashboard" },
-  hall:    { icon: "🏰", title: "ห้องกิลด์", en: "Guild Hall" },
-  agents:  { icon: "🎭", title: "เหล่านักผจญภัย", en: "Adventurers" },
-  quests:  { icon: "📜", title: "กระดานภารกิจ", en: "Quest Board" },
+  hall:    { icon: "🏰", title: "ภาพรวมระบบ", en: "Guild Hall" },
+  agents:  { icon: "🎭", title: "เหล่าเอเจนต์", en: "Adventurers" },
+  quests:  { icon: "📜", title: "กระดานงาน", en: "Quest Board" },
   world:   { icon: "🌍", title: "สถานะโลก", en: "World State" },
   meeting: { icon: "💬", title: "ห้องประชุม Agent", en: "Council" },
   sitemap: { icon: "🗺️", title: "ตรวจไซต์แมพ", en: "Sitemap Match" },
-  mana:    { icon: "🔵", title: "มานา (Token)", en: "Mana" },
-  treasury:{ icon: "💰", title: "คลังสมบัติ", en: "Treasury" },
-  stats:   { icon: "📊", title: "สถิติการผจญภัย", en: "Chronicle" },
+  mana:    { icon: "🔵", title: "โทเคน (Token)", en: "Mana" },
+  treasury:{ icon: "💰", title: "งบประมาณ", en: "Treasury" },
+  stats:   { icon: "📊", title: "สถิติการทำงาน", en: "Chronicle" },
   admin:   { icon: "👥", title: "จัดการผู้ใช้", en: "User Management" },
   toolsmgr:{ icon: "🧰", title: "จัดการเครื่องมือ", en: "Tools" },
   roles:   { icon: "🔑", title: "บทบาทและสิทธิ์", en: "Roles & Access" },
-  workflows: { icon: "⚗️", title: "โต๊ะปรุงเวท", en: "Workflows" },
+  workflows: { icon: "⚗️", title: "เวิร์กโฟลว์", en: "Workflows" },
   audit:   { icon: "📋", title: "บันทึกการตรวจสอบ", en: "Audit Log" },
   userDetail: { icon: "👤", title: "ข้อมูลสมาชิก", en: "User" },
-  settings:{ icon: "⚙️", title: "ตั้งค่ากิลด์", en: "Settings" },
+  settings:{ icon: "⚙️", title: "ตั้งค่าระบบ", en: "Settings" },
   library: { icon: "🧩", title: "คลังคอมโพเนนต์", en: "Component Library" },
-  history: { icon: "🗂️", title: "ประวัติภารกิจ", en: "Quest Log" },
+  history: { icon: "🗂️", title: "ประวัติงาน", en: "Quest Log" },
   watch:   { icon: "🛡️", title: "ระบบเฝ้าระวัง", en: "Watchtower" },
   ...PLUGIN_ROUTE_META,   // plugin routes contribute their own topbar metadata (Phase 6 seam)
 };
 
-const NAV_GROUP_KEY = { "ศูนย์บัญชาการ": "command", "ความรู้และความทรงจำ": "knowledge", "ทรัพยากร": "resources", "ผู้ดูแลกิลด์": "admin" };
+const NAV_GROUP_KEY = { "ศูนย์บัญชาการ": "command", "ความรู้และความทรงจำ": "knowledge", "ทรัพยากร": "resources", "ผู้ดูแลระบบ": "admin" };
 
 // does this node, or any descendant, match the current route? → keep that branch expanded
 function navContains(node, route) {

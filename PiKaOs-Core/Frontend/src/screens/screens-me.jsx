@@ -127,7 +127,7 @@ function FocusQuest({ q, T, onOpen }) {
           </div>
           {lead && <span className="muted" style={{ fontSize: 12 }}>{T("Lead", "นำโดย")} · {lead.name.split(" ")[0]}</span>}
           <span className="fq-reward" style={{ marginLeft: "auto" }}>◈ <b>{q.reward.toLocaleString()}</b></span>
-          <Btn kind="gold" sm onClick={onOpen}>{T("Open quest", "เปิดเควส")}</Btn>
+          <Btn kind="gold" sm onClick={onOpen}>{T("Open quest", "เปิดงาน")}</Btn>
         </div>
       </div>
     </div>

@@ -25,7 +25,7 @@ function LiveChat({ seed = CHAT, compact = false }) {
   useEffect(() => {
     const replies = [
       { who: "a5", text: "test suite ผ่าน 142/146 — มี 4 เคสที่เกี่ยวกับ token expiry ขอให้ช่างดูอีกที" },
-      { who: "a6", text: "พบงานวิจัยที่ชี้ว่า hybrid + rerank ดีกว่า ~14% บนชุดข้อมูลกิลด์ จะสรุปเข้าคลังความรู้" },
+      { who: "a6", text: "พบงานวิจัยที่ชี้ว่า hybrid + rerank ดีกว่า ~14% บนชุดข้อมูลองค์กร จะสรุปเข้าคลังความรู้" },
       { who: "a4", text: "ปรับ diagram แล้ว เพิ่ม flow สำหรับ social login ตามที่อ้อยเสนอ" },
     ];
     let i = 0;
@@ -58,7 +58,7 @@ function LiveChat({ seed = CHAT, compact = false }) {
       <div className="chat-input">
         <input value={draft} onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
-          placeholder="สั่งการสภากิลด์ในนามผู้นำ…" />
+          placeholder="สั่งการห้องประชุมกลางในนามผู้นำ…" />
         <Btn kind="gold" sm onClick={send}>ส่ง</Btn>
       </div>
     </div>
@@ -68,7 +68,7 @@ function nowTime() { const d = new Date(); return `${String(d.getHours()).padSta
 
 /* ---------------- PIXEL FLOORPLAN (characters walk) ---------------- */
 const FLOOR_ROOMS = [
-  { th: "ห้องสภา", en: "COUNCIL", x: 5, y: 9, w: 43, h: 40 },
+  { th: "ห้องที่ประชุม", en: "COUNCIL", x: 5, y: 9, w: 43, h: 40 },
   { th: "คลังความรู้", en: "CODEX VAULT", x: 52, y: 8, w: 43, h: 36 },
   { th: "ลานฝึก", en: "TRAINING YARD", x: 6, y: 54, w: 40, h: 40 },
   { th: "โรงตีเหล็ก", en: "FORGE", x: 52, y: 50, w: 43, h: 44 },
@@ -115,7 +115,7 @@ function FloorMap({ chars, height = 220, big = false, onAgent }) {
         <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", textAlign: "center" }}>
           <div>
             <div style={{ fontSize: 30, opacity: .5 }}>🏰</div>
-            <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>หอคอยยังว่างเปล่า — เรียกนักผจญภัยมาประจำการ</div>
+            <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>ยังไม่มีเอเจนต์ — เพิ่มเอเจนต์เพื่อเริ่มงาน</div>
           </div>
         </div>
       )}
@@ -139,19 +139,19 @@ function AlertsPanel({ chars, go }) {
   const usedPct = Math.round((MANA.cap - MANA.balance) / MANA.cap * 100);
   const base = [];
   if (usedPct >= 55) base.push({ id: "mana", sev: usedPct >= 80 ? "critical" : "warn", icon: "🔵",
-    title: "มานาใกล้เต็มเพดาน", detail: `ใช้ไปแล้ว ${usedPct}% ของเพดานวันนี้ · เผา ${MANA.burnRate}/ชม.`, time: "เมื่อสักครู่", to: "mana" });
+    title: "โทเคนใกล้เต็มเพดาน", detail: `ใช้ไปแล้ว ${usedPct}% ของเพดานวันนี้ · เผา ${MANA.burnRate}/ชม.`, time: "เมื่อสักครู่", to: "mana" });
   const failed = QUESTS.filter(q => q.status === "failed").length;
-  if (failed) base.push({ id: "failed", sev: "critical", icon: "⚠️", title: "เควสล้มเหลว",
-    detail: `${failed} เควสไม่สำเร็จ ต้องตรวจสอบ`, time: "5 นาที", to: "history" });
+  if (failed) base.push({ id: "failed", sev: "critical", icon: "⚠️", title: "งานล้มเหลว",
+    detail: `${failed} งานไม่สำเร็จ ต้องตรวจสอบ`, time: "5 นาที", to: "history" });
   const queued = QUESTS.filter(q => q.status === "queued").length;
-  if (queued) base.push({ id: "queued", sev: "warn", icon: "📜", title: "เควสรอเริ่มงาน",
-    detail: `${queued} เควสอยู่ในคิว ยังไม่ได้มอบหมาย`, time: "12 นาที", to: "quests" });
+  if (queued) base.push({ id: "queued", sev: "warn", icon: "📜", title: "งานรอเริ่มงาน",
+    detail: `${queued} งานอยู่ในคิว ยังไม่ได้มอบหมาย`, time: "12 นาที", to: "quests" });
   const review = QUESTS.filter(q => q.status === "review").length;
   if (review) base.push({ id: "review", sev: "info", icon: "🔍", title: "รอตรวจผลงาน",
-    detail: `${review} เควสเสร็จแล้ว รอการตรวจรับ`, time: "20 นาที", to: "history" });
+    detail: `${review} งานเสร็จแล้ว รอการตรวจรับ`, time: "20 นาที", to: "history" });
   const away = chars.filter(a => a.status === "away" || a.status === "idle").length;
-  if (away) base.push({ id: "away", sev: "info", icon: "🎭", title: "นักผจญภัยไม่พร้อมรบ",
-    detail: `${away} คนกำลังพักหรือออกเดินทาง`, time: "30 นาที", to: "agents" });
+  if (away) base.push({ id: "away", sev: "info", icon: "🎭", title: "เอเจนต์ไม่พร้อมรบ",
+    detail: `${away} คนกำลังพักหรือไม่อยู่`, time: "30 นาที", to: "agents" });
 
   const alerts = base.filter(a => !dismissed.includes(a.id));
   const crit = alerts.filter(a => a.sev === "critical").length;

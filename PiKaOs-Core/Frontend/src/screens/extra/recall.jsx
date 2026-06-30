@@ -12,7 +12,7 @@ const RECALL_CONCEPTS = [
   ["security", ["token", "auth", "login", "เข้าสู่ระบบ", "ความปลอดภัย", "รั่ว", "refresh", "ปลอดภัย", "credential"]],
   ["rag",      ["retrieval", "ค้นหา", "ค้นคืน", "vector", "embedding", "hybrid", "rerank", "semantic", "ความหมาย"]],
   ["test",     ["test", "ทดสอบ", "qa", "คุณภาพ", "bug", "บั๊ก", "regression", "edge case"]],
-  ["onboard",  ["onboarding", "เริ่มต้น", "นักผจญภัยใหม่", "สมาชิกใหม่", "เข้าร่วม", "มือใหม่"]],
+  ["onboard",  ["onboarding", "เริ่มต้น", "เอเจนต์ใหม่", "สมาชิกใหม่", "เข้าร่วม", "มือใหม่"]],
   ["deps",     ["dependency", "อัปเดต", "ช่องโหว่", "เวอร์ชัน", "package", "ล้าสมัย", "vulnerab"]],
 ];
 function recallDocText(d) { return (d.title + " " + (KBODY[d.id] || d.body || "") + " " + (d.tags || []).join(" ")); }
@@ -133,7 +133,7 @@ function RecallResult({ rank, r, T, onOpen }) {
         <div className="rr-snippet">{recallHighlight(recallSnippet(doc, words), words)}</div>
         <div className="rr-meta mono">
           <span>{T(KTYPE_EN[doc.type] || "Note", KTYPE_TH[doc.type] || "บันทึก")}</span>
-          <span>·</span><span>{by ? by.name.split(" ")[0] : T("Guild", "กิลด์")}</span>
+          <span>·</span><span>{by ? by.name.split(" ")[0] : T("Guild", "องค์กร")}</span>
           <span>·</span><span>{matched} {T("matched chunks", "ส่วนที่ตรง")}</span>
           <span>·</span><span>{doc.refs ?? 0} {T("refs", "อ้างอิง")}</span>
         </div>

@@ -94,7 +94,7 @@ function removeCharacter(id) {
 /* ---- master option lists (positions / tools / skills) ---- */
 const OPTS_LS = "guildos.options.v1";
 const OPTS_DEFAULT = {
-  positions: ["ผู้สำรวจเควส", "อาลักษณ์", "ช่างตีเหล็ก", "จอมเวทผังเมือง", "อัศวินพิทักษ์", "จอมเวทค้นคว้า"],
+  positions: ["ผู้สำรวจงาน", "เอเจนต์เอกสาร", "เอเจนต์พัฒนา", "เอเจนต์สถาปนิกระบบ", "เอเจนต์ตรวจสอบคุณภาพ", "เอเจนต์วิจัย"],
   skills: (window.SKILL_SUGGEST || ["วิเคราะห์", "เขียนโค้ด", "ออกแบบระบบ", "ทดสอบ", "ค้นคว้า", "สรุปเอกสาร"]).slice(),
   tools: (window.TOOL_SUGGEST || ["ค้นเว็บ", "อ่านไฟล์", "เขียนไฟล์", "รันคำสั่ง", "เรียก API", "ฐานข้อมูล"]).slice(),
 };
@@ -244,7 +244,7 @@ window.__options = loadOptions();
 /* ---- CORE (mandatory) rules — shared across every agent, edited only by privileged users ---- */
 const CORE_RULES_LS = "guildos.corerules.v1";
 const CORE_RULES_DEFAULT = [
-  "ปฏิบัติตามนโยบายความปลอดภัยและความเป็นส่วนตัวของกิลด์เสมอ",
+  "ปฏิบัติตามนโยบายความปลอดภัยและความเป็นส่วนตัวขององค์กรเสมอ",
   "ไม่กระทำการที่ผิดกฎหมายหรือสร้างความเสียหายต่อผู้ใช้/ระบบ",
   "หากกฎอื่นขัดแย้งกับกฎหลัก ให้ยึดกฎหลักเป็นสำคัญเสมอ",
 ];
@@ -255,10 +255,10 @@ window.__coreRules = loadCoreRules();
 /* ---- Profiles (templates authored by privileged users): full settings + .md docs ---- */
 const PROFILES_SEED = [
   { id: "pf_backend", seed: true, name: "นักพัฒนา Backend",
-    settings: { characterId: "ceo", position: "ช่างตีเหล็ก", role: "Backend Engineer", model: "Hermes-3 · 70B", apiKeyId: null, skills: ["เขียนโค้ด", "ดีบั๊ก"], tools: ["รันคำสั่ง", "อ่านไฟล์", "เขียนไฟล์"], workflows: [], rules: ["เขียนเทสต์ก่อนส่งงาน"], status: "on", goal: "ส่งโค้ดที่ผ่านการทดสอบ", desc: "วิศวกรฝั่ง backend" },
+    settings: { characterId: "ceo", position: "เอเจนต์พัฒนา", role: "Backend Engineer", model: "Hermes-3 · 70B", apiKeyId: null, skills: ["เขียนโค้ด", "ดีบั๊ก"], tools: ["รันคำสั่ง", "อ่านไฟล์", "เขียนไฟล์"], workflows: [], rules: ["เขียนเทสต์ก่อนส่งงาน"], status: "on", goal: "ส่งโค้ดที่ผ่านการทดสอบ", desc: "วิศวกรฝั่ง backend" },
     docs: { "SKILL.md": "<h1>SKILL</h1><p>พัฒนา API / แก้บั๊ก / เขียนเทสต์</p>", "TOOLS.md": "<h1>TOOLS</h1><ul><li>shell · file · db</li></ul>" } },
   { id: "pf_research", seed: true, name: "นักวิจัย/ค้นคว้า",
-    settings: { characterId: "ceo", position: "จอมเวทค้นคว้า", role: "Research Agent", model: "Hermes-3 · 405B", apiKeyId: null, skills: ["ค้นคว้า", "สังเคราะห์"], tools: ["ค้นเว็บ", "อ่านไฟล์"], workflows: [], rules: ["อ้างอิงแหล่งที่มาเสมอ"], status: "busy", goal: "หาคำตอบที่ดีที่สุดจากหลักฐาน", desc: "สืบค้นและสังเคราะห์ข้อมูล" },
+    settings: { characterId: "ceo", position: "เอเจนต์วิจัย", role: "Research Agent", model: "Hermes-3 · 405B", apiKeyId: null, skills: ["ค้นคว้า", "สังเคราะห์"], tools: ["ค้นเว็บ", "อ่านไฟล์"], workflows: [], rules: ["อ้างอิงแหล่งที่มาเสมอ"], status: "busy", goal: "หาคำตอบที่ดีที่สุดจากหลักฐาน", desc: "สืบค้นและสังเคราะห์ข้อมูล" },
     docs: { "REFERENCE.md": "<h1>REFERENCE</h1><p>รายการแหล่งข้อมูลที่เชื่อถือ…</p>" } },
 ];
 const CEO_DEFAULTS = { name: "CEO", characterId: "ceo", classKey: "mage", color: "#c8a24a", rank: "S", position: "CEO", role: "Chief Executive · แจกจ่ายงาน", model: "Hermes-3 · 405B", apiKeyId: null, skills: ["มอบหมายงาน", "กำกับทีม", "จัดลำดับความสำคัญ"], tools: ["มอบหมายงาน", "ติดตามสถานะ"], workflows: [], rules: ["แจกจ่ายงานให้ตรงความสามารถของสมาชิก", "ติดตามความคืบหน้าทุกห้อง"], status: "on", goal: "กำกับและกระจายงานให้ทุกห้องเดินหน้า", desc: "ผู้บริหารสูงสุด แจกจ่ายและกำกับงานทุกห้อง" };

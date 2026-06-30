@@ -18,8 +18,8 @@ const ct = (k, v) => _ct(k, v);
 function ktypeLabel(type) { return ct("ktype." + type); }
 const KBODY = {
   k1: "สถาปัตยกรรมของ auth-service แบ่งเป็น 3 ชั้น: API gateway, token service และ user store. ใช้ rotating refresh token อายุ 7 วัน และ access token อายุ 15 นาที",
-  k2: "จากการทดลอง hybrid search (BM25 + vector) ร่วมกับ reranking พบว่าให้ผลแม่นยำกว่า ~14% บนชุดข้อมูลของกิลด์ และควรใช้กับเอกสารที่ยาว",
-  k3: "ขั้นตอนเริ่มต้นสำหรับนักผจญภัยใหม่: สร้างตัวละคร → รับเควสแรก → เข้าร่วมสภากิลด์",
+  k2: "จากการทดลอง hybrid search (BM25 + vector) ร่วมกับ reranking พบว่าให้ผลแม่นยำกว่า ~14% บนชุดข้อมูลขององค์กร และควรใช้กับเอกสารที่ยาว",
+  k3: "ขั้นตอนเริ่มต้นสำหรับเอเจนต์ใหม่: สร้างตัวละคร → รับงานแรก → เข้าร่วมห้องประชุมกลาง",
   k4: "มาตรฐานการเขียน test: ครอบคลุม edge case, ตั้งชื่อทดสอบให้สื่อความ, รายงานความล้มเหลวพร้อมขั้นตอนทำซ้ำ",
   k5: "บันทึกการตัดสินใจ: เลือก rotating refresh token แทน long-lived token เพื่อลดความเสี่ยงหาก token รั่วไหล",
   k6: "รายการ dependency ที่มีช่องโหว่ระดับสูง ควรอัปเดตก่อนปล่อยเวอร์ชันถัดไป",
@@ -49,7 +49,7 @@ function CodexDrawer({ k, onClose }) {
             ? <div style={{ margin: 0, color: "var(--ink-2)", fontSize: 14, lineHeight: 1.7 }} dangerouslySetInnerHTML={{ __html: k.bodyHtml }} />
             : <p style={{ margin: 0, color: "var(--ink-2)", fontSize: 14, lineHeight: 1.7 }}>{k.body || KBODY[k.id] || "— ยังไม่มีรายละเอียดเพิ่มเติม —"}</p>}
           <div className="kv">
-            <div className="kv-item"><div className="kv-label">บันทึกโดย</div><div className="kv-val" style={{ fontSize: 14 }}>{by ? by.name : "หอคอยกิลด์"}</div></div>
+            <div className="kv-item"><div className="kv-label">บันทึกโดย</div><div className="kv-val" style={{ fontSize: 14 }}>{by ? by.name : "ศูนย์ควบคุมกลาง"}</div></div>
             <div className="kv-item"><div className="kv-label">การอ้างอิง</div><div className="kv-val">{k.refs ?? 0}</div></div>
           </div>
           <div>

@@ -17,7 +17,7 @@ const PERMISSIONS = [
   { key: "profile.manage",   group: "Agents",    th: "สร้าง/จัดการโปรไฟล์ (Profile)", en: "Manage profiles" },
   { key: "agent.edit.any",   group: "Agents",    th: "แก้ Agent ของผู้อื่น",   en: "Edit any agent" },
   { key: "agent.delete.any", group: "Agents",    th: "ลบ Agent ของผู้อื่น",    en: "Delete any agent" },
-  { key: "quest.run",        group: "Work",      th: "สั่งรันงาน/เควส",        en: "Run quests" },
+  { key: "quest.run",        group: "Work",      th: "สั่งรันงาน/งาน",        en: "Run quests" },
   { key: "task.delete",      group: "Work",      th: "ลบงาน (Task)",           en: "Delete tasks" },
   { key: "codex.view",       group: "Knowledge", th: "ดู/ค้นหาคลังความรู้",     en: "View & search codex" },
   { key: "codex.manage",     group: "Knowledge", th: "อัปโหลด/จัดการเนื้อหาคลังความรู้", en: "Upload & manage codex content" },

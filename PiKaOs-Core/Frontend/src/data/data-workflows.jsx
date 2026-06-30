@@ -1,7 +1,7 @@
 /* PiKaOs — ES module (migrated from PiKaOs-Core/data-workflows.jsx). */
 
 /* ============================================================
-   WORKFLOWS / "โต๊ะปรุงเวท" (Activepieces) — mock data + run service.
+   WORKFLOWS / "เวิร์กโฟลว์" (Activepieces) — mock data + run service.
    Mirrors PLAN §7: workflows + tool_runs. A workflow has an
    input_schema (form fields) and a step graph (for the builder
    canvas). Running one simulates the webhook → creates a tool_run.
@@ -33,7 +33,7 @@ const WORKFLOWS_SEED = [
   },
   {
     id: "wf_daily_digest", name: "สรุปข่าวประจำวัน", nameEn: "Daily Digest",
-    desc: "รวบรวมความเคลื่อนไหวของกิลด์เมื่อวาน แล้วส่งสรุปเข้าช่องประชุม",
+    desc: "รวบรวมความเคลื่อนไหวขององค์กรเมื่อวาน แล้วส่งสรุปเข้าช่องประชุม",
     descEn: "Collects yesterday's guild activity and posts a summary to the council channel.",
     icon: "📰", category: "ops", trigger: "schedule", enabled: true,
     ap_flow_id: "ap_8b22cd", webhook_url: "https://ap.guildos.io/webhook/8b22cd",

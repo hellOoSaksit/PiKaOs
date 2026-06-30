@@ -117,7 +117,7 @@ function TodoBell({ t, formal, activeCount, route }) {
   return (
     <div className={`tb-stat tb-todo ${open ? "open" : ""}`} onClick={() => setOpen(o => !o)}>
       <span className="tbs-ico">📜</span>
-      <span className="tbs-lbl">{t ? t("topbar.tasks") : (formal ? "งาน" : "เควส")}</span>
+      <span className="tbs-lbl">{t ? t("topbar.tasks") : (formal ? "งาน" : "งาน")}</span>
       {count > 0 && <span className="tb-badge">{count}</span>}
       {open && ReactDOM.createPortal((<>
         <div className="notif-scrim" onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
