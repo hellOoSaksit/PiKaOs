@@ -17,7 +17,7 @@ function _agentLine(c) {
 function ceoContext(rooms, chars) {
   const lines = rooms.map((r, i) => {
     const mem = roomAgents(r, i, rooms, chars);
-    const tok = mem.reduce((s, c) => s + (c.mana || 0), 0);
+    const tok = mem.reduce((s, c) => s + (c.tokens || 0), 0);
     return `ห้อง ${r.name}: ${mem.length} คน, token ${tok}. ${mem.slice(0, 4).map(_agentLine).join("; ") || "ว่าง"}`;
   });
   return `คุณคือ CEO ของระบบ มีหน้าที่สรุปภาพรวมว่าแต่ละห้องทำอะไร ถึงไหนแล้ว ใช้ token เท่าไร ตอบไทยสั้นกระชับ.\n${lines.join("\n")}`;
@@ -25,9 +25,9 @@ function ceoContext(rooms, chars) {
 function ceoReply(p, rooms, chars) {
   const q = p.toLowerCase();
   const busy = chars.filter(c => c.status === "busy" || c.status === "on").length;
-  const tok = chars.reduce((s, c) => s + (c.mana || 0), 0);
+  const tok = chars.reduce((s, c) => s + (c.tokens || 0), 0);
   if (/(token|โทเคน|ใช้ไป|ต้นทุน|งบ)/.test(q)) {
-    const per = rooms.map((r, i) => `${r.name} ${roomAgents(r, i, rooms, chars).reduce((s, c) => s + (c.mana || 0), 0)}`).join(" · ");
+    const per = rooms.map((r, i) => `${r.name} ${roomAgents(r, i, rooms, chars).reduce((s, c) => s + (c.tokens || 0), 0)}`).join(" · ");
     return `รวมใช้ ~${tok} token ครับ แยกตามห้อง: ${per}`;
   }
   if (/(ใคร|who|ห้องไหน)/.test(q))

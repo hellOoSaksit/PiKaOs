@@ -99,7 +99,7 @@ function OverviewTab({ rooms, chars, onOpen, query }) {
       {shown.map(({ r, i }) => {
         const members = roomAgents(r, i, rooms, chars);
         const active = members.filter(c => c.status === "on" || c.status === "busy").length;
-        const tokens = members.reduce((s, c) => s + (c.mana || 0), 0);
+        const tokens = members.reduce((s, c) => s + (c.tokens || 0), 0);
         return (
           <div key={r.id} className="ov-card" onClick={() => onOpen(r.id)}>
             <div className="ov-head">

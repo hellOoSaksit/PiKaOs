@@ -48,10 +48,10 @@ function makeCharacter(input) {
     status: input.status || "idle",
     task: input.task || "พร้อมรับงานใหม่",
     level: input.level || (Math.floor((rankXp[input.rank || "C"] || 40) / 4) + 4),
-    mana: input.mana ?? (50 + Math.floor(Math.random() * 45)),
-    hp: input.hp ?? (84 + Math.floor(Math.random() * 15)),
-    xp: input.xp ?? (rankXp[input.rank || "C"] || 40),
-    quests: input.quests ?? Math.floor(Math.random() * 120),
+    tokens: input.tokens ?? (50 + Math.floor(Math.random() * 45)),
+    health: input.health ?? (84 + Math.floor(Math.random() * 15)),
+    experience: input.experience ?? (rankXp[input.rank || "C"] || 40),
+    tasksDone: input.tasksDone ?? Math.floor(Math.random() * 120),
     success: input.success ?? (88 + Math.floor(Math.random() * 11)),
     icon: (CLASS_OPTS.find(o => o.key === (input.roleKey || "analyst")) || {}).icon || "🎭",
     classEn: opt.en || "Agent",
@@ -72,13 +72,13 @@ const SAMPLE_CHARS = [
   makeCharacter({
     id: "ceo", name: "CEO", roleKey: "mage", color: "#c8a24a", rank: "S",
     position: "CEO", role: "Chief Executive · แจกจ่ายงาน", model: "Hermes-3 · 405B", status: "on",
-    task: "แจกจ่ายและกำกับงานทุกห้อง", level: 40, mana: 99, hp: 100, xp: 99, quests: 999, success: 99,
+    task: "แจกจ่ายและกำกับงานทุกห้อง", level: 40, tokens: 99, health: 100, experience: 99, tasksDone: 999, success: 99,
     skills: ["มอบหมายงาน", "กำกับทีม", "จัดลำดับความสำคัญ"], locked: true,
   }),
   makeCharacter({
     id: "a1", name: "อ้อย นักวิเคราะห์", roleKey: "analyst", color: "#5b87b8", rank: "B",
     position: "ผู้สำรวจงาน", role: "Requirement Analyst", model: "Hermes-3 · 70B", status: "busy",
-    task: "ถอดข้อกำหนดจากงาน #1042", level: 14, mana: 72, hp: 96, xp: 64, quests: 128, success: 94,
+    task: "ถอดข้อกำหนดจากงาน #1042", level: 14, tokens: 72, health: 96, experience: 64, tasksDone: 128, success: 94,
     desc: "นักวิเคราะห์ผู้เชี่ยวชาญการอ่านงานและแตกออกเป็นงานย่อยที่ทีมลงมือได้จริง",
     skills: ["วิเคราะห์", "วางแผน", "แตกงาน"], goal: "เปลี่ยนคำขอที่คลุมเครือให้เป็นแผนงานชัดเจน",
     tools: ["web_search", "file_read"],
@@ -87,7 +87,7 @@ const SAMPLE_CHARS = [
   makeCharacter({
     id: "a2", name: "เขียน ผู้จัดทำเอกสาร", roleKey: "scribe", color: "#9173c0", rank: "C",
     position: "เอเจนต์เอกสาร", role: "Documentation", model: "Hermes-3 · 8B", status: "on",
-    task: "ร่างเอกสาร API ภาคผนวก", level: 9, mana: 58, hp: 88, xp: 41, quests: 86, success: 91,
+    task: "ร่างเอกสาร API ภาคผนวก", level: 9, tokens: 58, health: 88, experience: 41, tasksDone: 86, success: 91,
     desc: "ผู้จัดทำเอกสารขององค์กร เปลี่ยนงานเทคนิคให้เป็นเอกสารที่อ่านเข้าใจง่าย",
     skills: ["สรุปเอกสาร", "เขียน"], goal: "ทุกการตัดสินใจขององค์กรต้องมีบันทึกที่ค้นเจอได้",
     tools: ["file_read"], rules: ["เขียนให้คนนอกทีมเข้าใจ", "อ้างอิงแหล่งที่มาทุกครั้ง"],
@@ -95,7 +95,7 @@ const SAMPLE_CHARS = [
   makeCharacter({
     id: "a3", name: "ช่าง นักพัฒนา", roleKey: "smith", color: "#c25563", rank: "A",
     position: "เอเจนต์พัฒนา", role: "Implementation", model: "Hermes-3 · 70B", status: "on",
-    task: "พัฒนาโมดูล auth-service", level: 22, mana: 81, hp: 92, xp: 78, quests: 240, success: 89,
+    task: "พัฒนาโมดูล auth-service", level: 22, tokens: 81, health: 92, experience: 78, tasksDone: 240, success: 89,
     desc: "เอเจนต์พัฒนา แปลงแบบให้เป็นโค้ดที่ใช้งานได้จริง",
     skills: ["เขียนโค้ด", "ดีบั๊ก", "รีวิวโค้ด"], goal: "ส่งโค้ดที่ผ่านการทดสอบและบำรุงรักษาง่าย",
     tools: ["code_run", "git", "terminal"],
@@ -105,7 +105,7 @@ const SAMPLE_CHARS = [
   makeCharacter({
     id: "a4", name: "แผน สถาปนิกระบบ", roleKey: "mage", color: "#5b87b8", rank: "A",
     position: "เอเจนต์สถาปนิกระบบ", role: "System Architect", model: "Hermes-3 · 70B", status: "busy",
-    task: "ออกแบบสคีมาเหตุการณ์", level: 25, mana: 88, hp: 90, xp: 83, quests: 176, success: 96,
+    task: "ออกแบบสคีมาเหตุการณ์", level: 25, tokens: 88, health: 90, experience: 83, tasksDone: 176, success: 96,
     desc: "เอเจนต์ผู้วางผังโครงสร้างทั้งหมดของระบบ ก่อนเริ่มพัฒนา",
     skills: ["ออกแบบระบบ", "วางแผน"], goal: "ออกแบบระบบให้ขยายได้และเข้าใจง่าย",
     tools: ["file_read", "vector_db"],
@@ -114,7 +114,7 @@ const SAMPLE_CHARS = [
   makeCharacter({
     id: "a5", name: "ตรวจ ผู้ประกันคุณภาพ", roleKey: "knight", color: "#7fa45a", rank: "B",
     position: "เอเจนต์ตรวจสอบคุณภาพ", role: "Quality Assurance", model: "Hermes-3 · 8B", status: "idle",
-    task: "รอผลการ build จากช่าง", level: 16, mana: 64, hp: 99, xp: 52, quests: 154, success: 93,
+    task: "รอผลการ build จากช่าง", level: 16, tokens: 64, health: 99, experience: 52, tasksDone: 154, success: 93,
     desc: "เอเจนต์ตรวจสอบคุณภาพ ไม่ปล่อยให้ข้อบกพร่องหลุดผ่านระบบ",
     skills: ["ทดสอบ", "รีวิวโค้ด"], goal: "จับบั๊กให้เจอก่อนผู้ใช้",
     tools: ["code_run", "terminal"],
@@ -123,7 +123,7 @@ const SAMPLE_CHARS = [
   makeCharacter({
     id: "a6", name: "ค้น นักวิจัย", roleKey: "researcher", color: "#9173c0", rank: "S",
     position: "เอเจนต์วิจัย", role: "Research Agent", model: "Hermes-3 · 405B", status: "busy",
-    task: "สืบค้นคลังความรู้ · 12 แหล่ง", level: 31, mana: 93, hp: 86, xp: 91, quests: 312, success: 97,
+    task: "สืบค้นคลังความรู้ · 12 แหล่ง", level: 31, tokens: 93, health: 86, experience: 91, tasksDone: 312, success: 97,
     desc: "เอเจนต์ความรู้ สืบค้นและสังเคราะห์ข้อมูลจากทุกสารบบเพื่อสนับสนุนองค์กร",
     skills: ["ค้นคว้า", "สังเคราะห์", "วิเคราะห์"], goal: "หาคำตอบที่ดีที่สุดจากหลักฐานที่มี",
     tools: ["web_search", "vector_db", "browser"],
@@ -138,9 +138,13 @@ function _ensureCeo(arr) {
   if (!arr.some(c => c.id === "ceo")) { const ceo = SAMPLE_CHARS.find(c => c.id === "ceo"); if (ceo) arr = [{ ...ceo, pos: randPos() }, ...arr]; }
   return arr.map(c => c.id === "ceo" ? { ...c, locked: true, position: c.position || "CEO" } : c);
 }
-// keep persisted rosters working across the classKey→roleKey rename: map the old field on load.
+// keep persisted rosters working across the formal-rename: map old field names on load
+// (classKey→roleKey · mana→tokens · hp→health · xp→experience · quests→tasksDone).
+const _FIELD_ALIASES = { classKey: "roleKey", mana: "tokens", hp: "health", xp: "experience", quests: "tasksDone" };
 function _migrateChar(c) {
-  if (c && c.classKey !== undefined && c.roleKey === undefined) { c.roleKey = c.classKey; delete c.classKey; }
+  if (c) for (const [oldK, newK] of Object.entries(_FIELD_ALIASES)) {
+    if (c[oldK] !== undefined && c[newK] === undefined) { c[newK] = c[oldK]; delete c[oldK]; }
+  }
   return { ...c, pos: c.pos || randPos() };
 }
 function loadChars() {

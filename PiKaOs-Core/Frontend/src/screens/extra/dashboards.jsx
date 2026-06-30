@@ -9,7 +9,7 @@ function Mana({ S, t }) {
   const xt = (typeof t === "function") ? t : ((k) => k);
   const chars = S.chars;
   const pctBalance = Math.round(TOKENS.balance / TOKENS.cap * 100);
-  const totalMana = chars.reduce((s, c) => s + c.mana, 0) || 1;
+  const totalMana = chars.reduce((s, c) => s + c.tokens, 0) || 1;
   return (
     <div className="content-pad fade-in">
       <PageHead kicker={xt("mana.kicker")} title={xt("mana.title")} tag="demo"
@@ -32,8 +32,8 @@ function Mana({ S, t }) {
         <Panel title={xt("mana.byAgent")} en="BY AGENT" icon="🎭">
           {chars.length === 0 ? <Empty icon="🔵" title={xt("mana.noUsage")} sub={xt("mana.noUsageSub")} /> :
           <div className="col" style={{ gap: 12 }}>
-            {[...chars].sort((x, y) => y.mana - x.mana).map(a => {
-              const pct = Math.round(a.mana / totalMana * 100);
+            {[...chars].sort((x, y) => y.tokens - x.tokens).map(a => {
+              const pct = Math.round(a.tokens / totalMana * 100);
               return (
                 <div key={a.id} className="stat-line">
                   <span className="sl-label" style={{ display: "flex", alignItems: "center", gap: 7, width: 130, flexBasis: 130 }}>
@@ -108,12 +108,12 @@ function Chronicle({ S, t }) {
         <Panel title={xt("chronicle.leaderboard")} en="LEADERBOARD" icon="🥇">
           {chars.length === 0 ? <Empty icon="🥇" title={xt("chronicle.noRank")} sub={xt("chronicle.noRankSub")} /> :
           <div className="list-rows">
-            {[...chars].sort((a,b) => b.quests - a.quests).slice(0,5).map((a, i) => (
+            {[...chars].sort((a,b) => b.tasksDone - a.tasksDone).slice(0,5).map((a, i) => (
               <div key={a.id} className="row" style={{ gap: 11 }}>
                 <span className="display" style={{ width: 22, color: i === 0 ? "var(--gold-bright)" : "var(--ink-3)", fontSize: 15 }}>{i + 1}</span>
                 <Avatar a={a} size="sm" />
                 <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{a.name}</div><div className="mono faint" style={{ fontSize: 10.5 }}>{a.classEn}</div></div>
-                <span className="mono" style={{ fontSize: 13, color: "var(--ink-2)" }}>{a.quests} {xt("chronicle.tasksUnit")}</span>
+                <span className="mono" style={{ fontSize: 13, color: "var(--ink-2)" }}>{a.tasksDone} {xt("chronicle.tasksUnit")}</span>
               </div>
             ))}
           </div>}

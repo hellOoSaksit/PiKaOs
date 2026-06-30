@@ -91,7 +91,7 @@ function AgentCard({ a, onClick, compact }) {
         <div className="ac-meta">
           <StatusBadge s={a.status} />
           <span className="mono faint" style={{ fontSize: 10.5 }}>Lv.{a.level}</span>
-          <span className="ac-mana mono"><i className="mana-orb" />{a.mana}</span>
+          <span className="ac-mana mono"><i className="mana-orb" />{a.tokens}</span>
         </div>
       </div>
     </button>

@@ -143,8 +143,8 @@ function BudgetPanel({ me, myAgents, T }) {
   const periodEn = { weekly: "this week", monthly: "this month", daily: "today" }[me.period] || me.period;
 
   // distribute usage across my agents, weighted by their mana draw
-  const totalMana = myAgents.reduce((s, a) => s + a.mana, 0) || 1;
-  const shares = myAgents.map(a => ({ a, tok: Math.round(me.used * a.mana / totalMana) }))
+  const totalMana = myAgents.reduce((s, a) => s + a.tokens, 0) || 1;
+  const shares = myAgents.map(a => ({ a, tok: Math.round(me.used * a.tokens / totalMana) }))
     .sort((x, y) => y.tok - x.tok);
   const maxShare = Math.max(...shares.map(s => s.tok), 1);
 
