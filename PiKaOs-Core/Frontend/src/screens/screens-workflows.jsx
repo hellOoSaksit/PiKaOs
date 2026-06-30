@@ -218,7 +218,7 @@ function Workflows({ Sys }) {
   const [agentFilter, setAgentFilter] = useState("all");
 
   const manage = can("workflow.manage");
-  const mayRun = can("quest.run") || can("workflow.manage");
+  const mayRun = can("task.run") || can("workflow.manage");
   const enabledCount = workflows.filter(w => w.enabled).length;
   const okRate = toolRuns.length ? Math.round(toolRuns.filter(r => r.status === "ok").length / toolRuns.length * 100) : 0;
   const agentsInRuns = [...new Set(toolRuns.map(r => r.agent).filter(Boolean))];

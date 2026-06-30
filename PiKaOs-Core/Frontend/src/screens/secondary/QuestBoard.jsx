@@ -40,7 +40,7 @@ function QuestBoard({ onQuest, can, t }) {
   const [newRoomName, setNewRoomName] = useState("");
   const [roomFilter, setRoomFilter] = useState("all");
   const [q2, setQ2] = useState("");
-  const mayRun = !can || can("quest.run");
+  const mayRun = !can || can("task.run");
   const [works, setWorks] = useState(loadWorks);
   const [creating, setCreating] = useState(false);
   const [doc, setDoc] = useState(null);

@@ -17,7 +17,7 @@ const PERMISSIONS = [
   { key: "profile.manage",   group: "Agents",    th: "สร้าง/จัดการโปรไฟล์ (Profile)", en: "Manage profiles" },
   { key: "agent.edit.any",   group: "Agents",    th: "แก้ Agent ของผู้อื่น",   en: "Edit any agent" },
   { key: "agent.delete.any", group: "Agents",    th: "ลบ Agent ของผู้อื่น",    en: "Delete any agent" },
-  { key: "quest.run",        group: "Work",      th: "สั่งรันงาน/งาน",        en: "Run quests" },
+  { key: "task.run",        group: "Work",      th: "สั่งรันงาน/งาน",        en: "Run quests" },
   { key: "task.delete",      group: "Work",      th: "ลบงาน (Task)",           en: "Delete tasks" },
   { key: "codex.view",       group: "Knowledge", th: "ดู/ค้นหาคลังความรู้",     en: "View & search codex" },
   { key: "codex.manage",     group: "Knowledge", th: "อัปโหลด/จัดการเนื้อหาคลังความรู้", en: "Upload & manage codex content" },
@@ -53,8 +53,8 @@ const ROLES_SEED = [
 /* ---- default role → permission set ---- */
 const ROLE_PERMS_SEED = {
   admin:   [...PERM_KEYS],
-  manager: ["agent.create", "agent.edit.any", "agent.delete.any", "quest.run", "codex.view", "codex.manage", "codex.delete", "workflow.manage", "user.view.any", "audit.view", "room.build", "room.place", "room.move", "room.reset", "room.create", "room.delete", "room.template", "options.manage", "character.manage", "rules.manage", "agent.config", "task.delete"],
-  member:  ["agent.create", "quest.run", "codex.view", "codex.manage", "codex.delete", "workflow.manage", "room.build", "room.place", "room.move"],
+  manager: ["agent.create", "agent.edit.any", "agent.delete.any", "task.run", "codex.view", "codex.manage", "codex.delete", "workflow.manage", "user.view.any", "audit.view", "room.build", "room.place", "room.move", "room.reset", "room.create", "room.delete", "room.template", "options.manage", "character.manage", "rules.manage", "agent.config", "task.delete"],
+  member:  ["agent.create", "task.run", "codex.view", "codex.manage", "codex.delete", "workflow.manage", "room.build", "room.place", "room.move"],
   viewer:  ["codex.view"],
 };
 
@@ -77,7 +77,7 @@ const USERS_SEED = [
 /* ---- per-user permission overrides (grant beyond role / deny below role) ---- */
 const USER_PERMS_SEED = {
   u_kitt: { "audit.view": "grant" },   // a trusted member who can see the audit log
-  u_ploy: { "quest.run": "deny" },     // temporarily blocked from running quests
+  u_ploy: { "task.run": "deny" },     // temporarily blocked from running quests
 };
 
 /* ---- which user owns which seeded agent (agents = a1..a6) ---- */
@@ -91,7 +91,7 @@ const AUDIT_SEED = [
   { id: "ev7", actor: "u_somchai", action: "permission.grant", targetType: "user", target: "u_kitt",  meta: "+ audit.view",              time: "เมื่อวาน" },
   { id: "ev6", actor: "u_somchai", action: "role.update",      targetType: "role", target: "manager", meta: "+ workflow.manage",         time: "เมื่อวาน" },
   { id: "ev5", actor: "u_nicha",   action: "user.create",      targetType: "user", target: "u_anan",  meta: "บทบาท viewer",              time: "2 วัน" },
-  { id: "ev4", actor: "u_somchai", action: "permission.deny",  targetType: "user", target: "u_ploy",  meta: "− quest.run",               time: "3 วัน" },
+  { id: "ev4", actor: "u_somchai", action: "permission.deny",  targetType: "user", target: "u_ploy",  meta: "− task.run",               time: "3 วัน" },
   { id: "ev3", actor: "u_somchai", action: "user.create",      targetType: "user", target: "u_ploy",  meta: "บทบาท member",              time: "4 วัน" },
   { id: "ev2", actor: "u_somchai", action: "role.update",      targetType: "role", target: "member",  meta: "− user.view.any",           time: "5 วัน" },
   { id: "ev1", actor: "u_somchai", action: "user.create",      targetType: "user", target: "u_kitt",  meta: "บทบาท member",              time: "6 วัน" },

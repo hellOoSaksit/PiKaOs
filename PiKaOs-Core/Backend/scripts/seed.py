@@ -38,7 +38,7 @@ SEED_PERMISSIONS = [
     ("profile.manage", "Agents", "สร้าง/จัดการโปรไฟล์ (Profile)", "Manage profiles"),
     ("agent.edit.any", "Agents", "แก้ Agent ของผู้อื่น", "Edit any agent"),
     ("agent.delete.any", "Agents", "ลบ Agent ของผู้อื่น", "Delete any agent"),
-    ("quest.run", "Work", "สั่งรันงาน/เควส", "Run quests"),
+    ("task.run", "Work", "สั่งรันงาน", "Run quests"),
     ("task.delete", "Work", "ลบงาน (Task)", "Delete tasks"),
     # Chat access (channel-agnostic — enforced by the Telegram bot today, the web chat later).
     # Two tiers per the access model in features/telegram-integration.md: read-only vs read+command.
@@ -77,12 +77,12 @@ SEED_ROLES = [
 
 SEED_ROLE_PERMS = {
     "admin": list(_PERM_KEYS),
-    "manager": ["agent.create", "agent.edit.any", "agent.delete.any", "quest.run",
+    "manager": ["agent.create", "agent.edit.any", "agent.delete.any", "task.run",
                 "codex.view", "codex.manage", "codex.delete", "chat.use",
                 "workflow.manage", "user.view.any", "audit.view", "room.build", "room.place",
                 "room.move", "room.reset", "room.create", "room.delete", "room.template",
                 "options.manage", "character.manage", "rules.manage", "agent.config", "task.delete"],
-    "member": ["agent.create", "quest.run", "codex.view", "codex.manage", "codex.delete", "chat.use",
+    "member": ["agent.create", "task.run", "codex.view", "codex.manage", "codex.delete", "chat.use",
                "workflow.manage", "room.build", "room.place", "room.move"],
     "viewer": ["codex.view", "chat.read"],
 }
@@ -90,7 +90,7 @@ SEED_ROLE_PERMS = {
 # username -> {perm_key: allow(bool)}  (frontend "grant"/"deny" -> True/False)
 SEED_USER_PERMS = {
     "kitt": {"audit.view": True},   # trusted member who can see the audit log
-    "ploy": {"quest.run": False},   # temporarily blocked from running quests
+    "ploy": {"task.run": False},   # temporarily blocked from running quests
 }
 
 
