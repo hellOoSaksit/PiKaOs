@@ -18,6 +18,7 @@
 
 # local tooling / MCP state (not shared)
 .mcp.json
+.mcp.json.*
 .playwright-mcp/
 
 # OS / editor junk
