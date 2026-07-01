@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..deps import require_perm
+from ..identity import require_perm
 from ..schemas import (
     LlmConnectionIn,
     LlmConnectionOut,

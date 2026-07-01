@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..db import get_db
-from ..deps import get_current_user
+from ..identity import get_current_user
 from ..models import User
 from ..schemas import ForgotIn, LoginIn, LoginResult, TokenOut, UserOut
 from ..services import auth_service, rbac_service

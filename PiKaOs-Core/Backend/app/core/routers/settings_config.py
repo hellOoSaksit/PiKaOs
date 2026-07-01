@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..deps import get_current_user, require_perm
+from ..identity import get_current_user, require_perm
 from ..models import User
 from ..repositories import app_settings as repo
 from ..repositories import user_settings as user_repo

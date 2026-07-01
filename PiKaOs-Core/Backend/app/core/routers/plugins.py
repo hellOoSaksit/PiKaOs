@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import plugin_registry as registry
 from ..db import get_db
-from ..deps import get_current_user, require_perm
+from ..identity import get_current_user, require_perm
 from ..models import User
 
 router = APIRouter(prefix="/api/plugins", tags=["plugins"])
