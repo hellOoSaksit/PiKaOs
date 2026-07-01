@@ -16,10 +16,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.config import settings
 from app.core.db import register_pgvector
-from app.core.models import Department, Document, User, UserDepartment
+from app.core.models import Document
+from app.plugins.auth.models import Department, User, UserDepartment
 from app.plugins.knowledge import doc_chunks as chunks_repo
 from app.plugins.knowledge import documents as docs_repo
-from app.core.security import hash_password
+from app.plugins.auth.security import hash_password
 from app.plugins.knowledge import retrieval_service as rs
 from app.core.services.embeddings import StubEmbedder
 

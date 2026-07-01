@@ -13,24 +13,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..repositories import tasks as tasks_repo
 from ..repositories import runs as runs_repo
 from ..identity import ADMIN_ROLE
-from ..repositories import users as users_repo
 from .events import serialize_step
 
 
 async def can_view(db: AsyncSession, user_id: str, task_id: str) -> bool:
     """May this user view this task's stream? admin · the task's creator · or a member of
-    the task's department. (A dept-less task is owner/admin-only — depts are seeded in D.)"""
+    the task's department. (A dept-less task is owner/admin-only — depts are seeded in D.)
+
+    User role + department membership are logical reads of the auth-owned tables (via tasks_repo) —
+    Core no longer imports the auth User model."""
     try:
         uid, qid = uuid.UUID(user_id), uuid.UUID(task_id)
     except (ValueError, TypeError):
         return False
-    user = await users_repo.get_by_id(db, uid)
+    role = await tasks_repo.user_role(db, uid)
     task = await tasks_repo.get_task(db, qid)
-    if user is None or task is None:
+    if role is None or task is None:
         return False
-    if user.role == ADMIN_ROLE or task.created_by == user.id:
+    if role == ADMIN_ROLE or task.created_by == uid:
         return True
-    if task.department_id is not None and await tasks_repo.user_in_department(db, user.id, task.department_id):
+    if task.department_id is not None and await tasks_repo.user_in_department(db, uid, task.department_id):
         return True
     return False
 

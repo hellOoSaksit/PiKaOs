@@ -46,8 +46,8 @@ def upgrade() -> None:
         CREATE TABLE doc_chunks (
             id              uuid PRIMARY KEY,
             document_id     uuid NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-            owner_id        uuid REFERENCES users(id) ON DELETE SET NULL,
-            department_id   uuid REFERENCES departments(id) ON DELETE SET NULL,
+            owner_id        uuid,
+            department_id   uuid,
             seq             integer NOT NULL,
             heading         text NOT NULL DEFAULT '',
             content         text NOT NULL DEFAULT '',

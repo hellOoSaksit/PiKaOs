@@ -18,11 +18,11 @@ from __future__ import annotations
 import asyncio
 import json
 
-import jwt
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from .. import redis_client, security
+from .. import redis_client
 from ..db import SessionLocal
+from ..identity import provider_for
 from ..services import task_service
 
 router = APIRouter()
@@ -44,16 +44,11 @@ async def _authenticate(websocket: WebSocket) -> str | None:
         return None
     if msg.get("type") != "auth":
         return None
-    try:
-        payload = security.decode_access_token(msg.get("token", ""))
-    except jwt.PyJWTError:
-        return None
-    if payload.get("type") != "access":
-        return None
-    jti, user_id = payload.get("jti"), payload.get("sub")
-    if not jti or not user_id or await redis_client.is_access_denied(jti):
-        return None
-    return user_id
+    # Delegate token validation to the identity provider (auth plugin) — the kernel router no longer
+    # decodes JWTs itself. The provider checks signature, type, jti-denylist and active status, returning
+    # a user or None; unbound provider (auth off) → BootstrapProvider denies → None.
+    user = await provider_for(websocket.app).authenticate(msg.get("token", ""))
+    return str(user.id) if user is not None else None
 
 
 async def _can_view_task(user_id: str, task_id: str) -> bool:

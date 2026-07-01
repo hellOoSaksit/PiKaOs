@@ -25,7 +25,7 @@ def upgrade() -> None:
         sa.Column("key", sa.String(64), primary_key=True),
         sa.Column("value", postgresql.JSONB(), nullable=False),
         sa.Column("updated_by", postgresql.UUID(as_uuid=True),
-                  sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+                  nullable=True),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
     )
 

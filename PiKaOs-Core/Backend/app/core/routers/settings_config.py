@@ -11,8 +11,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..identity import get_current_user, require_perm
-from ..models import User
+from ..identity import UserLike, get_current_user, require_perm
 from ..repositories import app_settings as repo
 from ..repositories import user_settings as user_repo
 from ..schemas import GlobalConfigOut, NavConfigIn, NavConfigOut, SettingValueIn, UserSettingsOut
@@ -24,7 +23,7 @@ _NAV_KEY = "nav"
 
 @router.get("/nav", response_model=NavConfigOut)
 async def get_nav(
-    _: User = Depends(get_current_user),
+    _: UserLike = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> NavConfigOut:
     """The shared sidebar arrangement (or value=null when an admin hasn't customized it yet)."""
@@ -37,7 +36,7 @@ async def get_nav(
 @router.put("/nav", response_model=NavConfigOut)
 async def put_nav(
     body: NavConfigIn,
-    user: User = Depends(require_perm("options.manage")),
+    user: UserLike = Depends(require_perm("options.manage")),
     db: AsyncSession = Depends(get_db),
 ) -> NavConfigOut:
     """Replace the shared sidebar arrangement (admin only). The frontend owns the value's shape."""
@@ -50,7 +49,7 @@ async def put_nav(
 
 @router.get("/me", response_model=UserSettingsOut)
 async def get_my_settings(
-    user: User = Depends(get_current_user),
+    user: UserLike = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> UserSettingsOut:
     """All of the current user's personal settings ({key: value}); empty for a fresh account."""
@@ -61,7 +60,7 @@ async def get_my_settings(
 async def set_my_setting(
     key: str,
     body: SettingValueIn,
-    user: User = Depends(get_current_user),
+    user: UserLike = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> UserSettingsOut:
     """Set one of the current user's settings (own scope only)."""
@@ -75,7 +74,7 @@ async def set_my_setting(
 @router.get("/global/{key}", response_model=GlobalConfigOut)
 async def get_global(
     key: str,
-    _: User = Depends(get_current_user),
+    _: UserLike = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> GlobalConfigOut:
     """A shared config blob by key (or null). Any authenticated user can read it."""
@@ -87,7 +86,7 @@ async def get_global(
 async def put_global(
     key: str,
     body: SettingValueIn,
-    user: User = Depends(require_perm("options.manage")),
+    user: UserLike = Depends(require_perm("options.manage")),
     db: AsyncSession = Depends(get_db),
 ) -> GlobalConfigOut:
     """Set a shared config blob (requires options.manage). Seen by every user/device."""

@@ -41,7 +41,7 @@ def test_deny_absent_perm_is_noop():
 # --- seed data integrity ---------------------------------------------------
 
 def test_seed_role_perms_are_within_catalog():
-    from scripts.seed import SEED_ROLE_PERMS, _PERM_KEYS
+    from app.plugins.auth.seed import SEED_ROLE_PERMS, _PERM_KEYS
 
     catalog = set(_PERM_KEYS)
     assert len(catalog) == len(_PERM_KEYS)  # no duplicate permission keys

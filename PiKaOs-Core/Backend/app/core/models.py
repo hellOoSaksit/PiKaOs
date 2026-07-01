@@ -30,26 +30,10 @@ class Vector(UserDefinedType):
         return f"vector({self.dim})"
 
 
-class User(Base):
-    __tablename__ = "users"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    username: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
-    display: Mapped[str] = mapped_column(String(120), nullable=False, default="")
-    role: Mapped[str] = mapped_column(String(32), nullable=False, default="member")
-    status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
-    avatar: Mapped[str] = mapped_column(String(64), nullable=False, default="🙂")
-    quota: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    period: Mapped[str] = mapped_column(String(16), nullable=False, default="monthly")
-    used: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
-
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-
-    last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+# NOTE: the auth/RBAC tables (users · roles · permissions · role_perms · user_perms · departments ·
+# user_departments) moved to the `auth` plugin in Phase C — they live on the plugin's OWN metadata now
+# (PiKaOs-Plugin-Auth/backend/models.py), created by its migration step, not by Core. Columns below that
+# used to FK `users.id`/`departments.id` are plain UUIDs now (logical cross-plugin refs, no FK).
 
 
 class Document(Base):
@@ -63,7 +47,7 @@ class Document(Base):
     # FK → users.id, ON DELETE SET NULL: deleting a user keeps their docs but clears ownership
     # (owner_id is nullable). See migration 0003 / risk-mitigation §4.4 (A3).
     owner_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), index=True, nullable=True
+        UUID(as_uuid=True), index=True, nullable=True
     )
     kind: Mapped[str] = mapped_column(String(16), nullable=False, default="md")  # md|image|log|pdf|other
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -75,7 +59,7 @@ class Document(Base):
     size: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     # department scoping (column added in migration 0004 — system-design §7.1)
     department_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("departments.id", ondelete="SET NULL"), index=True, nullable=True
+        UUID(as_uuid=True), index=True, nullable=True
     )
     # RAG ingest state (migration 0005) — markdown stays the truth; this just records whether the
     # file has been chunked+embedded into doc_chunks, and with which model (knowledge-rag.md §3).
@@ -107,10 +91,10 @@ class DocChunk(Base):
         UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), index=True, nullable=False
     )
     owner_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), index=True, nullable=True
+        UUID(as_uuid=True), index=True, nullable=True
     )
     department_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("departments.id", ondelete="SET NULL"), index=True, nullable=True
+        UUID(as_uuid=True), index=True, nullable=True
     )
     seq: Mapped[int] = mapped_column(Integer, nullable=False)
     heading: Mapped[str] = mapped_column(Text, nullable=False, default="")
@@ -172,7 +156,7 @@ class AppSetting(Base):
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[dict | list] = mapped_column(JSONB, nullable=False)
     updated_by: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        UUID(as_uuid=True), nullable=True
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -189,7 +173,7 @@ class UserSetting(Base):
     __tablename__ = "user_settings"
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+        UUID(as_uuid=True), primary_key=True
     )
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[dict | list | str] = mapped_column(JSONB, nullable=False)
@@ -198,87 +182,9 @@ class UserSetting(Base):
     )
 
 
-# --- RBAC (server-side permission model — mirrors Frontend/src/data/data-users.jsx) ---
-# Roles map to permission sets; per-user overrides grant/deny single permissions on top.
-# Effective perms = role_perms ∪ grants − denies (deny wins); admin implicitly has all.
-# See docs/architecture/risk-mitigation.md §2.
-
-
-class Role(Base):
-    __tablename__ = "roles"
-
-    key: Mapped[str] = mapped_column(String(32), primary_key=True)
-    name_th: Mapped[str] = mapped_column(String(64), nullable=False, default="")
-    name_en: Mapped[str] = mapped_column(String(64), nullable=False, default="")
-    description: Mapped[str] = mapped_column(String(255), nullable=False, default="")
-    color: Mapped[str] = mapped_column(String(32), nullable=False, default="")
-    system: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-
-
-class Permission(Base):
-    __tablename__ = "permissions"
-
-    key: Mapped[str] = mapped_column(String(64), primary_key=True)
-    grp: Mapped[str] = mapped_column(String(32), nullable=False, default="")
-    name_th: Mapped[str] = mapped_column(String(128), nullable=False, default="")
-    name_en: Mapped[str] = mapped_column(String(128), nullable=False, default="")
-
-
-class RolePerm(Base):
-    """A permission granted to a role (the role's default set)."""
-
-    __tablename__ = "role_perms"
-
-    role_key: Mapped[str] = mapped_column(
-        String(32), ForeignKey("roles.key", ondelete="CASCADE"), primary_key=True
-    )
-    perm_key: Mapped[str] = mapped_column(
-        String(64), ForeignKey("permissions.key", ondelete="CASCADE"), primary_key=True
-    )
-
-
-class UserPerm(Base):
-    """A per-user override: allow=True grants beyond the role, allow=False denies below it."""
-
-    __tablename__ = "user_perms"
-
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
-    )
-    perm_key: Mapped[str] = mapped_column(
-        String(64), ForeignKey("permissions.key", ondelete="CASCADE"), primary_key=True
-    )
-    allow: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-
-
 # --- Engine module (system-design §7; FK/index per risk-mitigation §4.4) ---
 # Schema source of truth = migration 0001_baseline (organized by module — modularity.md).
 # subtasks/tools_config/notifications are deferred to their phase (orchestrator/tools/notify, phase C).
-
-
-class Department(Base):
-    """A department within the single org — scoping/visibility dimension (system-design §7.1)."""
-
-    __tablename__ = "departments"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name_th: Mapped[str] = mapped_column(String(120), nullable=False, default="")
-    name_en: Mapped[str] = mapped_column(String(120), nullable=False, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
-
-class UserDepartment(Base):
-    """m:n user↔department — a user can belong to several departments; is_primary = default dept."""
-
-    __tablename__ = "user_departments"
-
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
-    )
-    department_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("departments.id", ondelete="CASCADE"), primary_key=True
-    )
-    is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
 class Room(Base):
@@ -288,10 +194,10 @@ class Room(Base):
     name: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     template: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     created_by: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        UUID(as_uuid=True), nullable=True
     )
     department_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("departments.id", ondelete="SET NULL"), nullable=True
+        UUID(as_uuid=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
@@ -303,7 +209,7 @@ class Agent(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     owner_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        UUID(as_uuid=True), nullable=True
     )
     name: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     role: Mapped[str] = mapped_column(String(64), nullable=False, default="")
@@ -316,7 +222,7 @@ class Agent(Base):
         UUID(as_uuid=True), ForeignKey("rooms.id", ondelete="SET NULL"), nullable=True
     )
     department_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("departments.id", ondelete="SET NULL"), nullable=True
+        UUID(as_uuid=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
@@ -332,10 +238,10 @@ class Task(Base):
     )
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="open")
     created_by: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        UUID(as_uuid=True), nullable=True
     )
     department_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("departments.id", ondelete="SET NULL"), nullable=True
+        UUID(as_uuid=True), nullable=True
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -361,7 +267,7 @@ class Run(Base):
         UUID(as_uuid=True), ForeignKey("rooms.id", ondelete="SET NULL"), nullable=True
     )
     department_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("departments.id", ondelete="SET NULL"), nullable=True
+        UUID(as_uuid=True), nullable=True
     )
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="queued")
     input: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
@@ -448,7 +354,7 @@ class TelegramLink(Base):
     tg_user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
     tg_chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)    # private chat to reply into
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+        UUID(as_uuid=True), nullable=False, index=True
     )
     task_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True
@@ -468,7 +374,7 @@ class TelegramLinkCode(Base):
 
     code: Mapped[str] = mapped_column(String(64), primary_key=True)
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+        UUID(as_uuid=True), nullable=False, index=True
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

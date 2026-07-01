@@ -17,7 +17,8 @@ from sqlalchemy import delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import settings
-from app.core.models import Department, Document, User
+from app.core.models import Document
+from app.plugins.auth.models import Department, User
 from app.plugins.knowledge import documents as docs_repo
 from app.plugins.knowledge import knowledge_service as ks
 

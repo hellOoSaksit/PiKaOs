@@ -41,74 +41,12 @@ def _ts():
 
 def upgrade() -> None:
     # ===================== MODULE: core (identity · access · tenancy) =====================
-    # The shared base every deployment carries. Other modules FK into these; core FKs nowhere.
-
-    op.create_table(
-        "users",
-        sa.Column("id", UUID, primary_key=True),
-        sa.Column("username", sa.String(64), nullable=False, unique=True),
-        sa.Column("email", sa.String(255), nullable=False, unique=True),
-        sa.Column("display", sa.String(120), nullable=False, server_default=""),
-        sa.Column("role", sa.String(32), nullable=False, server_default="member"),
-        sa.Column("status", sa.String(32), nullable=False, server_default="active"),
-        sa.Column("avatar", sa.String(64), nullable=False, server_default="🙂"),
-        sa.Column("quota", sa.BigInteger(), nullable=True),
-        sa.Column("period", sa.String(16), nullable=False, server_default="monthly"),
-        sa.Column("used", sa.BigInteger(), nullable=False, server_default="0"),
-        sa.Column("password_hash", sa.String(255), nullable=False),
-        sa.Column("last_login", sa.DateTime(timezone=True), nullable=True),
-        _ts(),
-    )
-    op.create_index("ix_users_username", "users", ["username"])
-    op.create_index("ix_users_email", "users", ["email"])
-
-    op.create_table(
-        "departments",
-        sa.Column("id", UUID, primary_key=True),
-        sa.Column("name_th", sa.String(120), nullable=False, server_default=""),
-        sa.Column("name_en", sa.String(120), nullable=False, server_default=""),
-        _ts(),
-    )
-
-    op.create_table(
-        "roles",
-        sa.Column("key", sa.String(32), primary_key=True),
-        sa.Column("name_th", sa.String(64), nullable=False, server_default=""),
-        sa.Column("name_en", sa.String(64), nullable=False, server_default=""),
-        sa.Column("description", sa.String(255), nullable=False, server_default=""),
-        sa.Column("color", sa.String(32), nullable=False, server_default=""),
-        sa.Column("system", sa.Boolean(), nullable=False, server_default=sa.false()),
-    )
-
-    op.create_table(
-        "permissions",
-        sa.Column("key", sa.String(64), primary_key=True),
-        sa.Column("grp", sa.String(32), nullable=False, server_default=""),
-        sa.Column("name_th", sa.String(128), nullable=False, server_default=""),
-        sa.Column("name_en", sa.String(128), nullable=False, server_default=""),
-    )
-
-    op.create_table(
-        "role_perms",
-        sa.Column("role_key", sa.String(32), sa.ForeignKey("roles.key", ondelete="CASCADE"), primary_key=True),
-        sa.Column("perm_key", sa.String(64), sa.ForeignKey("permissions.key", ondelete="CASCADE"), primary_key=True),
-    )
-
-    op.create_table(
-        "user_perms",
-        sa.Column("user_id", UUID, sa.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
-        sa.Column("perm_key", sa.String(64), sa.ForeignKey("permissions.key", ondelete="CASCADE"), primary_key=True),
-        sa.Column("allow", sa.Boolean(), nullable=False, server_default=sa.true()),
-    )
-
-    # user ↔ department, many-to-many (1 user can belong to several departments)
-    op.create_table(
-        "user_departments",
-        sa.Column("user_id", UUID, sa.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
-        sa.Column("department_id", UUID, sa.ForeignKey("departments.id", ondelete="CASCADE"), primary_key=True),
-        sa.Column("is_primary", sa.Boolean(), nullable=False, server_default=sa.false()),
-    )
-    op.create_index("ix_user_departments_department_id", "user_departments", ["department_id"])
+    # NOTE (Phase C): the auth/identity tables — users · departments · user_departments · roles ·
+    # permissions · role_perms · user_perms — are NO LONGER created here. They moved to the `auth`
+    # plugin, which owns them on its own metadata and creates + seeds them via its migrate() step
+    # (run by scripts.migrate_plugins right after this baseline). Columns in the modules below that
+    # used to FK users.id/departments.id are plain UUIDs now (logical cross-plugin refs, no FK), so
+    # this baseline stays valid on a fresh DB even when the auth plugin is disabled.
 
     # ===================== MODULE: knowledge (document storage) =====================
     # Markdown is the source of truth (knowledge-rag.md); no vector column. FKs → core only.
@@ -116,13 +54,13 @@ def upgrade() -> None:
     op.create_table(
         "documents",
         sa.Column("id", UUID, primary_key=True),
-        sa.Column("owner_id", UUID, sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("owner_id", UUID, nullable=True),
         sa.Column("kind", sa.String(16), nullable=False, server_default="md"),
         sa.Column("name", sa.String(255), nullable=False),
         sa.Column("object_key", sa.String(512), nullable=False),
         sa.Column("content_type", sa.String(128), nullable=False, server_default="application/octet-stream"),
         sa.Column("size", sa.BigInteger(), nullable=False, server_default="0"),
-        sa.Column("department_id", UUID, sa.ForeignKey("departments.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("department_id", UUID, nullable=True),
         _ts(),
     )
     op.create_index("ix_documents_owner_id", "documents", ["owner_id"])
@@ -136,8 +74,8 @@ def upgrade() -> None:
         sa.Column("id", UUID, primary_key=True),
         sa.Column("name", sa.String(120), nullable=False, server_default=""),
         sa.Column("template", sa.String(64), nullable=False, server_default=""),
-        sa.Column("created_by", UUID, sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("department_id", UUID, sa.ForeignKey("departments.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("created_by", UUID, nullable=True),
+        sa.Column("department_id", UUID, nullable=True),
         _ts(),
     )
     op.create_index("ix_rooms_department_id", "rooms", ["department_id"])
@@ -145,7 +83,7 @@ def upgrade() -> None:
     op.create_table(
         "agents",
         sa.Column("id", UUID, primary_key=True),
-        sa.Column("owner_id", UUID, sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("owner_id", UUID, nullable=True),
         sa.Column("name", sa.String(120), nullable=False, server_default=""),
         sa.Column("role", sa.String(64), nullable=False, server_default=""),
         sa.Column("status", sa.String(32), nullable=False, server_default="idle"),  # AI-set only
@@ -154,7 +92,7 @@ def upgrade() -> None:
         sa.Column("granted_tools", ARR(sa.String()), nullable=False, server_default=_EMPTY_ARR),
         sa.Column("sprite", sa.String(64), nullable=False, server_default=""),
         sa.Column("room_id", UUID, sa.ForeignKey("rooms.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("department_id", UUID, sa.ForeignKey("departments.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("department_id", UUID, nullable=True),
         _ts(),
     )
     op.create_index("ix_agents_owner_id", "agents", ["owner_id"])
@@ -168,8 +106,8 @@ def upgrade() -> None:
         sa.Column("brief", sa.Text(), nullable=False, server_default=""),
         sa.Column("room_id", UUID, sa.ForeignKey("rooms.id", ondelete="SET NULL"), nullable=True),
         sa.Column("status", sa.String(32), nullable=False, server_default="open"),
-        sa.Column("created_by", UUID, sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("department_id", UUID, sa.ForeignKey("departments.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("created_by", UUID, nullable=True),
+        sa.Column("department_id", UUID, nullable=True),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),  # soft delete
         _ts(),
     )
@@ -185,7 +123,7 @@ def upgrade() -> None:
         sa.Column("quest_id", UUID, sa.ForeignKey("quests.id", ondelete="SET NULL"), nullable=True),
         sa.Column("room_id", UUID, sa.ForeignKey("rooms.id", ondelete="SET NULL"), nullable=True),
         # denormalized from room/agent at creation for fast department-scoped filtering (§7.1)
-        sa.Column("department_id", UUID, sa.ForeignKey("departments.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("department_id", UUID, nullable=True),
         sa.Column("status", sa.String(32), nullable=False, server_default="queued"),
         sa.Column("input", JSONB, nullable=True),
         sa.Column("tokens_used", sa.BigInteger(), nullable=False, server_default="0"),
@@ -215,17 +153,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # reverse dependency order
+    # reverse dependency order (auth tables are owned by the auth plugin now — not dropped here)
     op.drop_table("run_steps")
     op.drop_table("runs")
     op.drop_table("quests")
     op.drop_table("agents")
     op.drop_table("rooms")
     op.drop_table("documents")
-    op.drop_table("user_departments")
-    op.drop_table("user_perms")
-    op.drop_table("role_perms")
-    op.drop_table("permissions")
-    op.drop_table("roles")
-    op.drop_table("departments")
-    op.drop_table("users")

@@ -19,7 +19,8 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import settings
-from app.core.models import Department, Task, User, UserDepartment
+from app.core.models import Task
+from app.plugins.auth.models import Department, User, UserDepartment
 from app.core.services import events, task_service
 
 

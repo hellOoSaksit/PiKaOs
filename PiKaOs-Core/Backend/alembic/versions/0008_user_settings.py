@@ -22,7 +22,7 @@ def upgrade() -> None:
     op.create_table(
         "user_settings",
         sa.Column("user_id", postgresql.UUID(as_uuid=True),
-                  sa.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+                  primary_key=True),
         sa.Column("key", sa.String(64), primary_key=True),
         sa.Column("value", postgresql.JSONB(), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),

@@ -18,8 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import plugin_registry as registry
 from ..db import get_db
-from ..identity import get_current_user, require_perm
-from ..models import User
+from ..identity import UserLike, get_current_user, require_perm
 
 router = APIRouter(prefix="/api/plugins", tags=["plugins"])
 
@@ -89,7 +88,7 @@ def _action_response(reg: dict[str, dict]) -> ActionOut:
 
 @router.get("", response_model=list[PluginOut])
 async def list_plugins(
-    _: User = Depends(get_current_user),
+    _: UserLike = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[PluginOut]:
     """Every discovered plugin + its registry state + whether it is mounted in this process."""
@@ -99,7 +98,7 @@ async def list_plugins(
 @router.get("/{plugin_id}/install-plan", response_model=InstallPlanOut)
 async def install_plan(
     plugin_id: str,
-    _: User = Depends(get_current_user),
+    _: UserLike = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> InstallPlanOut:
     """Resolve the dependency-request: what installing `plugin_id` adds (deps first), what is already
@@ -119,7 +118,7 @@ def _require_known(plugin_id: str) -> None:
 @router.post("/{plugin_id}/install", response_model=ActionOut)
 async def install(
     plugin_id: str,
-    user: User = Depends(require_perm("plugins.manage")),
+    user: UserLike = Depends(require_perm("plugins.manage")),
     db: AsyncSession = Depends(get_db),
 ) -> ActionOut:
     """Install `plugin_id` and any missing dependencies (dependency-first), enabling each. Already-
@@ -137,7 +136,7 @@ async def install(
 @router.post("/{plugin_id}/enable", response_model=ActionOut)
 async def enable(
     plugin_id: str,
-    user: User = Depends(require_perm("plugins.manage")),
+    user: UserLike = Depends(require_perm("plugins.manage")),
     db: AsyncSession = Depends(get_db),
 ) -> ActionOut:
     """Mark a plugin enabled (mounted on next restart). Data is kept."""
@@ -150,7 +149,7 @@ async def enable(
 @router.post("/{plugin_id}/disable", response_model=ActionOut)
 async def disable(
     plugin_id: str,
-    user: User = Depends(require_perm("plugins.manage")),
+    user: UserLike = Depends(require_perm("plugins.manage")),
     db: AsyncSession = Depends(get_db),
 ) -> ActionOut:
     """Mark a plugin disabled — kept installed, data retained, unmounted on next restart."""
@@ -162,7 +161,7 @@ async def disable(
 @router.delete("/{plugin_id}", response_model=ActionOut)
 async def uninstall(
     plugin_id: str,
-    user: User = Depends(require_perm("plugins.manage")),
+    user: UserLike = Depends(require_perm("plugins.manage")),
     db: AsyncSession = Depends(get_db),
 ) -> ActionOut:
     """Uninstall — forget the registry row (back to *available*). First cut keeps the plugin's tables

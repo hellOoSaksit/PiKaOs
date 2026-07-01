@@ -75,13 +75,19 @@ _UNAUTHORIZED = HTTPException(
 _FORBIDDEN = HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
 
-def _provider(request: Request) -> IdentityProvider:
-    """The bound identity provider for this app, or the deny-all bootstrap fallback."""
-    container = getattr(request.app.state, "container", None)
+def provider_for(app) -> IdentityProvider:
+    """The bound identity provider for an ASGI app, or the deny-all bootstrap fallback. Takes the app
+    (not a request) so non-HTTP callers — e.g. the WebSocket router — can authenticate too."""
+    container = getattr(app.state, "container", None)
     if container is None:
         return BOOTSTRAP
     provider = container.resolve(IDENTITY)
     return provider if provider is not None else BOOTSTRAP
+
+
+def _provider(request: Request) -> IdentityProvider:
+    """The bound identity provider for this request, or the deny-all bootstrap fallback."""
+    return provider_for(request.app)
 
 
 def _bearer(request: Request) -> str | None:
@@ -132,6 +138,6 @@ def require_role(*roles: str):
 
 
 __all__ = [
-    "UserLike", "IdentityProvider", "BootstrapProvider", "BOOTSTRAP",
-    "get_current_user", "require_perm", "require_role",
+    "UserLike", "IdentityProvider", "BootstrapProvider", "BOOTSTRAP", "provider_for",
+    "get_current_user", "require_perm", "require_role", "ADMIN_ROLE",
 ]

@@ -46,7 +46,7 @@ def upgrade() -> None:
         # Telegram's numeric user id — supplied by Telegram, NOT autoincrement (no sequence).
         sa.Column("tg_user_id", sa.BigInteger, primary_key=True, autoincrement=False),
         sa.Column("tg_chat_id", sa.BigInteger, nullable=False),
-        sa.Column("user_id", UUID, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("user_id", UUID, nullable=False),
         sa.Column("quest_id", UUID, sa.ForeignKey("quests.id", ondelete="SET NULL"), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
     )
@@ -55,7 +55,7 @@ def upgrade() -> None:
     op.create_table(
         "telegram_link_codes",
         sa.Column("code", sa.String(64), primary_key=True),
-        sa.Column("user_id", UUID, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("user_id", UUID, nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("used_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),

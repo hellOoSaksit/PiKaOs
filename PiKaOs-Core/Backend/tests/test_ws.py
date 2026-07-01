@@ -12,7 +12,8 @@ import json
 
 import pytest
 
-from app.core import redis_client, security
+from app.core import redis_client
+from app.plugins.auth import security
 from app.core.routers import ws as wsmod
 
 
