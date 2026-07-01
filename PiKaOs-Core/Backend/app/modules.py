@@ -17,7 +17,7 @@ from fastapi import APIRouter, FastAPI
 
 from . import plugin_loader
 from .core.config import settings
-from .core.routers import health, llm_config, plugins, settings_config, ws
+from .core.routers import health, plugins, settings_config
 from .core.routers import storage as storage_router
 
 log = logging.getLogger("pikaos.plugins")
@@ -38,16 +38,16 @@ class Module:
     optional: bool = True
 
 
-# --- Base (Core): always on — infra + core + the agent-runtime platform (engine) --------------------
+# --- Base (Core): always on — infra + core (the kernel host: health/config/plugins) ----------------
+# The agent-runtime "engine" module + its ws/llm_config routers moved to the `ai` plugin; auth (login/RBAC)
+# is the `auth` plugin; knowledge/documents are the `knowledge` plugin. The Base is now just the shell.
 BASE_MODULES: tuple[Module, ...] = (
     Module("infra", routers=(health.router,), optional=False),
     Module(
-        "core",  # access / system config the kernel serves; auth (login/RBAC) is now the `auth` plugin
-        routers=(llm_config.router, llm_config.roles_router, storage_router.router,
-                 settings_config.router, plugins.router),
+        "core",  # access / system config the kernel serves
+        routers=(storage_router.router, settings_config.router, plugins.router),
         optional=False,
     ),
-    Module("engine", routers=(ws.router,), optional=False),  # agent-ops runtime — part of Core
 )
 BASE_NAMES: frozenset[str] = frozenset(m.name for m in BASE_MODULES)
 
@@ -75,11 +75,11 @@ def active_modules() -> list[Module]:
     _DEGRADED.clear()
     mods = list(BASE_MODULES)
     for pid in plugin_loader.topo_order(enabled_optional_modules(), PLUGIN_MANIFESTS):
-        # A plugin contributes a router only if its manifest declares routes. `kind: tool` plugins
-        # (postgres/minio/…) provide a DI contract via register() and expose no HTTP surface — mounting
-        # a router for them is neither expected nor possible (their package exports none).
+        # `kind: tool` plugins (postgres/minio/…) provide a DI contract via register() and expose no HTTP
+        # surface — they export no `router`, so don't try to mount one (mounting nothing ≠ degraded).
+        # Capability/app plugins must export a `router`; a missing one is a real fault (degraded, §8).
         manifest = PLUGIN_MANIFESTS.get(pid)
-        if manifest is not None and not manifest.routes:
+        if manifest is not None and manifest.kind == "tool":
             mods.append(Module(name=pid, routers=()))
             continue
         try:

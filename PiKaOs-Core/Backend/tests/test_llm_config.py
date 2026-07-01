@@ -14,13 +14,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core import crypto
 from app.core.config import settings
-from app.core.models import LlmConnection, LlmRoleBinding
-from app.core.repositories import llm_connections as repo
-from app.core.repositories import llm_role_bindings as role_repo
-from app.core.services import llm_config_service as svc
-from app.core.services.llm_anthropic import AnthropicProvider
-from app.core.services.llm_ollama import OllamaProvider
-from app.core.services.llm_openai import OpenAIProvider
+from app.plugins.ai.models import LlmConnection, LlmRoleBinding
+from app.plugins.ai import llm_connections_repo as repo
+from app.plugins.ai import llm_role_bindings_repo as role_repo
+from app.plugins.ai import llm_config_service as svc
+from app.plugins.ai.llm_anthropic import AnthropicProvider
+from app.plugins.ai.llm_ollama import OllamaProvider
+from app.plugins.ai.llm_openai import OpenAIProvider
 
 
 # --- crypto (encrypt at rest) -----------------------------------------------

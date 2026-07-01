@@ -19,7 +19,7 @@ from app import modules, plugin_loader
 from app.core import contracts
 from app.core.container import Container
 from app.core.events import EventBus
-from app.core.services.agent_runner import Retriever
+from app.core.contracts import Retriever
 
 
 def _ctx() -> plugin_loader.PluginContext:

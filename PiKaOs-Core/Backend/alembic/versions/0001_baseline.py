@@ -52,96 +52,16 @@ def upgrade() -> None:
     # `knowledge` plugin — it owns them on its own metadata and creates them via its migrate() step
     # (CREATE EXTENSION vector → create_all → HNSW index). Core no longer creates them.
 
-    # ===================== MODULE: engine (agent-ops) =====================
-    # Stateful. FKs → core (users/departments) or within engine (rooms/agents/quests/runs) only.
-
-    op.create_table(
-        "rooms",
-        sa.Column("id", UUID, primary_key=True),
-        sa.Column("name", sa.String(120), nullable=False, server_default=""),
-        sa.Column("template", sa.String(64), nullable=False, server_default=""),
-        sa.Column("created_by", UUID, nullable=True),
-        sa.Column("department_id", UUID, nullable=True),
-        _ts(),
-    )
-    op.create_index("ix_rooms_department_id", "rooms", ["department_id"])
-
-    op.create_table(
-        "agents",
-        sa.Column("id", UUID, primary_key=True),
-        sa.Column("owner_id", UUID, nullable=True),
-        sa.Column("name", sa.String(120), nullable=False, server_default=""),
-        sa.Column("role", sa.String(64), nullable=False, server_default=""),
-        sa.Column("status", sa.String(32), nullable=False, server_default="idle"),  # AI-set only
-        sa.Column("model", sa.String(64), nullable=False, server_default=""),
-        sa.Column("skills", ARR(sa.String()), nullable=False, server_default=_EMPTY_ARR),
-        sa.Column("granted_tools", ARR(sa.String()), nullable=False, server_default=_EMPTY_ARR),
-        sa.Column("sprite", sa.String(64), nullable=False, server_default=""),
-        sa.Column("room_id", UUID, sa.ForeignKey("rooms.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("department_id", UUID, nullable=True),
-        _ts(),
-    )
-    op.create_index("ix_agents_owner_id", "agents", ["owner_id"])
-    op.create_index("ix_agents_room_id", "agents", ["room_id"])
-    op.create_index("ix_agents_department_id", "agents", ["department_id"])
-
-    op.create_table(
-        "quests",
-        sa.Column("id", UUID, primary_key=True),
-        sa.Column("title", sa.String(255), nullable=False, server_default=""),
-        sa.Column("brief", sa.Text(), nullable=False, server_default=""),
-        sa.Column("room_id", UUID, sa.ForeignKey("rooms.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("status", sa.String(32), nullable=False, server_default="open"),
-        sa.Column("created_by", UUID, nullable=True),
-        sa.Column("department_id", UUID, nullable=True),
-        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),  # soft delete
-        _ts(),
-    )
-    op.create_index("ix_quests_room_id", "quests", ["room_id"])
-    op.create_index("ix_quests_department_id", "quests", ["department_id"])
-
-    op.create_table(
-        "runs",
-        sa.Column("id", UUID, primary_key=True),
-        sa.Column("kind", sa.String(16), nullable=False, server_default="agent"),  # agent | orchestration
-        sa.Column("parent_run_id", UUID, sa.ForeignKey("runs.id", ondelete="CASCADE"), nullable=True),
-        sa.Column("agent_id", UUID, sa.ForeignKey("agents.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("quest_id", UUID, sa.ForeignKey("quests.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("room_id", UUID, sa.ForeignKey("rooms.id", ondelete="SET NULL"), nullable=True),
-        # denormalized from room/agent at creation for fast department-scoped filtering (§7.1)
-        sa.Column("department_id", UUID, nullable=True),
-        sa.Column("status", sa.String(32), nullable=False, server_default="queued"),
-        sa.Column("input", JSONB, nullable=True),
-        sa.Column("tokens_used", sa.BigInteger(), nullable=False, server_default="0"),
-        sa.Column("error", sa.Text(), nullable=True),
-        sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("ended_at", sa.DateTime(timezone=True), nullable=True),
-        _ts(),
-    )
-    op.create_index("ix_runs_parent_run_id", "runs", ["parent_run_id"])
-    op.create_index("ix_runs_quest_status", "runs", ["quest_id", "status"])
-    op.create_index("ix_runs_department_id", "runs", ["department_id"])
-
-    op.create_table(
-        "run_steps",
-        sa.Column("id", UUID, primary_key=True),
-        sa.Column("run_id", UUID, sa.ForeignKey("runs.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("seq", sa.Integer(), nullable=False),
-        sa.Column("kind", sa.String(16), nullable=False),                       # llm|tool|message|status
-        sa.Column("status", sa.String(16), nullable=False, server_default="done"),  # pending|done|failed
-        sa.Column("idempotency_key", sa.String(128), nullable=True),            # "{run_id}:{seq}"
-        sa.Column("role", sa.String(32), nullable=True),
-        sa.Column("content", JSONB, nullable=True),
-        sa.Column("tokens", sa.Integer(), nullable=False, server_default="0"),
-        _ts(),
-        sa.UniqueConstraint("run_id", "seq", name="uq_run_steps_run_seq"),
-    )
+    # NOTE (AI extraction): the engine tables — rooms · agents · tasks · runs · run_steps (+
+    # stub_tool_writes · llm_connections · llm_role_bindings, formerly migrations 0002/0003/0004) — moved
+    # to the `ai` plugin. It owns them on its own metadata and creates them via its migrate() step. Core
+    # no longer creates any of them.
+    #
+    # After the auth/knowledge/ai extractions this baseline creates NO domain tables — Core's own tables
+    # (app_settings · user_settings · telegram_*) are created by their later migrations (0007/0008/0010).
+    # Kept as the chain root (down_revision=None) so the history stays linear on a fresh DB.
+    pass
 
 
 def downgrade() -> None:
-    # reverse dependency order (auth tables are owned by the auth plugin now — not dropped here)
-    op.drop_table("run_steps")
-    op.drop_table("runs")
-    op.drop_table("quests")
-    op.drop_table("agents")
-    op.drop_table("rooms")
+    pass

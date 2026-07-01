@@ -11,7 +11,7 @@ import json
 
 import httpx
 
-from app.core.services.llm_openai import (
+from app.plugins.ai.llm_openai import (
     OpenAIProvider,
     parse_openai_response,
     to_openai_messages,

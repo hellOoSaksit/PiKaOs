@@ -13,7 +13,7 @@ import json
 
 import httpx
 
-from app.core.services.llm_ollama import (
+from app.plugins.ai.llm_ollama import (
     OllamaProvider,
     parse_ollama_response,
     to_ollama_messages,

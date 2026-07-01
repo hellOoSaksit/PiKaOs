@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 
 class NavConfigIn(BaseModel):
@@ -121,47 +121,6 @@ class KnowledgeReindexOut(BaseModel):
     matched: int   # documents in scope to rebuild
     queued: int    # ingest jobs actually enqueued (best-effort; < matched on a Redis outage)
     model: str     # the embedding model they'll be (re)embedded with
-
-
-# --- runtime LLM provider config (no-hardcode — admin sets API vs Local from the UI) ---
-
-
-class LlmConnectionIn(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
-    provider: str = Field(description="ollama | openai | anthropic")
-    model: str = ""
-    base_url: str | None = None
-    api_key: str | None = None         # write-only — encrypted at rest, never returned
-
-
-class LlmConnectionUpdate(BaseModel):
-    name: str | None = None
-    provider: str | None = None
-    model: str | None = None
-    base_url: str | None = None
-    api_key: str | None = None         # omit/empty = leave the stored key unchanged
-
-
-class LlmConnectionOut(BaseModel):
-    id: uuid.UUID
-    name: str
-    provider: str
-    model: str
-    base_url: str | None = None
-    is_active: bool
-    api_key_set: bool                  # masked — true if a key is stored (the value is never sent)
-    created_at: datetime
-
-
-# Per-system LLM assignment (which connection a role uses — engine/search/summarize)
-class LlmRoleSet(BaseModel):
-    connection_id: uuid.UUID | None = None    # null = clear the binding (fall back to active)
-
-
-class LlmRoleOut(BaseModel):
-    role: str
-    connection_id: uuid.UUID | None = None
-    connection_name: str | None = None
 
 
 # Object-storage status (read-only) — surfaced in the tools tab. No secrets: access/secret keys

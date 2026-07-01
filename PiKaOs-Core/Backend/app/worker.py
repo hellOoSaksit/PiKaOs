@@ -1,32 +1,26 @@
-"""arq worker entrypoint (B2) — the engine's run loop, plus whatever jobs the enabled plugins contribute.
+"""arq worker entrypoint — runs whatever jobs the enabled plugins contribute, out-of-process from the
+FastAPI web app (a crashed or slow job can't take the API down). Same image, different command
+(`arq app.worker.WorkerSettings`); see the `worker` service in deploy/docker-compose.ai.yml.
 
-Runs the agent-ops engine jobs out-of-process from the FastAPI web app — a crashed or slow job can't take
-the API down, and jobs run concurrently. Same image, different command (`arq app.worker.WorkerSettings`);
-see the `worker` service in deploy/docker-compose.ai.yml.
-
-This module is **Core only** — it imports no plugin. The engine job `agent_run` is Base; every *feature*
-job (e.g. knowledge's `ingest_document`) is contributed by its plugin's `jobs` list and discovered through
-the Loader (dynamic import). At startup the worker assembles the DI container + Event Bus, runs each enabled
-plugin's `register()/boot()`, and resolves the `knowledge.Retriever` contract for the engine — so the engine
-gets RAG when knowledge is enabled and `None` when it isn't, without ever importing the plugin (§5).
+This module is **Core only** — it imports no plugin. Every job (e.g. the AI plugin's `agent_run`, the
+knowledge plugin's `ingest_document`) is contributed by its plugin's `jobs` list and discovered through
+the Loader (dynamic import). At startup the worker assembles the DI container + Event Bus and runs each
+enabled plugin's `register()/boot()` in dependency order — so a plugin's `boot()` (e.g. the AI engine
+wiring its runtime + resolving the optional `knowledge.Retriever`) happens here, without the worker ever
+importing the plugin (§5).
 """
 from __future__ import annotations
 
 import logging
 
-from arq import func
 from arq.connections import RedisSettings
 
 from . import modules, plugin_loader
-from .core import contracts
 from .core.config import settings
 from .core.container import Container
 from .core.db import SessionLocal
 from .core.events import EventBus
 from .core.logging_ctx import configure_worker_logging
-from .core.services import agent_runner
-from .core.services.engine_stubs import StubToolRegistry
-from .core.services.llm_config_service import ConfiguredLLMProvider
 
 log = logging.getLogger("pikaos.worker")
 
@@ -36,17 +30,11 @@ async def ping(ctx) -> str:
     return "pong"
 
 
-async def agent_run(ctx, run_id: str) -> str:
-    """arq job: execute (or resume) one agent run. See services/agent_runner.run."""
-    return await agent_runner.run_job(run_id)
-
-
 async def startup(ctx) -> None:
-    """Wire structured logging (B7), assemble the plugin tier, and configure the engine runtime once per
-    worker. The DI container + Event Bus are built here (this worker is a composition root); each enabled
-    plugin's register()/boot() runs in dependency order, then the engine resolves its optional `Retriever`
-    contract from the container — present iff a provider plugin (knowledge) is enabled. The LLM provider is
-    resolved from the DB (llm_connections) per call with a short cache, env fallback; tools stay stub until C5."""
+    """Wire structured logging (B7) and assemble the plugin tier once per worker. The DI container +
+    Event Bus are built here (this worker is a composition root); each enabled plugin's register()/boot()
+    runs in dependency order — a plugin's boot() (e.g. the AI engine wiring its runtime + resolving the
+    optional `knowledge.Retriever`) happens there, never in this Core module."""
     configure_worker_logging()
 
     container, bus = Container(), EventBus()
@@ -58,14 +46,8 @@ async def startup(ctx) -> None:
                                                                         settings=settings))
     if result.degraded:  # §8 — a plugin whose register/boot raised; the worker stays up
         log.warning("plugins degraded (lifecycle failed, others unaffected): %s", result.degraded)
-
-    # The engine consumes RAG only through the contract — never an import. Unresolved (no knowledge) → None.
-    retriever = container.resolve(contracts.RETRIEVER)
-    agent_runner.set_engine_runtime(ConfiguredLLMProvider(), StubToolRegistry(), retriever=retriever)
-    log.info("pikaos worker up — structured logging on · engine runtime: DB-configured LLM "
-             "(env fallback: %s) + stub tools · plugins booted: %s · degraded: %s · RAG retriever: %s",
-             settings.llm_provider, result.booted or "(none)", result.degraded or "(none)",
-             "on" if retriever else "off")
+    log.info("pikaos worker up — structured logging on · plugins booted: %s · degraded: %s",
+             result.booted or "(none)", result.degraded or "(none)")
 
 
 async def shutdown(ctx) -> None:
@@ -85,11 +67,11 @@ async def shutdown(ctx) -> None:
 
 
 def _active_functions() -> list:
-    """The arq job set for this build: infra `ping` + the engine `agent_run` (Base, always on) + the jobs
-    every enabled plugin contributes via its `jobs` list (collected through the Loader — no plugin import
-    here, §5). `agent_run` is keyed by run_id so arq dedups concurrent enqueues (resume replay-safety)."""
+    """The arq job set for this build: infra `ping` + the jobs every enabled plugin contributes via its
+    `jobs` list (collected through the Loader — no plugin import here, §5). The AI plugin contributes
+    `agent_run` (with its `keep_result` wrapper); knowledge contributes `ingest_document`; etc."""
     plugin_jobs = plugin_loader.collect_jobs(modules.enabled_optional_modules(), modules.PLUGIN_MANIFESTS)
-    return [ping, func(agent_run, keep_result=3600), *plugin_jobs]
+    return [ping, *plugin_jobs]
 
 
 class WorkerSettings:

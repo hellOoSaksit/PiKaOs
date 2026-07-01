@@ -19,8 +19,8 @@ from types import SimpleNamespace
 import pytest
 
 from app.core.config import settings
-from app.core.services import agent_runner
-from app.core.services.agent_runner import (
+from app.plugins.ai import agent_runner
+from app.plugins.ai.agent_runner import (
     EFFECT_READ,
     EFFECT_SIDE_EFFECT,
     LLMResult,
