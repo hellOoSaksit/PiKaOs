@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     # in Backend/.env so plugin code is exercised. See app/modules.py for the registry.
     enabled_modules: str = ""
 
+    # --- kernel local-JSON state (zero-datastore kernel) ---
+    # Where the kernel persists its OWN state as JSON — the plugin install registry (read at boot to
+    # resolve ENABLED_MODULES, so the kernel needs no DB to know its plugin set), the shared nav/global
+    # config, and per-user prefs. MUST be a persistent volume shared by the backend + worker (both read
+    # the registry). See app/core/kernel_state.py.
+    kernel_state_dir: str = "/app/state"
+
     # --- database (async SQLAlchemy / asyncpg) ---
     database_url: str = "postgresql+asyncpg://pikaos:pikaos@db:5432/pikaos"
 

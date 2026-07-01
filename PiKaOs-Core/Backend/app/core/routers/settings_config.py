@@ -1,59 +1,78 @@
 """App settings HTTP routes — server-scoped, cross-device config (`/api/settings`).
 
-The sidebar nav arrangement lives here so an admin's layout is the same on every user and device
-(it used to be per-browser localStorage). Read = any authenticated user (the sidebar needs it on
-load); write = `options.manage` (the same permission that opens the Menu Manager). Backed by the
-generic `app_settings` table under key "nav".
+The sidebar nav arrangement lives here so an admin's layout is the same on every user and device (it used
+to be per-browser localStorage). Read = any authenticated user (the sidebar needs it on load); write =
+`options.manage`. Backed by **kernel local-JSON** now (zero-datastore kernel): the shared nav + global
+blobs live in the `app_settings` state file (`{key: {value, updated_at}}`), per-user prefs in
+`user_settings` (`{user_id: {key: value}}`). The API + response schemas are unchanged, so the frontend is
+untouched.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime, timezone
+from typing import Any
 
-from ..db import get_db
+from fastapi import APIRouter, Depends
+
+from .. import kernel_state
 from ..identity import UserLike, get_current_user, require_perm
-from ..repositories import app_settings as repo
-from ..repositories import user_settings as user_repo
 from ..schemas import GlobalConfigOut, NavConfigIn, NavConfigOut, SettingValueIn, UserSettingsOut
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 _NAV_KEY = "nav"
+_APP = "app_settings"       # {key: {"value": <json>, "updated_at": <iso>}}
+_USERS = "user_settings"    # {user_id: {key: <json>}}
+
+
+# --- shared (app-scoped) config over the app_settings state file ------------------------------------
+
+def _app_get(key: str) -> dict | None:
+    """The `{value, updated_at}` entry for `key`, or None if never written."""
+    entry = kernel_state.read_json(_APP, {}).get(key)
+    return entry if isinstance(entry, dict) else None
+
+
+def _app_upsert(key: str, value: Any) -> dict:
+    """Create or overwrite `key`'s value; stamps `updated_at`; returns the new entry."""
+    store = kernel_state.read_json(_APP, {})
+    entry = {"value": value, "updated_at": datetime.now(timezone.utc).isoformat()}
+    store[key] = entry
+    kernel_state.write_json(_APP, store)
+    return entry
 
 
 @router.get("/nav", response_model=NavConfigOut)
-async def get_nav(
-    _: UserLike = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> NavConfigOut:
+async def get_nav(_: UserLike = Depends(get_current_user)) -> NavConfigOut:
     """The shared sidebar arrangement (or value=null when an admin hasn't customized it yet)."""
-    row = await repo.get(db, _NAV_KEY)
-    if row is None:
+    entry = _app_get(_NAV_KEY)
+    if entry is None:
         return NavConfigOut(value=None, updated_at=None)
-    return NavConfigOut(value=row.value, updated_at=row.updated_at)
+    return NavConfigOut(value=entry.get("value"), updated_at=entry.get("updated_at"))
 
 
 @router.put("/nav", response_model=NavConfigOut)
 async def put_nav(
     body: NavConfigIn,
     user: UserLike = Depends(require_perm("options.manage")),
-    db: AsyncSession = Depends(get_db),
 ) -> NavConfigOut:
     """Replace the shared sidebar arrangement (admin only). The frontend owns the value's shape."""
-    row = await repo.upsert(db, _NAV_KEY, body.value, updated_by=user.id)
-    return NavConfigOut(value=row.value, updated_at=row.updated_at)
+    entry = _app_upsert(_NAV_KEY, body.value)
+    return NavConfigOut(value=entry["value"], updated_at=entry["updated_at"])
 
 
 # --- per-user settings (theme/lexicon/...) — follow the user across devices (the per-user tier) ---
 
 
+def _user_all(user_id: str) -> dict[str, Any]:
+    values = kernel_state.read_json(_USERS, {}).get(user_id)
+    return dict(values) if isinstance(values, dict) else {}
+
+
 @router.get("/me", response_model=UserSettingsOut)
-async def get_my_settings(
-    user: UserLike = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> UserSettingsOut:
+async def get_my_settings(user: UserLike = Depends(get_current_user)) -> UserSettingsOut:
     """All of the current user's personal settings ({key: value}); empty for a fresh account."""
-    return UserSettingsOut(values=await user_repo.get_all(db, user.id))
+    return UserSettingsOut(values=_user_all(str(user.id)))
 
 
 @router.put("/me/{key}", response_model=UserSettingsOut)
@@ -61,25 +80,25 @@ async def set_my_setting(
     key: str,
     body: SettingValueIn,
     user: UserLike = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
 ) -> UserSettingsOut:
     """Set one of the current user's settings (own scope only)."""
-    await user_repo.upsert(db, user.id, key, body.value)
-    return UserSettingsOut(values=await user_repo.get_all(db, user.id))
+    uid = str(user.id)
+    store = kernel_state.read_json(_USERS, {})
+    values = dict(store.get(uid) or {})
+    values[key] = body.value
+    store[uid] = values
+    kernel_state.write_json(_USERS, store)
+    return UserSettingsOut(values=values)
 
 
 # --- generic global config blobs (Tools/system settings — same for everyone, the global tier) ---
 
 
 @router.get("/global/{key}", response_model=GlobalConfigOut)
-async def get_global(
-    key: str,
-    _: UserLike = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> GlobalConfigOut:
+async def get_global(key: str, _: UserLike = Depends(get_current_user)) -> GlobalConfigOut:
     """A shared config blob by key (or null). Any authenticated user can read it."""
-    row = await repo.get(db, key)
-    return GlobalConfigOut(value=row.value if row else None)
+    entry = _app_get(key)
+    return GlobalConfigOut(value=entry.get("value") if entry else None)
 
 
 @router.put("/global/{key}", response_model=GlobalConfigOut)
@@ -87,8 +106,7 @@ async def put_global(
     key: str,
     body: SettingValueIn,
     user: UserLike = Depends(require_perm("options.manage")),
-    db: AsyncSession = Depends(get_db),
 ) -> GlobalConfigOut:
     """Set a shared config blob (requires options.manage). Seen by every user/device."""
-    row = await repo.upsert(db, key, body.value, updated_by=user.id)
-    return GlobalConfigOut(value=row.value)
+    entry = _app_upsert(key, body.value)
+    return GlobalConfigOut(value=entry["value"])

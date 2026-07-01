@@ -57,10 +57,12 @@ def upgrade() -> None:
     # to the `ai` plugin. It owns them on its own metadata and creates them via its migrate() step. Core
     # no longer creates any of them.
     #
-    # After the auth/knowledge/ai/chat extractions this baseline creates NO domain tables — Core's own
-    # tables (app_settings · user_settings) are created by their later migrations (0007/0008). The former
-    # telegram tables (0010) left Core for the `chat` plugin + `telegram` Tool (own metadata + migrate()).
-    # Kept as the chain root (down_revision=None) so the history stays linear on a fresh DB.
+    # After the auth/knowledge/ai/chat extractions AND the settings→local-JSON move, this baseline (and the
+    # whole Core Alembic history) creates NO tables at all — the kernel Base is empty. Core's former own
+    # tables app_settings/user_settings (migrations 0007/0008, now deleted) became kernel local-JSON state
+    # (app/core/kernel_state.py); the telegram tables (0010) left for the chat plugin + telegram Tool. Every
+    # remaining table is plugin-owned (created by each plugin's migrate() step, not here). Kept as the chain
+    # root (down_revision=None) so the history stays linear on a fresh DB.
     pass
 
 
