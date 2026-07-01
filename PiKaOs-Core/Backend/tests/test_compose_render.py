@@ -17,6 +17,12 @@ def test_merge_is_pure():
     assert "db" not in base["services"]  # input not mutated
 
 
+def test_merge_unions_networks():
+    base = {"services": {}, "networks": {"a": None}}
+    out = merge_fragments(base, [{"networks": {"b": None}}])
+    assert set(out["networks"]) == {"a", "b"}
+
+
 def test_real_postgres_fragment_loads():
     from app.plugin_loader import discover
     from app.core.compose_render import load_tool_fragments

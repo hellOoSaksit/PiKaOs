@@ -8,7 +8,6 @@ are separate, later steps. Keeping it pure makes the merge fully unit-testable w
 from __future__ import annotations
 
 import copy
-from pathlib import Path
 
 import yaml
 
@@ -22,7 +21,7 @@ def merge_fragments(base: dict, fragments: list[dict]) -> dict:
     for frag in fragments:
         for section in ("services", "volumes", "networks"):
             if section in frag:
-                out.setdefault(section, {}).update(frag[section] or {})
+                out.setdefault(section, {}).update(copy.deepcopy(frag[section] or {}))
     return out
 
 
