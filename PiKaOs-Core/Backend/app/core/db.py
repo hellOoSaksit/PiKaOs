@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 
+from fastapi import Request
 from pgvector.asyncpg import register_vector
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
@@ -35,7 +36,22 @@ class Base(DeclarativeBase):
     pass
 
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
+def _session_factory_from(request: Request):
+    """The session factory a tool bound under `postgres.Connection` on the app container
+    (`main.py:lifespan`), else this module's `SessionLocal` — the bootstrap path used before startup, in
+    kernel mode (no postgres tool enabled), or if the container wiring is unavailable for any reason.
+    Never raises: DB access must not fail on composition wiring."""
+    try:
+        from .contracts import POSTGRES_CONNECTION
+        conn = request.app.state.container.resolve(POSTGRES_CONNECTION)
+        if conn and conn.get("session_factory"):
+            return conn["session_factory"]
+    except Exception:  # noqa: BLE001 — fall back to the module factory on any wiring gap
+        pass
+    return SessionLocal
+
+
+async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency yielding a transactional session."""
-    async with SessionLocal() as session:
+    async with _session_factory_from(request)() as session:
         yield session
