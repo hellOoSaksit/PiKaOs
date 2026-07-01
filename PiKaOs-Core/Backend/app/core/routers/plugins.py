@@ -25,17 +25,18 @@ router = APIRouter(prefix="/api/plugins", tags=["plugins"])
 
 
 def _manifests() -> dict:
-    """Discovered plugin manifests. Lazy import of `app.modules` avoids the import cycle (modules imports
-    this router); `PLUGIN_MANIFESTS` is computed once at modules import."""
-    from ... import modules
-    return modules.PLUGIN_MANIFESTS
+    """Discovered plugin manifests, read from the kernel catalog (`plugin_loader.PLUGIN_MANIFESTS`,
+    computed once at import). Read here rather than from `modules` so this Core router never reaches UP
+    into the composition seam (§2.1). Lazy import keeps it out of module-load order."""
+    from ... import plugin_loader
+    return plugin_loader.PLUGIN_MANIFESTS
 
 
 def _active_now() -> set[str]:
     """The plugins actually mounted in THIS process (driven by ENABLED_MODULES at boot) — used to tell the
     UI when a registry change still needs a restart to take effect."""
-    from ... import modules
-    return modules.enabled_optional_modules()
+    from ... import plugin_loader
+    return plugin_loader.enabled_optional_modules()
 
 
 # --- schemas ----------------------------------------------------------------------------------------

@@ -318,3 +318,25 @@ def shutdown_plugins(enabled: set[str], manifests: dict[str, Manifest], ctx: Plu
             errors[pid] = str(exc)
             log.exception("plugin '%s' shutdown() failed", pid)
     return errors
+
+
+# --- kernel plugin catalog (discovered once at import) ----------------------------------------------
+# The kernel owns *which plugins exist* and *which are enabled* — pure discovery + selection, no plugin
+# code imported. Lives here (kernel) rather than in `modules` (the composition seam) so Core-side consumers
+# (composition, plugin_registry, the plugins router) read it without reaching UP into the composition root.
+# `modules` re-exports these for backward compatibility. Empty in a plugin-free Core build.
+PLUGIN_MANIFESTS: dict[str, Manifest] = discover()
+OPTIONAL_MODULE_NAMES: tuple[str, ...] = tuple(sorted(PLUGIN_MANIFESTS))
+
+
+def enabled_optional_modules() -> set[str]:
+    """The PLUGINS this build loads on top of the Base, parsed from `settings.enabled_modules`:
+    "" / unset = **Base only, no plugins** (the default) · "*" = every plugin · a comma-list = those
+    plugins, intersected with the discovered manifest ids (an unknown name is ignored, never fatal)."""
+    raw = (settings.enabled_modules or "").strip()
+    if raw == "*":
+        return set(OPTIONAL_MODULE_NAMES)
+    if raw == "":
+        return set()
+    wanted = {p.strip() for p in raw.split(",") if p.strip()}
+    return wanted & set(OPTIONAL_MODULE_NAMES)

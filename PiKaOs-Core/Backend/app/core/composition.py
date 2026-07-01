@@ -9,7 +9,7 @@ crashes the caller.
 """
 from __future__ import annotations
 
-from .. import plugin_loader, modules
+from .. import plugin_loader
 from .config import settings
 from .container import Container
 from .events import EventBus
@@ -21,7 +21,7 @@ def build_container(enabled: set[str], session_factory) -> tuple[Container, Even
     container, bus = Container(), EventBus()
     ctx = plugin_loader.PluginContext(container=container, events=bus,
                                       session_factory=session_factory, settings=settings)
-    result = plugin_loader.register_plugins(enabled, modules.PLUGIN_MANIFESTS, ctx)
+    result = plugin_loader.register_plugins(enabled, plugin_loader.PLUGIN_MANIFESTS, ctx)
     return container, bus, result
 
 
@@ -30,4 +30,4 @@ def teardown_container(container: Container, bus: EventBus, enabled: set[str], s
     so a misbehaving shutdown() never blocks the rest. Returns errors."""
     ctx = plugin_loader.PluginContext(container=container, events=bus,
                                       session_factory=session_factory, settings=settings)
-    return plugin_loader.shutdown_plugins(enabled, modules.PLUGIN_MANIFESTS, ctx)
+    return plugin_loader.shutdown_plugins(enabled, plugin_loader.PLUGIN_MANIFESTS, ctx)

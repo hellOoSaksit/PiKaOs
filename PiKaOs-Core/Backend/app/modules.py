@@ -52,21 +52,11 @@ BASE_MODULES: tuple[Module, ...] = (
 BASE_NAMES: frozenset[str] = frozenset(m.name for m in BASE_MODULES)
 
 # --- Plugins (features): discovered + validated from manifests at import (§3) -----------------------
-PLUGIN_MANIFESTS: dict[str, plugin_loader.Manifest] = plugin_loader.discover()
-OPTIONAL_MODULE_NAMES: tuple[str, ...] = tuple(sorted(PLUGIN_MANIFESTS))
-
-
-def enabled_optional_modules() -> set[str]:
-    """The PLUGINS this build loads on top of the Base, parsed from `settings.enabled_modules`:
-    "" / unset = **Base only, no plugins** (the default) · "*" = every plugin · a comma-list = those
-    plugins, intersected with the discovered manifest ids (an unknown name is ignored, never fatal)."""
-    raw = (settings.enabled_modules or "").strip()
-    if raw == "*":
-        return set(OPTIONAL_MODULE_NAMES)
-    if raw == "":
-        return set()
-    wanted = {p.strip() for p in raw.split(",") if p.strip()}
-    return wanted & set(OPTIONAL_MODULE_NAMES)
+# The catalog + enable-selection now live in the kernel (`plugin_loader`) so Core-side consumers read them
+# without importing this composition seam; re-exported here to keep `modules`' public API stable.
+PLUGIN_MANIFESTS: dict[str, plugin_loader.Manifest] = plugin_loader.PLUGIN_MANIFESTS
+OPTIONAL_MODULE_NAMES: tuple[str, ...] = plugin_loader.OPTIONAL_MODULE_NAMES
+enabled_optional_modules = plugin_loader.enabled_optional_modules
 
 
 def is_module_active(name: str) -> bool:

@@ -8,9 +8,12 @@
 #      plugin only through the DI container (`knowledge.Retriever` contract) + the Event Bus, and the
 #      worker discovers plugin jobs via the Loader's dynamic import — zero static plugin imports.
 #   2. Plugin ↛ sibling plugin (§2.3) — features talk only through Core contracts, never each other.
-#      Add every new app.plugins.<id> to the independence contract as it lands.
+#      Enforced in each plugin repo's OWN CI (which links the plugin into a Core checkout), NOT here:
+#      a plugin-free Core checkout has no app.plugins.<id> for grimp to resolve, so listing them would
+#      make lint-imports fail with "module does not exist" before any contract is even checked.
 #   3. Core ↛ App composition (§2.1) — the Base never reaches up into the composition seam
-#      (main/worker/modules/plugin_loader = the PiKaOs-App layer). Inversions go through app.state / DI.
+#      (main/worker/modules = the PiKaOs-App layer). `plugin_loader` is the KERNEL plugin catalog
+#      (discover/topo/enabled-selection), so app.core MAY import it. Inversions go through app.state / DI.
 
 [importlinter]
 root_package = app
@@ -31,9 +34,11 @@ forbidden_modules =
 
 [importlinter:contract:core-must-not-import-app-composition]
 name = Core (Base) must not import the App composition seam (§2.1 — Core ↛ App)
-# The composition root (main/worker/modules/plugin_loader = the PiKaOs-App layer) wires Core + plugins
-# together; Core must never reach UP into it. The one prior breach — core/routers/health.py importing
-# `modules` for plugin_states() — was inverted via app.state (the App registers the provider at startup).
+# The composition root (main/worker/modules = the PiKaOs-App layer) wires Core + plugins together; Core
+# must never reach UP into it. `plugin_loader` is NOT in this list — the kernel-redesign moves the plugin
+# catalog (discover/topo/enabled-selection) into the kernel, so Core-side code (composition, plugin_registry,
+# the plugins router) legitimately imports it. A prior breach — core/routers/health.py importing `modules`
+# for plugin_states() — was inverted via app.state (the App registers the provider at startup).
 type = forbidden
 source_modules =
     app.core
@@ -41,12 +46,6 @@ forbidden_modules =
     app.main
     app.worker
     app.modules
-    app.plugin_loader
 
-[importlinter:contract:plugins-are-independent]
-name = Plugins must not import sibling plugins (§2.3)
-type = independence
-modules =
-    app.plugins.knowledge
-    app.plugins.minio
-    app.plugins.postgres
+# NOTE: the plugin↛sibling-plugin independence contract lives in each plugin repo's own CI (see header #2),
+# not here — a plugin-free Core checkout has no app.plugins.<id> modules for grimp to resolve.
