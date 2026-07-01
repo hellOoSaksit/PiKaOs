@@ -12,6 +12,7 @@ from __future__ import annotations
 from .. import plugin_loader
 from .config import settings
 from .container import Container
+from .contracts import IDENTITY
 from .events import EventBus
 
 
@@ -22,6 +23,11 @@ def build_container(enabled: set[str], session_factory) -> tuple[Container, Even
     ctx = plugin_loader.PluginContext(container=container, events=bus,
                                       session_factory=session_factory, settings=settings)
     result = plugin_loader.register_plugins(enabled, plugin_loader.PLUGIN_MANIFESTS, ctx)
+    # Kernel default: bind Core's built-in identity provider unless an auth plugin already bound one.
+    # (Temporary — Phase B moves this into the auth plugin; then unbound → BootstrapProvider takes over.)
+    if container.resolve(IDENTITY) is None:
+        from .services.core_identity_provider import CoreIdentityProvider
+        container.bind(IDENTITY, CoreIdentityProvider(session_factory))
     return container, bus, result
 
 
