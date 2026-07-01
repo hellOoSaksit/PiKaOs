@@ -48,6 +48,9 @@ class Manifest:
     routes: tuple[str, ...] = ()
     config_schema: str | None = None   # relative path to the plugin's config.schema.json (§11), if any
     migrations: str | None = None
+    kind: str = "capability"
+    secrets: tuple[str, ...] = ()
+    compose: str | None = None
     raw: dict = field(default_factory=dict)
 
 
@@ -120,6 +123,9 @@ def _validate(folder: str, raw: dict) -> Manifest:
             json.loads(schema_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as e:
             raise ManifestError(f"plugin '{pid}': config schema '{config_schema}' is not valid JSON — {e}") from e
+    kind = raw.get("kind", "capability")
+    if kind not in ("capability", "tool", "app"):
+        raise ManifestError(f"plugin '{pid}': kind '{kind}' must be one of capability|tool|app")
     return Manifest(
         id=pid, name=raw["name"], version=raw["version"], coreVersion=raw["coreVersion"],
         dependencies=tuple(raw.get("dependencies", [])),
@@ -127,6 +133,9 @@ def _validate(folder: str, raw: dict) -> Manifest:
         provides=tuple(raw.get("provides", [])), consumes=tuple(raw.get("consumes", [])),
         permissions=tuple(raw.get("permissions", [])), routes=tuple(raw.get("routes", [])),
         config_schema=config_schema, migrations=raw.get("migrations"),
+        kind=kind,
+        secrets=tuple(raw.get("secrets", [])),
+        compose=raw.get("compose"),
         raw=raw,
     )
 

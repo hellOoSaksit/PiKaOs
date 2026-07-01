@@ -31,6 +31,23 @@
       "description": "Semver RANGE of the Core this plugin is compatible with (\u00a74); the Loader refuses to load a plugin whose range excludes the running Core.",
       "minLength": 1
     },
+    "kind": {
+      "type": "string",
+      "description": "Packaging kind: capability (baked in-process), tool (sidecar/client engine), or app (standalone).",
+      "enum": ["capability", "tool", "app"],
+      "default": "capability"
+    },
+    "secrets": {
+      "type": "array",
+      "description": "Secret field names the operator fills in the tools tab; stored encrypted in kernel state (kernel-redesign \u00a71 Q1).",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+      "uniqueItems": true,
+      "default": []
+    },
+    "compose": {
+      "type": "string",
+      "description": "Path (relative to the plugin) to a docker-compose sidecar fragment; tool kind only."
+    },
     "dependencies": {
       "type": "array",
       "description": "Plugin ids that MUST boot first (\u00a74). The Loader topologically sorts on these; a cycle is a hard boot failure.",
