@@ -12,9 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..repositories import tasks as tasks_repo
 from ..repositories import runs as runs_repo
+from ..identity import ADMIN_ROLE
 from ..repositories import users as users_repo
 from .events import serialize_step
-from .rbac_service import ADMIN_ROLE
 
 
 async def can_view(db: AsyncSession, user_id: str, task_id: str) -> bool:

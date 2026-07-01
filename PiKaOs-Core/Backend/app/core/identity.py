@@ -20,6 +20,11 @@ from fastapi import HTTPException, Request, status
 
 from .contracts import IDENTITY
 
+# The well-known superuser role. Lives in the kernel identity module (not in the auth plugin's
+# rbac_service) so kernel/other-feature code can reference it without importing the auth plugin — e.g.
+# an admin-or-owner check. The auth plugin's rbac_service imports it from here.
+ADMIN_ROLE = "admin"
+
 
 # --- the contract (interface both sides agree on) ---------------------------------------------------
 
