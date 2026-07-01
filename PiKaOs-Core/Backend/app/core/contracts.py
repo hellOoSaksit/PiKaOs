@@ -25,4 +25,9 @@ POSTGRES_CONNECTION = "postgres.Connection"
 # get_object/presigned_get/remove_object/ping. The kernel resolves this instead of importing storage.py.
 STORAGE = "minio.Storage"
 
-__all__ = ["Retriever", "RETRIEVER", "POSTGRES_CONNECTION", "STORAGE"]
+# The identity/RBAC provider an auth plugin binds — authenticate(token)->user, has_perm, has_role.
+# The kernel's identity.py FastAPI deps resolve this per request; unbound → BootstrapProvider (deny data,
+# console-code gates setup). The interface (IdentityProvider Protocol) lives in identity.py.
+IDENTITY = "identity.Provider"
+
+__all__ = ["Retriever", "RETRIEVER", "POSTGRES_CONNECTION", "STORAGE", "IDENTITY"]
