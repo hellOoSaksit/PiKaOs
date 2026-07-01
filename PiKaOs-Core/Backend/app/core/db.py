@@ -36,7 +36,7 @@ class Base(DeclarativeBase):
     pass
 
 
-def _session_factory_from(request: Request):
+def _session_factory_from(request: Request) -> async_sessionmaker[AsyncSession]:
     """The session factory a tool bound under `postgres.Connection` on the app container
     (`main.py:lifespan`), else this module's `SessionLocal` — the bootstrap path used before startup, in
     kernel mode (no postgres tool enabled), or if the container wiring is unavailable for any reason.

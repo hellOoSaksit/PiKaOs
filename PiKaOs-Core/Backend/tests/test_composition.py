@@ -1,3 +1,5 @@
+from starlette.testclient import TestClient
+
 from app.core.composition import build_container, teardown_container
 from app.core.contracts import POSTGRES_CONNECTION
 from app.core.db import SessionLocal
@@ -24,13 +26,10 @@ def test_teardown_container_runs_clean():
     assert errors == {}                   # postgres has no shutdown() → no errors
 
 
-from starlette.testclient import TestClient
-
-
 def test_lifespan_populates_app_state(monkeypatch):
     import app.main as main
     # enable the postgres tool for this run so the container binds its connection
     monkeypatch.setattr(main.modules, "enabled_optional_modules", lambda: {"postgres"})
     with TestClient(main.app) as client:            # entering runs the lifespan startup
         assert client.get("/").status_code == 200
-        assert main.app.state.container.resolve("postgres.Connection")["session_factory"] is not None
+        assert main.app.state.container.resolve(POSTGRES_CONNECTION)["session_factory"] is not None
