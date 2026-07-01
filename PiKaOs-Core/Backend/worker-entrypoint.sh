@@ -14,4 +14,4 @@ if RESOLVED="$(python -m scripts.compute_enabled)"; then
   export ENABLED_MODULES="${RESOLVED}"
 fi
 
-exec arq app.worker.WorkerSettings
+exec arq app.plugins.redis.worker.WorkerSettings

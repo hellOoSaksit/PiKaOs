@@ -5,9 +5,8 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import redis_client
 from ..config import settings
-from ..contracts import STORAGE
+from ..contracts import REDIS_CONNECTION, STORAGE
 from ..db import get_db
 from ..schemas import HealthOut, PluginHealth, VersionOut
 
@@ -33,8 +32,12 @@ async def health(request: Request, db: AsyncSession = Depends(get_db)) -> Health
     except Exception:
         db_ok = "down"
 
-    redis_ok = "ok" if await redis_client.ping() else "down"
     _container = getattr(request.app.state, "container", None)
+    _redis = _container.resolve(REDIS_CONNECTION) if _container is not None else None
+    try:
+        redis_ok = "ok" if (_redis is not None and await _redis.ping()) else "down"
+    except Exception:
+        redis_ok = "down"
     _storage = _container.resolve(STORAGE) if _container is not None else None
     minio_ok = "ok" if (_storage is not None and _storage.ping()) else "down"
 

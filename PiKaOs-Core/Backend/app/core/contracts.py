@@ -50,4 +50,16 @@ STORAGE = "minio.Storage"
 # console-code gates setup). The interface (IdentityProvider Protocol) lives in identity.py.
 IDENTITY = "identity.Provider"
 
-__all__ = ["Retriever", "RETRIEVER", "AI_LLM", "POSTGRES_CONNECTION", "STORAGE", "IDENTITY"]
+# The Redis connection a tool plugin (redis) provides — the aioredis client. Consumers (auth session
+# store, ai run-cancel/realtime) resolve this instead of importing a kernel redis_client. Unbound →
+# the feature that needs Redis degrades (auth read-paths fail open; enqueue is best-effort).
+REDIS_CONNECTION = "redis.Connection"
+
+# The job-enqueue handle the redis tool provides — a best-effort `enqueue(job, *args) -> bool` over the
+# arq pool. Producers (knowledge ingestion) resolve this instead of importing a kernel queue module.
+REDIS_QUEUE = "redis.Queue"
+
+__all__ = [
+    "Retriever", "RETRIEVER", "AI_LLM", "POSTGRES_CONNECTION", "STORAGE", "IDENTITY",
+    "REDIS_CONNECTION", "REDIS_QUEUE",
+]

@@ -107,7 +107,7 @@ async def _noop(*a, **k):
 
 def _patch_io(monkeypatch):
     """Isolate to Postgres: no Redis cancel checks, no event publishing in these tests."""
-    monkeypatch.setattr(agent_runner.redis_client, "is_run_cancelled", _never_cancelled)
+    monkeypatch.setattr(agent_runner.redis_bus, "is_run_cancelled", _never_cancelled)
     monkeypatch.setattr(agent_runner.events, "publish_step", _noop)
     monkeypatch.setattr(agent_runner.events, "publish_run", _noop)
 

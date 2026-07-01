@@ -9,6 +9,10 @@ pydantic-settings==2.14.1
 PyJWT==2.13.0
 argon2-cffi==25.1.0
 cryptography==43.0.3
+# Plugin-owned datastore libs — the kernel CODE no longer imports these; they belong to their Tool
+# plugins (redis/arq → PiKaOs-Plugin-Tools-Redis, minio → -Tools-MinIO, sqlalchemy/asyncpg/pgvector/
+# alembic → -Tools-Postgres). They stay in the kernel image until the build-merge machinery merges each
+# enabled plugin's requirements at install; only then do they drop from here.
 redis==5.3.1
 arq==0.28.0
 minio==7.2.20

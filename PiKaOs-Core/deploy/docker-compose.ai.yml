@@ -47,7 +47,7 @@ services:
     # `arq --check` exits 0 only when the worker wrote a recent health record to Redis. MUST mirror the
     # worker healthcheck in docker-compose.backend.yml (release-and-rollback.md §2).
     healthcheck:
-      test: ["CMD", "arq", "app.worker.WorkerSettings", "--check"]
+      test: ["CMD", "arq", "app.plugins.redis.worker.WorkerSettings", "--check"]
       interval: 15s
       timeout: 5s
       start_period: 40s

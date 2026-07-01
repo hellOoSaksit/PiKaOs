@@ -3,7 +3,7 @@
 Two layers, mirroring test_rbac.py's "pure first, no live server" style:
 
 * pure helpers (classify_effect / resume_action / messages_from_run) tested directly;
-* the run() loop driven against an in-memory fake of repositories/runs + redis_client,
+* the run() loop driven against an in-memory fake of repositories/runs + redis_bus,
   with a scripted fake LLM provider + fake tool registry — so resume, two-phase tools,
   atomic quota, timeouts and cancel are asserted with no DB. (The real-Postgres harness
   that kills a worker mid-step is B6.)
@@ -176,7 +176,7 @@ class _FakeDB:
 
 def _patch(monkeypatch, store):
     monkeypatch.setattr(agent_runner, "runs_repo", store)
-    monkeypatch.setattr(agent_runner.redis_client, "is_run_cancelled", _never_cancelled)
+    monkeypatch.setattr(agent_runner.redis_bus, "is_run_cancelled", _never_cancelled)
 
 
 async def _never_cancelled(rid):
@@ -312,7 +312,7 @@ def test_cancel_between_steps(monkeypatch):
     async def _cancelled(rid):
         return True
 
-    monkeypatch.setattr(agent_runner.redis_client, "is_run_cancelled", _cancelled)
+    monkeypatch.setattr(agent_runner.redis_bus, "is_run_cancelled", _cancelled)
     out = _run(store, FakeProvider([LLMResult(text="x", stop_reason="end", tokens=1)]), FakeTools({}))
     assert out == "cancelled"
     assert store.run.status == "cancelled"

@@ -37,7 +37,7 @@ services:
     # a recent health record to Redis (release-and-rollback.md §2: every service reports health so the
     # rolling update / auto-rollback can see it).
     healthcheck:
-      test: ["CMD", "arq", "app.worker.WorkerSettings", "--check"]
+      test: ["CMD", "arq", "app.plugins.redis.worker.WorkerSettings", "--check"]
       interval: 15s
       timeout: 5s
       start_period: 40s
