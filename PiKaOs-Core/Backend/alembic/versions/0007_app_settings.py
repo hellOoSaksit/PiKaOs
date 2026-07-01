@@ -14,7 +14,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision = "0007_app_settings"
-down_revision = "0006_doc_source"
+down_revision = "0004_llm_role_bindings"
 branch_labels = None
 depends_on = None
 

@@ -75,6 +75,13 @@ def active_modules() -> list[Module]:
     _DEGRADED.clear()
     mods = list(BASE_MODULES)
     for pid in plugin_loader.topo_order(enabled_optional_modules(), PLUGIN_MANIFESTS):
+        # A plugin contributes a router only if its manifest declares routes. `kind: tool` plugins
+        # (postgres/minio/…) provide a DI contract via register() and expose no HTTP surface — mounting
+        # a router for them is neither expected nor possible (their package exports none).
+        manifest = PLUGIN_MANIFESTS.get(pid)
+        if manifest is not None and not manifest.routes:
+            mods.append(Module(name=pid, routers=()))
+            continue
         try:
             mods.append(Module(name=pid, routers=(plugin_loader.load_router(pid),)))
         except Exception as exc:  # §8 boundary — a bad plugin is degraded, not fatal

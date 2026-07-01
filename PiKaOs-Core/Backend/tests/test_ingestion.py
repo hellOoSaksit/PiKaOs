@@ -17,12 +17,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.plugins.minio import storage
 from app.core.config import settings
 from app.core.db import register_pgvector
-from app.core.models import Document
+from app.plugins.knowledge.models import Document
 from app.plugins.knowledge import doc_chunks as chunks_repo
 from app.plugins.knowledge import documents as docs_repo
 from app.plugins.knowledge import ingestion_service
 from app.plugins.knowledge import storage_ref
-from app.core.services.embeddings import StubEmbedder
+from app.plugins.knowledge.embeddings import StubEmbedder
 
 _MD = "# Intro\nhello world\n\n## Details\nmore body text here\n\n## More\nand even more"
 

@@ -48,23 +48,9 @@ def upgrade() -> None:
     # used to FK users.id/departments.id are plain UUIDs now (logical cross-plugin refs, no FK), so
     # this baseline stays valid on a fresh DB even when the auth plugin is disabled.
 
-    # ===================== MODULE: knowledge (document storage) =====================
-    # Markdown is the source of truth (knowledge-rag.md); no vector column. FKs → core only.
-
-    op.create_table(
-        "documents",
-        sa.Column("id", UUID, primary_key=True),
-        sa.Column("owner_id", UUID, nullable=True),
-        sa.Column("kind", sa.String(16), nullable=False, server_default="md"),
-        sa.Column("name", sa.String(255), nullable=False),
-        sa.Column("object_key", sa.String(512), nullable=False),
-        sa.Column("content_type", sa.String(128), nullable=False, server_default="application/octet-stream"),
-        sa.Column("size", sa.BigInteger(), nullable=False, server_default="0"),
-        sa.Column("department_id", UUID, nullable=True),
-        _ts(),
-    )
-    op.create_index("ix_documents_owner_id", "documents", ["owner_id"])
-    op.create_index("ix_documents_department_id", "documents", ["department_id"])
+    # NOTE (knowledge extraction): the `documents` + `doc_chunks` tables (+ pgvector) moved to the
+    # `knowledge` plugin — it owns them on its own metadata and creates them via its migrate() step
+    # (CREATE EXTENSION vector → create_all → HNSW index). Core no longer creates them.
 
     # ===================== MODULE: engine (agent-ops) =====================
     # Stateful. FKs → core (users/departments) or within engine (rooms/agents/quests/runs) only.
@@ -159,4 +145,3 @@ def downgrade() -> None:
     op.drop_table("quests")
     op.drop_table("agents")
     op.drop_table("rooms")
-    op.drop_table("documents")

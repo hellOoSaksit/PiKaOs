@@ -12,17 +12,31 @@ from sqlalchemy.orm import DeclarativeBase
 from .config import settings
 
 
-def register_pgvector(eng: AsyncEngine) -> AsyncEngine:
-    """Register pgvector's asyncpg codec on every connection this engine opens, so the RAG repo
-    binds/reads embeddings as `list[float]` directly instead of formatting a `'[..]'::vector`
-    string literal (app/plugins/knowledge/doc_chunks.py). The `vector` type must exist — it does once
-    migration 0005 has run `CREATE EXTENSION vector`, which is before any app/test query.
+async def _register_vector_if_available(conn) -> None:
+    """Register the pgvector codec on a connection, tolerating the `vector` type being absent.
 
-    Returns the engine so the call site can wrap creation in one expression. Tests that build
-    their own engine call this too (the codec is per-engine)."""
+    The `knowledge` plugin OWNS pgvector now — it creates `CREATE EXTENSION vector` in its migrate()
+    step. So the type may not exist when a connection opens: the plugin is disabled (zero-datastore /
+    knowledge-off), or this connection was opened during boot before the plugin's migrate ran. In those
+    cases we skip the codec instead of crashing every connection — a connection opened after the
+    extension exists (e.g. at request time, once migrate has run) registers it. Connections without the
+    codec are only used for non-vector work, so skipping is safe."""
+    try:
+        await register_vector(conn)
+    except ValueError:
+        pass  # `vector` type not installed on this connection yet — see docstring
+
+
+def register_pgvector(eng: AsyncEngine) -> AsyncEngine:
+    """Register pgvector's asyncpg codec on every connection this engine opens (leniently — see
+    `_register_vector_if_available`), so the RAG repo binds/reads embeddings as `list[float]` directly
+    instead of formatting a `'[..]'::vector` string literal (app/plugins/knowledge/doc_chunks.py).
+
+    Returns the engine so the call site can wrap creation in one expression. Tests that build their own
+    engine call this too (the codec is per-engine)."""
     @event.listens_for(eng.sync_engine, "connect")
     def _on_connect(dbapi_connection, _record):  # noqa: ANN001 — SQLAlchemy event signature
-        dbapi_connection.run_async(register_vector)
+        dbapi_connection.run_async(_register_vector_if_available)
     return eng
 
 

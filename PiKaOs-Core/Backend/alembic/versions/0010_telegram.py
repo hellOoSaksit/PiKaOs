@@ -16,7 +16,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision = "0010_telegram"
-down_revision = "0009_doc_summary"
+down_revision = "0008_user_settings"
 branch_labels = None
 depends_on = None
 

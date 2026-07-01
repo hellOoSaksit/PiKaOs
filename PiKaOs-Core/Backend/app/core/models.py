@@ -7,103 +7,17 @@ from datetime import datetime
 from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.types import UserDefinedType
 
-from .config import settings
 from .db import Base
 
 
-class Vector(UserDefinedType):
-    """Minimal mapping for pgvector's `vector(N)` column — DDL/metadata only.
-
-    Reads and writes of embeddings go through raw SQL in app/plugins/knowledge/doc_chunks.py, binding the
-    embedding as a `list[float]` via the official pgvector asyncpg codec (`db.register_pgvector`).
-    This type exists so the ORM/migrations know the column shape; it deliberately has no bind/result
-    processors, so the embedding column is never round-tripped through the ORM."""
-
-    cache_ok = True
-
-    def __init__(self, dim: int):
-        self.dim = dim
-
-    def get_col_spec(self, **_kw) -> str:
-        return f"vector({self.dim})"
-
-
-# NOTE: the auth/RBAC tables (users · roles · permissions · role_perms · user_perms · departments ·
-# user_departments) moved to the `auth` plugin in Phase C — they live on the plugin's OWN metadata now
-# (PiKaOs-Plugin-Auth/backend/models.py), created by its migration step, not by Core. Columns below that
-# used to FK `users.id`/`departments.id` are plain UUIDs now (logical cross-plugin refs, no FK).
-
-
-class Document(Base):
-    """File metadata for MinIO-stored documents. The knowledge store is markdown-as-truth
-    (docs/architecture/knowledge-rag.md); a vector column is intentionally absent — RAG
-    (phase E) adds embeddings via its own migration if/when retrieval need is real."""
-
-    __tablename__ = "documents"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    # FK → users.id, ON DELETE SET NULL: deleting a user keeps their docs but clears ownership
-    # (owner_id is nullable). See migration 0003 / risk-mitigation §4.4 (A3).
-    owner_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), index=True, nullable=True
-    )
-    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="md")  # md|image|log|pdf|other
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    object_key: Mapped[str] = mapped_column(String(512), nullable=False)  # MinIO object path (markdown truth once ingested)
-    # The original uploaded file (pdf/word) kept as a Ref after conversion to markdown (E6,
-    # knowledge-rag.md §6.4). NULL = the upload was already markdown/text (object_key IS the truth).
-    source_object_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
-    content_type: Mapped[str] = mapped_column(String(128), nullable=False, default="application/octet-stream")
-    size: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
-    # department scoping (column added in migration 0004 — system-design §7.1)
-    department_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), index=True, nullable=True
-    )
-    # RAG ingest state (migration 0005) — markdown stays the truth; this just records whether the
-    # file has been chunked+embedded into doc_chunks, and with which model (knowledge-rag.md §3).
-    ingest_status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")  # pending|done|failed|skipped
-    embedding_model: Mapped[str] = mapped_column(String(120), nullable=False, default="")
-    # Doc-level summary produced at ingest (enrich B, migration 0009, knowledge-rag.md §6.2) — a
-    # coarse "what is this file" layer for high-level retrieval. Derived/rebuildable; NULL until
-    # summarized (off by default, or no summarize provider configured).
-    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-
-
-class DocChunk(Base):
-    """RAG semantic index — one heading-bounded slice of a document + its embedding (migration
-    0005, knowledge-rag.md §3). A **derived, rebuildable cache**: chunks are deleted+recreated on
-    re-ingest and cascade-deleted with their document (no orphan vectors). owner_id/department_id
-    are denormalized from the document so retrieval can scope by permission without a join.
-
-    The `embedding` column is read/written only via raw SQL (app/plugins/knowledge/doc_chunks.py) — see
-    the Vector type docstring."""
-
-    __tablename__ = "doc_chunks"
-    __table_args__ = (UniqueConstraint("document_id", "seq", name="uq_doc_chunks_document_seq"),)
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    document_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), index=True, nullable=False
-    )
-    owner_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), index=True, nullable=True
-    )
-    department_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), index=True, nullable=True
-    )
-    seq: Mapped[int] = mapped_column(Integer, nullable=False)
-    heading: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    embedding: Mapped[list[float]] = mapped_column(Vector(settings.embed_dim), nullable=False)
-    embedding_model: Mapped[str] = mapped_column(String(120), nullable=False, default="")
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+# NOTE: extracted-plugin tables no longer live in Core's metadata —
+#   * auth/RBAC (users · roles · permissions · role_perms · user_perms · departments · user_departments)
+#     → the `auth` plugin (Phase C);
+#   * knowledge (documents · doc_chunks + the pgvector `Vector` type)
+#     → the `knowledge` plugin (PiKaOs-Plugin-Knowledge/backend/models.py).
+# Each plugin owns those tables on its OWN metadata, created by its migrate() step, not by Core's Alembic
+# baseline. Columns here that used to FK users.id/departments.id are plain UUIDs (logical refs, no FK).
 
 
 class LlmConnection(Base):
