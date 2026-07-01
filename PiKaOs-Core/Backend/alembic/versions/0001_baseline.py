@@ -57,8 +57,9 @@ def upgrade() -> None:
     # to the `ai` plugin. It owns them on its own metadata and creates them via its migrate() step. Core
     # no longer creates any of them.
     #
-    # After the auth/knowledge/ai extractions this baseline creates NO domain tables — Core's own tables
-    # (app_settings · user_settings · telegram_*) are created by their later migrations (0007/0008/0010).
+    # After the auth/knowledge/ai/chat extractions this baseline creates NO domain tables — Core's own
+    # tables (app_settings · user_settings) are created by their later migrations (0007/0008). The former
+    # telegram tables (0010) left Core for the `chat` plugin + `telegram` Tool (own metadata + migrate()).
     # Kept as the chain root (down_revision=None) so the history stays linear on a fresh DB.
     pass
 

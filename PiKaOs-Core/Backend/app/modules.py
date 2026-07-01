@@ -75,11 +75,13 @@ def active_modules() -> list[Module]:
     _DEGRADED.clear()
     mods = list(BASE_MODULES)
     for pid in plugin_loader.topo_order(enabled_optional_modules(), PLUGIN_MANIFESTS):
-        # `kind: tool` plugins (postgres/minio/…) provide a DI contract via register() and expose no HTTP
-        # surface — they export no `router`, so don't try to mount one (mounting nothing ≠ degraded).
-        # Capability/app plugins must export a `router`; a missing one is a real fault (degraded, §8).
+        # A plugin that declares NO routes (`routes: []`) exposes no HTTP surface, so don't look for a
+        # `router` — mounting nothing ≠ degraded. This covers `kind: tool` plugins (postgres/minio/…,
+        # DI contract only) AND schema/contract-only capabilities (e.g. `chat` before its gateway routes
+        # exist). Only a plugin that DECLARES routes must export a matching `router`; a missing one is a
+        # real fault (degraded, §8).
         manifest = PLUGIN_MANIFESTS.get(pid)
-        if manifest is not None and manifest.kind == "tool":
+        if manifest is not None and not manifest.routes:
             mods.append(Module(name=pid, routers=()))
             continue
         try:
