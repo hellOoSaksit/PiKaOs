@@ -17,4 +17,8 @@ from .services.agent_runner import Retriever
 # resolves it at worker startup. Optional — unresolved (no knowledge plugin) → retriever=None.
 RETRIEVER = "knowledge.Retriever"
 
-__all__ = ["Retriever", "RETRIEVER"]
+# The DB connection a tool plugin (postgres) provides — {"engine", "session_factory"}.
+# The kernel consumes this instead of importing db.py's globals directly (kernel-redesign seam).
+POSTGRES_CONNECTION = "postgres.Connection"
+
+__all__ = ["Retriever", "RETRIEVER", "POSTGRES_CONNECTION"]
