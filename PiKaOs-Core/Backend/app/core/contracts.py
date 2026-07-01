@@ -21,4 +21,8 @@ RETRIEVER = "knowledge.Retriever"
 # The kernel consumes this instead of importing db.py's globals directly (kernel-redesign seam).
 POSTGRES_CONNECTION = "postgres.Connection"
 
-__all__ = ["Retriever", "RETRIEVER", "POSTGRES_CONNECTION"]
+# The object-storage facade a tool plugin (minio) provides — exposes status/ensure_bucket/put_object/
+# get_object/presigned_get/remove_object/ping. The kernel resolves this instead of importing storage.py.
+STORAGE = "minio.Storage"
+
+__all__ = ["Retriever", "RETRIEVER", "POSTGRES_CONNECTION", "STORAGE"]
