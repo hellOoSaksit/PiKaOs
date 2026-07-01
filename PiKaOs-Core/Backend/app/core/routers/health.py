@@ -5,8 +5,9 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import redis_client, storage
+from .. import redis_client
 from ..config import settings
+from ..contracts import STORAGE
 from ..db import get_db
 from ..schemas import HealthOut, PluginHealth, VersionOut
 
@@ -33,7 +34,9 @@ async def health(request: Request, db: AsyncSession = Depends(get_db)) -> Health
         db_ok = "down"
 
     redis_ok = "ok" if await redis_client.ping() else "down"
-    minio_ok = "ok" if storage.ping() else "down"
+    _container = getattr(request.app.state, "container", None)
+    _storage = _container.resolve(STORAGE) if _container is not None else None
+    minio_ok = "ok" if (_storage is not None and _storage.ping()) else "down"
 
     overall = "ok" if db_ok == redis_ok == minio_ok == "ok" else "degraded"
     # Each plugin's state + manifest version (§14) — disabled plugins still listed. Core (the Base)

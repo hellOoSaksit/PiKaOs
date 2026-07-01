@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import modules
 from .core.composition import build_container, teardown_container
 from .core.config import settings
+from .core.contracts import STORAGE
 from .core.db import SessionLocal
 
 # uvicorn configures this logger with a handler, so the line actually prints in the web log
@@ -38,11 +39,12 @@ async def lifespan(app: FastAPI):
     app.state.container = container
     app.state.event_bus = bus
 
-    try:
-        from .core import storage
-        storage.ensure_bucket()
-    except Exception as exc:  # pragma: no cover - infra not ready yet
-        print(f"[startup] MinIO bucket check failed: {exc}")
+    storage_facade = container.resolve(STORAGE)
+    if storage_facade is not None:
+        try:
+            storage_facade.ensure_bucket()
+        except Exception as exc:  # pragma: no cover - infra not ready yet
+            print(f"[startup] MinIO bucket check failed: {exc}")
 
     yield
 
