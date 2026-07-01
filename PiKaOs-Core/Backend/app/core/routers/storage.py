@@ -11,7 +11,7 @@ import asyncio
 from fastapi import APIRouter, Depends, Request
 
 from ..contracts import STORAGE
-from ..identity import require_perm
+from ..deps import require_perm
 from ..schemas import StorageStatusOut
 
 router = APIRouter(prefix="/api/storage", tags=["storage"])
