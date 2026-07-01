@@ -8,7 +8,7 @@ resolution algebra (`rbac_service.resolve_perms`) and that the seed's role→per
 """
 from __future__ import annotations
 
-from app.core.services.rbac_service import resolve_perms
+from app.plugins.auth.rbac_service import resolve_perms  # moved to the auth plugin (Phase B)
 
 CATALOG = {"agent.create", "task.run", "audit.view", "user.manage", "room.build"}
 
