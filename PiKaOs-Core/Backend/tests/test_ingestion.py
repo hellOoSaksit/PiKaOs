@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 
+import pytest
 from sqlalchemy import delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -20,9 +21,20 @@ from app.core.models import Document
 from app.plugins.knowledge import doc_chunks as chunks_repo
 from app.plugins.knowledge import documents as docs_repo
 from app.plugins.knowledge import ingestion_service
+from app.plugins.knowledge import storage_ref
 from app.core.services.embeddings import StubEmbedder
 
 _MD = "# Intro\nhello world\n\n## Details\nmore body text here\n\n## More\nand even more"
+
+
+@pytest.fixture(autouse=True)
+def _wire_storage_ref():
+    """Ingestion resolves storage via `storage_ref.get_storage()`; point it at the same
+    `minio.storage` module these tests monkeypatch, so the patched functions are what
+    the service actually calls (see storage_ref.py — raises if never wired)."""
+    storage_ref.set_storage(storage)
+    yield
+    storage_ref.set_storage(None)
 
 
 def test_ingest_markdown_creates_chunks(monkeypatch):
