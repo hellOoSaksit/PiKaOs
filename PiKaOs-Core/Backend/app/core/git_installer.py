@@ -8,6 +8,7 @@ throwaway `GIT_ASKPASS` script for a single call, never embedded in the URL or l
 """
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import tempfile
@@ -79,9 +80,15 @@ def _run_git(args: list[str], *, cwd: str | None = None, askpass_token: str | No
     if askpass_token:
         fd, askpass_path = tempfile.mkstemp(prefix="pikaos-askpass-", text=True)
         with open(fd, "w") as f:
-            f.write(f'#!/bin/sh\necho "{askpass_token}"\n')
+            # The token is NEVER string-interpolated into the script text (git executes this file
+            # via its #!/bin/sh shebang, so anything written here is parsed as shell source — a
+            # token containing `` ` `` or `$(...)` would otherwise be arbitrary command injection).
+            # Instead the script only echoes an environment variable the shell expands at runtime,
+            # and `printf '%s\n'` (not `echo`) is exact regardless of a leading `-` or backslashes.
+            f.write('#!/bin/sh\nprintf \'%s\\n\' "$PIKAOS_ASKPASS_TOKEN"\n')
         Path(askpass_path).chmod(0o700)
-        env = {"GIT_ASKPASS": askpass_path, "GIT_TERMINAL_PROMPT": "0"}
+        env = {**os.environ, "GIT_ASKPASS": askpass_path, "GIT_TERMINAL_PROMPT": "0",
+               "PIKAOS_ASKPASS_TOKEN": askpass_token}
     try:
         return subprocess.run(["git", *args], cwd=cwd, env=env, capture_output=True, text=True,
                                timeout=timeout)
@@ -98,8 +105,17 @@ def clone_to_staging(repo_url: str, ref: str | None = None) -> Path:
     args = ["clone", "--depth", "1"]
     if ref:
         args += ["--branch", ref]
-    args += [repo_url, str(staging)]
-    result = _run_git(args, askpass_token=_credential_for(_host_of(repo_url)))
+    # `--` ends option parsing so a repo_url/staging path that happens to start with `-` can never
+    # be parsed as a git flag (argument injection — Finding 5).
+    args += ["--", repo_url, str(staging)]
+    try:
+        result = _run_git(args, askpass_token=_credential_for(_host_of(repo_url)))
+    except Exception:
+        # `_run_git` can raise (e.g. `subprocess.TimeoutExpired`) instead of returning a non-zero
+        # `returncode` — the staging dir must still be discarded, and no raw exception detail
+        # should escape this module's error boundary (rule 10: clients get generic errors).
+        shutil.rmtree(staging, ignore_errors=True)
+        raise GitInstallError("could not clone the plugin repository")
     if result.returncode != 0:
         shutil.rmtree(staging, ignore_errors=True)
         raise GitInstallError("could not clone the plugin repository")
@@ -108,8 +124,8 @@ def clone_to_staging(repo_url: str, ref: str | None = None) -> Path:
 
 def latest_tag(repo_url: str) -> str | None:
     """The highest semver git tag on `repo_url`'s remote, or None if it has no (semver) tags."""
-    result = _run_git(["ls-remote", "--tags", repo_url], askpass_token=_credential_for(_host_of(repo_url)),
-                       timeout=30)
+    result = _run_git(["ls-remote", "--tags", "--", repo_url],
+                       askpass_token=_credential_for(_host_of(repo_url)), timeout=30)
     if result.returncode != 0:
         return None
     tags: list[tuple[tuple[int, int, int], str]] = []
@@ -124,10 +140,14 @@ def latest_tag(repo_url: str) -> str | None:
 def fetch_and_checkout(plugin_dir: Path, repo_url: str, tag: str) -> None:
     """Fetch + check out `tag` in an already-installed plugin directory (the update flow, §2.2)."""
     token = _credential_for(_host_of(repo_url))
-    result = _run_git(["fetch", "--depth", "1", "origin", "tag", tag], cwd=str(plugin_dir),
+    # `--` before the positional repository/refspec args stops a `tag` value starting with `-`
+    # from being parsed as a git flag (argument injection — Finding 5).
+    result = _run_git(["fetch", "--depth", "1", "--", "origin", "tag", tag], cwd=str(plugin_dir),
                        askpass_token=token)
     if result.returncode != 0:
         raise GitInstallError("could not fetch the update")
-    result = _run_git(["checkout", f"tags/{tag}"], cwd=str(plugin_dir))
+    # `checkout` is the opposite: `git checkout -- <ref>` switches into "restore paths" mode and
+    # never touches HEAD, so `--` must come AFTER the ref (git-checkout(1)) — confirmed empirically.
+    result = _run_git(["checkout", f"tags/{tag}", "--"], cwd=str(plugin_dir))
     if result.returncode != 0:
         raise GitInstallError("could not check out the update")
