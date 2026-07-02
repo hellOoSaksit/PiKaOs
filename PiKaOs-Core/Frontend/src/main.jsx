@@ -26,6 +26,7 @@ import './screens/screens-sitemap.jsx';
 import './lib/ui-modal.jsx';
 import './lib/notify.jsx';
 import App from './App.jsx';
+import { AppBoot } from './AppBoot.jsx';
 import './lib/tweaks-panel.jsx';
 import './lib/tweaks-app.jsx';
 import './lib/fx.js';
@@ -36,4 +37,4 @@ try {
   if (t === 'pro' || t === 'pro-dark') document.documentElement.setAttribute('data-theme', t);
 } catch (e) {}
 
-createRoot(document.getElementById('root')).render(<App />);
+createRoot(document.getElementById('root')).render(<AppBoot><App /></AppBoot>);
