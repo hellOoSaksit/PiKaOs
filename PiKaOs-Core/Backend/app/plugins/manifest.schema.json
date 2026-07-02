@@ -162,6 +162,21 @@
     "migrations": {
       "type": "string",
       "description": "Path to this plugin's migrations; run in dependency order (\u00a74)."
+    },
+    "description": {
+      "type": "string",
+      "description": "One-line human description shown in the Plugins UI."
+    },
+    "icon": {
+      "type": "string",
+      "description": "Path (relative to the plugin) to an icon image shown in the Plugins UI."
+    },
+    "screenshots": {
+      "type": "array",
+      "description": "Paths (relative to the plugin) to screenshot images shown in the Plugins UI.",
+      "items": { "type": "string" },
+      "uniqueItems": true,
+      "default": []
     }
   }
 }

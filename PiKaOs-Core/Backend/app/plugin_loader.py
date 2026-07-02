@@ -53,6 +53,9 @@ class Manifest:
     kind: str = "capability"
     secrets: tuple[str, ...] = ()
     compose: str | None = None
+    description: str = ""
+    icon: str | None = None
+    screenshots: tuple[str, ...] = ()
     raw: dict = field(default_factory=dict)
 
 
@@ -173,6 +176,9 @@ def _validate(folder: str, raw: dict) -> Manifest:
         kind=kind,
         secrets=tuple(raw.get("secrets", [])),
         compose=raw.get("compose"),
+        description=raw.get("description", ""),
+        icon=raw.get("icon"),
+        screenshots=tuple(raw.get("screenshots", [])),
         raw=raw,
     )
 
