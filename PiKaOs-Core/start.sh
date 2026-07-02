@@ -1,24 +1,22 @@
 #!/usr/bin/env bash
 # ===========================================================
 #  PiKaOs launcher (Linux) — the Linux counterpart of start.bat.
-#  Split 4-stack — the only supported way to run (CLAUDE.md §0).
+#  Single generated compose project — the only supported way to run (CLAUDE.md §0).
 #
-#  Flow (same as start.bat, Linux mechanics):
+#  Flow:
 #    1) make sure the Docker engine answers `docker info`
 #         - if not, try `sudo systemctl start docker` and wait
 #         - (first time? run ./setup.sh once — group + env files)
-#    2) bring up the 4 SEPARATE stacks (each its own compose
-#       project/network), in order so each is ready before the next:
-#         data     (db, redis, minio)            -p pikaos-data
-#         backend  (FastAPI API, hot-reload)     -p pikaos-backend  (+ sim overlay)
-#         ai       (arq worker)                  -p pikaos-ai
-#         frontend (Vite dev server, hot-reload) -p pikaos-frontend
-#    3) open the app in the browser (xdg-open) and exit
+#    2) render deploy/docker-compose.generated.yml: the kernel base
+#       (backend + frontend) merged with every ENABLED tool plugin's
+#       compose.fragment.yml (Backend/scripts/render_compose.py —
+#       kernel-redesign.md §3, install-time compose generation)
+#    3) bring up the ONE generated stack, -p pikaos
+#    4) open the app in the browser (xdg-open) and exit
 #
-#  Stacks talk over the host (host.docker.internal:<port>) — the
-#  compose files map that to host-gateway so it resolves on Linux.
-#  Stop everything with ./stop.sh. Watch logs:
-#    docker compose -p pikaos-frontend logs -f   (or -backend / -ai / -data)
+#  All services share one compose network now (backend/frontend/worker/
+#  db/redis/minio reach each other by service name — no host.docker.internal).
+#  Stop everything with ./stop.sh. Watch logs: docker compose -p pikaos logs -f
 # ===========================================================
 set -uo pipefail
 
@@ -32,11 +30,10 @@ red()   { printf '\033[31m%s\033[0m\n' "$*"; }
 
 cyan "==========================================================="
 cyan "       .:::.   P i K a O S   .:::."
-cyan "       Agent-Ops Workspace launcher  (split 4-stack)"
+cyan "       Agent-Ops Workspace launcher"
 cyan "==========================================================="
 echo
 
-# ---- poll helpers (mirror :waitdocker / :waitbackend in start.bat) ----
 wait_docker() {  # $1 = max seconds
   local max="$1" t=0
   while ! docker info >/dev/null 2>&1; do
@@ -55,11 +52,10 @@ wait_backend() {  # $1 = max seconds; 200 only via --fail
 }
 
 # ---- 1. Docker preflight ---------------------------------------
-echo "[1/3] Checking Docker engine..."
+echo "[1/4] Checking Docker engine..."
 if docker info >/dev/null 2>&1; then
   echo "      Docker is already running."
 else
-  # Distinguish "daemon down" from "no permission" so the message is useful.
   if ! id -nG "$USER" | tr ' ' '\n' | grep -qx docker && ! [ -w /var/run/docker.sock ]; then
     red "      Cannot reach the Docker daemon and you're not in the 'docker' group."
     yellow "      Run ./setup.sh once, then re-login (or 'newgrp docker'), then ./start.sh."
@@ -88,22 +84,18 @@ if [[ "$missing" == "1" ]]; then
   exit 1
 fi
 
-# ---- 2. bring up the 4 stacks (order matters) ------------------
-echo "[2/3] (1/4) data stack  (db, redis, minio)..."
-docker compose -p pikaos-data -f deploy/docker-compose.data.yml up -d --wait \
-  || { red "      ERROR: data stack failed to start."; exit 1; }
+# ---- 2. render the compose file (base + enabled tool fragments) ----
+echo "[2/4] Rendering docker-compose.generated.yml..."
+if ! python3 Backend/scripts/render_compose.py; then
+  red "      ERROR: render_compose.py failed."
+  exit 1
+fi
+echo
 
-echo "      (2/4) backend stack (FastAPI + migrate/seed)..."
-docker compose -p pikaos-backend -f deploy/docker-compose.backend.yml -f deploy/docker-compose.sim.yml up -d --build --wait backend \
-  || { red "      ERROR: backend stack failed to start."; exit 1; }
-
-echo "      (3/4) ai stack      (arq worker)..."
-docker compose -p pikaos-ai -f deploy/docker-compose.ai.yml up -d --build \
-  || yellow "      WARNING: ai/worker stack failed to start — continuing."
-
-echo "      (4/4) frontend stack (Vite dev server)..."
-docker compose -p pikaos-frontend -f deploy/docker-compose.frontend.dev.yml up -d --build \
-  || { red "      ERROR: frontend stack failed to start."; exit 1; }
+# ---- 3. bring up the ONE generated stack ------------------------
+echo "[3/4] Starting the stack (build + wait for health)..."
+docker compose -p pikaos -f deploy/docker-compose.generated.yml up -d --build --wait \
+  || { red "      ERROR: stack failed to start."; docker compose -p pikaos -f deploy/docker-compose.generated.yml logs; exit 1; }
 
 printf "      Waiting for the backend API (so the UI doesn't load before it's ready)"
 if wait_backend 90; then echo; echo "      Backend API is ready."; else
@@ -111,13 +103,13 @@ if wait_backend 90; then echo; echo "      Backend API is ready."; else
 fi
 echo
 
-# ---- 3. open the app + exit (logs live in docker) --------------
-echo "[3/3] Opening http://localhost:5173 ..."
+# ---- 4. open the app + exit (logs live in docker) --------------
+echo "[4/4] Opening http://localhost:5173 ..."
 if command -v xdg-open >/dev/null 2>&1; then
   xdg-open "http://localhost:5173" >/dev/null 2>&1 &
 else
   yellow "      (no xdg-open) open this manually: http://localhost:5173"
 fi
 echo
-green "      All 4 stacks run in Docker. Stop them with ./stop.sh. Watch logs:"
-echo  "        docker compose -p pikaos-frontend logs -f   (or -backend / -ai / -data)"
+green "      The stack runs in Docker. Stop it with ./stop.sh. Watch logs:"
+echo  "        docker compose -p pikaos -f deploy/docker-compose.generated.yml logs -f"

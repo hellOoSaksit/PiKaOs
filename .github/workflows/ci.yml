@@ -5,6 +5,12 @@
 # Backend: pytest on the real stack (tests hit the live server, so we spin docker compose).
 name: CI
 
+# Fix-DEP-01: least-privilege GITHUB_TOKEN. CI only lints/builds/tests — it never writes to the repo
+# or pushes packages — so read-only contents is all any job needs. Individual jobs can widen this if
+# they ever must (they don't today).
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
@@ -18,8 +24,8 @@ jobs:
       run:
         working-directory: PiKaOs-Core/Frontend
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22
           cache: npm
@@ -44,8 +50,8 @@ jobs:
       run:
         working-directory: PiKaOs-Core/Backend
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'  # match the runtime image (Dockerfile: python:3.12-slim)
           cache: pip
@@ -58,19 +64,25 @@ jobs:
 
   backend:
     runs-on: ubuntu-latest
-    # The split stacks load gitignored .env files; seed CI with the tracked *.example (dev creds).
+    # No plugin repos are checked out in CI, so Core's suite runs plugin-free (testpaths = tests) and
+    # needs no datastore sidecar — render_compose.py sees an empty app/plugins/ and emits just the
+    # kernel base compose (backend + frontend, no tool fragments). Gitignored .env files aren't in the
+    # checkout; seed CI with the tracked *.example (dev creds) first.
     env:
-      BE: docker compose -p pikaos-backend -f PiKaOs-Core/deploy/docker-compose.backend.yml -f PiKaOs-Core/deploy/docker-compose.sim.yml
+      BE: docker compose -p pikaos -f PiKaOs-Core/deploy/docker-compose.generated.yml
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
       - name: Seed env files (dev defaults)
         run: |
           cp PiKaOs-Core/Backend/.env.example PiKaOs-Core/Backend/.env
           cp PiKaOs-Core/Frontend/.env.example PiKaOs-Core/Frontend/.env
           cp PiKaOs-Core/.env.ai.example PiKaOs-Core/.env.ai
-      - name: Start data stack (db, redis, minio)
-        run: docker compose -p pikaos-data -f PiKaOs-Core/deploy/docker-compose.data.yml up -d --wait
-      - name: Start backend stack (migrate + seed)
+      - name: Render compose (kernel base — no plugins linked in CI)
+        run: python PiKaOs-Core/Backend/scripts/render_compose.py
+      - name: Start backend
         run: $BE up -d --build backend
       - name: Wait for backend health
         run: |
@@ -83,6 +95,4 @@ jobs:
         run: $BE exec -T backend pytest -q
       - name: Tear down
         if: always()
-        run: |
-          $BE down -v
-          docker compose -p pikaos-data -f PiKaOs-Core/deploy/docker-compose.data.yml down -v
+        run: $BE down -v

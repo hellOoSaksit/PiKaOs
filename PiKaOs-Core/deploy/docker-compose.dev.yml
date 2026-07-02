@@ -1,0 +1,46 @@
+# PiKaOs — local dev BASE compose (kernel-only: backend + frontend).
+#
+# Tool-plugin sidecars (postgres/redis/minio/...) are NOT defined here — they are merged in from each
+# enabled plugin's `compose.fragment.yml` by `Backend/scripts/render_compose.py`, matching the
+# install-time compose generation model (PiKaOs-Docs/docs/architecture/kernel-redesign.md §3). All
+# services share ONE compose network/project now, so datastores are reached at their plugin-id
+# hostname (`db`, `redis`, `minio` — see each plugin's `.env.example` defaults), not
+# `host.docker.internal`.
+#
+# Never edit docker-compose.generated.yml by hand — it's a build artifact. Edit this file (kernel
+# services) or a plugin's compose.fragment.yml (tool sidecars) instead, then re-run render_compose.py
+# (start.sh / start.bat do this automatically).
+services:
+  backend:
+    build: ../Backend
+    restart: unless-stopped
+    env_file:
+      - ../Backend/.env
+      - ../.env.ai
+    ports:
+      - "8000:8000"
+    environment:
+      UVICORN_RELOAD: "1"        # dev hot-reload (entrypoint runs uvicorn --reload, 1 worker)
+    volumes:
+      - ../Backend:/app          # hot-reload: code edits on the host reflect in the container
+      - kernelstate:/app/state   # kernel local-JSON state (plugin registry + nav + user prefs)
+
+  frontend:
+    build:
+      context: ../Frontend
+      target: dev                # Vite hot-reload (the prod target is the nginx static build)
+    restart: unless-stopped
+    env_file: ../Frontend/.env   # VITE_API_BASE (PUBLIC app config — baked into the bundle)
+    environment:
+      VITE_PROXY_TARGET: http://backend:8000   # same compose network — no host.docker.internal needed
+      VITE_OPEN: "false"
+      VITE_POLL: "true"          # watcher fires reliably on a Docker bind mount
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../Frontend:/app
+      - frontend_node_modules:/app/node_modules
+
+volumes:
+  kernelstate:
+  frontend_node_modules:
