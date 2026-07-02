@@ -5,7 +5,7 @@ Plugins UI (install-from-git design §2.1).
 """
 from __future__ import annotations
 
-from app import plugin_loader
+from app import modules, plugin_loader
 
 
 def test_display_fields_default_to_empty():
@@ -30,17 +30,36 @@ def test_display_fields_are_parsed():
 
 
 def test_register_discovered_makes_a_manifest_visible_without_restart(monkeypatch):
-    monkeypatch.setattr(plugin_loader, "PLUGIN_MANIFESTS", {})
-    monkeypatch.setattr(plugin_loader, "OPTIONAL_MODULE_NAMES", ())
+    # patch BOTH the kernel source (plugin_loader) and the re-export (modules) — see conftest's
+    # sample_plugins fixture — so we can assert the re-export stays in sync too.
+    for target in (plugin_loader, modules):
+        monkeypatch.setattr(target, "PLUGIN_MANIFESTS", {})
+        monkeypatch.setattr(target, "OPTIONAL_MODULE_NAMES", ())
     mf = plugin_loader._validate("crm", {
         "id": "crm", "name": "CRM", "version": "0.1.0", "coreVersion": "*",
     })
     plugin_loader.register_discovered(mf)
     assert plugin_loader.PLUGIN_MANIFESTS["crm"] is mf
     assert "crm" in plugin_loader.OPTIONAL_MODULE_NAMES
+    # the re-export in `modules` must reflect the same update, not a stale import-time snapshot
+    assert modules.PLUGIN_MANIFESTS["crm"] is mf
+    assert "crm" in modules.OPTIONAL_MODULE_NAMES
 
 
-def test_deregister_discovered_removes_it():
+def test_deregister_discovered_removes_it(monkeypatch):
+    mf = plugin_loader._validate("crm", {
+        "id": "crm", "name": "CRM", "version": "0.1.0", "coreVersion": "*",
+    })
+    seeded_manifests = {"crm": mf}
+    seeded_names = ("crm",)
+    for target in (plugin_loader, modules):
+        monkeypatch.setattr(target, "PLUGIN_MANIFESTS", seeded_manifests)
+        monkeypatch.setattr(target, "OPTIONAL_MODULE_NAMES", seeded_names)
+
     plugin_loader.deregister_discovered("crm")
+
     assert "crm" not in plugin_loader.PLUGIN_MANIFESTS
     assert "crm" not in plugin_loader.OPTIONAL_MODULE_NAMES
+    # the re-export in `modules` must reflect the same removal, not a stale import-time snapshot
+    assert "crm" not in modules.PLUGIN_MANIFESTS
+    assert "crm" not in modules.OPTIONAL_MODULE_NAMES

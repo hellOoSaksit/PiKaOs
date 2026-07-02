@@ -373,6 +373,17 @@ PLUGIN_MANIFESTS: dict[str, Manifest] = discover()
 OPTIONAL_MODULE_NAMES: tuple[str, ...] = tuple(sorted(PLUGIN_MANIFESTS))
 
 
+def _sync_modules_reexport() -> None:
+    """`app/modules.py` re-exports `PLUGIN_MANIFESTS`/`OPTIONAL_MODULE_NAMES` as a snapshot taken at
+    import time (`modules.PLUGIN_MANIFESTS = plugin_loader.PLUGIN_MANIFESTS`), not a live reference —
+    rebinding this module's globals alone leaves that snapshot stale. Deferred import: `app.modules`
+    imports `plugin_loader` at top level, so importing it back at module scope here would cycle."""
+    from . import modules
+
+    modules.PLUGIN_MANIFESTS = PLUGIN_MANIFESTS
+    modules.OPTIONAL_MODULE_NAMES = OPTIONAL_MODULE_NAMES
+
+
 def register_discovered(manifest: Manifest) -> None:
     """Make a freshly-installed plugin's manifest visible to THIS process's `_manifests()` lookups
     without a restart (install-from-git design §2.2) — `discover()` runs once at import, so a plugin
@@ -381,6 +392,7 @@ def register_discovered(manifest: Manifest) -> None:
     global PLUGIN_MANIFESTS, OPTIONAL_MODULE_NAMES
     PLUGIN_MANIFESTS = {**PLUGIN_MANIFESTS, manifest.id: manifest}
     OPTIONAL_MODULE_NAMES = tuple(sorted(PLUGIN_MANIFESTS))
+    _sync_modules_reexport()
 
 
 def deregister_discovered(pid: str) -> None:
@@ -389,6 +401,7 @@ def deregister_discovered(pid: str) -> None:
     global PLUGIN_MANIFESTS, OPTIONAL_MODULE_NAMES
     PLUGIN_MANIFESTS = {k: v for k, v in PLUGIN_MANIFESTS.items() if k != pid}
     OPTIONAL_MODULE_NAMES = tuple(sorted(PLUGIN_MANIFESTS))
+    _sync_modules_reexport()
 
 
 def enabled_optional_modules() -> set[str]:
