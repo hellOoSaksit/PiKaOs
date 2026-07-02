@@ -27,7 +27,6 @@ const DICT = {
     codeHint: 'Find it in the server console / startup logs (stdout). The code rotates on every restart.',
     verifyIdle: 'Continue',
     verifyLoad: 'Verifying…',
-    bootMsg: 'Starting PIKA',
     errEmpty: 'Please enter the setup code from the server console.',
     errInvalid: 'That setup code is not valid. Check the latest code in the server console.',
     errNetwork: 'Cannot reach the server. Is the Core running?',
@@ -46,7 +45,6 @@ const DICT = {
     codeHint: 'ดูได้จากคอนโซล / log ตอนเริ่มระบบ (stdout) รหัสจะเปลี่ยนใหม่ทุกครั้งที่รีสตาร์ท',
     verifyIdle: 'ดำเนินการต่อ',
     verifyLoad: 'กำลังตรวจสอบ…',
-    bootMsg: 'กำลังเริ่ม PIKA',
     errEmpty: 'กรุณากรอกรหัสตั้งค่าจากคอนโซลของเซิร์ฟเวอร์',
     errInvalid: 'รหัสตั้งค่าไม่ถูกต้อง กรุณาตรวจรหัสล่าสุดที่คอนโซล',
     errNetwork: 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — Core กำลังทำงานอยู่หรือไม่?',
@@ -68,13 +66,9 @@ export function FirstRun({ t, language, onLang, onVerified }) {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [booting, setBooting] = useState(true);
   const [ok, setOk] = useState(false);
 
   const frame = useRef(null);
-  const ready = useRef(false);
-  const bootDone = useRef(false);
-  const t0 = useRef(0);
 
   // drive the mascot iframe over postMessage
   const pika = useCallback((method, ...args) => {
@@ -82,36 +76,18 @@ export function FirstRun({ t, language, onLang, onVerified }) {
     if (w) { try { w.postMessage({ pika: method, args }, '*'); } catch (e) { /* ignore */ } }
   }, []);
 
-  // boot screen: hold a minimum, finish once the mascot is ready (or immediately when there is no
-  // model / on narrow screens), hard-capped so a missing iframe never traps the user on the splash.
+  // the boot curtain itself now lives in AppBoot (mounted above App in main.jsx) — this just puts
+  // the persistent left-pane mascot to sleep once it's loaded, until setup succeeds (see succeed()
+  // below, which wakes it back up).
   useEffect(() => {
     document.body.classList.add('on-login');
-    t0.current = (typeof performance !== 'undefined' ? performance.now() : 0);
-    const BOOT_MIN = 1300;
-
-    const finish = () => { if (!bootDone.current) { bootDone.current = true; setBooting(false); } };
-    const tryFinish = () => {
-      if (bootDone.current) return;
-      const elapsed = (typeof performance !== 'undefined' ? performance.now() : BOOT_MIN) - t0.current;
-      const isReady = ready.current || window.innerWidth < 760;
-      if (elapsed >= BOOT_MIN && isReady) finish();
-    };
-
     const onMsg = (e) => {
-      if (e.data && e.data.pikaReady) {
-        ready.current = true;
-        pika('setState', 'sleeping');   // dormant — eyes shut — until setup succeeds
-        tryFinish();
-      }
+      if (e.data && e.data.pikaReady) pika('setState', 'sleeping');
     };
     window.addEventListener('message', onMsg);
-    const t1 = setTimeout(tryFinish, BOOT_MIN + 40);
-    const t2 = setTimeout(finish, 4000);   // hard cap
-
     return () => {
       document.body.classList.remove('on-login');
       window.removeEventListener('message', onMsg);
-      clearTimeout(t1); clearTimeout(t2);
     };
   }, [pika]);
 
@@ -155,30 +131,6 @@ export function FirstRun({ t, language, onLang, onVerified }) {
 
   return (
     <div className="auth-screen">
-      {/* boot / loading splash */}
-      {booting && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: 26, background: 'var(--bg-1)' }}>
-          <div style={{ position: 'absolute', top: '50%', left: '50%', width: 520, height: 520,
-            transform: 'translate(-50%,-56%)', background: 'radial-gradient(circle, var(--gold-glow) 0%, transparent 62%)',
-            pointerEvents: 'none', animation: 'glowBreath 6s ease-in-out infinite' }} />
-          <div style={{ display: 'flex', gap: 11, position: 'relative', zIndex: 2 }}>
-            {word.map((ch, i) => (
-              <span key={i} className="ltr" style={{ fontSize: 62, animation: `letterBounce 1.15s ease-in-out ${i * 0.12}s infinite` }}>{ch}</span>
-            ))}
-          </div>
-          <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: 8,
-            fontFamily: 'var(--font-mono)', fontSize: 11.5, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
-            {T.bootMsg}
-            <span style={{ display: 'inline-flex', gap: 3 }}>
-              {[0, 0.2, 0.4].map((d, i) => (
-                <span key={i} style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--gold)', animation: `bootDots 1.1s ease-in-out ${d}s infinite` }} />
-              ))}
-            </span>
-          </div>
-        </div>
-      )}
-
       {/* language toggle */}
       {onLang && (
         <div className="auth-lang" role="group" aria-label="language">
