@@ -111,6 +111,17 @@ export async function forgotPassword(usernameOrEmail) {
   return raw("/auth/forgot-password", { method: "POST", auth: false, body: { usernameOrEmail } });
 }
 
+// --- first-run setup (kernel console-code gate) ---
+// The Core prints a rotating setup code to the server console (stdout) on startup; the operator
+// pastes it here to unlock the install page (Jupyter-token pattern). No auth — this gate runs
+// before any account exists.
+// TODO(kernel backend): POST /api/setup/verify-code + GET /api/setup/status don't exist yet — these
+// 404 until that lands. The FirstRun screen handles the missing backend gracefully in dev preview.
+export async function setupStatus() { return raw("/setup/status", { auth: false }); }   // { needsSetup, ... }
+export async function verifySetupCode(code) {
+  return raw("/setup/verify-code", { method: "POST", auth: false, body: { code } });
+}
+
 // --- LLM provider config API (admin: which provider/model/key the engine uses — no-hardcode) ---
 // The API key is write-only: send it in the body to set/replace it; the server never returns it
 // (responses carry `api_key_set` only). Omit it on update to keep the stored key unchanged.

@@ -11,7 +11,7 @@ import { applyGlobalConfig } from './lib/characters.jsx';
 import { Admin } from './screens/screens-admin.jsx';
 import { CharacterBuilder } from './screens/screens-builder.jsx';
 import { Chronicle, Mana, QuestLog, Settings, Treasury, Watchtower } from './screens/screens-extra.jsx';
-import { Login } from './screens/Login.jsx';
+import { FirstRun } from './screens/FirstRun.jsx';
 import { MyDashboard } from './screens/screens-me.jsx';
 import { PluginsManager } from './screens/screens-plugins.jsx';
 import { AuditLog, PermissionsCatalog, RolesPermissions, UserDetail, UserForm } from './screens/screens-rbac.jsx';
@@ -597,8 +597,12 @@ function App() {
     if (need && !can(need)) go("me");
   }, [route, viewAs, rolePerms, userPerms]);
 
-  if (!auth.ready) return null;   // avoid flashing the login screen while restoring a session
-  if (!auth.loggedIn) return <Login onLogin={auth.login} t={t} language={language} onLang={pickLanguage} />;
+  if (!auth.ready) return null;   // avoid flashing the setup screen while restoring a session
+  // Kernel-only right now (no auth plugin) — the console-code first-run gate is the ONLY entry
+  // screen. TODO(kernel backend): once /api/setup/verify-code exists, onVerified should re-check
+  // auth/plugin state (or reload) instead of no-op; a real Login only returns once an auth plugin
+  // is installed (plugin-lifecycle-ui — kernel login seam, not built yet).
+  if (!auth.loggedIn) return <FirstRun t={t} language={language} onLang={pickLanguage} onVerified={() => {}} />;
 
   const screen = (() => {
     const guard = (perm, el) => can(perm) ? el : <MyDashboard Sys={Sys} onAgent={setAgentSel} onQuest={setQuestSel} />;
