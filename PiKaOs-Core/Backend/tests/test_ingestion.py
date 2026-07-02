@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.plugins.minio import storage
 from app.core.config import settings
-from app.core.db import register_pgvector
+from app.plugins.postgres.engine import register_pgvector
 from app.plugins.knowledge.models import Document
 from app.plugins.knowledge import doc_chunks as chunks_repo
 from app.plugins.knowledge import documents as docs_repo

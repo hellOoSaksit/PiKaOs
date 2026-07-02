@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
-echo "[entrypoint] running Core migrations..."
-alembic upgrade head
+# Zero-datastore kernel: Core owns no tables and no Alembic. Every table is plugin-owned and created by
+# scripts.migrate_plugins below (create_all), so there is no Core migration step here anymore.
 
 # Resolve the plugin registry (set by the install UI) into ENABLED_MODULES so this boot mounts exactly
 # what the registry wants (restart-to-apply, plugin-lifecycle-ui §7). compute_enabled exits 0 ONLY when a

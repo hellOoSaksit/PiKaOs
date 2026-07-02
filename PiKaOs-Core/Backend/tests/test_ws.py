@@ -13,7 +13,22 @@ import json
 from types import SimpleNamespace
 
 from app.core import contracts
+from app.plugins.ai import db_ref
 from app.plugins.ai import ws as wsmod
+
+
+class _NoopSession:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+
+# _can_view_task opens a session before delegating to task_service.can_view, which rejects non-UUID ids
+# before any query. The plugin lifecycle (which binds db_ref from postgres.Connection) doesn't run in this
+# unit test, so bind a no-op factory — the malformed-id path never actually touches the DB.
+db_ref.bind({"session_factory": lambda: _NoopSession()})
 
 
 class _FakeProvider:

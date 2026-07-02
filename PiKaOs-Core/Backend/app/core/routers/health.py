@@ -1,13 +1,10 @@
 """Health check — pings db, redis, minio."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Request
 
 from ..config import settings
-from ..contracts import REDIS_CONNECTION, STORAGE
-from ..db import get_db
+from ..contracts import POSTGRES_CONNECTION, REDIS_CONNECTION, STORAGE
 from ..schemas import HealthOut, PluginHealth, VersionOut
 
 router = APIRouter(prefix="/api", tags=["health"])
@@ -23,16 +20,19 @@ async def version() -> VersionOut:
 
 
 @router.get("/health", response_model=HealthOut)
-async def health(request: Request, db: AsyncSession = Depends(get_db)) -> HealthOut:
+async def health(request: Request) -> HealthOut:
     """Deep readiness — pings every dependency. Returns 200 with status "degraded" (not an error) when
     a dependency is down, so dashboards see the detail; use /version for liveness, not this."""
+    _container = getattr(request.app.state, "container", None)
+
+    # DB via the postgres.Connection contract (no sqlalchemy in the kernel) — "down"/skip when the
+    # postgres tool is disabled, mirroring the redis/minio probes below.
+    _pg = _container.resolve(POSTGRES_CONNECTION) if _container is not None else None
     try:
-        await db.execute(text("SELECT 1"))
-        db_ok = "ok"
+        db_ok = "ok" if (_pg is not None and await _pg["ping"]()) else "down"
     except Exception:
         db_ok = "down"
 
-    _container = getattr(request.app.state, "container", None)
     _redis = _container.resolve(REDIS_CONNECTION) if _container is not None else None
     try:
         redis_ok = "ok" if (_redis is not None and await _redis.ping()) else "down"

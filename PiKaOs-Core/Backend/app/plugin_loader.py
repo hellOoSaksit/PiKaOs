@@ -213,12 +213,13 @@ def load_router(plugin_id: str) -> APIRouter:
 @dataclass
 class PluginContext:
     """What a plugin's register()/boot()/shutdown() receives — the Core seams it may use, never each
-    other (§5). `container` for DI, `events` for the bus, `session_factory` for DB sessions, `settings`
-    for global config, and `config` = this plugin's own schema-defaulted config block (§11)."""
+    other (§5). `container` for DI (resolve `postgres.Connection` for a DB session factory), `events` for
+    the bus, `settings` for global config, and `config` = this plugin's own schema-defaulted config
+    block (§11). No `session_factory` — the zero-datastore kernel owns no engine; the postgres Tool binds
+    one under `postgres.Connection` and DB consumers resolve it from `container`."""
 
     container: object
     events: object
-    session_factory: object = None
     settings: object = None
     config: dict = field(default_factory=dict)
 

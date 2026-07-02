@@ -11,7 +11,6 @@ from . import modules
 from .core.composition import build_container, teardown_container
 from .core.config import settings
 from .core.contracts import STORAGE
-from .core.db import SessionLocal
 
 # uvicorn configures this logger with a handler, so the line actually prints in the web log
 # (a bare "pikaos.app" logger would propagate to a root with no INFO handler and be swallowed).
@@ -33,7 +32,7 @@ async def lifespan(app: FastAPI):
     # Composition root: build the DI container + register enabled plugins (symmetric with worker.py:startup),
     # so routers can resolve tool/plugin contracts (e.g. postgres.Connection) per request. Fault-isolated.
     enabled = modules.enabled_optional_modules()
-    container, bus, result = build_container(enabled, SessionLocal)
+    container, bus, result = build_container(enabled)
     if result.degraded:
         log.warning("plugins degraded in web (lifecycle failed, others unaffected): %s", result.degraded)
     app.state.container = container
@@ -48,7 +47,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    teardown_container(container, bus, enabled, SessionLocal)
+    teardown_container(container, bus, enabled)
 
 
 app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)

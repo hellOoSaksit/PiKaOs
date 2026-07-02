@@ -15,7 +15,7 @@ from sqlalchemy import delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import settings
-from app.core.db import register_pgvector
+from app.plugins.postgres.engine import register_pgvector
 from app.plugins.knowledge.models import Document
 from app.plugins.auth.models import Department, User, UserDepartment
 from app.plugins.knowledge import doc_chunks as chunks_repo
