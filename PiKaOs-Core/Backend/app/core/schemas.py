@@ -39,11 +39,15 @@ class PluginHealth(BaseModel):
 
 class HealthOut(BaseModel):
     status: str
-    version: str       # app_version (versions.md registry — surfaced here per the SSOT rule)
-    build: str         # build_hash (immutable build identity)
-    db: str
-    redis: str
-    minio: str
+    # Detail fields are optional (Fix-SEC-10): an unauthenticated caller in production gets only
+    # `status` (a shallow readiness signal for load-balancer/uptime probes), while authenticated
+    # dashboards and every non-production caller get the full breakdown below. Dev + tests are
+    # unchanged because the trim only applies to production-unauthenticated requests.
+    version: str | None = None   # app_version (versions.md registry — surfaced here per the SSOT rule)
+    build: str | None = None     # build_hash (immutable build identity)
+    db: str | None = None
+    redis: str | None = None
+    minio: str | None = None
     plugins: list[PluginHealth] = []   # Core + each plugin's state + manifest version (§14)
 
 

@@ -199,6 +199,11 @@ class Settings(BaseSettings):
             problems.append("SEED_PASSWORD is the dev default — change it")
         if self.minio_secret_key in _DEV_MINIO_SECRETS:
             problems.append("MINIO_SECRET_KEY is the dev default — change it")
+        # Fix-SEC-06: CORS runs with allow_credentials=True (main.py), so a "*" origin would let ANY
+        # site make credentialed cross-origin calls. Browsers reject literal "*"+credentials, but some
+        # stacks reflect the origin — forbid the wildcard outright and require an explicit allowlist.
+        if "*" in self.cors_list:
+            problems.append("CORS_ORIGINS contains '*' — a wildcard origin with credentials is unsafe; list explicit origins in production")
         # Redis holds sessions, the perms cache, and the job queue; an unauthenticated Redis exposed
         # across servers is fully readable. Require a password in production (empty is fine in dev,
         # where Redis is only reachable on the private compose network).

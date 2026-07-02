@@ -5,9 +5,23 @@ from fastapi import APIRouter, Request
 
 from ..config import settings
 from ..contracts import POSTGRES_CONNECTION, REDIS_CONNECTION, STORAGE
+from ..identity import provider_for
 from ..schemas import HealthOut, PluginHealth, VersionOut
 
 router = APIRouter(prefix="/api", tags=["health"])
+
+
+async def _is_authenticated(request: Request) -> bool:
+    """True if the request carries a valid bearer token (any authenticated user). Used only to decide
+    whether /health may return its full detail — never to authorize an action."""
+    auth = request.headers.get("Authorization")
+    token = auth[7:].strip() if auth and auth.lower().startswith("bearer ") else None
+    if not token:
+        return False
+    try:
+        return await provider_for(request.app).authenticate(token) is not None
+    except Exception:
+        return False
 
 
 @router.get("/version", response_model=VersionOut)
@@ -42,6 +56,14 @@ async def health(request: Request) -> HealthOut:
     minio_ok = "ok" if (_storage is not None and _storage.ping()) else "down"
 
     overall = "ok" if db_ok == redis_ok == minio_ok == "ok" else "degraded"
+
+    # Fix-SEC-10: in production, an UNAUTHENTICATED caller gets only the shallow readiness status —
+    # not the version/build, per-dependency breakdown, or installed-plugin list (all recon aids).
+    # Authenticated dashboards and every non-production caller fall through to the full detail below,
+    # so dev and the test suite are unchanged.
+    if settings.is_production and not await _is_authenticated(request):
+        return HealthOut(status=overall)
+
     # Each plugin's state + manifest version (§14) — disabled plugins still listed. Core (the Base)
     # never imports the composition seam: the App layer registers `modules.plugin_states` on
     # `app.state` at startup (DIP), so this stays an upward-facing detail Core merely *renders*.

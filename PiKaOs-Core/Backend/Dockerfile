@@ -40,4 +40,18 @@ HEALTHCHECK --interval=15s --timeout=3s --start-period=40s --retries=3 \
 # Invoke via `bash` (not `./`) so it works even though the compose dev mount (./Backend:/app)
 # shadows the image with the host checkout, which may lack the +x bit (e.g. committed on Windows).
 RUN chmod +x docker-entrypoint.sh
+
+# Fix-SEC-05: drop root — the app runs as a non-root user (least privilege; a container compromise no
+# longer starts as root). APP_UID defaults to 1000 to MATCH the dev host user, so the bind-mounted
+# source (./Backend:/app) and the shared kernelstate volume (/app/state) stay writable under the dev
+# compose. In prod (baked image + fresh named volume) Docker seeds the empty volume's ownership from
+# the chowned /app/state below, so the worker/api can write the plugin registry.
+# NOTE: requires an image rebuild + clean-slate (`down -v`) to take effect; an existing root-owned
+# kernelstate volume must be recreated so appuser can write it.
+ARG APP_UID=1000
+RUN useradd --create-home --uid ${APP_UID} appuser \
+    && mkdir -p /app/state \
+    && chown -R appuser:appuser /app
+USER appuser
+
 CMD ["bash", "docker-entrypoint.sh"]

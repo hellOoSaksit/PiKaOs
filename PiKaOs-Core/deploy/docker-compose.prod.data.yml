@@ -24,3 +24,15 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    # Fix-NET-02: in prod publish ONLY the S3 API (9000) — the admin web console (9001) must not be
+    # host-reachable. `!override` replaces the base service's `ports` list (compose merges lists by
+    # append otherwise, which can't remove 9001). Reach the console via an SSH tunnel when needed.
+    ports: !override
+      - "9000:9000"
+    #
+    # Fix-NET-01 (host firewall, NOT loopback): the data ports are published on the host on purpose so
+    # the separate backend/ai compose stacks reach them over host.docker.internal (docker gateway IP,
+    # not 127.0.0.1 — binding to loopback here would BREAK that cross-stack path). Restrict external
+    # exposure at the host firewall instead: default-deny inbound, allow 5432/6379/9000 only from the
+    # backend host / docker bridge. See runbook-provisioning (Fix-NET-04). Revisit once the topology
+    # reconcile (Fix-ARCH-01) decides whether prod collapses the data tier onto one internal network.

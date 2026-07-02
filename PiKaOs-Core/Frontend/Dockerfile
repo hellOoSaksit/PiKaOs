@@ -6,7 +6,9 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
+# Fix-DEP-01: reproducible install straight from the committed lockfile (was `npm install`, which can
+# drift the lock). `npm ci` requires package-lock.json to be present and in sync.
+RUN npm ci
 
 # --- dev: Vite dev server. Source + node_modules arrive as volumes at runtime (deploy/docker-compose.frontend.dev.yml):
 #     the bind mount gives hot reload; a named volume keeps node_modules off the Windows host. ---
