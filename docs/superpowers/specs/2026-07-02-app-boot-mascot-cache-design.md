@@ -99,17 +99,36 @@ the time `FirstRun` is visible the curtain has already finished).
 - No retry logic beyond what exists today — keep this addition minimal, don't invent new resilience
   machinery for a decorative element.
 
-### Mascot asset porting (prerequisite, same effort)
+### Mascot asset porting (DONE — commit `b1506a2`, prerequisite completed before writing the plan)
 
-Copy the DesignSync mascot bundle into `PiKaOs-Core/Frontend/public/mascot/`:
-`embed.html`, `Face.js`, `Limbs.js`, `PikaMascot.js`, `lights.js`, `main.js`, `states.js`,
-`support.js` (source: DesignSync project `390db268-9d3b-4638-aec2-35d29aa67748`, already
-downloaded once this session into `PiKaOs-Docs/design-system/` for the Login/Error-page reference —
-these particular files were listed but not yet copied into the app). Vite serves anything under
-`public/` at the site root unchanged, so `/mascot/embed.html` resolves correctly once copied — no
-build config changes needed. `browser-window.jsx`/`ios-frame.jsx`/`index.html` (the DesignSync
-project's own preview harness) are not needed — only the embeddable `embed.html` + its `src/*.js`
-dependencies.
+Ported into `PiKaOs-Core/Frontend/public/mascot/`: `embed.html` + `src/{PikaMascot,Face,Limbs,lights,states}.js`
+(source: DesignSync project `390db268-9d3b-4638-aec2-35d29aa67748`). `main.js`/`support.js`/`index.html`
+(the DesignSync project's own debug-panel preview harness) were confirmed unneeded — `embed.html`'s
+only entry-point import is `./src/PikaMascot.js`, which doesn't reach them.
+
+**Found and fixed during porting:** `embed.html`'s original import map pointed `three` and
+`three/addons/` at `unpkg.com` (a CDN) — pinned to Three.js 0.160.0, an older version than this
+app's already-installed `three` (`^0.184.0`, used by Room 3D — `PiKaOs-Core/Frontend/src/lib/room-three.jsx`).
+Confirmed with the user and vendored a fully offline copy instead:
+- **Source:** the official `github.com/mrdoob/three.js` repo, tag `r185` (= npm `0.185.1`, the
+  current latest stable release, confirmed against the npm registry this session) — not unpkg.
+- **Isolated from the app's own `three` dependency** — kept as its own copy under
+  `public/mascot/vendor/`, not touching `PiKaOs-Core/Frontend/package.json`'s `three` version, so
+  bumping to "latest" for the mascot carries zero regression risk to the already-working Room 3D
+  feature. The mascot is a raw static iframe outside the Vite bundle anyway, so this isolation is
+  free, not extra work.
+- **Full dependency tree resolved and vendored**, not just the two files the import map originally
+  named: `vendor/three.module.js` + `vendor/three.core.js` (Three.js splits into these two as of
+  recent releases) + 11 files under `vendor/jsm/{postprocessing,environments,shaders}/` (every
+  relative import transitively reachable from `PikaMascot.js`'s `three/addons/postprocessing/*`
+  and `lights.js`'s `three/addons/environments/RoomEnvironment.js` imports — verified with a script
+  that every relative import across the whole tree resolves to a file on disk; zero missing).
+- `embed.html`'s import map was rewritten to `"three": "./vendor/three.module.js"` /
+  `"three/addons/": "./vendor/jsm/"` — no other file needed any edits, since import maps resolve
+  bare specifiers per-document regardless of where they point.
+
+Vite serves anything under `public/` at the site root unchanged, so `/mascot/embed.html` (already
+referenced by `FirstRun.jsx`) now resolves for real — no build config changes needed.
 
 ### Testing / verification
 
