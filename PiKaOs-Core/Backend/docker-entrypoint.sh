@@ -13,6 +13,11 @@ if RESOLVED="$(python -m scripts.compute_enabled)"; then
   export ENABLED_MODULES="${RESOLVED}"
 fi
 
+# Bootstrap gate: print this boot's console-only setup code (once, before any uvicorn worker spawns —
+# see scripts/generate_setup_code.py for why it can't just happen at app import time). No-ops once
+# `auth` is enabled.
+python -m scripts.generate_setup_code
+
 # Per-plugin schema step: each enabled plugin that owns tables creates + seeds them on its own metadata
 # (Phase C). Auth's users/roles/permissions live here now, not in Core's Alembic baseline. Idempotent.
 echo "[entrypoint] running enabled-plugin migrations + seed..."
