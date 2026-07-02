@@ -122,6 +122,10 @@ export async function verifySetupCode(code) {
   return raw("/setup/verify-code", { method: "POST", auth: false, body: { code } });
 }
 
+// --- app version / build hash (AppBoot's mascot-cache check; also the seam release-and-
+// rollback.md §4's SPA version-skew policy is meant to use) ---
+export async function getVersion() { return raw("/version", { auth: false }); }   // { version, build, name }
+
 // --- LLM provider config API (admin: which provider/model/key the engine uses — no-hardcode) ---
 // The API key is write-only: send it in the body to set/replace it; the server never returns it
 // (responses carry `api_key_set` only). Omit it on update to keep the stored key unchanged.
