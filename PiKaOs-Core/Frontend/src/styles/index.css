@@ -8,3 +8,4 @@
 @import './rbac.css';
 @import './fx.css';
 @import './login.css';        /* first-run console-code gate (split-stage auth surface) */
+@import './shell.css';        /* Bottom Utility Bar + popover panel styles */

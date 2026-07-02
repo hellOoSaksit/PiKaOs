@@ -1,0 +1,123 @@
+/* Bottom Utility Bar + generic popover shell — ported from DesignSync
+   Bottom Utility Bar.dc.html. Tokens reused from styles.css (byte-identical
+   to the DC reference's own CSS — never import ds/pikaos-*.css). */
+
+@keyframes barPop {
+  from { opacity: 0; transform: translate(-50%, 14px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes popUp {
+  from { opacity: 0; transform: translateY(10px) scale(.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); }
+  45%      { transform: scale(1.18); }
+}
+
+.utility-bar-overlay {
+  position: fixed; inset: 0; z-index: 40;
+}
+
+.utility-bar {
+  position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+  z-index: 42;
+  display: flex; align-items: center; gap: 5px;
+  padding: 9px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-pop);
+  animation: barPop .4s var(--spring) both;
+}
+
+.ub-btn {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  width: 54px; padding: 9px 6px;
+  border: none; background: transparent;
+  border-radius: 15px;
+  cursor: pointer;
+  font-family: var(--font-body);
+  color: var(--ink-3);
+  transition: transform .2s var(--spring), background .14s;
+}
+.ub-btn:hover { background: var(--bg-3); }
+.ub-btn:active { transform: scale(.93); }
+.ub-btn.active { color: #fff; }
+.ub-btn-pill {
+  position: absolute; inset: 0; border-radius: 15px;
+  background: var(--gold-grad);
+  box-shadow: 0 3px 0 var(--gold-deep);
+}
+.ub-btn-icon { position: relative; z-index: 1; display: grid; place-items: center; }
+.ub-btn-label { position: relative; z-index: 1; font-size: 9.5px; font-weight: 600; }
+
+.ub-badge {
+  position: absolute; top: 3px; right: 7px; z-index: 2;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  display: grid; place-items: center;
+  border-radius: 999px;
+  background: var(--crimson); color: #fff;
+  font-family: var(--font-mono); font-weight: 700; font-size: 10.5px; line-height: 1;
+  border: 2px solid var(--bg-2);
+  animation: badgePulse 2.6s var(--spring) infinite;
+}
+
+.ub-divider {
+  width: 1px; height: 30px; background: var(--line); margin: 0 3px;
+}
+
+.ub-profile-btn {
+  position: relative;
+  display: block; width: 44px; height: 44px; padding: 0;
+  border: 2px solid transparent; border-radius: 13px;
+  background: linear-gradient(150deg, var(--gold-bright), var(--amethyst));
+  color: #fff; cursor: pointer;
+  font-family: var(--font-display); font-weight: 700; font-size: 15px;
+  box-shadow: var(--shadow-raised);
+  transition: transform .25s var(--spring), border-color .15s;
+}
+.ub-profile-btn:hover { transform: translateY(-2px); }
+.ub-profile-btn:active { transform: scale(.95); }
+.ub-profile-btn.open { border-color: var(--gold-deep); }
+.ub-profile-btn .ub-avatar-wrap { display: grid; place-items: center; width: 100%; height: 100%; }
+
+.popover-panel {
+  position: absolute; bottom: calc(100% + 14px); z-index: 41;
+  border-radius: var(--radius-lg);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-pop);
+  overflow: hidden;
+  animation: popUp .22s var(--spring) both;
+}
+.popover-panel.anchor-left { left: 0; }
+.popover-panel.anchor-right { right: 0; }
+.popover-panel.anchor-center { left: 50%; transform: translateX(-50%); }
+
+.pop-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid var(--line-soft);
+}
+.pop-title { font-family: var(--font-head); font-weight: 700; font-size: 14.5px; }
+.pop-action {
+  font-family: var(--font-display); font-weight: 600; font-size: 11.5px;
+  color: var(--gold-bright); cursor: pointer; background: none; border: none;
+}
+.pop-empty { padding: 24px 16px; text-align: center; font-size: 12.5px; color: var(--ink-3); }
+.pop-foot {
+  padding: 11px; border-top: 1px solid var(--line-soft); text-align: center;
+  font-family: var(--font-display); font-weight: 600; font-size: 12.5px;
+  color: var(--gold-bright); cursor: pointer; background: none; border: none; width: 100%;
+}
+.pop-search-field {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 12px; margin: 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-3); border: 1px solid var(--line);
+}
+.pop-search-field input {
+  flex: 1; border: none; background: transparent; outline: none;
+  font-family: var(--font-body); font-size: 13.5px; color: var(--ink);
+}
