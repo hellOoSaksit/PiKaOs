@@ -1,0 +1,38 @@
+# Fix-KIT-05 — Dependabot watches every ecosystem PiKaOs actually ships, so known-vulnerable deps
+# surface as PRs instead of rotting. Grouped + weekly to keep the noise low.
+version: 2
+updates:
+  # GitHub Actions used by the workflows in this repo (keeps the SHA-pins current — Fix-KIT-06).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Backend (FastAPI / Python) — pip against requirements*.txt.
+  - package-ecosystem: pip
+    directory: /PiKaOs-Core/Backend
+    schedule:
+      interval: weekly
+    groups:
+      backend:
+        patterns: ["*"]
+
+  # Frontend (Vite / React) — npm against package-lock.json.
+  - package-ecosystem: npm
+    directory: /PiKaOs-Core/Frontend
+    schedule:
+      interval: weekly
+    groups:
+      frontend:
+        patterns: ["*"]
+
+  # Container base images in the Core Dockerfiles.
+  - package-ecosystem: docker
+    directories:
+      - /PiKaOs-Core/Backend
+      - /PiKaOs-Core/Frontend
+    schedule:
+      interval: weekly
