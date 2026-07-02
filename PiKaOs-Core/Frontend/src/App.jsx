@@ -22,6 +22,7 @@ import { ComponentLibrary } from './screens/screens-library.jsx';
 import { Workflows } from './screens/screens-workflows.jsx';
 import { useAuth } from './lib/auth.jsx';
 import { Menu } from './components/ui/Dropdown.jsx';
+import { BottomUtilityBar } from './components/ui/BottomUtilityBar.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
 import { SAMPLE_CHARS, loadArchived, loadChars, randPos, saveArchived, saveChars } from './lib/store.jsx';
 import { UILoadingHost, UIModalHost } from './lib/ui-modal.jsx';
@@ -653,6 +654,13 @@ function App() {
         onDelete={async (id) => { const c = chars.find(x => x.id === id); if (c && c.locked) { await window.uiAlert({ title: t("ad.cantDelTitle"), message: t("ad.ceoLockedAlert") }); return; } setAgentSel(null); S.remove(id); }} />}
       {questSel && <QuestDrawer q={questSel} onClose={() => setQuestSel(null)} t={t} onAgent={(a) => { setQuestSel(null); setAgentSel(a); }} />}
       {builder && <CharacterBuilder initial={builder.id ? builder : null} onSave={saveChar} onClose={() => setBuilder(null)} can={can} archived={archived} t={t} onRestore={(id) => { S.restore(id); setBuilder(null); }} />}
+      <BottomUtilityBar
+        t={t} route={route} onHome={() => go("me")} me={me}
+        theme={theme} onToggleTheme={() => setTheme(theme === "pro" ? "pro-dark" : "pro")}
+        onSignOut={auth.logout}
+        notifications={[]} chatThreads={[]}
+        onAdd={() => Sys.openBuilder()}
+      />
       <UIModalHost />
       <UILoadingHost />
     </div>
