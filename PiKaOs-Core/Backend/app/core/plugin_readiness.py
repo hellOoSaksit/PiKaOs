@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 from . import compose_render
 from . import plugin_registry as registry
+from ..plugin_loader import Manifest
 
 
 @dataclass(frozen=True)
@@ -18,7 +19,7 @@ class ReadinessResult:
     reasons: tuple[str, ...] = ()
 
 
-def check(pid: str, manifest, all_manifests: dict) -> ReadinessResult:
+def check(pid: str, manifest: Manifest, all_manifests: dict[str, Manifest]) -> ReadinessResult:
     """Readiness for `pid`, given `manifest` and the full candidate manifest set (including `pid`)."""
     reasons: list[str] = []
 
@@ -28,7 +29,10 @@ def check(pid: str, manifest, all_manifests: dict) -> ReadinessResult:
 
     if manifest.kind == "tool" and manifest.compose:
         reg = registry.read()
-        installed = {p for p in reg if registry.state_of(reg, p) != registry.AVAILABLE}
+        # Must match what actually gets merged into the real compose file at boot (registry.ENABLED
+        # only) — not the broader "not available" set from routers/plugins.py's resolve_install_plan,
+        # which would also drag in DISABLED/PENDING_PURGE plugins unrelated to this candidate.
+        installed = registry.enabled_ids(reg)
         try:
             compose_render.render_compose({"services": {}}, installed | {pid}, all_manifests)
         except Exception as exc:  # a broken fragment must never crash the readiness check itself

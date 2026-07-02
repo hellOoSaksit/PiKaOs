@@ -45,3 +45,25 @@ def test_fails_on_broken_compose_fragment(monkeypatch, tmp_path):
     result = plugin_readiness.check("crm", mf, {"crm": mf})
     assert result.passed is False
     assert any("compose" in r for r in result.reasons)
+
+
+def test_disabled_plugin_with_broken_fragment_does_not_fail_unrelated_candidate(monkeypatch, tmp_path):
+    """A DISABLED (not ENABLED) plugin's broken compose fragment must never leak into the readiness
+    simulation for an unrelated candidate — only registry.ENABLED plugins are actually merged into the
+    real compose file at boot (registry.enabled_ids), so that's the only set readiness should simulate."""
+    from app.core import kernel_state, plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+
+    # A broken tool plugin, present in the registry but DISABLED — not part of the real boot-time merge.
+    registry.set_state("broken-tool", registry.DISABLED)
+
+    def _boom_if_broken_tool_included(base, enabled, manifests):
+        if "broken-tool" in enabled:
+            raise ValueError("bad yaml")
+        return {"services": {}}
+    monkeypatch.setattr(plugin_readiness.compose_render, "render_compose", _boom_if_broken_tool_included)
+
+    mf = _mf(kind="tool", compose="compose.fragment.yml")
+    result = plugin_readiness.check("crm", mf, {"crm": mf})
+    assert result.passed is True
+    assert result.reasons == ()
