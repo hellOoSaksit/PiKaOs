@@ -56,3 +56,6 @@ desktop.ini
 *.swp
 .idea/
 .vscode/
+
+# Local git worktrees (subagent-driven-development isolation)
+.worktrees/
