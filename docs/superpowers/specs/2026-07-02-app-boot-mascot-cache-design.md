@@ -70,10 +70,13 @@ the time `FirstRun` is visible the curtain has already finished).
    pre-auth section): `export async function getVersion() { return raw("/version", { auth: false }); }`
    — hits `GET /api/version`, which already exists and returns `{version, build, name}`
    (`Backend/app/core/routers/health.py:27-33`). No backend changes.
-2. **Storage key:** `localStorage` key `guildos.boot.v1`, following the existing `guildos.*`
-   convention (`guildos.notify.v1`, `guildos.rooms.v2`) — stores the last-seen `build` string.
+2. **Storage key:** `localStorage` key `pikaos.boot.v1`, matching the formal `pikaos.*` naming
+   already established for `TOKEN_KEY = "pikaos.access"` in `api.js` (per the project's
+   formal-terminology-only rule — legacy `guildos.*` keys elsewhere, e.g. `guildos.notify.v1`,
+   `guildos.rooms.v2`, are pre-existing game-metaphor debt, not a pattern to extend) — stores the
+   last-seen `build` string.
 3. **On `AppBoot` mount:**
-   - Read `storedHash = localStorage.getItem('guildos.boot.v1')` synchronously.
+   - Read `storedHash = localStorage.getItem('pikaos.boot.v1')` synchronously.
    - Call `getVersion()` (async, in parallel — no other work is blocked on this besides the gate
      itself).
    - While the request is in flight: render `null` (mirrors the existing `if (!auth.ready) return
@@ -83,7 +86,7 @@ the time `FirstRun` is visible the curtain has already finished).
    - **`build !== storedHash`** (mismatch, or `storedHash` was `null` — first visit): render the
      curtain + a temporary mascot iframe (`<iframe src="/mascot/embed.html">`, same as today's
      `FirstRun` one), run the existing `BOOT_MIN` (1300ms) + `pikaReady` postMessage wait, hard-capped
-     at 4000ms exactly as today. On completion: `localStorage.setItem('guildos.boot.v1', build)`,
+     at 4000ms exactly as today. On completion: `localStorage.setItem('pikaos.boot.v1', build)`,
      unmount the temporary iframe, remove the curtain, render `children`.
 
 ### Error handling
@@ -117,7 +120,7 @@ dev server):
 - First visit / cleared `localStorage` → real mascot animation shows in the curtain (not a blank
   iframe), then `FirstRun` (or the app shell) appears.
 - Reload immediately after → curtain is skipped entirely, no flash.
-- Manually delete the `guildos.boot.v1` key → curtain reappears on next load.
+- Manually delete the `pikaos.boot.v1` key → curtain reappears on next load.
 
 ## Not deciding now
 
