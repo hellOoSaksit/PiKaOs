@@ -1,25 +1,14 @@
+# Kernel-only runtime deps. The kernel CODE imports EXACTLY these (verified across app/core, app/main,
+# app/modules, app/plugin_loader, scripts): fastapi/pydantic/pydantic-settings/cryptography/PyYAML.
+# Every datastore + feature library is now PLUGIN-OWNED (declared in that plugin's backend/requirements.txt)
+# and merged into the image at build by scripts/render_requirements.py → requirements.lock. A bare kernel
+# image (no plugins) installs only this file — and Core's plugin-free test suite runs on it unchanged.
 fastapi==0.137.1
 uvicorn[standard]==0.49.0
-sqlalchemy[asyncio]==2.0.51
-asyncpg==0.31.0
-pgvector==0.4.2
-alembic==1.18.4
 pydantic==2.13.4
 pydantic-settings==2.14.1
-PyJWT==2.13.0
-argon2-cffi==25.1.0
-cryptography==43.0.3
-# Plugin-owned datastore libs — the kernel CODE no longer imports these; they belong to their Tool
-# plugins (redis/arq → PiKaOs-Plugin-Tools-Redis, minio → -Tools-MinIO, sqlalchemy/asyncpg/pgvector/
-# alembic → -Tools-Postgres). They stay in the kernel image until the build-merge machinery merges each
-# enabled plugin's requirements at install; only then do they drop from here.
-redis==5.3.1
-arq==0.28.0
-minio==7.2.20
-python-multipart==0.0.32
-httpx==0.28.1
-pypdf==5.1.0
-mammoth==1.8.0
-PyYAML==6.0.3
-pytest==8.4.2
+cryptography==43.0.3        # kernel keystore (app.core.crypto) — encrypts runtime secrets at rest
+PyYAML==6.0.3              # compose_render merges tool compose-fragments at install
+httpx==0.28.1             # starlette TestClient (Core's plugin-free test suite) rides on httpx
+pytest==8.4.2             # the backend-CI job runs Core's suite in-container, so the runners ship in the image
 pytest-asyncio==0.26.0

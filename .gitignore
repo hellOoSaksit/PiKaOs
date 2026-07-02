@@ -37,6 +37,10 @@
 !/PiKaOs-Core/Backend/app/plugins/__init__.py
 !/PiKaOs-Core/Backend/app/plugins/manifest.schema.json
 
+# Build-merge artifact — kernel + enabled-plugin requirements merged by scripts/render_requirements.py
+# (regenerated on every link-plugins.sh run to match the installed plugin set). Never committed.
+/PiKaOs-Core/Backend/requirements.lock
+
 # Kernel runtime state — first-run setup state (a hash of the console code), written at boot to a local
 # JSON file (NOT the DB) so the kernel works before any datastore exists. Runtime-only, never committed.
 /PiKaOs-Core/Backend/data/

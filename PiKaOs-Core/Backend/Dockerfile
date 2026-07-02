@@ -15,6 +15,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Build-merge (kernel-redesign.md §2–§3, "install engine = HYBRID"): every datastore/feature lib is
+# plugin-owned. If link-plugins.sh + scripts/render_requirements.py produced a requirements.lock
+# (kernel + enabled-plugin libs), install the extra plugin libs it declares on top of the kernel layer
+# above. A bare kernel build ships NO lock → kernel-only image, and Core's plugin-free suite runs on it
+# unchanged. (This bakes the LIBS; the plugin CODE is mounted/linked per the deploy flow.)
+RUN if [ -f requirements.lock ]; then pip install --no-cache-dir -r requirements.lock; fi
+
 # Immutable build identity baked into the image (CI passes --build-arg BUILD_HASH=$GIT_SHA);
 # read by config.build_hash → /api/version for version-skew detection (release-and-rollback.md §4).
 ARG BUILD_HASH=dev
