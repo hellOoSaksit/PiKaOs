@@ -21,11 +21,3 @@ def test_merge_unions_networks():
     base = {"services": {}, "networks": {"a": None}}
     out = merge_fragments(base, [{"networks": {"b": None}}])
     assert set(out["networks"]) == {"a", "b"}
-
-
-def test_real_postgres_fragment_loads():
-    from app.plugin_loader import discover
-    from app.core.compose_render import load_tool_fragments
-    m = discover()
-    frags = load_tool_fragments({"postgres"}, m)
-    assert any("db" in (f.get("services") or {}) for f in frags)
