@@ -61,17 +61,22 @@
 
     // ---- host bridge: let a parent page drive the mascot via postMessage ----
     // e.g. parent.postMessage({ pika:'setState', arg:'listening' }, '*')
+    // Restricted to same-origin embeds (this app only ever mounts this iframe from its own
+    // origin — AppBoot.jsx/FirstRun.jsx) and a fixed allowlist of the mascot's public API, so a
+    // postMessage from an unrelated origin or an unlisted method name is ignored outright.
+    const PIKA_METHODS = new Set(['setState', 'playGesture', 'setStatusLED', 'setTalking', 'lookAt', 'setPower', 'setScreenArt']);
     window.addEventListener('message', (e) => {
+      if (e.origin !== window.location.origin) return;
       const m = e.data;
-      if (!m || typeof m !== 'object' || !m.pika) return;
+      if (!m || typeof m !== 'object' || !PIKA_METHODS.has(m.pika)) return;
       const fn = pika[m.pika];
       if (typeof fn === 'function') {
         try { Array.isArray(m.args) ? fn.apply(pika, m.args) : fn.call(pika, m.arg); }
         catch (err) { /* ignore bad calls */ }
       }
     });
-    // announce readiness so the host can sync initial state
-    try { parent.postMessage({ pikaReady: true }, '*'); } catch (err) {}
+    // announce readiness to the parent frame (same-origin only, matching the listener above)
+    try { parent.postMessage({ pikaReady: true }, window.location.origin); } catch (err) {}
   </script>
 </body>
 </html>
