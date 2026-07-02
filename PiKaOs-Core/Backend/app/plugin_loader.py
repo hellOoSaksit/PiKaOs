@@ -44,7 +44,9 @@ class Manifest:
     optional_dependencies: tuple[str, ...] = ()
     provides: tuple[str, ...] = ()
     consumes: tuple[str, ...] = ()
-    permissions: tuple[str, ...] = ()
+    # normalized permission entries: {"key","group","name_th","name_en"} — a plugin declares the perms it
+    # owns (with RBAC-UI metadata); the auth plugin aggregates these into the seeded permission catalog.
+    permissions: tuple[dict, ...] = ()
     routes: tuple[str, ...] = ()
     config_schema: str | None = None   # relative path to the plugin's config.schema.json (§11), if any
     migrations: str | None = None
@@ -84,6 +86,33 @@ def _satisfies(version: str, spec: str) -> bool:
 
 # --- discovery + validation -------------------------------------------------------------------------
 
+def _norm_perm(p: "str | dict") -> dict:
+    """Normalize a manifest permission entry to {key, group, name_th, name_en}. A bare string is a key
+    with empty metadata (still valid — the RBAC UI shows the key). An object carries the display metadata."""
+    if isinstance(p, str):
+        return {"key": p, "group": "", "name_th": "", "name_en": ""}
+    return {"key": p["key"], "group": p.get("group", ""),
+            "name_th": p.get("name_th", ""), "name_en": p.get("name_en", "")}
+
+
+def permission_catalog(enabled: set[str], manifests: dict[str, "Manifest"]) -> list[dict]:
+    """The RBAC permission catalog = the union of every ENABLED plugin's declared permissions, in a
+    stable order (by plugin id, then declaration order). This is the seam the auth plugin seeds from
+    (plugin-architecture: Base ships zero plugin perms; each plugin owns the perms it declares). A key
+    declared by two plugins keeps the first (deterministic)."""
+    seen: set[str] = set()
+    out: list[dict] = []
+    for pid in sorted(enabled):
+        mf = manifests.get(pid)
+        if mf is None:
+            continue
+        for perm in mf.permissions:
+            if perm["key"] not in seen:
+                seen.add(perm["key"])
+                out.append({**perm, "plugin": pid})
+    return out
+
+
 def _validate(folder: str, raw: dict) -> Manifest:
     for key in _REQUIRED:
         if not raw.get(key):
@@ -97,12 +126,20 @@ def _validate(folder: str, raw: dict) -> Manifest:
         raise ManifestError(
             f"plugin '{pid}': coreVersion '{raw['coreVersion']}' excludes the running Core "
             f"{settings.app_version} — refusing to load")
-    # §6 namespacing: every registered key is prefixed with the id
+    # §6 namespacing: every DI-contract key a plugin `provides` is prefixed with the id — that is the seam
+    # where a collision would silently mis-wire two plugins, so it stays strict.
     prefix = f"{pid}."
-    for kind in ("permissions", "provides"):
-        for k in raw.get(kind, []):
-            if not k.startswith(prefix):
-                raise ManifestError(f"plugin '{pid}': {kind} key '{k}' is not prefixed with '{prefix}'")
+    for k in raw.get("provides", []):
+        if not k.startswith(prefix):
+            raise ManifestError(f"plugin '{pid}': provides key '{k}' is not prefixed with '{prefix}'")
+    # Permissions are a GLOBAL vocabulary (the RBAC catalog aggregates them across all plugins; roles bind
+    # to bare keys like `user.manage`/`agent.create`), so they are NOT id-prefixed — a plugin declares the
+    # perms it owns using the real keys its code enforces. Namespacing here would force an entire vocabulary
+    # rename with no collision benefit (perms are keys, not import/DI tokens). Only shape is validated.
+    for p in raw.get("permissions", []):
+        key = p.get("key") if isinstance(p, dict) else p
+        if not isinstance(key, str) or not key:
+            raise ManifestError(f"plugin '{pid}': permission entry {p!r} must be a key string or an object with a 'key'")
     for ev in raw.get("events", {}).get("emits", []):
         if not ev.startswith(prefix):
             raise ManifestError(f"plugin '{pid}': emitted event '{ev}' is not prefixed with '{prefix}'")
@@ -131,7 +168,7 @@ def _validate(folder: str, raw: dict) -> Manifest:
         dependencies=tuple(raw.get("dependencies", [])),
         optional_dependencies=tuple(raw.get("optionalDependencies", [])),
         provides=tuple(raw.get("provides", [])), consumes=tuple(raw.get("consumes", [])),
-        permissions=tuple(raw.get("permissions", [])), routes=tuple(raw.get("routes", [])),
+        permissions=tuple(_norm_perm(p) for p in raw.get("permissions", [])), routes=tuple(raw.get("routes", [])),
         config_schema=config_schema, migrations=raw.get("migrations"),
         kind=kind,
         secrets=tuple(raw.get("secrets", [])),

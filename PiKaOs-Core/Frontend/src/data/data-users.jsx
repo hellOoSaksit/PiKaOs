@@ -52,9 +52,9 @@ const ROLES_SEED = [
 /* ---- default role → permission set ---- */
 const ROLE_PERMS_SEED = {
   admin:   [...PERM_KEYS],
-  manager: ["agent.create", "agent.edit.any", "agent.delete.any", "task.run", "codex.view", "codex.manage", "codex.delete", "workflow.manage", "user.view.any", "audit.view", "room.build", "room.place", "room.move", "room.reset", "room.create", "room.delete", "room.template", "options.manage", "character.manage", "rules.manage", "agent.config", "task.delete"],
-  member:  ["agent.create", "task.run", "codex.view", "codex.manage", "codex.delete", "workflow.manage", "room.build", "room.place", "room.move"],
-  viewer:  ["codex.view"],
+  manager: ["agent.create", "agent.edit.any", "agent.delete.any", "task.run", "knowledge.view", "knowledge.manage", "knowledge.delete", "workflow.manage", "user.view.any", "audit.view", "room.build", "room.place", "room.move", "room.reset", "room.create", "room.delete", "room.template", "options.manage", "character.manage", "rules.manage", "agent.config", "task.delete"],
+  member:  ["agent.create", "task.run", "knowledge.view", "knowledge.manage", "knowledge.delete", "workflow.manage", "room.build", "room.place", "room.move"],
+  viewer:  ["knowledge.view"],
 };
 
 /* ---- users (real accounts) ---- */

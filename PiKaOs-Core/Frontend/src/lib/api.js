@@ -127,7 +127,7 @@ export async function setLlmRole(role, connectionId) { return raw(`/llm/roles/${
 
 // --- knowledge / codex documents API (markdown-as-truth store + RAG search) ---
 // Files live in MinIO; the backend chunks + embeds them in the background (ingest_status).
-// Upload/delete need the codex.manage permission; list/get/search are any authenticated user
+// Upload/delete need the knowledge.manage permission; list/get/search are any authenticated user
 // (scoped to what the caller may read, server-side).
 export async function listDocuments({ kind, limit, offset } = {}) {
   const qs = new URLSearchParams();
@@ -152,13 +152,13 @@ export async function searchKnowledge(q, k) {
   return raw(`/knowledge/search?${qs.toString()}`);
 }
 // Ask a question and get an answer synthesized from the codex with citations (E8). Any logged-in
-// user (codex.view); scope is enforced server-side. k omitted → server default. Returns
+// user (knowledge.view); scope is enforced server-side. k omitted → server default. Returns
 // { answer, sources:[{n, document_id, document_name, heading, score}], rewritten_query, used_chunks }.
 export async function askKnowledge(question, k) {
   return raw("/knowledge/answer", { method: "POST", body: { question, ...(k ? { k } : {}) } });
 }
 // Rebuild the RAG index from the markdown source ('single rebuild command' — knowledge-rag.md §3).
-// Needs codex.manage. onlyStale=true (default) re-embeds only docs not on the current model — use
+// Needs knowledge.manage. onlyStale=true (default) re-embeds only docs not on the current model — use
 // after switching the embedder; false forces a full rebuild. Returns { matched, queued, model }.
 export async function reindexKnowledge(onlyStale = true) {
   return raw(`/knowledge/reindex?only_stale=${onlyStale ? "true" : "false"}`, { method: "POST" });

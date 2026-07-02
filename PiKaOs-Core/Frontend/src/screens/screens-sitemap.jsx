@@ -44,7 +44,7 @@ function smLoadTrain() { try { return JSON.parse(localStorage.getItem("guildos.s
 function smSaveTrain(l) { try { localStorage.setItem("guildos.sitemap.train", JSON.stringify(l)); } catch (e) { } }
 
 function SitemapAudit({ t, lang, can, actor }) {
-  const canEdit = !can || can("codex.manage");
+  const canEdit = !can || can("knowledge.manage");
   const me = actor || t("log.actor");
   const [log, setLog] = useState(() => { try { return JSON.parse(localStorage.getItem("guildos.sitemap.log") || "[]"); } catch (e) { return []; } });
   const slog = (action, detail) => { const e = { id: "lg" + Date.now() + Math.random().toString(36).slice(2, 5), actor: me, action, detail, ts: Date.now() }; const nx = [e, ...log].slice(0, 200); setLog(nx); try { localStorage.setItem("guildos.sitemap.log", JSON.stringify(nx)); } catch (e2) { } };
