@@ -91,12 +91,12 @@ export function FirstRun({ t, language, onLang, onVerified }) {
     };
   }, [pika]);
 
-  const succeed = useCallback((value) => {
+  const succeed = useCallback((token) => {
     setOk(true);
     // wake the mascot: eyes snap open, then a delighted cheer
     pika('setState', 'surprised');
     setTimeout(() => { pika('setState', 'happy'); pika('playGesture', 'cheer'); }, 650);
-    setTimeout(() => { if (onVerified) onVerified(value); }, 1100);
+    setTimeout(() => { if (onVerified) onVerified(token); }, 1100);
   }, [pika, onVerified]);
 
   const submit = async (e) => {
@@ -107,14 +107,14 @@ export function FirstRun({ t, language, onLang, onVerified }) {
     setError('');
     setLoading(true);
     try {
-      await api.verifySetupCode(value);
-      succeed(value);
+      const resp = await api.verifySetupCode(value);
+      succeed(resp.token);
     } catch (err) {
       // Preview only (#firstrun): if the setup backend isn't reachable, accept any non-empty code so the
       // screen is viewable. In real first-run this is OFF — a wrong/unreachable code shows the real error.
       if (PREVIEW && import.meta.env.DEV && (err.status === 0 || err.status === 404)) {
         console.warn('[FirstRun] preview: setup backend unreachable (status %s) — accepting code locally.', err.status);
-        succeed(value);
+        succeed(null);
       } else if (err.status === 0) {
         setError(T.errNetwork);
       } else if (err.status === 400 || err.status === 401 || err.status === 403) {
@@ -153,15 +153,16 @@ export function FirstRun({ t, language, onLang, onVerified }) {
           {word.map((ch, i) => (<span key={i} className="ltr" style={{ fontSize: 52 }}>{ch}</span>))}
         </div>
 
-        <div style={{ position: 'relative', zIndex: 2, width: 340, height: 380, animation: 'pikaFloat 5.5s ease-in-out infinite' }}>
+        {/* one step smaller than the original 340×380 (×0.8) — the Zzz overlay offsets scale with it */}
+        <div style={{ position: 'relative', zIndex: 2, width: 272, height: 304, animation: 'pikaFloat 5.5s ease-in-out infinite' }}>
           <iframe src="/mascot/embed.html" title="PIKA mascot" ref={frame} allowTransparency="true" loading="eager"
             style={{ width: '100%', height: '100%', border: 0, background: 'transparent', pointerEvents: 'none' }} />
           {!ok && (
-            <div style={{ position: 'absolute', top: 92, left: 196, pointerEvents: 'none', zIndex: 4,
+            <div style={{ position: 'absolute', top: 74, left: 157, pointerEvents: 'none', zIndex: 4,
               fontFamily: 'var(--font-head)', fontWeight: 800, color: 'var(--gold-bright)', opacity: .85 }}>
-              <span style={{ position: 'absolute', fontSize: 15, animation: 'zzz 2.6s ease-in-out infinite' }}>z</span>
-              <span style={{ position: 'absolute', left: 13, top: -9, fontSize: 19, animation: 'zzz 2.6s ease-in-out .85s infinite' }}>z</span>
-              <span style={{ position: 'absolute', left: 31, top: -23, fontSize: 24, animation: 'zzz 2.6s ease-in-out 1.7s infinite' }}>Z</span>
+              <span style={{ position: 'absolute', fontSize: 12, animation: 'zzz 2.6s ease-in-out infinite' }}>z</span>
+              <span style={{ position: 'absolute', left: 10, top: -7, fontSize: 15, animation: 'zzz 2.6s ease-in-out .85s infinite' }}>z</span>
+              <span style={{ position: 'absolute', left: 25, top: -18, fontSize: 19, animation: 'zzz 2.6s ease-in-out 1.7s infinite' }}>Z</span>
             </div>
           )}
         </div>

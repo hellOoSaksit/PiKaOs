@@ -113,12 +113,14 @@ export async function forgotPassword(usernameOrEmail) {
 
 // --- first-run setup (kernel console-code gate) ---
 // The Core prints a rotating setup code to the server console (stdout) on startup; the operator
-// pastes it here to unlock the install page (Jupyter-token pattern). No auth — this gate runs
-// before any account exists.
-// TODO(kernel backend): POST /api/setup/verify-code + GET /api/setup/status don't exist yet — these
-// 404 until that lands. The FirstRun screen handles the missing backend gracefully in dev preview.
-export async function setupStatus() { return raw("/setup/status", { auth: false }); }   // { needsSetup, ... }
+// pastes it here to unlock the install page (Jupyter-token pattern) before any account exists.
+// setupStatus() sends whatever token is stored (auth: true, the default) — the backend reads it as an
+// OPTIONAL signal, never requires it, and reports back whether it's still a valid bootstrap session
+// (`bootstrapAuthorized`) so a stored-but-stale token (e.g. after a restart) falls back to FirstRun.
+export async function setupStatus() { return raw("/setup/status"); }   // { needsSetup, bootstrapAuthorized }
 export async function verifySetupCode(code) {
+  // unauthenticated by definition — proving the code IS the auth; verifying it hands back the
+  // session token (setToken() it on success) that unlocks the kernel-only install shell.
   return raw("/setup/verify-code", { method: "POST", auth: false, body: { code } });
 }
 

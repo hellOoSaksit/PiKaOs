@@ -6,12 +6,13 @@ import { AUDIT_SEED, ROLES_SEED, ROLE_PERMS_SEED, USERS_SEED, USER_PERMS_SEED, f
 import { TOOL_RUNS_SEED, WORKFLOWS_SEED, loadWF, saveWF } from './data/data-workflows.jsx';
 import { TOKENS, NAV, TASKS } from './data/data.jsx';
 import { loadNav, saveNav, mergeWithDefault } from './data/data-nav.jsx';
-import { getNavConfig, setNavConfig, getMySettings, setMySetting, getGlobalConfig, setGlobalConfig } from './lib/api.js';
+import { getNavConfig, setNavConfig, getMySettings, setMySetting, getGlobalConfig, setGlobalConfig, setupStatus, setToken } from './lib/api.js';
 import { applyGlobalConfig } from './lib/characters.jsx';
 import { Admin } from './screens/screens-admin.jsx';
 import { CharacterBuilder } from './screens/screens-builder.jsx';
 import { Chronicle, Mana, QuestLog, Settings, Treasury, Watchtower } from './screens/screens-extra.jsx';
 import { FirstRun } from './screens/FirstRun.jsx';
+import { KernelOnlyShell } from './screens/KernelOnlyShell.jsx';
 import { MyDashboard } from './screens/screens-me.jsx';
 import { PluginsManager } from './screens/screens-plugins.jsx';
 import { AuditLog, PermissionsCatalog, RolesPermissions, UserDetail, UserForm } from './screens/screens-rbac.jsx';
@@ -367,6 +368,17 @@ function App() {
   const auth = useAuth();                                  // { user, ready, loggedIn, login, logout }
   const currentUser = auth.user;                           // backend account or null
   const username = currentUser?.username || "somchai";     // for the topbar avatar label
+
+  // Kernel-only bootstrap gate (no auth plugin installed yet — 2026-07-02-bootstrap-install-shell-
+  // design.md): a stored session token from a verified setup code unlocks a minimal install shell.
+  // `null` = not checked yet (avoid flashing FirstRun before we know); re-checked after FirstRun's
+  // onVerified stores a fresh token, so a page load with a still-valid token skips straight past it.
+  const [bootstrap, setBootstrap] = useState(null);
+  const refreshBootstrap = React.useCallback(() => {
+    setupStatus().then(setBootstrap).catch(() => setBootstrap({ needsSetup: false, bootstrapAuthorized: false }));
+  }, []);
+  useEffect(() => { refreshBootstrap(); }, [refreshBootstrap]);
+
   const [route, setRoute] = useState("me");
   const [theme, setThemeState] = useState(() => { const t = localStorage.getItem("guild-theme"); return (t === "pro" || t === "pro-dark") ? t : "pro"; });
   // active lexicon = ภาษาที่แสดง + รูปแบบคำศัพท์ รวมเป็นชุดเดียว (รหัสชุดจาก data/lexicons/*.json)
@@ -598,12 +610,13 @@ function App() {
     if (need && !can(need)) go("me");
   }, [route, viewAs, rolePerms, userPerms]);
 
-  if (!auth.ready) return null;   // avoid flashing the setup screen while restoring a session
-  // Kernel-only right now (no auth plugin) — the console-code first-run gate is the ONLY entry
-  // screen. TODO(kernel backend): once /api/setup/verify-code exists, onVerified should re-check
-  // auth/plugin state (or reload) instead of no-op; a real Login only returns once an auth plugin
-  // is installed (plugin-lifecycle-ui — kernel login seam, not built yet).
-  if (!auth.loggedIn) return <FirstRun t={t} language={language} onLang={pickLanguage} onVerified={() => {}} />;
+  if (!auth.ready || !bootstrap) return null;   // avoid flashing the setup screen while restoring a session
+  // Kernel-only (no auth plugin installed yet): a verified setup code unlocks a minimal install shell
+  // instead of the full app — there's no real Login screen yet (arrives with the auth plugin itself).
+  if (!auth.loggedIn) {
+    if (bootstrap.bootstrapAuthorized) return <KernelOnlyShell language={language} />;
+    return <FirstRun t={t} language={language} onLang={pickLanguage} onVerified={(token) => { setToken(token); refreshBootstrap(); }} />;
+  }
 
   const screen = (() => {
     const guard = (perm, el) => can(perm) ? el : <MyDashboard Sys={Sys} onAgent={setAgentSel} onQuest={setQuestSel} />;
