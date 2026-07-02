@@ -373,6 +373,24 @@ PLUGIN_MANIFESTS: dict[str, Manifest] = discover()
 OPTIONAL_MODULE_NAMES: tuple[str, ...] = tuple(sorted(PLUGIN_MANIFESTS))
 
 
+def register_discovered(manifest: Manifest) -> None:
+    """Make a freshly-installed plugin's manifest visible to THIS process's `_manifests()` lookups
+    without a restart (install-from-git design §2.2) — `discover()` runs once at import, so a plugin
+    cloned onto disk afterwards needs this to appear in install-plan/install/list-plugins calls in the
+    same process. Mounting its ROUTER still needs a restart (unchanged restart-to-apply model)."""
+    global PLUGIN_MANIFESTS, OPTIONAL_MODULE_NAMES
+    PLUGIN_MANIFESTS = {**PLUGIN_MANIFESTS, manifest.id: manifest}
+    OPTIONAL_MODULE_NAMES = tuple(sorted(PLUGIN_MANIFESTS))
+
+
+def deregister_discovered(pid: str) -> None:
+    """Remove a plugin from THIS process's manifest catalog after its on-disk folder is deleted
+    (Purge of a git-installed plugin, §2.2/§8) — mirrors `register_discovered`."""
+    global PLUGIN_MANIFESTS, OPTIONAL_MODULE_NAMES
+    PLUGIN_MANIFESTS = {k: v for k, v in PLUGIN_MANIFESTS.items() if k != pid}
+    OPTIONAL_MODULE_NAMES = tuple(sorted(PLUGIN_MANIFESTS))
+
+
 def enabled_optional_modules() -> set[str]:
     """The PLUGINS this build loads on top of the Base, parsed from `settings.enabled_modules`:
     "" / unset = **Base only, no plugins** (the default) · "*" = every plugin · a comma-list = those
