@@ -66,6 +66,9 @@ def _make_tool_module() -> ModuleType:
 SAMPLE_MF = plugin_loader.Manifest(
     id="sample", name="Sample", version="1.2.3", coreVersion="*",
     provides=(SAMPLE_CONTRACT,), routes=("/api/sample",),
+    # a declared permission in the normalized {key, group, name_th, name_en} shape _norm_perm() produces
+    # (not a bare string) — exercises the object form GET /api/plugins must serialize down to keys only.
+    permissions=({"key": "sample.manage", "group": "", "name_th": "", "name_en": ""},),
 )
 TOOL_MF = plugin_loader.Manifest(
     id="sampletool", name="Sample Tool", version="0.1.0", coreVersion="*",

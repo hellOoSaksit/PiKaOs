@@ -43,10 +43,11 @@ def _print_banner(code: str) -> None:
 
 def main() -> None:
     if "auth" in _enabled_modules():
-        setup_state.clear_code()
+        setup_state.clear()
         return
     code = setup_state.generate_code()
-    setup_state.write_code(code)
+    token = setup_state.generate_session_token()
+    setup_state.write(code, token)
     _print_banner(code)
 
 

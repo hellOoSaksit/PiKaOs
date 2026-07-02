@@ -4,10 +4,15 @@ Before any `auth` plugin exists there is no one to log in as, so the install/Mod
 gated by a code printed ONLY to the server console (stdout) — the Jupyter-token pattern. Generated once
 per container boot (`scripts/generate_setup_code.py`, run before uvicorn workers spawn — see that
 module's docstring for why) and shared across every worker process via kernel state (the same JSON-file
-mechanism the plugin registry uses). This module owns the code's format + the kernel-state round-trip;
-`scripts/generate_setup_code.py` writes it, `routers/setup.py` reads/verifies it.
+mechanism the plugin registry uses). This module owns the code's + session token's format and the
+kernel-state round-trip; `scripts/generate_setup_code.py` writes them, `routers/setup.py` reads/verifies
+the code, `identity.BootstrapProvider` verifies the session token.
 
-Design: docs/superpowers/specs/2026-07-02-setup-code-bootstrap-design.md.
+A second, machine-only value — the session token — travels alongside the human-typed code: once an
+operator proves they read the console by submitting the right code, the backend hands back this token
+so the frontend can act as a temporary bootstrap admin (installing `auth` itself, chicken-and-egg)
+without re-typing the code on every request. See
+docs/superpowers/specs/2026-07-02-bootstrap-install-shell-design.md.
 """
 from __future__ import annotations
 
@@ -35,20 +40,34 @@ def generate_code() -> str:
     return "PIKA-" + "-".join(groups)
 
 
-def write_code(code: str) -> None:
-    """Persist the boot's setup code to kernel state, visible to every worker process."""
-    kernel_state.write_json(_KEY, {"code": code})
+def generate_session_token() -> str:
+    """A fresh opaque bearer token — machine-only, never displayed, never typed by a human."""
+    return secrets.token_urlsafe(32)
 
 
-def clear_code() -> None:
-    """Drop any stored code — called when `auth` is enabled, so the bootstrap gate goes moot."""
+def write(code: str, session_token: str) -> None:
+    """Persist this boot's code + session token to kernel state, visible to every worker process."""
+    kernel_state.write_json(_KEY, {"code": code, "session_token": session_token})
+
+
+def clear() -> None:
+    """Drop any stored code/token — called when `auth` is enabled, so the bootstrap gate goes moot."""
     kernel_state.write_json(_KEY, None)
+
+
+def _entry() -> dict:
+    data = kernel_state.read_json(_KEY, None)
+    return data if isinstance(data, dict) else {}
 
 
 def read_code() -> str | None:
     """The current boot's setup code, or None if none is set (auth installed, or never generated)."""
-    data = kernel_state.read_json(_KEY, None)
-    return data.get("code") if isinstance(data, dict) else None
+    return _entry().get("code")
+
+
+def read_session_token() -> str | None:
+    """The current boot's session token, or None if none is set."""
+    return _entry().get("session_token")
 
 
 def verify_code(candidate: str) -> bool:
@@ -59,4 +78,15 @@ def verify_code(candidate: str) -> bool:
     return hmac.compare_digest(candidate.strip().upper(), code.upper())
 
 
-__all__ = ["generate_code", "write_code", "clear_code", "read_code", "verify_code"]
+def verify_session_token(candidate: str | None) -> bool:
+    """Constant-time match against the stored session token. False if none set or none given."""
+    token = read_session_token()
+    if not token or not candidate:
+        return False
+    return hmac.compare_digest(candidate, token)
+
+
+__all__ = [
+    "generate_code", "generate_session_token", "write", "clear",
+    "read_code", "read_session_token", "verify_code", "verify_session_token",
+]

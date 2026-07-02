@@ -4,8 +4,10 @@ Core owns the *interface* (an `IdentityProvider` Protocol) and the FastAPI *depe
 uses (`get_current_user` / `require_perm` / `require_role`); an **auth plugin** binds the concrete
 provider into the DI container under the `IDENTITY` token (`contracts.IDENTITY`). The dependencies
 resolve that provider from `request.app.state.container` **per request**, so the auth plugin is
-swappable and the kernel boots without it — falling back to `BootstrapProvider`, which denies all data
-access (the setup/install surface is gated separately by the console code, not by this provider).
+swappable and the kernel boots without it — falling back to `BootstrapProvider`, which denies everyone
+EXCEPT a caller bearing the current boot's setup-code session token (`setup_state.py`), who is granted
+a synthetic admin identity — the install page's only way to call `plugins.manage`-gated routes before
+any auth plugin exists. Spec: docs/superpowers/specs/2026-07-02-bootstrap-install-shell-design.md.
 
 Routers and plugins import these dependencies from here (kernel), NEVER from the auth plugin — that is
 what keeps Core independent of the plugin (import-linter §2.1). Spec:
@@ -13,11 +15,13 @@ docs/superpowers/specs/2026-07-01-auth-plugin-extraction-design.md.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
 from fastapi import HTTPException, Request, status
 
+from . import setup_state
 from .contracts import IDENTITY
 
 # The well-known superuser role. Lives in the kernel identity module (not in the auth plugin's
@@ -48,18 +52,34 @@ class IdentityProvider(Protocol):
 
 # --- fallback when no auth plugin is bound ----------------------------------------------------------
 
+@dataclass(frozen=True)
+class _SyntheticUser:
+    """The one identity `BootstrapProvider` ever authenticates — satisfies `UserLike` structurally."""
+    id: UUID
+    role: str
+    status: str
+
+
+# A fixed nil UUID: there is at most one holder of a valid bootstrap session token per boot (the
+# operator who read the console code), so no per-request identity beyond "right token or not" exists.
+_BOOTSTRAP_ADMIN = _SyntheticUser(id=UUID(int=0), role=ADMIN_ROLE, status="active")
+
+
 class BootstrapProvider:
-    """No auth plugin installed/enabled: no real user resolves, so every data endpoint is denied. The
-    first-run setup/install surface is authorized separately by the console code (routers/setup.py)."""
+    """No auth plugin installed/enabled: denies everyone EXCEPT a caller bearing the current boot's
+    setup-code session token (`setup_state.verify_session_token`), who authenticates as a synthetic
+    admin — install-page-only access until a real `auth` plugin takes over."""
 
     async def authenticate(self, token: str | None) -> "UserLike | None":
+        if token and setup_state.verify_session_token(token):
+            return _BOOTSTRAP_ADMIN
         return None
 
     async def has_perm(self, user: "UserLike", perm: str) -> bool:
-        return False
+        return getattr(user, "role", None) == ADMIN_ROLE
 
     def has_role(self, user: "UserLike", *roles: str) -> bool:
-        return False
+        return getattr(user, "role", None) in roles
 
 
 BOOTSTRAP = BootstrapProvider()

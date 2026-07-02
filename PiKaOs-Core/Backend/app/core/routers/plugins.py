@@ -72,7 +72,7 @@ def _view(reg: dict[str, dict], active: set[str]) -> list[PluginOut]:
             active_now=is_active,
             restart_required=(state == registry.ENABLED) != is_active,
             dependencies=list(mf.dependencies),
-            permissions=list(mf.permissions),
+            permissions=[p["key"] for p in mf.permissions],
         ))
     return out
 
