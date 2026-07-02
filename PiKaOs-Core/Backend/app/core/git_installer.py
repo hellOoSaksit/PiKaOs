@@ -72,21 +72,34 @@ def _credential_for(host: str) -> str | None:
     return decrypt(token) if token else None
 
 
+def _write_askpass_script(token: str) -> Path:
+    """Write the throwaway `GIT_ASKPASS` script that resolves `token` and return its path. Split
+    out of `_run_git` so the script body can be tested directly (by executing it via
+    `subprocess.run(["sh", path], env=...)`) without going through git at all — see
+    `test_askpass_script_*` in test_git_installer.py.
+
+    `token` is NEVER string-interpolated into the script text (git executes this file via its
+    `#!/bin/sh` shebang, so anything written here is parsed as shell source — a token containing
+    `` ` `` or `$(...)` would otherwise be arbitrary command injection). The script instead only
+    echoes the `PIKAOS_ASKPASS_TOKEN` environment variable, which the caller (`_run_git`) sets to
+    `token` when it invokes `git` with this script as `GIT_ASKPASS` — the shell expands it at
+    runtime rather than at write time, so `token`'s value never becomes part of the script source.
+    """
+    fd, askpass_path = tempfile.mkstemp(prefix="pikaos-askpass-", text=True)
+    with open(fd, "w") as f:
+        # `printf '%s\n'` (not `echo`) is exact regardless of a leading `-` or backslashes.
+        f.write('#!/bin/sh\nprintf \'%s\\n\' "$PIKAOS_ASKPASS_TOKEN"\n')
+    Path(askpass_path).chmod(0o700)
+    return Path(askpass_path)
+
+
 def _run_git(args: list[str], *, cwd: str | None = None, askpass_token: str | None = None,
              timeout: int = 60) -> subprocess.CompletedProcess:
     """One argument-array `git` invocation, returned uninterpreted (caller checks `returncode`)."""
     env = None
     askpass_path: str | None = None
     if askpass_token:
-        fd, askpass_path = tempfile.mkstemp(prefix="pikaos-askpass-", text=True)
-        with open(fd, "w") as f:
-            # The token is NEVER string-interpolated into the script text (git executes this file
-            # via its #!/bin/sh shebang, so anything written here is parsed as shell source — a
-            # token containing `` ` `` or `$(...)` would otherwise be arbitrary command injection).
-            # Instead the script only echoes an environment variable the shell expands at runtime,
-            # and `printf '%s\n'` (not `echo`) is exact regardless of a leading `-` or backslashes.
-            f.write('#!/bin/sh\nprintf \'%s\\n\' "$PIKAOS_ASKPASS_TOKEN"\n')
-        Path(askpass_path).chmod(0o700)
+        askpass_path = str(_write_askpass_script(askpass_token))
         env = {**os.environ, "GIT_ASKPASS": askpass_path, "GIT_TERMINAL_PROMPT": "0",
                "PIKAOS_ASKPASS_TOKEN": askpass_token}
     try:

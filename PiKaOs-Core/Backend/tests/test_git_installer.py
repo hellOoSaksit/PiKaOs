@@ -75,36 +75,68 @@ def test_latest_tag_returns_highest_semver(local_repo):
     assert git_installer.latest_tag(local_repo) == "v1.2.0"
 
 
-def test_clone_to_staging_uses_askpass_credential_end_to_end(local_repo, monkeypatch):
-    """Exercises the `if askpass_token:` branch in `_run_git` end to end (previously untested —
-    Finding 2): a credential stored for the `file://` fixture's host ("") must make it through the
-    GIT_ASKPASS script without corrupting the git invocation."""
+def test_askpass_script_prints_the_token_verbatim(tmp_path):
+    """The legitimate-case proof: the script `_run_git` writes (via `_write_askpass_script`),
+    executed directly the same way git would exec it (`sh <script>`, token supplied through the
+    `PIKAOS_ASKPASS_TOKEN` env var), must print exactly the token to stdout. This — not a `file://`
+    clone — is what actually exercises the script body, because git never invokes `GIT_ASKPASS` for
+    `file://` transport (local filesystem access needs no credential resolution; verified by
+    replaying the clone against the fixture with `GIT_ASKPASS` set — the script process never
+    starts). The two prior tests that drove this through `clone_to_staging` against the `file://`
+    fixture therefore never ran the script at all and passed regardless of whether the injection
+    bug was fixed — see task-5-report.md Fix Report Round 2."""
+    script_path = git_installer._write_askpass_script("some-test-token-value")
+    try:
+        result = subprocess.run(
+            ["sh", str(script_path)],
+            env={"PIKAOS_ASKPASS_TOKEN": "some-test-token-value"},
+            capture_output=True, text=True, check=True)
+    finally:
+        script_path.unlink(missing_ok=True)
+
+    assert result.stdout == "some-test-token-value\n"
+
+
+def test_askpass_script_token_with_shell_metacharacters_does_not_inject(tmp_path):
+    """Regression test for Finding 1/5, fixed for real this round: a credential token containing
+    shell metacharacters must never be executed as shell source. The old code wrote
+    `f.write(f'#!/bin/sh\\necho "{token}"\\n')` — string-interpolating the token straight into the
+    script text that git executes via its `#!/bin/sh` shebang — so a backtick or `$(...)` in the
+    token would run as an arbitrary shell command. This test executes the actual generated script
+    directly (bypassing git and its `file://`-only-skips-askpass quirk entirely) and asserts on its
+    real stdout/side-effects: the token must come out unexecuted, and no marker file may appear.
+    Verified RED/RE-GREEN: reverting `_write_askpass_script`'s body to the old f-string construction
+    makes this test fail (the marker file gets created); restoring the `printf` + env-var version
+    makes it pass again — see task-5-report.md Fix Report Round 2."""
+    marker_backtick = tmp_path / "pikaos-test-injection-marker-backtick"
+    marker_subshell = tmp_path / "pikaos-test-injection-marker-subshell"
+    token = f"a`touch {marker_backtick}`b$(touch {marker_subshell})c"
+
+    script_path = git_installer._write_askpass_script(token)
+    try:
+        result = subprocess.run(
+            ["sh", str(script_path)],
+            env={"PIKAOS_ASKPASS_TOKEN": token},
+            capture_output=True, text=True, check=True)
+    finally:
+        script_path.unlink(missing_ok=True)
+
+    assert result.stdout == f"{token}\n"   # raw token, never interpreted as shell source
+    assert not marker_backtick.exists()    # no shell command executed
+    assert not marker_subshell.exists()
+
+
+def test_clone_to_staging_with_stored_credential_still_succeeds(local_repo, monkeypatch):
+    """Lighter integration test: proves the credential-lookup plumbing (`_credential_for`, decrypt,
+    passing `askpass_token` through to `_run_git`) doesn't break a clone — NOT a proof that the
+    injection fix holds (git never calls `GIT_ASKPASS` for `file://` transport at all, so this path
+    can't exercise the script body; that proof lives in the `test_askpass_script_*` tests above)."""
     monkeypatch.setattr(git_installer, "allowed_hosts", lambda: [""])  # file:// has an empty host
     git_installer.set_credential("", "some-test-token-value")
 
     staging = git_installer.clone_to_staging(local_repo, ref="v1.0.0")
 
     assert (staging / "manifest.json").is_file()
-
-
-def test_clone_to_staging_askpass_token_with_shell_metacharacters_does_not_inject(
-        local_repo, monkeypatch, tmp_path):
-    """Regression test for Finding 1/5: a credential token containing shell metacharacters must
-    never be executed as shell source. The old code wrote `echo "{token}"` straight into a
-    `#!/bin/sh` script — git executes that file via its shebang, so a token containing a backtick
-    or `$(...)` would run as an arbitrary shell command. If this test ever starts creating the
-    marker files, the injection is back."""
-    monkeypatch.setattr(git_installer, "allowed_hosts", lambda: [""])  # file:// has an empty host
-    marker_backtick = tmp_path / "pikaos-test-injection-marker-backtick"
-    marker_subshell = tmp_path / "pikaos-test-injection-marker-subshell"
-    token = f"a`touch {marker_backtick}`b$(touch {marker_subshell})c"
-    git_installer.set_credential("", token)
-
-    staging = git_installer.clone_to_staging(local_repo, ref="v1.0.0")
-
-    assert (staging / "manifest.json").is_file()     # clone still succeeded
-    assert not marker_backtick.exists()               # no shell command executed
-    assert not marker_subshell.exists()
 
 
 def test_run_git_askpass_env_preserves_path():
