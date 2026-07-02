@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PIKA mascot — embed</title>
+
+  <!--
+    ┌─────────────────────────────────────────────────────────────────────┐
+    │  EMBED THIS MASCOT ON ANY WEBSITE                                     │
+    │                                                                       │
+    │  Option A — drop-in <iframe> (simplest, fully isolated):             │
+    │    <iframe src="embed.html" title="PIKA mascot"                     │
+    │            style="width:360px;height:420px;border:0;background:none"  │
+    │            allowtransparency="true" loading="lazy"></iframe>          │
+    │                                                                       │
+    │  Option B — mount into your own page (copy the /src folder + three): │
+    │    <div id="mascot" style="width:360px;height:420px"></div>           │
+    │    <script type="module">                                            │
+    │      import { PikaMascot } from './src/PikaMascot.js';            │
+    │      new PikaMascot(document.getElementById('mascot'),              │
+    │                       { transparent: true });                         │
+    │    </script>                                                          │
+    │                                                                       │
+    │  The background is transparent, so it sits over any page colour.      │
+    │  It auto-pauses when scrolled off-screen or the tab is hidden, and    │
+    │  resizes to fill its container.                                       │
+    └─────────────────────────────────────────────────────────────────────┘
+  -->
+
+  <!-- Vendored locally (no CDN) — three.js r185 (0.185.1), fetched from the
+       official github.com/mrdoob/three.js repo. See docs/superpowers/specs/
+       2026-07-02-app-boot-mascot-cache-design.md for provenance. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three.module.js",
+      "three/addons/": "./vendor/jsm/"
+    }
+  }
+  </script>
+
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
+    /* the mascot fills this stage; size the host element (or the iframe) to taste */
+    #stage { position: fixed; inset: 0; }
+  </style>
+</head>
+<body>
+  <div id="stage"></div>
+
+  <script type="module">
+    import { PikaMascot } from './src/PikaMascot.js';
+    const pika = new PikaMascot(document.getElementById('stage'), {
+      transparent: true,
+      idleTimeout: 13,
+      maxFPS: 30,        // light on spec — bump to 60 (or remove) for max smoothness
+    });
+    window.pika = pika;   // optional: drive it from the host page
+
+    // ---- host bridge: let a parent page drive the mascot via postMessage ----
+    // e.g. parent.postMessage({ pika:'setState', arg:'listening' }, '*')
+    window.addEventListener('message', (e) => {
+      const m = e.data;
+      if (!m || typeof m !== 'object' || !m.pika) return;
+      const fn = pika[m.pika];
+      if (typeof fn === 'function') {
+        try { Array.isArray(m.args) ? fn.apply(pika, m.args) : fn.call(pika, m.arg); }
+        catch (err) { /* ignore bad calls */ }
+      }
+    });
+    // announce readiness so the host can sync initial state
+    try { parent.postMessage({ pikaReady: true }, '*'); } catch (err) {}
+  </script>
+</body>
+</html>
