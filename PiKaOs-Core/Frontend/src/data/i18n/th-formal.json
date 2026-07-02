@@ -1022,6 +1022,24 @@
     "api.desc": "เพิ่มคีย์ API ของผู้ให้บริการ AI โดยตั้งชื่อให้จำง่าย — ในรายการจะแสดงเฉพาะชื่อและเลขท้ายของคีย์ (เก็บไว้ในเครื่อง)",
     "api.namePh": "ชื่อที่ตั้ง (เช่น OpenAI งานหลัก)",
     "api.secretPh": "API key / secret",
-    "api.del": "ลบ"
+    "api.del": "ลบ",
+    "utilitybar.home": "หน้าแรก",
+    "utilitybar.search": "ค้นหา",
+    "utilitybar.search.placeholder": "ค้นหาเอเจนต์ ภารกิจ ไฟล์...",
+    "utilitybar.notifications": "แจ้งเตือน",
+    "utilitybar.notifications.title": "การแจ้งเตือน",
+    "utilitybar.notifications.readAll": "อ่านทั้งหมด",
+    "utilitybar.notifications.empty": "ไม่มีการแจ้งเตือนใหม่",
+    "utilitybar.notifications.viewAll": "ดูการแจ้งเตือนทั้งหมด",
+    "utilitybar.add": "สร้าง",
+    "utilitybar.add.title": "สร้างใหม่",
+    "utilitybar.chat": "แชท",
+    "utilitybar.chat.title": "ข้อความ",
+    "utilitybar.chat.compose": "เขียนใหม่",
+    "utilitybar.chat.empty": "ยังไม่มีข้อความ",
+    "utilitybar.chat.open": "เปิดกล่องข้อความ",
+    "utilitybar.profile": "โปรไฟล์",
+    "utilitybar.profile.viewProfile": "ดูโปรไฟล์",
+    "utilitybar.profile.settings": "ตั้งค่า"
   }
 }
