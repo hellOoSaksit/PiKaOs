@@ -4,11 +4,23 @@
 // - sends cookies (httpOnly refresh token) with credentials: "include"
 // - on 401, refreshes once then retries the original request
 
-const BASE = (import.meta.env.VITE_API_BASE || "/api").replace(/\/$/, "");
+let base = (import.meta.env.VITE_API_BASE || "/api").replace(/\/$/, "");
 const TOKEN_KEY = "pikaos.access";
 
 let accessToken = null;
 try { accessToken = localStorage.getItem(TOKEN_KEY); } catch (e) { /* ignore */ }
+
+let mode = "cookie";                       // "cookie" (web) | "token" (desktop)
+let provider = null;                       // { get, refresh, onLogout }
+
+// Runtime transport config for the desktop shell: point at a remote base URL and/or supply a
+// token provider (bearer auth instead of the httpOnly cookie). Web keeps the defaults (cookie
+// mode, relative /api base) unless this is called.
+export function configureTransport({ apiBase, tokenProvider }) {
+  if (apiBase) base = apiBase.replace(/\/$/, "");
+  provider = tokenProvider || null;
+  mode = provider ? "token" : "cookie";
+}
 
 export function getToken() { return accessToken; }
 export function setToken(tok) {
@@ -32,14 +44,17 @@ async function raw(path, { method = "GET", body, form, auth = true, signal, _ret
   // JSON body sets its content-type; a FormData (file upload) must NOT — the browser sets the
   // multipart boundary itself.
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  if (auth && accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+  if (auth) {
+    const tok = provider ? await provider.get() : accessToken;
+    if (tok) headers["Authorization"] = `Bearer ${tok}`;
+  }
 
   let res;
   try {
-    res = await fetch(BASE + path, {
+    res = await fetch(base + path, {
       method,
       headers,
-      credentials: "include",
+      ...(mode === "cookie" ? { credentials: "include" } : {}),
       signal,                                  // lets callers abort (cancel) the request
       body: form !== undefined ? form : (body !== undefined ? JSON.stringify(body) : undefined),
     });
@@ -53,7 +68,7 @@ async function raw(path, { method = "GET", body, form, auth = true, signal, _ret
 
   // transparent refresh-once on expired access token
   if (res.status === 401 && auth && !_retry && path !== "/auth/refresh") {
-    const ok = await tryRefresh();
+    const ok = await doRefresh();
     if (ok) return raw(path, { method, body, form, auth, signal, _retry: true });
   }
 
@@ -64,6 +79,11 @@ async function raw(path, { method = "GET", body, form, auth = true, signal, _ret
   if (!res.ok) throw new ApiError(res.status, data);
   return data;
 }
+
+// refresh seam: token mode delegates to the injected provider; cookie mode uses the
+// httpOnly refresh-cookie flow below. Used by raw()'s 401-retry and restore() (session
+// revive on app boot).
+async function doRefresh() { return provider ? provider.refresh() : tryRefresh(); }
 
 let refreshInFlight = null;
 async function tryRefresh() {
@@ -102,7 +122,7 @@ export async function me() {
 
 export async function restore() {
   // revive a session on page load using the refresh cookie
-  const ok = await tryRefresh();
+  const ok = await doRefresh();
   if (!ok) return null;
   try { return await me(); } catch (e) { return null; }
 }
