@@ -4,7 +4,7 @@
    state, so this sits above the whole SPA rather than inside App.jsx's own conditional returns. */
 import React from 'react';
 const { useState, useEffect, useRef, useCallback } = React;
-import { getVersion } from './lib/api.js';
+import { getVersion, configureTransport } from './lib/api.js';
 import { packById, defaultPack } from './lib/i18n.jsx';
 
 const BOOT_KEY = 'pikaos.boot.v1';
@@ -36,12 +36,27 @@ export function AppBoot({ children }) {
     if (w) { try { w.postMessage({ pika: method, args }, '*'); } catch (e) { /* ignore */ } }
   }, []);
 
-  // cache check: compare the server's current build hash to the one saved on the last successful boot
+  // cache check: compare the server's current build hash to the one saved on the last successful boot.
+  // On desktop, the transport (API base + bearer-token provider) must be wired to the main process
+  // BEFORE any request fires — including this one — and well before App mounts and useAuth's restore()
+  // runs (App/children only mount once this component reaches phase 'ready', see below).
   useEffect(() => {
     let alive = true;
     let stored = null;
     try { stored = localStorage.getItem(BOOT_KEY); } catch (e) { /* ignore */ }
-    getVersion()
+    (async () => {
+      if (window.pikaosDesktop?.isDesktop) {
+        const { apiBaseUrl } = await window.pikaosDesktop.config.get();
+        configureTransport({
+          apiBase: apiBaseUrl,
+          tokenProvider: {
+            get: () => window.pikaosDesktop.auth.getAccessToken(),
+            refresh: async () => !!(await window.pikaosDesktop.auth.getAccessToken()),
+          },
+        });
+      }
+      return getVersion();
+    })()
       .then((v) => {
         if (!alive) return;
         buildRef.current = (v && v.build) || null;

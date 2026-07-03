@@ -106,12 +106,17 @@ async function tryRefresh() {
 
 // --- auth API ---
 export async function login(usernameOrEmail, password) {
+  if (mode === "token" && window.pikaosDesktop) {           // desktop: main process holds the token
+    const { user } = await window.pikaosDesktop.auth.login(usernameOrEmail, password);
+    return user;
+  }
   const data = await raw("/auth/login", { method: "POST", auth: false, body: { usernameOrEmail, password } });
   setToken(data.token.accessToken);
   return data.user;
 }
 
 export async function logout() {
+  if (mode === "token" && window.pikaosDesktop) { await window.pikaosDesktop.auth.logout(); return; }
   try { await raw("/auth/logout", { method: "POST" }); } catch (e) { /* ignore */ }
   setToken(null);
 }
