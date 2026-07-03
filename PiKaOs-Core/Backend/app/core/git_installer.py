@@ -185,3 +185,38 @@ def fetch_and_checkout(plugin_dir: Path, repo_url: str, tag: str) -> None:
     if result.returncode != 0:
         _log_git_failure("checkout", result)
         raise GitInstallError("could not check out the update")
+
+
+def head_sha(plugin_dir: Path) -> str | None:
+    """The full commit SHA currently checked out in `plugin_dir`, or None if it isn't a git working
+    tree (e.g. a dev symlink to a non-repo, or git itself failing). This is the immutable pin we record
+    at install/update time — a tag can be force-moved later, a commit SHA cannot (marketplace.md W2)."""
+    result = _run_git(["rev-parse", "HEAD"], cwd=str(plugin_dir), timeout=15)
+    if result.returncode != 0:
+        return None
+    sha = result.stdout.strip()
+    return sha or None
+
+
+def remote_tag_sha(repo_url: str, tag: str) -> str | None:
+    """The COMMIT SHA `tag` resolves to on `repo_url`'s remote, or None if the tag is absent. An
+    annotated tag has two ls-remote lines — `<sha> refs/tags/<tag>` (the tag object) and
+    `<sha>^{} refs/tags/<tag>^{}` (the commit it dereferences to); we want the commit, so the `^{}`
+    line wins when present (it's what `git checkout tags/<tag>` lands HEAD on, so it matches
+    `head_sha` after an install). Used to detect a tag that was moved after we pinned it (W2)."""
+    result = _run_git(["ls-remote", "--tags", "--", repo_url, tag, f"{tag}^{{}}"],
+                      askpass_token=_credential_for(_host_of(repo_url)), timeout=30)
+    if result.returncode != 0:
+        return None
+    deref: str | None = None
+    plain: str | None = None
+    for line in result.stdout.splitlines():
+        parts = line.split()
+        if len(parts) != 2:
+            continue
+        sha, ref = parts
+        if ref.endswith("^{}"):
+            deref = sha
+        elif ref == f"refs/tags/{tag}":
+            plain = sha
+    return deref or plain

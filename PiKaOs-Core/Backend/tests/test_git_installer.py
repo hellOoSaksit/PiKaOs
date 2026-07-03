@@ -75,6 +75,31 @@ def test_latest_tag_returns_highest_semver(local_repo):
     assert git_installer.latest_tag(local_repo) == "v1.2.0"
 
 
+def test_head_sha_returns_the_checked_out_commit(local_repo, monkeypatch, tmp_path):
+    monkeypatch.setattr(git_installer, "allowed_hosts", lambda: [""])
+    staging = git_installer.clone_to_staging(local_repo, ref="v1.0.0")
+    sha = git_installer.head_sha(staging)
+    assert isinstance(sha, str) and len(sha) == 40
+    # matches what git itself reports for that working tree
+    expected = subprocess.run(["git", "rev-parse", "HEAD"], cwd=staging,
+                              capture_output=True, text=True).stdout.strip()
+    assert sha == expected
+
+
+def test_head_sha_returns_none_for_a_non_git_dir(tmp_path):
+    assert git_installer.head_sha(tmp_path) is None
+
+
+def test_remote_tag_sha_matches_the_checked_out_head(local_repo, monkeypatch):
+    monkeypatch.setattr(git_installer, "allowed_hosts", lambda: [""])
+    staging = git_installer.clone_to_staging(local_repo, ref="v1.0.0")
+    assert git_installer.remote_tag_sha(local_repo, "v1.0.0") == git_installer.head_sha(staging)
+
+
+def test_remote_tag_sha_returns_none_for_a_missing_tag(local_repo):
+    assert git_installer.remote_tag_sha(local_repo, "v9.9.9") is None
+
+
 def test_askpass_script_prints_the_token_verbatim(tmp_path):
     """The legitimate-case proof: the script `_run_git` writes (via `_write_askpass_script`),
     executed directly the same way git would exec it (`sh <script>`, token supplied through the
