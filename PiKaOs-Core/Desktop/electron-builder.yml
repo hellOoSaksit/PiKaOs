@@ -7,8 +7,8 @@ files:
   - package.json
 asar: true
 # Signing deferred (unsigned build for now).
-# extraResources: wire in Frontend/dist here in Task 5 once the renderer is bundled
-# and loaded via the app:// protocol, e.g.:
-#   extraResources:
-#     - from: ../Frontend/dist
-#       to: renderer
+# Bundled renderer: Frontend/dist is copied in and served via the app://pikaos protocol
+# (src/main/protocol.ts), never file://.
+extraResources:
+  - from: ../Frontend/dist
+    to: frontend
