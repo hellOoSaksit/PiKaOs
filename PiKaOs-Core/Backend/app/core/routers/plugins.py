@@ -56,6 +56,10 @@ class PluginOut(BaseModel):
     restart_required: bool          # desired state (enabled) ≠ active_now
     dependencies: list[str]
     permissions: list[str]
+    description: str = ""
+    icon: str | None = None
+    repoUrl: str | None = None      # None for a dev-symlinked plugin — no remote to show/check-update against
+    installedVia: str = "symlink"   # "symlink" (dev sibling checkout) | "git" (install-from-git / update)
 
 
 class InstallPlanOut(BaseModel):
@@ -81,6 +85,10 @@ class CheckUpdateOut(BaseModel):
     hasUpdate: bool
 
 
+class GitCredentialIn(BaseModel):
+    token: str
+
+
 def _view(reg: dict[str, dict], active: set[str]) -> list[PluginOut]:
     out: list[PluginOut] = []
     for pid, mf in sorted(_manifests().items()):
@@ -92,6 +100,9 @@ def _view(reg: dict[str, dict], active: set[str]) -> list[PluginOut]:
             restart_required=(state == registry.ENABLED) != is_active,
             dependencies=list(mf.dependencies),
             permissions=[p["key"] for p in mf.permissions],
+            description=mf.description, icon=mf.icon,
+            repoUrl=registry.repo_url_of(reg, pid),
+            installedVia=registry.installed_via(reg, pid),
         ))
     return out
 
@@ -437,3 +448,17 @@ async def purge(
     plugin_loader.deregister_discovered(plugin_id)
     reg = registry.purge_complete(plugin_id)
     return _action_response(reg)
+
+
+@router.put("/git-credentials/{host}")
+async def set_git_credential(
+    host: str,
+    body: GitCredentialIn,
+    user: UserLike = Depends(require_perm("plugins.manage")),
+) -> dict:
+    """Store an encrypted git credential (PAT/deploy key) for `host` (§2.4) — used by install-from-git /
+    check-update / update to authenticate against a private repo on that host. Write-only: the token is
+    never echoed back here, and no read endpoint in this router (e.g. `list_plugins`/`PluginOut`) ever
+    surfaces a stored credential, encrypted or not."""
+    git_installer.set_credential(host, body.token)
+    return {"ok": True}

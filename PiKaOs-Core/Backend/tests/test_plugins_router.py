@@ -979,3 +979,94 @@ def test_purge_requires_plugins_manage_permission(sample_plugins, tmp_path, monk
     with TestClient(main.app) as client:
         resp = client.post("/api/plugins/sample/purge")
     assert resp.status_code == 401
+
+
+# --- display fields / git credentials -------------------------------------------------------------------
+
+def test_view_serializes_display_fields(sample_plugins, tmp_path, monkeypatch):
+    """`description`/`icon` come straight off the manifest (Task 1 fields); `installedVia` defaults to
+    "symlink" for a plugin the registry has no git-install row for (dev sibling checkout, §2.4)."""
+    from app.core import kernel_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    out = _view(reg={}, active=set())
+    sample = next(p for p in out if p.id == "sample")
+    assert sample.description == ""
+    assert sample.icon is None
+    assert sample.repoUrl is None
+    assert sample.installedVia == "symlink"
+
+
+def test_view_serializes_git_provenance_for_a_git_installed_plugin(sample_plugins, tmp_path, monkeypatch):
+    """A registry row written by `set_git_install` (install-from-git / update) surfaces its `repoUrl` and
+    `installedVia == "git"` — the UI's basis for showing an "Update"/"Uninstall" affordance instead of
+    the dev-only symlink one."""
+    from app.core import kernel_state
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    reg = registry.set_git_install("sample", repo_url="https://github.com/acme/sample.git",
+                                    tag="v1.2.3", version="1.2.3")
+    out = _view(reg=reg, active=set())
+    sample = next(p for p in out if p.id == "sample")
+    assert sample.repoUrl == "https://github.com/acme/sample.git"
+    assert sample.installedVia == "git"
+
+
+def test_set_git_credential_never_echoes_the_token(sample_plugins, tmp_path, monkeypatch):
+    from app.core import kernel_state, setup_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.put("/api/plugins/git-credentials/github.com",
+                           json={"token": "ghp_secret"},
+                           headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 200
+    assert "ghp_secret" not in resp.text
+
+
+def test_set_git_credential_stores_it_encrypted_and_retrievable(sample_plugins, tmp_path, monkeypatch):
+    """Real behavior, not a mock: the token really lands in kernel-state (so a later `clone_to_staging`/
+    `fetch_and_checkout` can use it), encrypted at rest — not the raw value — and decrypts back to the
+    original via `git_installer._credential_for`, matching a case-insensitive host."""
+    from app.core import kernel_state, setup_state, git_installer
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.put("/api/plugins/git-credentials/GitHub.com",
+                           json={"token": "ghp_secret"},
+                           headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 200
+    raw_store = kernel_state.read_json("app_settings", {})
+    stored = raw_store["plugin_git_credentials"]["value"]["github.com"]
+    assert stored != "ghp_secret"                                    # not stored in the clear
+    assert git_installer._credential_for("github.com") == "ghp_secret"
+
+
+def test_set_git_credential_never_surfaces_through_list_plugins(sample_plugins, tmp_path, monkeypatch):
+    """Nothing about a stored credential — encrypted or not — leaks through any other endpoint, including
+    the general plugin listing a lower-privileged reader can call."""
+    from app.core import kernel_state, setup_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.main as main
+    with TestClient(main.app) as client:
+        put_resp = client.put("/api/plugins/git-credentials/github.com",
+                               json={"token": "ghp_secret"},
+                               headers={"Authorization": "Bearer a-session-token"})
+        assert put_resp.status_code == 200
+        list_resp = client.get("/api/plugins", headers={"Authorization": "Bearer a-session-token"})
+    assert list_resp.status_code == 200
+    assert "ghp_secret" not in list_resp.text
+    assert "plugin_git_credentials" not in list_resp.text
+
+
+def test_set_git_credential_requires_plugins_manage_permission(sample_plugins, tmp_path, monkeypatch):
+    """No/invalid session token → 401, matching the other mutation routes' auth gate."""
+    from app.core import kernel_state, setup_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.put("/api/plugins/git-credentials/github.com", json={"token": "ghp_secret"})
+    assert resp.status_code == 401
