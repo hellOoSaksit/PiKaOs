@@ -12,6 +12,9 @@ protocol.registerSchemesAsPrivileged([
 export function registerAppProtocol(distDir: string) {
   protocol.handle('app', (req) => {
     const url = new URL(req.url) // app://pikaos/<path>
+    // Only serve the canonical host — a request to app://pikaosevil.com is a different origin
+    // and must not receive the app's files (defense-in-depth alongside the nav-lock).
+    if (url.host !== 'pikaos') return new Response('forbidden', { status: 403 })
     const rel = url.pathname === '/' ? '/index.html' : url.pathname
     const filePath = join(distDir, rel)
     if (!filePath.startsWith(distDir)) return new Response('forbidden', { status: 403 }) // traversal guard

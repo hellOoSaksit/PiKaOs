@@ -25,8 +25,11 @@ export function createWindow(): BrowserWindow {
   })
 
   // Block navigation away from the bundled app (or the dev server while developing).
+  // Parse and compare the origin EXACTLY — a startsWith('app://pikaos') check would also pass
+  // app://pikaosevil.com, a *different* Chromium origin that would slip outside the CSP's
+  // app://pikaos allowances.
   win.webContents.on('will-navigate', (e, url) => {
-    if (!url.startsWith('app://pikaos') && url !== process.env.VITE_DEV_SERVER_URL) e.preventDefault()
+    if (!isAllowedNavigation(url)) e.preventDefault()
   })
 
   // Deny every permission request (camera, mic, geolocation, notifications, ...) by default.
@@ -35,6 +38,18 @@ export function createWindow(): BrowserWindow {
   win.once('ready-to-show', () => win.show())
   loadRenderer(win)
   return win
+}
+
+// Exact-origin navigation allow-check: only the bundled app origin (app://pikaos) or the exact
+// dev server URL. Rejects lookalike hosts (app://pikaosevil.com) and unparseable URLs.
+export function isAllowedNavigation(url: string): boolean {
+  if (process.env.VITE_DEV_SERVER_URL && url === process.env.VITE_DEV_SERVER_URL) return true
+  try {
+    const u = new URL(url)
+    return u.protocol === 'app:' && u.host === 'pikaos'
+  } catch {
+    return false
+  }
 }
 
 // Dev → the Frontend Vite dev server; prod → the bundled Frontend/dist via app://pikaos.

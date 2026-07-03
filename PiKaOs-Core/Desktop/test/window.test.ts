@@ -99,6 +99,11 @@ it('blocks navigation away from app://pikaos and the dev server URL', async () =
   const blocked = { preventDefault: vi.fn() }
   onWillNavigate(blocked, 'https://evil.example.com')
   expect(blocked.preventDefault).toHaveBeenCalled()
+
+  // exact-origin: a lookalike host with the app:// scheme is a DIFFERENT origin and must be blocked
+  const lookalike = { preventDefault: vi.fn() }
+  onWillNavigate(lookalike, 'app://pikaosevil.com/index.html')
+  expect(lookalike.preventDefault).toHaveBeenCalled()
 })
 
 it('denies every permission request by default', async () => {
