@@ -7,6 +7,7 @@
 import React, { useEffect, useState } from 'react';
 
 import { Btn, Empty, HelpNote, PageHead, Panel } from '../components/components.jsx';
+import Segmented from '../components/ui/Segmented.jsx';
 import * as api from '../lib/api.js';
 
 const STATE_BADGE = {
@@ -136,6 +137,11 @@ export function PluginsManager({ Sys }) {
   const [gitRef, setGitRef] = useState('');
   const [allowHead, setAllowHead] = useState(false);
   const [updates, setUpdates] = useState({});      // { [pluginId]: { latestVersion, hasUpdate, tagMoved } }
+  const [tab, setTab] = useState('plugins');       // submenu: 'plugins' | 'market' | 'mine'
+
+  // Sharing to the market lives in the Auth plugin (kernel is zero-DB — identity can't live in Core);
+  // the Share affordance is gated on that plugin being installed + enabled (drafted, not built yet).
+  const authReady = (plugins || []).some(p => p.id === 'auth' && p.state === 'enabled');
 
   const load = async () => {
     setErr(null);
@@ -214,46 +220,77 @@ export function PluginsManager({ Sys }) {
                 'เลือกว่าระบบนี้จะเปิดฟีเจอร์ไหน · การติดตั้งฟีเจอร์จะดึงสิ่งที่มันพึ่งพามาด้วย (เช่น RAG ต้องการ AI) · ตัวที่ติดตั้งแล้วจะถูกใช้ซ้ำ ไม่ลงซ้ำ')}
         actions={<Btn kind="ghost" sm icon="↻" onClick={load}>{T('Refresh', 'รีเฟรช')}</Btn>} />
 
-      {may && (
-        <Panel>
-          <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <input className="bf-input" style={{ flex: 2, minWidth: 240 }} placeholder={T('Git URL to install…', 'ลิงก์ Git ที่จะติดตั้ง…')}
-              value={gitUrl} onChange={e => setGitUrl(e.target.value)} disabled={!may} />
-            <input className="bf-input" style={{ flex: 1, minWidth: 120 }} placeholder={T('Tag (optional)', 'แท็ก (ไม่บังคับ)')}
-              value={gitRef} onChange={e => setGitRef(e.target.value)} disabled={!may} />
-            <Btn kind="gold" sm icon="⬇" disabled={!may || busy === 'git-install'} onClick={submitGitInstall}>
-              {busy === 'git-install' ? '…' : T('Install from Git', 'ติดตั้งจาก Git')}
-            </Btn>
-          </div>
-          <label className="row" style={{ gap: 6, alignItems: 'center', marginTop: 6, fontSize: 12 }}>
-            <input type="checkbox" checked={allowHead} onChange={e => setAllowHead(e.target.checked)} disabled={!may} />
-            <span className="faint">{T('Allow installing an untagged default branch (not recommended — unpinned)',
-              'ยอมให้ติดตั้งจาก branch ที่ไม่มีแท็ก (ไม่แนะนำ — ไม่ตรึงเวอร์ชัน)')}</span>
-          </label>
-          <HelpNote tag="tip">{T('Leave the tag blank to pin the latest release automatically.',
-            'เว้นแท็กว่างไว้เพื่อตรึงเวอร์ชัน release ล่าสุดโดยอัตโนมัติ')}</HelpNote>
-        </Panel>
-      )}
+      <div style={{ margin: '4px 0 14px' }}>
+        <Segmented value={tab} onChange={setTab} options={[
+          { value: 'plugins', label: T('Plugins', 'ปลั๊กอิน') },
+          { value: 'market',  label: T('Marketplace', 'มาร์เก็ตเพลส') },
+          { value: 'mine',    label: T('My Packages & Share', 'แพ็กเกจของฉัน') },
+        ]} />
+      </div>
 
-      {may && <GitCredentialsPanel T={T} busy={busy} onSave={saveGitCredential} />}
-
-      {!may && <HelpNote tag="local">{T('You can view modules, but installing / enabling needs the “plugins.manage” permission.',
-        'ดูได้ แต่การติดตั้ง/เปิด-ปิด ต้องมีสิทธิ์ “plugins.manage”')}</HelpNote>}
+      {/* Global notices — kept above the tab body so a restart/error is visible on any tab. */}
       {restartHint && <HelpNote>{T('Saved. Restart the backend to apply — modules mount at startup (restart-to-apply).',
         'บันทึกแล้ว · รีสตาร์ท backend เพื่อให้มีผล — โมดูลถูกโหลดตอนเริ่มระบบ')}</HelpNote>}
       {err && <HelpNote>{T('Error: ', 'ผิดพลาด: ')}{err}</HelpNote>}
 
-      {plugins.length === 0
-        ? <Empty icon="🧩" title={T('No plugins discovered', 'ไม่พบปลั๊กอิน')} sub={T('This is a Base-only build.', 'บิลด์นี้เป็น Base ล้วน')} />
-        : <div style={{ display: 'grid', gap: 12 }}>
-            {plugins.map(p => (
-              <PluginRow key={p.id} p={p} T={T} may={may} busy={busy === p.id}
-                onInstall={() => startInstall(p.id)} onEnable={() => act(p.id, api.enablePlugin)}
-                onDisable={() => act(p.id, api.disablePlugin)} onUninstall={() => act(p.id, api.uninstallPlugin)}
-                onPurge={() => act(p.id, api.purgePlugin)}
-                onCheckUpdate={() => act(p.id, api.updatePlugin)} updateInfo={updates[p.id]} />
-            ))}
-          </div>}
+      {tab === 'plugins' && (
+        plugins.length === 0
+          ? <Empty icon="🧩" title={T('No plugins discovered', 'ไม่พบปลั๊กอิน')} sub={T('This is a Base-only build.', 'บิลด์นี้เป็น Base ล้วน')} />
+          : <div style={{ display: 'grid', gap: 12 }}>
+              {plugins.map(p => (
+                <PluginRow key={p.id} p={p} T={T} may={may} busy={busy === p.id}
+                  onInstall={() => startInstall(p.id)} onEnable={() => act(p.id, api.enablePlugin)}
+                  onDisable={() => act(p.id, api.disablePlugin)} onUninstall={() => act(p.id, api.uninstallPlugin)}
+                  onPurge={() => act(p.id, api.purgePlugin)}
+                  onCheckUpdate={() => act(p.id, api.updatePlugin)} updateInfo={updates[p.id]} />
+              ))}
+            </div>
+      )}
+
+      {tab === 'market' && (
+        <Empty icon="🛍️" title={T('Marketplace — coming soon', 'มาร์เก็ตเพลส — เร็วๆ นี้')}
+          sub={T('Browse & add packages. Starts with MCP servers.', 'เลือกดู/เพิ่มแพ็กเกจ · เริ่มจาก MCP server')} />
+      )}
+
+      {tab === 'mine' && (
+        <>
+          {may ? (
+            <>
+              <Panel>
+                <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input className="bf-input" style={{ flex: 2, minWidth: 240 }} placeholder={T('Git URL to install…', 'ลิงก์ Git ที่จะติดตั้ง…')}
+                    value={gitUrl} onChange={e => setGitUrl(e.target.value)} disabled={!may} />
+                  <input className="bf-input" style={{ flex: 1, minWidth: 120 }} placeholder={T('Tag (optional)', 'แท็ก (ไม่บังคับ)')}
+                    value={gitRef} onChange={e => setGitRef(e.target.value)} disabled={!may} />
+                  <Btn kind="gold" sm icon="⬇" disabled={!may || busy === 'git-install'} onClick={submitGitInstall}>
+                    {busy === 'git-install' ? '…' : T('Install from Git', 'ติดตั้งจาก Git')}
+                  </Btn>
+                </div>
+                <label className="row" style={{ gap: 6, alignItems: 'center', marginTop: 6, fontSize: 12 }}>
+                  <input type="checkbox" checked={allowHead} onChange={e => setAllowHead(e.target.checked)} disabled={!may} />
+                  <span className="faint">{T('Allow installing an untagged default branch (not recommended — unpinned)',
+                    'ยอมให้ติดตั้งจาก branch ที่ไม่มีแท็ก (ไม่แนะนำ — ไม่ตรึงเวอร์ชัน)')}</span>
+                </label>
+                <HelpNote tag="tip">{T('Leave the tag blank to pin the latest release automatically.',
+                  'เว้นแท็กว่างไว้เพื่อตรึงเวอร์ชัน release ล่าสุดโดยอัตโนมัติ')}</HelpNote>
+              </Panel>
+
+              <GitCredentialsPanel T={T} busy={busy} onSave={saveGitCredential} />
+            </>
+          ) : (
+            <HelpNote tag="local">{T('You can view modules, but installing / enabling needs the “plugins.manage” permission.',
+              'ดูได้ แต่การติดตั้ง/เปิด-ปิด ต้องมีสิทธิ์ “plugins.manage”')}</HelpNote>
+          )}
+
+          {/* Share to the Marketplace — drafted, not built. Gated on the Auth plugin (identity lives there,
+              not in the zero-DB kernel). Disabled hint until that plugin is installed + enabled. */}
+          <HelpNote tag="tip">{authReady
+            ? T('Publishing your packages to the Marketplace is coming soon.',
+                'การเผยแพร่แพ็กเกจของคุณขึ้นมาร์เก็ตเพลสจะมาเร็วๆ นี้')
+            : T('Sharing to the Marketplace needs the Auth plugin (identity) — install it to enable.',
+                'การแชร์ขึ้นมาร์เก็ตเพลสต้องติดตั้ง Auth plugin (ระบบยืนยันตัวตน) ก่อนจึงจะใช้ได้')}</HelpNote>
+        </>
+      )}
 
       {plan && <InstallPlanModal plan={plan} target={plugins.find(p => p.id === plan.target)}
         T={T} busy={busy === plan.target} onConfirm={confirmInstall} onCancel={() => setPlan(null)} />}
