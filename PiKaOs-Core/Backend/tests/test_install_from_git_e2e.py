@@ -65,7 +65,7 @@ def test_full_lifecycle(tmp_path, monkeypatch, sample_plugins):
         subprocess.run(["git", "tag", "v1.1.0"], cwd=src, check=True)
 
         resp = client.get("/api/plugins/crm/check-update", headers=headers)
-        assert resp.json() == {"latestVersion": "v1.1.0", "hasUpdate": True}
+        assert resp.json() == {"latestVersion": "v1.1.0", "hasUpdate": True, "tagMoved": False}
 
         resp = client.post("/api/plugins/crm/update", headers=headers)
         assert resp.status_code == 200, resp.text
