@@ -206,8 +206,12 @@ export async function installPlugin(id) { return raw(`/plugins/${id}/install`, {
 export async function enablePlugin(id) { return raw(`/plugins/${id}/enable`, { method: "POST" }); }
 export async function disablePlugin(id) { return raw(`/plugins/${id}/disable`, { method: "POST" }); }
 export async function uninstallPlugin(id) { return raw(`/plugins/${id}`, { method: "DELETE" }); }
-export async function installFromGit(repoUrl, ref) {
-  return raw("/plugins/install-from-git", { method: "POST", body: { repoUrl, ref: ref || undefined } });
+export async function installFromGit(repoUrl, opts = {}) {
+  const { ref, allowHead } = opts;
+  return raw("/plugins/install-from-git", {
+    method: "POST",
+    body: { repoUrl, ref: ref || undefined, allowHead: allowHead || undefined },
+  });
 }
 export async function checkPluginUpdate(id) { return raw(`/plugins/${id}/check-update`); }               // { latestVersion, hasUpdate }
 export async function updatePlugin(id) { return raw(`/plugins/${id}/update`, { method: "POST" }); }

@@ -31,6 +31,7 @@ function PluginRow({ p, T, may, busy, onInstall, onEnable, onDisable, onUninstal
             <span className="mono faint" style={{ fontSize: 11 }}>v{p.version}</span>
             {p.restart_required && <span className="badge" title={T('restart to apply', 'รีสตาร์ทเพื่อให้มีผล')}>↻ {T('restart', 'รีสตาร์ท')}</span>}
             {updateInfo?.hasUpdate && <span className="badge" title={T('update available', 'มีเวอร์ชันใหม่')}>↑ v{updateInfo.latestVersion}</span>}
+            {updateInfo?.tagMoved && <span className="badge warn" title={T('the installed tag was moved to a different commit after install', 'แท็กที่ติดตั้งถูกย้ายไปคอมมิตอื่นหลังติดตั้ง')}>⚠ {T('tag moved', 'แท็กถูกย้าย')}</span>}
           </div>
           {p.description && <div className="faint" style={{ fontSize: 12, marginTop: 2 }}>{p.description}</div>}
           <div className="mono faint" style={{ fontSize: 11, marginTop: 3 }}>
@@ -57,17 +58,61 @@ function PluginRow({ p, T, may, busy, onInstall, onEnable, onDisable, onUninstal
   );
 }
 
-function InstallPlanModal({ plan, T, busy, onConfirm, onCancel }) {
+function GitCredentialsPanel({ T, busy, onSave }) {
+  const [host, setHost] = useState('');
+  const [token, setToken] = useState('');
+  const submit = async () => {
+    if (!host.trim() || !token.trim()) return;
+    await onSave(host.trim(), token.trim());
+    setHost(''); setToken('');
+  };
+  return (
+    <Panel>
+      <div className="faint" style={{ fontSize: 12, marginBottom: 6 }}>
+        {T('Private repo credentials — a token per host, stored encrypted, never shown again.',
+           'ข้อมูลรับรองสำหรับ repo ส่วนตัว — โทเคนต่อโฮสต์ เก็บแบบเข้ารหัส ไม่แสดงซ้ำ')}
+      </div>
+      <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input className="bf-input" style={{ flex: 1, minWidth: 160 }} placeholder={T('Host (e.g. github.com)', 'โฮสต์ (เช่น github.com)')}
+          value={host} onChange={e => setHost(e.target.value)} />
+        <input className="bf-input" type="password" style={{ flex: 2, minWidth: 200 }} placeholder={T('Access token', 'โทเคน')}
+          value={token} onChange={e => setToken(e.target.value)} />
+        <Btn kind="ghost" sm disabled={busy === 'git-cred'} onClick={submit}>
+          {busy === 'git-cred' ? '…' : T('Save credential', 'บันทึกโทเคน')}
+        </Btn>
+      </div>
+    </Panel>
+  );
+}
+
+function InstallPlanModal({ plan, target, T, busy, onConfirm, onCancel }) {
   const deps = (plan.to_install || []).filter(id => id !== plan.target);
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={onCancel}>
       <div className="panel" style={{ maxWidth: 460, margin: 16 }} onClick={e => e.stopPropagation()}>
         <div style={{ padding: 20 }}>
           <h3 style={{ marginTop: 0 }}>{T('Install', 'ติดตั้ง')} “{plan.target}”</h3>
-          <p style={{ color: 'var(--ink-2)' }}>{T('This feature also needs these plugins, which aren’t installed yet:', 'ฟีเจอร์นี้ต้องการปลั๊กอินเหล่านี้ที่ยังไม่ได้ติดตั้ง:')}</p>
-          <ul style={{ margin: '6px 0' }}>{deps.map(d => <li key={d} className="mono">{d}</li>)}</ul>
+          {deps.length > 0 && (
+            <>
+              <p style={{ color: 'var(--ink-2)' }}>{T('This feature also needs these plugins, which aren’t installed yet:', 'ฟีเจอร์นี้ต้องการปลั๊กอินเหล่านี้ที่ยังไม่ได้ติดตั้ง:')}</p>
+              <ul style={{ margin: '6px 0' }}>{deps.map(d => <li key={d} className="mono">{d}</li>)}</ul>
+            </>
+          )}
           {plan.already_installed?.length > 0 && (
             <p className="faint" style={{ fontSize: 12 }}>{T('Already installed (reused, not reinstalled): ', 'ติดตั้งแล้ว (ใช้ซ้ำ ไม่ลงซ้ำ): ')}{plan.already_installed.join(', ')}</p>
+          )}
+          {target?.permissionInfo?.length > 0 && (
+            <>
+              <p style={{ color: 'var(--ink-2)', marginTop: 12 }}>{T('This plugin will be granted:', 'ปลั๊กอินนี้จะได้รับสิทธิ์:')}</p>
+              <ul style={{ margin: '6px 0' }}>
+                {target.permissionInfo.map(pi => (
+                  <li key={pi.key}>
+                    <span className="mono">{pi.key}</span>
+                    {pi.rationale && <span className="faint"> — {pi.rationale}</span>}
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
           <div className="row" style={{ gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
             <Btn kind="ghost" sm onClick={onCancel}>{T('Cancel', 'ยกเลิก')}</Btn>
@@ -88,7 +133,9 @@ export function PluginsManager({ Sys }) {
   const [restartHint, setRestartHint] = useState(false);
   const [plan, setPlan] = useState(null);          // dependency-request modal payload
   const [gitUrl, setGitUrl] = useState('');
-  const [updates, setUpdates] = useState({});      // { [pluginId]: { latestVersion, hasUpdate } }
+  const [gitRef, setGitRef] = useState('');
+  const [allowHead, setAllowHead] = useState(false);
+  const [updates, setUpdates] = useState({});      // { [pluginId]: { latestVersion, hasUpdate, tagMoved } }
 
   const load = async () => {
     setErr(null);
@@ -122,8 +169,11 @@ export function PluginsManager({ Sys }) {
     setBusy(id); setErr(null);
     try {
       const p = await api.pluginInstallPlan(id);
-      if ((p.to_install || []).length > 1) setPlan(p);          // deps beyond the target → confirm
-      else applyResult(await api.installPlugin(id));            // nothing extra → install straight away
+      const tgt = plugins.find(x => x.id === id);
+      const hasExtraDeps = (p.to_install || []).length > 1;     // deps beyond the target
+      const hasPerms = (tgt?.permissionInfo || []).length > 0;  // permissions to confirm
+      if (hasExtraDeps || hasPerms) setPlan(p);                 // confirm on deps OR permissions
+      else applyResult(await api.installPlugin(id));            // nothing to confirm → install straight away
     } catch (e) { setErr(e.message || 'plan failed'); }
     finally { setBusy(null); }
   };
@@ -136,8 +186,18 @@ export function PluginsManager({ Sys }) {
   const submitGitInstall = async () => {
     if (!gitUrl.trim()) return;
     setBusy('git-install'); setErr(null);
-    try { applyResult(await api.installFromGit(gitUrl.trim())); setGitUrl(''); }
+    try {
+      applyResult(await api.installFromGit(gitUrl.trim(), { ref: gitRef.trim(), allowHead }));
+      setGitUrl(''); setGitRef(''); setAllowHead(false);
+    }
     catch (e) { setErr(e.message || 'install failed'); }
+    finally { setBusy(null); }
+  };
+
+  const saveGitCredential = async (host, token) => {
+    setBusy('git-cred'); setErr(null);
+    try { await api.setGitCredential(host, token); }
+    catch (e) { setErr(e.message || 'save failed'); }
     finally { setBusy(null); }
   };
 
@@ -157,14 +217,25 @@ export function PluginsManager({ Sys }) {
       {may && (
         <Panel>
           <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <input className="bf-input" style={{ flex: 1, minWidth: 240 }} placeholder={T('Git URL to install…', 'ลิงก์ Git ที่จะติดตั้ง…')}
+            <input className="bf-input" style={{ flex: 2, minWidth: 240 }} placeholder={T('Git URL to install…', 'ลิงก์ Git ที่จะติดตั้ง…')}
               value={gitUrl} onChange={e => setGitUrl(e.target.value)} disabled={!may} />
+            <input className="bf-input" style={{ flex: 1, minWidth: 120 }} placeholder={T('Tag (optional)', 'แท็ก (ไม่บังคับ)')}
+              value={gitRef} onChange={e => setGitRef(e.target.value)} disabled={!may} />
             <Btn kind="gold" sm icon="⬇" disabled={!may || busy === 'git-install'} onClick={submitGitInstall}>
               {busy === 'git-install' ? '…' : T('Install from Git', 'ติดตั้งจาก Git')}
             </Btn>
           </div>
+          <label className="row" style={{ gap: 6, alignItems: 'center', marginTop: 6, fontSize: 12 }}>
+            <input type="checkbox" checked={allowHead} onChange={e => setAllowHead(e.target.checked)} disabled={!may} />
+            <span className="faint">{T('Allow installing an untagged default branch (not recommended — unpinned)',
+              'ยอมให้ติดตั้งจาก branch ที่ไม่มีแท็ก (ไม่แนะนำ — ไม่ตรึงเวอร์ชัน)')}</span>
+          </label>
+          <HelpNote tag="tip">{T('Leave the tag blank to pin the latest release automatically.',
+            'เว้นแท็กว่างไว้เพื่อตรึงเวอร์ชัน release ล่าสุดโดยอัตโนมัติ')}</HelpNote>
         </Panel>
       )}
+
+      {may && <GitCredentialsPanel T={T} busy={busy} onSave={saveGitCredential} />}
 
       {!may && <HelpNote tag="local">{T('You can view modules, but installing / enabling needs the “plugins.manage” permission.',
         'ดูได้ แต่การติดตั้ง/เปิด-ปิด ต้องมีสิทธิ์ “plugins.manage”')}</HelpNote>}
@@ -184,7 +255,8 @@ export function PluginsManager({ Sys }) {
             ))}
           </div>}
 
-      {plan && <InstallPlanModal plan={plan} T={T} busy={busy === plan.target} onConfirm={confirmInstall} onCancel={() => setPlan(null)} />}
+      {plan && <InstallPlanModal plan={plan} target={plugins.find(p => p.id === plan.target)}
+        T={T} busy={busy === plan.target} onConfirm={confirmInstall} onCancel={() => setPlan(null)} />}
     </div>
   );
 }
