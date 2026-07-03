@@ -1,0 +1,14 @@
+appId: io.pikaos.desktop
+productName: PiKaOs Desktop
+directories:
+  output: dist
+files:
+  - out/**/*
+  - package.json
+asar: true
+# Signing deferred (unsigned build for now).
+# extraResources: wire in Frontend/dist here in Task 5 once the renderer is bundled
+# and loaded via the app:// protocol, e.g.:
+#   extraResources:
+#     - from: ../Frontend/dist
+#       to: renderer
