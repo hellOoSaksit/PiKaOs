@@ -783,6 +783,67 @@ def test_uninstall_git_plugin_removes_code_but_registry_stays_pending_purge(samp
     assert registry.repo_url_of(reg, "crm") is not None  # provenance kept for Purge
 
 
+def _pending_purge_crm(tmp_path, monkeypatch):
+    """Register + git-install a synthetic `crm` manifest, then move it straight to PENDING_PURGE —
+    the shared setup for the enable/disable/update guard tests below (final-review Finding 1: none of
+    those three may pull a plugin back out of PENDING_PURGE)."""
+    from app.core import kernel_state, setup_state
+    from app.core import plugin_registry as registry
+    import sys
+    from types import ModuleType
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.plugin_loader as plugin_loader
+    mf = plugin_loader.Manifest(id="crm", name="CRM", version="1.0.0", coreVersion="*")
+    plugin_loader.register_discovered(mf)
+    registry.set_git_install("crm", repo_url="https://github.com/acme/crm.git", tag="v1.0.0", version="1.0.0")
+    registry.uninstall_git("crm")
+    # ENABLED_MODULES=* in this environment means the lifespan actually imports every registered manifest
+    # id, "crm" included — it needs a real (stub) module on sys.modules, exactly like the uninstall/purge
+    # tests above.
+    monkeypatch.setitem(sys.modules, "app.plugins.crm", ModuleType("app.plugins.crm"))
+
+
+def test_enable_rejects_a_plugin_that_is_pending_purge(sample_plugins, tmp_path, monkeypatch):
+    """final-review Finding 1: flipping a PENDING_PURGE plugin straight to ENABLED would erase the
+    PENDING_PURGE marker and make `purge()` (which requires `state_of(...) == PENDING_PURGE`)
+    permanently unreachable — orphaning its DB tables with no path left to drop them."""
+    from app.core import plugin_registry as registry
+    _pending_purge_crm(tmp_path, monkeypatch)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/crm/enable", headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 422
+    assert registry.state_of(registry.read(), "crm") == registry.PENDING_PURGE   # unchanged
+
+
+def test_disable_rejects_a_plugin_that_is_pending_purge(sample_plugins, tmp_path, monkeypatch):
+    """Same guard as `enable` — disable must not clobber PENDING_PURGE either (§ Finding 1)."""
+    from app.core import plugin_registry as registry
+    _pending_purge_crm(tmp_path, monkeypatch)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/crm/disable", headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 422
+    assert registry.state_of(registry.read(), "crm") == registry.PENDING_PURGE   # unchanged
+
+
+def test_update_rejects_a_plugin_that_is_pending_purge(sample_plugins, tmp_path, monkeypatch):
+    """Same guard as `enable`/`disable` — before this fix `update()` happened to fail anyway (its
+    on-disk checkout is gone once Uninstall has run), but only incidentally, at the `fetch_and_checkout`
+    step; this asserts the explicit, designed guard instead (§ Finding 1)."""
+    from app.core import plugin_registry as registry
+    _pending_purge_crm(tmp_path, monkeypatch)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/crm/update", headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 422
+    assert registry.state_of(registry.read(), "crm") == registry.PENDING_PURGE   # unchanged
+
+
 def test_uninstall_requires_plugins_manage_permission(sample_plugins, tmp_path, monkeypatch):
     from app.core import kernel_state, setup_state
     monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))

@@ -8,6 +8,7 @@ throwaway `GIT_ASKPASS` script for a single call, never embedded in the URL or l
 """
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 import subprocess
@@ -18,9 +19,12 @@ from urllib.parse import urlsplit
 from . import kernel_state
 from .crypto import decrypt, encrypt
 
+log = logging.getLogger("pikaos.plugins.git_installer")
+
 _APP = "app_settings"                              # same kernel-local blob settings_config.py uses
 _ALLOWLIST_KEY = "plugin_install_allowed_hosts"     # {value: [host, ...]}
 _CREDENTIALS_KEY = "plugin_git_credentials"         # {value: {host: encrypted_token}}
+_STDERR_LOG_LIMIT = 2000                            # cap so one runaway git error can't flood the log
 
 
 class GitInstallError(Exception):
@@ -110,6 +114,20 @@ def _run_git(args: list[str], *, cwd: str | None = None, askpass_token: str | No
             Path(askpass_path).unlink(missing_ok=True)
 
 
+def _log_git_failure(step: str, result: subprocess.CompletedProcess) -> None:
+    """Log the subprocess detail a `GitInstallError` deliberately hides from the client (rule 10:
+    clients get generic errors, stack traces/subprocess detail stay in server logs). Safe to log
+    verbatim: credentials never flow through the URL or the command line — `_run_git` hands the
+    token to git via a throwaway `GIT_ASKPASS` script (see `_write_askpass_script`). Git spawns that
+    script as its OWN child process and reads the token from *that* process' stdout directly; it is
+    never echoed back into the outer `git` process' stdout/stderr, which is the only thing `_run_git`
+    (and therefore `result` here) ever captures."""
+    stderr = (result.stderr or "").strip()
+    if len(stderr) > _STDERR_LOG_LIMIT:
+        stderr = stderr[:_STDERR_LOG_LIMIT] + "... (truncated)"
+    log.warning("git %s failed (exit %s): %s", step, result.returncode, stderr)
+
+
 def clone_to_staging(repo_url: str, ref: str | None = None) -> Path:
     """Shallow-clone `repo_url` (optionally at `ref`) into a fresh temp staging dir. Raises on a
     disallowed host or a failed clone; discards the staging dir on failure."""
@@ -130,6 +148,7 @@ def clone_to_staging(repo_url: str, ref: str | None = None) -> Path:
         shutil.rmtree(staging, ignore_errors=True)
         raise GitInstallError("could not clone the plugin repository")
     if result.returncode != 0:
+        _log_git_failure("clone", result)
         shutil.rmtree(staging, ignore_errors=True)
         raise GitInstallError("could not clone the plugin repository")
     return staging
@@ -158,9 +177,11 @@ def fetch_and_checkout(plugin_dir: Path, repo_url: str, tag: str) -> None:
     result = _run_git(["fetch", "--depth", "1", "--", "origin", "tag", tag], cwd=str(plugin_dir),
                        askpass_token=token)
     if result.returncode != 0:
+        _log_git_failure("fetch", result)
         raise GitInstallError("could not fetch the update")
     # `checkout` is the opposite: `git checkout -- <ref>` switches into "restore paths" mode and
     # never touches HEAD, so `--` must come AFTER the ref (git-checkout(1)) — confirmed empirically.
     result = _run_git(["checkout", f"tags/{tag}", "--"], cwd=str(plugin_dir))
     if result.returncode != 0:
+        _log_git_failure("checkout", result)
         raise GitInstallError("could not check out the update")

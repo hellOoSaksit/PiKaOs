@@ -141,6 +141,18 @@ def _require_known(plugin_id: str) -> None:
         raise HTTPException(status_code=404, detail=f"unknown plugin '{plugin_id}'")
 
 
+def _require_not_pending_purge(reg: dict[str, dict], plugin_id: str) -> None:
+    """Reject any mutation on a plugin currently PENDING_PURGE — the two-step destructive lifecycle
+    (Uninstall → Purge, §8/§9) only lets `install-from-git` (a fresh install, moot for an id that's
+    already pending purge) and `purge()` itself act on it. Everything else — `enable`/`disable`/`update`
+    — must refuse: flipping the state away from PENDING_PURGE would make `purge()`'s own
+    `state_of(...) == PENDING_PURGE` check permanently unreachable, orphaning that plugin's DB tables
+    with no path left to drop them (final-review Finding 1). Mirrors `purge()`'s own check, inverted."""
+    if registry.state_of(reg, plugin_id) == registry.PENDING_PURGE:
+        raise HTTPException(status_code=422,
+                             detail=f"'{plugin_id}' is pending purge — purge it (or nothing else) first")
+
+
 @router.post("/{plugin_id}/install", response_model=ActionOut)
 async def install(
     plugin_id: str,
@@ -306,6 +318,7 @@ async def update(
 
     _require_known(plugin_id)
     reg = registry.read()
+    _require_not_pending_purge(reg, plugin_id)
     _require_git_installed(reg, plugin_id)
     repo_url = registry.repo_url_of(reg, plugin_id)
     old_tag = registry.installed_tag_of(reg, plugin_id)
@@ -360,6 +373,8 @@ async def enable(
 ) -> ActionOut:
     """Mark a plugin enabled (mounted on next restart). Data is kept."""
     _require_known(plugin_id)
+    reg = registry.read()
+    _require_not_pending_purge(reg, plugin_id)
     reg = registry.set_state(plugin_id, registry.ENABLED,
                                    version=_manifests()[plugin_id].version)
     return _action_response(reg)
@@ -372,6 +387,8 @@ async def disable(
 ) -> ActionOut:
     """Mark a plugin disabled — kept installed, data retained, unmounted on next restart."""
     _require_known(plugin_id)
+    reg = registry.read()
+    _require_not_pending_purge(reg, plugin_id)
     reg = registry.set_state(plugin_id, registry.DISABLED)
     return _action_response(reg)
 
