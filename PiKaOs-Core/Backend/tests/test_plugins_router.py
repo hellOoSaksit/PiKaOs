@@ -634,3 +634,103 @@ def test_update_reverts_the_checkout_when_the_new_tags_manifest_is_invalid(sampl
 
     reg = registry.read()
     assert reg["crm"]["installedTag"] == "v1.0.0"
+
+
+def test_update_rolls_back_manifest_and_checkout_when_registry_persistence_fails(sample_plugins, tmp_path, monkeypatch):
+    """Mirrors `test_install_from_git_rolls_back_when_registry_persistence_fails` (Finding 1): the new
+    tag's manifest is valid and passes readiness, so `fetch_and_checkout` + `register_discovered` both
+    succeed for the NEW manifest — then `registry.set_git_install` raises (simulating a kernel-state I/O
+    failure persisting the registry). Unlike install-from-git there's a known-good prior version here, so
+    the finalize-failure branch must restore BOTH the in-process manifest (back to the OLD one) and the
+    on-disk checkout (back to the OLD tag) rather than tearing the plugin down — never leave the process
+    believing it's on the new version while disk/registry disagree (§3: a restart must still boot)."""
+    from app.core import kernel_state, setup_state
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    headers = {"Authorization": "Bearer a-session-token"}
+
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+
+    import app.main as main
+    from app import plugin_loader
+    with TestClient(main.app) as client:
+        src, repo_url = _install_crm_via_git(client, tmp_path, monkeypatch, headers)
+
+        (src / "manifest.json").write_text(
+            '{"id":"crm","name":"CRM","version":"1.1.0","coreVersion":"*"}', encoding="utf-8")
+        _git(src, "add", ".")
+        _git(src, "commit", "-q", "-m", "bump")
+        _git(src, "tag", "v1.1.0")
+
+        def _boom(*a, **k):
+            raise OSError("simulated kernel_state.write_json I/O failure")
+        monkeypatch.setattr(registry, "set_git_install", _boom)
+
+        resp = client.post("/api/plugins/crm/update", headers=headers)
+
+    assert resp.status_code == 500                     # clean error, not a leaked 500 with internals
+    assert "traceback" not in resp.text.lower()
+    assert repo_url not in resp.text and str(plugins_dir) not in resp.text
+
+    on_disk = (plugins_dir / "crm" / "manifest.json").read_text(encoding="utf-8")
+    assert '"1.1.0"' not in on_disk                     # on-disk code reverted off the new tag
+    assert '"1.0.0"' in on_disk                         # ...and back onto the old, known-good one
+
+    assert plugin_loader.PLUGIN_MANIFESTS["crm"].version == "1.0.0"   # in-process manifest restored
+
+    reg = registry.read()
+    assert reg["crm"]["installedTag"] == "v1.0.0"       # registry never advanced past the old tag
+    assert reg["crm"]["version"] == "1.0.0"
+
+
+def test_update_still_returns_a_clean_error_when_the_revert_itself_raises_a_non_git_install_error(
+        sample_plugins, tmp_path, monkeypatch):
+    """Finding 2: `_revert_checkout` is explicitly best-effort — it must never let an exception escape
+    past `update()`'s error boundary, even one `fetch_and_checkout` itself doesn't normally raise (e.g.
+    `subprocess.TimeoutExpired` out of `_run_git`, or any other non-`GitInstallError` failure). Simulates
+    the revert-time `fetch_and_checkout` call raising a plain `Exception` and asserts `update()` still
+    responds with a clean 4xx/5xx instead of propagating the raw exception (which would otherwise replace
+    the intended generic error response with an unhandled 500 from the test client / ASGI stack)."""
+    from app.core import kernel_state, setup_state, git_installer
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    headers = {"Authorization": "Bearer a-session-token"}
+
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        src, repo_url = _install_crm_via_git(client, tmp_path, monkeypatch, headers)
+
+        # New tag's manifest is invalid — this is what drives update() into calling _revert_checkout.
+        (src / "manifest.json").write_text(
+            '{"id":"crm","version":"1.1.0","coreVersion":"*"}', encoding="utf-8")  # no 'name'
+        _git(src, "add", ".")
+        _git(src, "commit", "-q", "-m", "invalid bump")
+        _git(src, "tag", "v1.1.0")
+
+        # The revert's own fetch_and_checkout call raises something other than GitInstallError —
+        # simulating a hung/timed-out revert-time git call. Only the REVERT call (back to the old
+        # tag, "v1.0.0") must fail; the initial checkout of the new tag ("v1.1.0") has to succeed
+        # first so update() actually reaches the manifest-validation step that triggers the revert.
+        real_fetch_and_checkout = git_installer.fetch_and_checkout
+
+        def _revert_boom(plugin_dir_arg, repo_url_arg, tag_arg):
+            if tag_arg == "v1.0.0":
+                raise TimeoutError("simulated non-GitInstallError failure during revert")
+            return real_fetch_and_checkout(plugin_dir_arg, repo_url_arg, tag_arg)
+        monkeypatch.setattr(git_installer, "fetch_and_checkout", _revert_boom)
+
+        resp = client.post("/api/plugins/crm/update", headers=headers)
+
+    assert resp.status_code == 422                     # the ORIGINAL update error, not an unhandled 500
+    assert "traceback" not in resp.text.lower()
+
+    reg = registry.read()
+    assert reg["crm"]["installedTag"] == "v1.0.0"       # registry still reflects the pre-update state

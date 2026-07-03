@@ -248,7 +248,12 @@ def _revert_checkout(plugin_dir: Path, repo_url: str, tag: str | None) -> None:
         return
     try:
         git_installer.fetch_and_checkout(plugin_dir, repo_url, tag)
-    except git_installer.GitInstallError:
+    except Exception:
+        # Broad on purpose (mirrors `clone_to_staging`'s pattern in git_installer.py): `_run_git` can
+        # raise something other than `GitInstallError` (e.g. `subprocess.TimeoutExpired` if the
+        # revert-time git call hangs) instead of surfacing as a clean error. This function is
+        # explicitly best-effort — the original update error must still reach the client (rule 10) —
+        # so any failure here, of any kind, gets logged and swallowed rather than propagated.
         log.error("plugin '%s': failed to revert checkout back to '%s' after a failed update — "
                    "on-disk code may not match the registry", plugin_dir.name, tag)
 
