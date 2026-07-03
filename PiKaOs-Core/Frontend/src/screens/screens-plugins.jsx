@@ -10,13 +10,14 @@ import { Btn, Empty, HelpNote, PageHead, Panel } from '../components/components.
 import * as api from '../lib/api.js';
 
 const STATE_BADGE = {
-  enabled:   { cls: 'on',   en: 'Enabled',   th: 'เปิดใช้งาน' },
-  disabled:  { cls: 'idle', en: 'Disabled',  th: 'ปิดอยู่' },
-  installed: { cls: 'info', en: 'Installed',  th: 'ติดตั้งแล้ว' },
-  available: { cls: '',     en: 'Available',  th: 'ยังไม่ติดตั้ง' },
+  enabled:       { cls: 'on',   en: 'Enabled',       th: 'เปิดใช้งาน' },
+  disabled:      { cls: 'idle', en: 'Disabled',      th: 'ปิดอยู่' },
+  installed:     { cls: 'info', en: 'Installed',     th: 'ติดตั้งแล้ว' },
+  available:     { cls: '',     en: 'Available',     th: 'ยังไม่ติดตั้ง' },
+  pending_purge: { cls: 'warn', en: 'Pending purge', th: 'รอล้างข้อมูล' },
 };
 
-function PluginRow({ p, T, may, busy, onInstall, onEnable, onDisable, onUninstall }) {
+function PluginRow({ p, T, may, busy, onInstall, onEnable, onDisable, onUninstall, onPurge, onCheckUpdate, updateInfo }) {
   const sb = STATE_BADGE[p.state] || STATE_BADGE.available;
   const lbl = (en, th) => (busy ? '…' : T(en, th));
   return (
@@ -24,11 +25,14 @@ function PluginRow({ p, T, may, busy, onInstall, onEnable, onDisable, onUninstal
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {p.icon && <img src={p.icon} alt="" style={{ width: 20, height: 20, borderRadius: 4 }} />}
             <strong>{p.name}</strong>
             <span className={`badge ${sb.cls}`}>{T(sb.en, sb.th)}</span>
             <span className="mono faint" style={{ fontSize: 11 }}>v{p.version}</span>
             {p.restart_required && <span className="badge" title={T('restart to apply', 'รีสตาร์ทเพื่อให้มีผล')}>↻ {T('restart', 'รีสตาร์ท')}</span>}
+            {updateInfo?.hasUpdate && <span className="badge" title={T('update available', 'มีเวอร์ชันใหม่')}>↑ v{updateInfo.latestVersion}</span>}
           </div>
+          {p.description && <div className="faint" style={{ fontSize: 12, marginTop: 2 }}>{p.description}</div>}
           <div className="mono faint" style={{ fontSize: 11, marginTop: 3 }}>
             {p.id}
             {p.dependencies?.length ? ' · ' + T('needs', 'ต้องการ') + ': ' + p.dependencies.join(', ') : ''}
@@ -37,10 +41,15 @@ function PluginRow({ p, T, may, busy, onInstall, onEnable, onDisable, onUninstal
         </div>
         {may && (
           <div className="row" style={{ gap: 6 }}>
-            {p.state === 'available' && <Btn kind="gold" sm icon="⬇" onClick={onInstall}>{lbl('Install', 'ติดตั้ง')}</Btn>}
-            {p.state === 'enabled' && <Btn kind="ghost" sm onClick={onDisable}>{lbl('Disable', 'ปิด')}</Btn>}
-            {(p.state === 'disabled' || p.state === 'installed') && <Btn kind="gold" sm onClick={onEnable}>{lbl('Enable', 'เปิด')}</Btn>}
-            {p.state !== 'available' && <Btn kind="danger" sm icon="🗑" onClick={onUninstall}>{lbl('Uninstall', 'ถอน')}</Btn>}
+            {p.state === 'pending_purge'
+              ? <Btn kind="danger" sm onClick={onPurge}>{lbl('Purge data', 'ล้างข้อมูล')}</Btn>
+              : <>
+                  {p.state === 'available' && <Btn kind="gold" sm icon="⬇" onClick={onInstall}>{lbl('Install', 'ติดตั้ง')}</Btn>}
+                  {p.state === 'enabled' && <Btn kind="ghost" sm onClick={onDisable}>{lbl('Disable', 'ปิด')}</Btn>}
+                  {(p.state === 'disabled' || p.state === 'installed') && <Btn kind="gold" sm onClick={onEnable}>{lbl('Enable', 'เปิด')}</Btn>}
+                  {p.installedVia === 'git' && updateInfo?.hasUpdate && <Btn kind="gold" sm onClick={onCheckUpdate}>{lbl('Update', 'อัปเดต')}</Btn>}
+                  {p.state !== 'available' && <Btn kind="danger" sm icon="🗑" onClick={onUninstall}>{lbl('Uninstall', 'ถอน')}</Btn>}
+                </>}
           </div>
         )}
       </div>
@@ -78,6 +87,8 @@ export function PluginsManager({ Sys }) {
   const [busy, setBusy] = useState(null);          // plugin id mid-action
   const [restartHint, setRestartHint] = useState(false);
   const [plan, setPlan] = useState(null);          // dependency-request modal payload
+  const [gitUrl, setGitUrl] = useState('');
+  const [updates, setUpdates] = useState({});      // { [pluginId]: { latestVersion, hasUpdate } }
 
   const load = async () => {
     setErr(null);
@@ -85,6 +96,15 @@ export function PluginsManager({ Sys }) {
     catch (e) { setErr(e.message || 'load failed'); setPlugins([]); }
   };
   useEffect(() => { load(); }, []);
+
+  // After the list loads, poll each git-installed plugin for a newer version (best-effort — a
+  // failed check just leaves that row without an update badge, no error surfaced).
+  useEffect(() => {
+    if (!plugins) return;
+    plugins.filter(p => p.installedVia === 'git').forEach(p => {
+      api.checkPluginUpdate(p.id).then(r => setUpdates(u => ({ ...u, [p.id]: r }))).catch(() => {});
+    });
+  }, [plugins]);
 
   const applyResult = (res) => {
     if (res && res.plugins) { setPlugins(res.plugins); setRestartHint(!!res.restart_required); }
@@ -113,6 +133,14 @@ export function PluginsManager({ Sys }) {
     await act(id, api.installPlugin);
   };
 
+  const submitGitInstall = async () => {
+    if (!gitUrl.trim()) return;
+    setBusy('git-install'); setErr(null);
+    try { applyResult(await api.installFromGit(gitUrl.trim())); setGitUrl(''); }
+    catch (e) { setErr(e.message || 'install failed'); }
+    finally { setBusy(null); }
+  };
+
   if (plugins === null) {
     return <div className="content-pad"><Empty icon="🧩" title={T('Loading modules…', 'กำลังโหลดโมดูล…')} /></div>;
   }
@@ -126,6 +154,18 @@ export function PluginsManager({ Sys }) {
                 'เลือกว่าระบบนี้จะเปิดฟีเจอร์ไหน · การติดตั้งฟีเจอร์จะดึงสิ่งที่มันพึ่งพามาด้วย (เช่น RAG ต้องการ AI) · ตัวที่ติดตั้งแล้วจะถูกใช้ซ้ำ ไม่ลงซ้ำ')}
         actions={<Btn kind="ghost" sm icon="↻" onClick={load}>{T('Refresh', 'รีเฟรช')}</Btn>} />
 
+      {may && (
+        <Panel>
+          <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input className="bf-input" style={{ flex: 1, minWidth: 240 }} placeholder={T('Git URL to install…', 'ลิงก์ Git ที่จะติดตั้ง…')}
+              value={gitUrl} onChange={e => setGitUrl(e.target.value)} disabled={!may} />
+            <Btn kind="gold" sm icon="⬇" disabled={!may || busy === 'git-install'} onClick={submitGitInstall}>
+              {busy === 'git-install' ? '…' : T('Install from Git', 'ติดตั้งจาก Git')}
+            </Btn>
+          </div>
+        </Panel>
+      )}
+
       {!may && <HelpNote tag="local">{T('You can view modules, but installing / enabling needs the “plugins.manage” permission.',
         'ดูได้ แต่การติดตั้ง/เปิด-ปิด ต้องมีสิทธิ์ “plugins.manage”')}</HelpNote>}
       {restartHint && <HelpNote>{T('Saved. Restart the backend to apply — modules mount at startup (restart-to-apply).',
@@ -138,7 +178,9 @@ export function PluginsManager({ Sys }) {
             {plugins.map(p => (
               <PluginRow key={p.id} p={p} T={T} may={may} busy={busy === p.id}
                 onInstall={() => startInstall(p.id)} onEnable={() => act(p.id, api.enablePlugin)}
-                onDisable={() => act(p.id, api.disablePlugin)} onUninstall={() => act(p.id, api.uninstallPlugin)} />
+                onDisable={() => act(p.id, api.disablePlugin)} onUninstall={() => act(p.id, api.uninstallPlugin)}
+                onPurge={() => act(p.id, api.purgePlugin)}
+                onCheckUpdate={() => act(p.id, api.updatePlugin)} updateInfo={updates[p.id]} />
             ))}
           </div>}
 

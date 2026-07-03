@@ -53,6 +53,9 @@ class Manifest:
     kind: str = "capability"
     secrets: tuple[str, ...] = ()
     compose: str | None = None
+    description: str = ""
+    icon: str | None = None
+    screenshots: tuple[str, ...] = ()
     raw: dict = field(default_factory=dict)
 
 
@@ -173,6 +176,9 @@ def _validate(folder: str, raw: dict) -> Manifest:
         kind=kind,
         secrets=tuple(raw.get("secrets", [])),
         compose=raw.get("compose"),
+        description=raw.get("description", ""),
+        icon=raw.get("icon"),
+        screenshots=tuple(raw.get("screenshots", [])),
         raw=raw,
     )
 
@@ -202,10 +208,25 @@ def discover() -> dict[str, Manifest]:
 
 def topo_order(ids: set[str], manifests: dict[str, Manifest]) -> list[str]:
     """Topologically sort `ids` so each plugin comes after its `dependencies` (§4). A cycle is a hard
-    failure. Ties broken alphabetically for a deterministic, reproducible boot order."""
+    failure. Ties broken alphabetically for a deterministic, reproducible boot order.
+
+    An id in `ids` that is no longer in `manifests` is silently skipped rather than raising `KeyError`
+    on `manifests[pid]` — mirrors `plugin_registry._closure()`'s existing "ignore deps absent from
+    manifests" precedent. This matters because callers can legitimately hold a STALE `ids` set: e.g.
+    `main.py:lifespan` snapshots `enabled_optional_modules()` once at process start and reuses that same
+    local variable at shutdown, but a plugin present at boot can be Purged mid-process (`purge()` calls
+    `deregister_discovered()`, which mutates `PLUGIN_MANIFESTS` — the very dict passed in here) — by
+    teardown time the purged id is in the stale `enabled` set but no longer in `manifests`. There is
+    nothing meaningful left to order/boot/shut down for an id that no longer structurally exists as a
+    plugin in this process, so skipping it (instead of crashing the whole ordering — and with it every
+    OTHER still-valid plugin's shutdown) is correct, not a swallowed bug. Every current caller already
+    intersects its `ids` against the CURRENT manifest catalog before calling in (`enabled_optional_modules()`
+    filters against `OPTIONAL_MODULE_NAMES`; `_closure()` filters against `manifests` itself) — so in every
+    calling context except this stale-snapshot-after-purge one, this filter is a no-op."""
     order: list[str] = []
     visiting: set[str] = set()
     done: set[str] = set()
+    live_ids = {pid for pid in ids if pid in manifests}
 
     def visit(pid: str, trail: tuple[str, ...]) -> None:
         if pid in done:
@@ -215,13 +236,13 @@ def topo_order(ids: set[str], manifests: dict[str, Manifest]) -> list[str]:
             raise ManifestError(f"plugin dependency cycle: {cycle}")
         visiting.add(pid)
         for dep in sorted(manifests[pid].dependencies):
-            if dep in ids:  # only order among the enabled set
+            if dep in live_ids:  # only order among the (still-live) enabled set
                 visit(dep, trail + (pid,))
         visiting.discard(pid)
         done.add(pid)
         order.append(pid)
 
-    for pid in sorted(ids):
+    for pid in sorted(live_ids):
         visit(pid, ())
     return order
 
@@ -242,6 +263,9 @@ def load_router(plugin_id: str) -> APIRouter:
 #   register(ctx)  — bind its provided contracts into ctx.container (NO cross-plugin calls yet, §10)
 #   boot(ctx)      — subscribe to events / wire listeners, in dependency order (§10)
 #   shutdown(ctx)  — release / flush / deregister, in REVERSE dependency order (§10)
+#   purge(engine)  — drop this plugin's OWN tables (e.g. `Base.metadata.drop_all`). Called ONLY by the
+#                    Purge action (install-from-git design §8/§9), never at boot. A plugin that omits
+#                    it cannot be Purged yet — Uninstall (code removal, DB kept) still works either way.
 #   jobs           — a list of arq job callables the worker should run when this plugin is enabled
 # All optional: a pure-router plugin (like knowledge today for routes) needs none of them. Every
 # lifecycle call is fault-isolated (§8): a raised exception marks that plugin degraded, never the rest.
@@ -365,6 +389,37 @@ def shutdown_plugins(enabled: set[str], manifests: dict[str, Manifest], ctx: Plu
 # `modules` re-exports these for backward compatibility. Empty in a plugin-free Core build.
 PLUGIN_MANIFESTS: dict[str, Manifest] = discover()
 OPTIONAL_MODULE_NAMES: tuple[str, ...] = tuple(sorted(PLUGIN_MANIFESTS))
+
+
+def _sync_modules_reexport() -> None:
+    """`app/modules.py` re-exports `PLUGIN_MANIFESTS`/`OPTIONAL_MODULE_NAMES` as a snapshot taken at
+    import time (`modules.PLUGIN_MANIFESTS = plugin_loader.PLUGIN_MANIFESTS`), not a live reference —
+    rebinding this module's globals alone leaves that snapshot stale. Deferred import: `app.modules`
+    imports `plugin_loader` at top level, so importing it back at module scope here would cycle."""
+    from . import modules
+
+    modules.PLUGIN_MANIFESTS = PLUGIN_MANIFESTS
+    modules.OPTIONAL_MODULE_NAMES = OPTIONAL_MODULE_NAMES
+
+
+def register_discovered(manifest: Manifest) -> None:
+    """Make a freshly-installed plugin's manifest visible to THIS process's `_manifests()` lookups
+    without a restart (install-from-git design §2.2) — `discover()` runs once at import, so a plugin
+    cloned onto disk afterwards needs this to appear in install-plan/install/list-plugins calls in the
+    same process. Mounting its ROUTER still needs a restart (unchanged restart-to-apply model)."""
+    global PLUGIN_MANIFESTS, OPTIONAL_MODULE_NAMES
+    PLUGIN_MANIFESTS = {**PLUGIN_MANIFESTS, manifest.id: manifest}
+    OPTIONAL_MODULE_NAMES = tuple(sorted(PLUGIN_MANIFESTS))
+    _sync_modules_reexport()
+
+
+def deregister_discovered(pid: str) -> None:
+    """Remove a plugin from THIS process's manifest catalog after its on-disk folder is deleted
+    (Purge of a git-installed plugin, §2.2/§8) — mirrors `register_discovered`."""
+    global PLUGIN_MANIFESTS, OPTIONAL_MODULE_NAMES
+    PLUGIN_MANIFESTS = {k: v for k, v in PLUGIN_MANIFESTS.items() if k != pid}
+    OPTIONAL_MODULE_NAMES = tuple(sorted(PLUGIN_MANIFESTS))
+    _sync_modules_reexport()
 
 
 def enabled_optional_modules() -> set[str]:

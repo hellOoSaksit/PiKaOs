@@ -30,6 +30,7 @@ AVAILABLE = "available"
 INSTALLED = "installed"
 ENABLED = "enabled"
 DISABLED = "disabled"
+PENDING_PURGE = "pending_purge"   # uninstalled (code gone) but its DB tables are kept for Purge
 
 
 # --- persistence (kernel local-JSON, over the "plugins" state file) ---------------------------------
@@ -63,6 +64,55 @@ def set_state(pid: str, state: str, *, version: str | None = None) -> dict[str, 
     reg[pid] = entry
     kernel_state.write_json(_KEY, reg)
     return reg
+
+
+def set_git_install(pid: str, *, repo_url: str, tag: str, version: str) -> dict[str, dict]:
+    """Upsert a plugin installed via install-from-git (§2.1): same as `set_state(..., ENABLED)` plus
+    the provenance Uninstall/Purge/update-check need — `repoUrl`/`installedTag` and
+    `installedVia: "git"` (a `symlink` entry, the default, is never physically deletable — it's a
+    dev's sibling checkout)."""
+    reg = set_state(pid, ENABLED, version=version)
+    entry = dict(reg[pid])
+    entry["repoUrl"] = repo_url
+    entry["installedVia"] = "git"
+    entry["installedTag"] = tag
+    reg[pid] = entry
+    kernel_state.write_json(_KEY, reg)
+    return reg
+
+
+def installed_via(registry: dict[str, dict], pid: str) -> str:
+    """`"git"` or `"symlink"` (default) — whether Uninstall may delete the on-disk plugin folder."""
+    entry = registry.get(pid)
+    return entry.get("installedVia", "symlink") if isinstance(entry, dict) else "symlink"
+
+
+def repo_url_of(registry: dict[str, dict], pid: str) -> str | None:
+    entry = registry.get(pid)
+    return entry.get("repoUrl") if isinstance(entry, dict) else None
+
+
+def installed_tag_of(registry: dict[str, dict], pid: str) -> str | None:
+    """The git tag currently checked out for `pid` — the update flow's revert-to-known-good point."""
+    entry = registry.get(pid)
+    return entry.get("installedTag") if isinstance(entry, dict) else None
+
+
+def uninstall_git(pid: str) -> dict[str, dict]:
+    """Uninstall a git-installed plugin: state → PENDING_PURGE. Provenance (`repoUrl`/`installedTag`)
+    is deliberately KEPT (not `remove()`d) so Purge can still find what to drop. The caller (router)
+    is responsible for the on-disk folder deletion — the registry only tracks desired state."""
+    reg = read()
+    entry = dict(reg.get(pid) or {})
+    entry["state"] = PENDING_PURGE
+    reg[pid] = entry
+    kernel_state.write_json(_KEY, reg)
+    return reg
+
+
+def purge_complete(pid: str) -> dict[str, dict]:
+    """Purge finished — forget the plugin entirely (back to *available*, same as a normal uninstall)."""
+    return remove(pid)
 
 
 def remove(pid: str) -> dict[str, dict]:
