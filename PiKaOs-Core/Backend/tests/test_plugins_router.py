@@ -390,3 +390,247 @@ def test_existing_install_endpoint_still_succeeds_when_readiness_passes(sample_p
     body = resp.json()
     sample = next(p for p in body["plugins"] if p["id"] == "sample")
     assert sample["state"] == "enabled"
+
+
+# --- check-update / update (git-installed plugins) ------------------------------------------------------
+
+def _git(cwd, *args):
+    import subprocess
+    subprocess.run(["git", *args], cwd=cwd, check=True)
+
+
+def _install_crm_via_git(client, tmp_path, monkeypatch, headers, *, version="1.0.0", tag="v1.0.0"):
+    """Real git repo, cloned in through the actual install-from-git endpoint — so the resulting plugin
+    directory is a genuine git working copy with an `origin` remote, exactly what `fetch_and_checkout`
+    needs for the update tests below (mirrors Task 5/7's local-file-remote pattern; not a mock)."""
+    import subprocess
+    from app.core import git_installer
+
+    src = tmp_path / "src"
+    src.mkdir()
+    _git(src, "init", "-q")
+    _git(src, "config", "user.email", "t@t.co")
+    _git(src, "config", "user.name", "t")
+    (src / "manifest.json").write_text(
+        '{"id":"crm","name":"CRM","version":"%s","coreVersion":"*"}' % version,
+        encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=src, check=True)
+    _git(src, "commit", "-q", "-m", "init")
+    _git(src, "tag", tag)
+    repo_url = f"file://{src}"
+    monkeypatch.setattr(git_installer, "allowed_hosts", lambda: [""])
+
+    resp = client.post("/api/plugins/install-from-git", json={"repoUrl": repo_url, "ref": tag},
+                        headers=headers)
+    assert resp.status_code == 200, resp.text
+    return src, repo_url
+
+
+def test_check_update_reports_a_newer_tag(sample_plugins, tmp_path, monkeypatch):
+    from app.core import kernel_state, setup_state, git_installer
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    registry.set_git_install("sample", repo_url="https://github.com/acme/sample.git",
+                              tag="v1.2.3", version="1.2.3")
+    monkeypatch.setattr(git_installer, "latest_tag", lambda url: "v1.3.0")
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.get("/api/plugins/sample/check-update",
+                           headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {"latestVersion": "v1.3.0", "hasUpdate": True}
+
+
+def test_check_update_reports_no_update_when_already_current(sample_plugins, tmp_path, monkeypatch):
+    from app.core import kernel_state, setup_state, git_installer
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    registry.set_git_install("sample", repo_url="https://github.com/acme/sample.git",
+                              tag="v1.2.3", version="1.2.3")
+    monkeypatch.setattr(git_installer, "latest_tag", lambda url: "v1.2.3")
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.get("/api/plugins/sample/check-update",
+                           headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {"latestVersion": "v1.2.3", "hasUpdate": False}
+
+
+def test_check_update_404s_for_a_non_git_installed_plugin(sample_plugins, tmp_path, monkeypatch):
+    """`sample` is discovered but never installed via git (default provenance is `symlink`) — there's
+    nothing to check against, so this must 404, not fall through to a confusing error."""
+    from app.core import kernel_state, setup_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.get("/api/plugins/sample/check-update",
+                           headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 404
+
+
+def test_check_update_404s_for_an_unknown_plugin(sample_plugins, tmp_path, monkeypatch):
+    from app.core import kernel_state, setup_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.get("/api/plugins/does-not-exist/check-update",
+                           headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 404
+
+
+def test_update_404s_for_a_non_git_installed_plugin(sample_plugins, tmp_path, monkeypatch):
+    from app.core import kernel_state, setup_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/sample/update",
+                            headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 404
+
+
+def test_update_requires_plugins_manage_permission(sample_plugins, tmp_path, monkeypatch):
+    from app.core import kernel_state, setup_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/sample/update")
+    assert resp.status_code == 401
+
+
+def test_update_fetches_new_tag_revalidates_and_updates_registry(sample_plugins, tmp_path, monkeypatch):
+    """End-to-end update against a real local git remote (Task 5/7's pattern — a `file://` repo, not a
+    mock): a second, higher-semver tag is pushed after the initial install, and `update()` must fetch +
+    check it out, re-validate the manifest + readiness, and persist the new tag/version to the registry."""
+    from app.core import kernel_state, setup_state
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    headers = {"Authorization": "Bearer a-session-token"}
+
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        src, repo_url = _install_crm_via_git(client, tmp_path, monkeypatch, headers)
+
+        (src / "manifest.json").write_text(
+            '{"id":"crm","name":"CRM","version":"1.1.0","coreVersion":"*"}', encoding="utf-8")
+        _git(src, "add", ".")
+        _git(src, "commit", "-q", "-m", "bump")
+        _git(src, "tag", "v1.1.0")
+
+        check_resp = client.get("/api/plugins/crm/check-update", headers=headers)
+        assert check_resp.status_code == 200, check_resp.text
+        assert check_resp.json() == {"latestVersion": "v1.1.0", "hasUpdate": True}
+
+        resp = client.post("/api/plugins/crm/update", headers=headers)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    crm = next(p for p in body["plugins"] if p["id"] == "crm")
+    assert crm["version"] == "1.1.0"
+    assert (plugins_dir / "crm" / "manifest.json").read_text(encoding="utf-8").find('"1.1.0"') != -1
+
+    reg = registry.read()
+    assert reg["crm"]["installedTag"] == "v1.1.0"
+    assert reg["crm"]["version"] == "1.1.0"
+
+
+def test_update_returns_422_when_the_remote_has_no_tags(sample_plugins, tmp_path, monkeypatch):
+    """`latest_tag` returns `None` when the remote has no (semver) tags at all — nothing to update to.
+    (Re-running update while already on the latest tag is a separate, harmless no-op case: `latest_tag`
+    still returns that same tag, so `update()` just re-checks-out and re-validates it — see the
+    check-update test for the "no newer tag" comparison.)"""
+    from app.core import kernel_state, setup_state, git_installer
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    headers = {"Authorization": "Bearer a-session-token"}
+
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        _install_crm_via_git(client, tmp_path, monkeypatch, headers)
+        monkeypatch.setattr(git_installer, "latest_tag", lambda url: None)
+        resp = client.post("/api/plugins/crm/update", headers=headers)
+    assert resp.status_code == 422
+
+
+def test_update_reverts_the_checkout_when_the_new_tags_manifest_fails_readiness(sample_plugins, tmp_path, monkeypatch):
+    """The new tag's manifest declares an unresolvable dependency — readiness must fail, and the
+    on-disk checkout must be reverted back to the previously-installed (known-good) tag rather than
+    left sitting on the bad new one. A restart after this must still see the OLD, valid manifest —
+    never the broken one (§3: a malformed/failing manifest on disk is a hard boot failure)."""
+    from app.core import kernel_state, setup_state
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    headers = {"Authorization": "Bearer a-session-token"}
+
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        src, repo_url = _install_crm_via_git(client, tmp_path, monkeypatch, headers)
+
+        (src / "manifest.json").write_text(
+            '{"id":"crm","name":"CRM","version":"1.1.0","coreVersion":"*",'
+            '"dependencies":["nope-not-a-real-plugin"]}', encoding="utf-8")
+        _git(src, "add", ".")
+        _git(src, "commit", "-q", "-m", "bad bump")
+        _git(src, "tag", "v1.1.0")
+
+        resp = client.post("/api/plugins/crm/update", headers=headers)
+    assert resp.status_code == 422
+
+    on_disk = (plugins_dir / "crm" / "manifest.json").read_text(encoding="utf-8")
+    assert '"1.1.0"' not in on_disk       # reverted, not left on the bad tag
+    assert '"1.0.0"' in on_disk
+
+    reg = registry.read()
+    assert reg["crm"]["installedTag"] == "v1.0.0"
+    assert reg["crm"]["version"] == "1.0.0"
+
+
+def test_update_reverts_the_checkout_when_the_new_tags_manifest_is_invalid(sample_plugins, tmp_path, monkeypatch):
+    """The new tag's manifest.json is missing a required field — rejected by `plugin_loader._validate`,
+    and the checkout is reverted the same as a failed-readiness update (never left on a broken tag)."""
+    from app.core import kernel_state, setup_state
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    headers = {"Authorization": "Bearer a-session-token"}
+
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        src, repo_url = _install_crm_via_git(client, tmp_path, monkeypatch, headers)
+
+        (src / "manifest.json").write_text(
+            '{"id":"crm","version":"1.1.0","coreVersion":"*"}', encoding="utf-8")  # no 'name'
+        _git(src, "add", ".")
+        _git(src, "commit", "-q", "-m", "invalid bump")
+        _git(src, "tag", "v1.1.0")
+
+        resp = client.post("/api/plugins/crm/update", headers=headers)
+    assert resp.status_code == 422
+
+    on_disk = (plugins_dir / "crm" / "manifest.json").read_text(encoding="utf-8")
+    assert '"1.0.0"' in on_disk
+
+    reg = registry.read()
+    assert reg["crm"]["installedTag"] == "v1.0.0"

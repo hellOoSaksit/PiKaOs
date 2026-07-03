@@ -92,6 +92,12 @@ def repo_url_of(registry: dict[str, dict], pid: str) -> str | None:
     return entry.get("repoUrl") if isinstance(entry, dict) else None
 
 
+def installed_tag_of(registry: dict[str, dict], pid: str) -> str | None:
+    """The git tag currently checked out for `pid` — the update flow's revert-to-known-good point."""
+    entry = registry.get(pid)
+    return entry.get("installedTag") if isinstance(entry, dict) else None
+
+
 def uninstall_git(pid: str) -> dict[str, dict]:
     """Uninstall a git-installed plugin: state → PENDING_PURGE. Provenance (`repoUrl`/`installedTag`)
     is deliberately KEPT (not `remove()`d) so Purge can still find what to drop. The caller (router)

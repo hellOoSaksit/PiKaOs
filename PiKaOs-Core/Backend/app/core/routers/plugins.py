@@ -13,7 +13,9 @@ forgets the registry row without dropping tables (see plugin_registry.py).
 from __future__ import annotations
 
 import json
+import logging
 import shutil
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -21,6 +23,8 @@ from pydantic import BaseModel
 from .. import git_installer, plugin_readiness
 from .. import plugin_registry as registry
 from ..identity import UserLike, get_current_user, require_perm
+
+log = logging.getLogger("pikaos.plugins.router")
 
 router = APIRouter(prefix="/api/plugins", tags=["plugins"])
 
@@ -69,6 +73,11 @@ class ActionOut(BaseModel):
 class InstallFromGitIn(BaseModel):
     repoUrl: str
     ref: str | None = None          # a tag to pin to; None = the repo's default branch HEAD
+
+
+class CheckUpdateOut(BaseModel):
+    latestVersion: str | None
+    hasUpdate: bool
 
 
 def _view(reg: dict[str, dict], active: set[str]) -> list[PluginOut]:
@@ -213,6 +222,117 @@ async def install_from_git(
         plugin_loader.deregister_discovered(pid)   # no-op if register_discovered never got that far
         shutil.rmtree(target_dir, ignore_errors=True)
         raise HTTPException(status_code=500, detail="plugin install failed to finalize") from e
+    return _action_response(reg)
+
+
+def _require_git_installed(reg: dict[str, dict], plugin_id: str) -> None:
+    """404 (not 422/generic-error fallthrough) for a plugin that wasn't installed via git — there's no
+    remote to check/update against, and a `symlink` install's on-disk folder is a dev's sibling checkout
+    that this endpoint must never touch."""
+    if registry.installed_via(reg, plugin_id) != "git":
+        raise HTTPException(status_code=404, detail="not a git-installed plugin")
+
+
+def _revert_checkout(plugin_dir: Path, repo_url: str, tag: str | None) -> None:
+    """Best-effort revert of `plugin_dir`'s on-disk checkout back to `tag` (the previously-installed,
+    known-good version) after a failed update. `fetch_and_checkout` having already succeeded for the
+    *new* tag means the working tree now holds code the manifest/readiness gate just rejected — leaving
+    it there would mean the registry says one version while disk holds another, and a restart's
+    `discover()` would find the bad manifest and refuse to boot at all (§3). `tag` is always set for a
+    git-installed plugin (`set_git_install` always writes it); the None guard is defensive only.
+
+    Best-effort: if the revert itself fails, the *original* update error is still what reaches the
+    client (rule 10 — generic, no git detail) — this only logs so an operator can find a plugin stuck
+    mid-update."""
+    if not tag:
+        return
+    try:
+        git_installer.fetch_and_checkout(plugin_dir, repo_url, tag)
+    except git_installer.GitInstallError:
+        log.error("plugin '%s': failed to revert checkout back to '%s' after a failed update — "
+                   "on-disk code may not match the registry", plugin_dir.name, tag)
+
+
+@router.get("/{plugin_id}/check-update", response_model=CheckUpdateOut)
+async def check_update(
+    plugin_id: str,
+    _: UserLike = Depends(get_current_user),
+) -> CheckUpdateOut:
+    """On-demand only (no background polling, §2.2) — compares the highest remote semver tag to the
+    installed version. 404 if the plugin wasn't installed via git (nothing to check against)."""
+    _require_known(plugin_id)
+    reg = registry.read()
+    _require_git_installed(reg, plugin_id)
+    repo_url = registry.repo_url_of(reg, plugin_id)
+    latest = git_installer.latest_tag(repo_url) if repo_url else None
+    current = _manifests()[plugin_id].version
+    has_update = bool(latest and latest.lstrip("v") != current.lstrip("v"))
+    return CheckUpdateOut(latestVersion=latest, hasUpdate=has_update)
+
+
+@router.post("/{plugin_id}/update", response_model=ActionOut)
+async def update(
+    plugin_id: str,
+    user: UserLike = Depends(require_perm("plugins.manage")),
+) -> ActionOut:
+    """Fetch + check out the latest tag, re-validate the manifest + readiness, apply on the existing
+    restart-to-apply model. 404 if not git-installed.
+
+    Failure discipline mirrors `install_from_git` (§2.2), extended for the fact that — unlike a fresh
+    install — there IS a previously-good on-disk version here: a failure that happens *after* the new
+    tag is actually checked out (bad manifest, failed readiness, or a registry-persistence error) reverts
+    the working tree back to the tag that was installed before this call, via `_revert_checkout`, rather
+    than discarding it (there's nothing to discard back to — this plugin already existed). A failure in
+    `fetch_and_checkout` itself needs no revert: git only mutates the working tree on a successful
+    checkout, so the old version is still exactly what's on disk."""
+    from ... import plugin_loader
+
+    _require_known(plugin_id)
+    reg = registry.read()
+    _require_git_installed(reg, plugin_id)
+    repo_url = registry.repo_url_of(reg, plugin_id)
+    old_tag = registry.installed_tag_of(reg, plugin_id)
+    old_manifest = _manifests()[plugin_id]
+
+    tag = git_installer.latest_tag(repo_url) if repo_url else None
+    if not tag:
+        raise HTTPException(status_code=422, detail="no update available")
+
+    plugin_dir = plugin_loader.PLUGINS_DIR / plugin_id
+    try:
+        git_installer.fetch_and_checkout(plugin_dir, repo_url, tag)
+    except git_installer.GitInstallError as e:
+        raise HTTPException(status_code=422, detail="could not fetch the update") from e
+
+    manifest_path = plugin_dir / "manifest.json"
+    try:
+        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
+        _revert_checkout(plugin_dir, repo_url, old_tag)
+        raise HTTPException(status_code=422, detail="update's manifest.json is not valid JSON") from e
+
+    try:
+        manifest = plugin_loader._validate(plugin_id, raw)
+        candidate = {**_manifests(), plugin_id: manifest}
+        result = plugin_readiness.check(plugin_id, manifest, candidate)
+        if not result.passed:
+            raise plugin_loader.ManifestError("; ".join(result.reasons))
+    except plugin_loader.ManifestError as e:
+        _revert_checkout(plugin_dir, repo_url, old_tag)
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+    # Same rationale as install_from_git's rollback (§2.2): `register_discovered` mutates in-process
+    # state and `set_git_install` persists to the kernel-state JSON file; either can raise on a genuinely
+    # unexpected failure. Unlike a fresh install there's a known-good prior state to restore to, so the
+    # revert here restores BOTH the in-process manifest (back to `old_manifest`) and the on-disk checkout
+    # (back to `old_tag`) rather than tearing the plugin down.
+    try:
+        plugin_loader.register_discovered(manifest)
+        reg = registry.set_git_install(plugin_id, repo_url=repo_url, tag=tag, version=manifest.version)
+    except Exception as e:
+        plugin_loader.register_discovered(old_manifest)
+        _revert_checkout(plugin_dir, repo_url, old_tag)
+        raise HTTPException(status_code=500, detail="plugin update failed to finalize") from e
     return _action_response(reg)
 
 
