@@ -12,9 +12,13 @@ forgets the registry row without dropping tables (see plugin_registry.py).
 """
 from __future__ import annotations
 
+import json
+import shutil
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from .. import git_installer, plugin_readiness
 from .. import plugin_registry as registry
 from ..identity import UserLike, get_current_user, require_perm
 
@@ -60,6 +64,11 @@ class InstallPlanOut(BaseModel):
 class ActionOut(BaseModel):
     plugins: list[PluginOut]
     restart_required: bool          # any plugin now differs from what's mounted → restart to apply
+
+
+class InstallFromGitIn(BaseModel):
+    repoUrl: str
+    ref: str | None = None          # a tag to pin to; None = the repo's default branch HEAD
 
 
 def _view(reg: dict[str, dict], active: set[str]) -> list[PluginOut]:
@@ -116,15 +125,82 @@ async def install(
     plugin_id: str,
     user: UserLike = Depends(require_perm("plugins.manage")),
 ) -> ActionOut:
-    """Install `plugin_id` and any missing dependencies (dependency-first), enabling each. Already-
-    installed deps are left untouched (no duplicate install). Idempotent."""
+    """Install `plugin_id` and any missing dependencies (dependency-first), enabling each — after every
+    one of them passes the readiness gate (§2.3: dependency resolution + a `kind:tool` plugin's compose
+    fragment merging cleanly). Already-installed deps are left untouched (no duplicate install).
+    Idempotent."""
     _require_known(plugin_id)
     reg = registry.read()
     installed = {pid for pid in reg if registry.state_of(reg, pid) != registry.AVAILABLE}
     plan = registry.resolve_install_plan(plugin_id, _manifests(), installed)
+    for pid in plan["to_install"]:
+        result = plugin_readiness.check(pid, _manifests()[pid], _manifests())
+        if not result.passed:
+            raise HTTPException(status_code=422,
+                                 detail=f"'{pid}' failed readiness: {'; '.join(result.reasons)}")
     for pid in plan["to_install"]:                       # deps first, target last (topo order)
         reg = registry.set_state(pid, registry.ENABLED,
                                        version=_manifests()[pid].version)
+    return _action_response(reg)
+
+
+@router.post("/install-from-git", response_model=ActionOut)
+async def install_from_git(
+    body: InstallFromGitIn,
+    user: UserLike = Depends(require_perm("plugins.manage")),
+) -> ActionOut:
+    """Install a plugin straight from a git remote (install-from-git design §2.2). Clones `body.repoUrl`
+    (optionally pinned to `body.ref`, a tag) into a staging dir — never straight into PLUGINS_DIR — then
+    validates its manifest and runs the same readiness gate as `install()`, moves it into PLUGINS_DIR,
+    registers it with the running process (no restart needed to see it), and marks it enabled with its
+    git provenance. Any failure past the clone discards the staging/target dir — never a half-installed
+    plugin on disk or in the registry (§2.2). Errors are generic: no raw filesystem path, git stderr, or
+    stack trace ever reaches the client (rule 10)."""
+    from ... import plugin_loader
+
+    try:
+        staging = git_installer.clone_to_staging(body.repoUrl, body.ref)
+    except git_installer.GitInstallError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+    manifest_path = staging / "manifest.json"
+    if not manifest_path.is_file():
+        shutil.rmtree(staging, ignore_errors=True)
+        raise HTTPException(status_code=422, detail="repository has no manifest.json at its root")
+    try:
+        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise HTTPException(status_code=422, detail="repository's manifest.json is not valid JSON") from e
+    pid = raw.get("id") if isinstance(raw, dict) else None
+    # Validated against the loader's own id shape BEFORE it ever becomes part of a filesystem path —
+    # `pid` is repo-controlled content, and `target_dir`/`shutil.move` below would otherwise let an
+    # id like "../../../tmp/evil" escape PLUGINS_DIR entirely (path traversal). `_validate()` checks
+    # this same shape too, but only *after* the move, which is too late to matter for this.
+    if not isinstance(pid, str) or not plugin_loader._ID_RE.match(pid):
+        shutil.rmtree(staging, ignore_errors=True)
+        raise HTTPException(status_code=422, detail="manifest.json has no valid 'id'")
+
+    target_dir = plugin_loader.PLUGINS_DIR / pid
+    if target_dir.exists():
+        shutil.rmtree(staging, ignore_errors=True)
+        raise HTTPException(status_code=409, detail=f"plugin '{pid}' is already installed")
+
+    plugin_loader.PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(staging), str(target_dir))
+    try:
+        manifest = plugin_loader._validate(pid, raw)
+        candidate_manifests = {**_manifests(), pid: manifest}
+        result = plugin_readiness.check(pid, manifest, candidate_manifests)
+        if not result.passed:
+            raise plugin_loader.ManifestError("; ".join(result.reasons))
+    except plugin_loader.ManifestError as e:
+        shutil.rmtree(target_dir, ignore_errors=True)
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+    plugin_loader.register_discovered(manifest)
+    tag = body.ref or git_installer.latest_tag(body.repoUrl) or manifest.version
+    reg = registry.set_git_install(pid, repo_url=body.repoUrl, tag=tag, version=manifest.version)
     return _action_response(reg)
 
 

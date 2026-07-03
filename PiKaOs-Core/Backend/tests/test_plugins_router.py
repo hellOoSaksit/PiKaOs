@@ -32,3 +32,292 @@ def test_plugins_endpoint_returns_200_with_a_bootstrap_token(sample_plugins, tmp
     body = resp.json()
     sample = next(p for p in body if p["id"] == "sample")
     assert sample["permissions"] == ["sample.manage"]
+
+
+# --- install-from-git ---------------------------------------------------------------------------------
+
+def test_install_from_git_clones_validates_and_registers(sample_plugins, tmp_path, monkeypatch):
+    import subprocess
+    from app.core import kernel_state, setup_state, git_installer
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+
+    src = tmp_path / "src"
+    src.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t.co"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=src, check=True)
+    (src / "manifest.json").write_text(
+        '{"id":"crm","name":"CRM","version":"1.0.0","coreVersion":"*"}', encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=src, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=src, check=True)
+    subprocess.run(["git", "tag", "v1.0.0"], cwd=src, check=True)
+    repo_url = f"file://{src}"
+    monkeypatch.setattr(git_installer, "allowed_hosts", lambda: [""])
+
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/install-from-git",
+                            json={"repoUrl": repo_url, "ref": "v1.0.0"},
+                            headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    crm = next(p for p in body["plugins"] if p["id"] == "crm")
+    assert crm["state"] == "enabled"
+    assert (plugins_dir / "crm" / "manifest.json").is_file()
+
+
+def test_install_from_git_rejects_disallowed_host(sample_plugins, tmp_path, monkeypatch):
+    from app.core import kernel_state, setup_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/install-from-git",
+                            json={"repoUrl": "https://not-allowed.example/x.git"},
+                            headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 422
+
+
+def test_install_from_git_rejects_missing_manifest(sample_plugins, tmp_path, monkeypatch):
+    """A repo with no manifest.json at its root is rejected — and the staging dir is discarded, not
+    left behind (never a half-installed plugin)."""
+    import subprocess
+    from app.core import kernel_state, setup_state, git_installer
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+
+    src = tmp_path / "src"
+    src.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t.co"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=src, check=True)
+    (src / "README.md").write_text("no manifest here", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=src, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=src, check=True)
+    repo_url = f"file://{src}"
+    monkeypatch.setattr(git_installer, "allowed_hosts", lambda: [""])
+
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/install-from-git",
+                            json={"repoUrl": repo_url},
+                            headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 422
+    assert list(plugins_dir.iterdir()) == []   # nothing left on disk
+
+
+def test_install_from_git_rejects_duplicate_plugin(sample_plugins, tmp_path, monkeypatch):
+    """Cloning a manifest whose id collides with an already-discovered plugin is rejected (409) —
+    no double-install."""
+    import subprocess
+    from app.core import kernel_state, setup_state, git_installer
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+
+    src = tmp_path / "src"
+    src.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t.co"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=src, check=True)
+    (src / "manifest.json").write_text(
+        '{"id":"sample","name":"Sample","version":"1.0.0","coreVersion":"*"}', encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=src, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=src, check=True)
+    repo_url = f"file://{src}"
+    monkeypatch.setattr(git_installer, "allowed_hosts", lambda: [""])
+
+    plugins_dir = tmp_path / "plugins"
+    (plugins_dir / "sample").mkdir(parents=True)   # already-installed folder
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/install-from-git",
+                            json={"repoUrl": repo_url},
+                            headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 409
+
+
+def test_install_from_git_rejects_path_traversal_id(sample_plugins, tmp_path, monkeypatch):
+    """A manifest.json whose 'id' isn't a valid plugin-id shape (e.g. contains '..' / '/') must never
+    reach the filesystem move — `target_dir = PLUGINS_DIR / pid` would otherwise let the clone land
+    outside PLUGINS_DIR entirely."""
+    import subprocess
+    from app.core import kernel_state, setup_state, git_installer
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+
+    src = tmp_path / "src"
+    src.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t.co"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=src, check=True)
+    (src / "manifest.json").write_text(
+        '{"id":"../../escaped","name":"Evil","version":"1.0.0","coreVersion":"*"}', encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=src, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=src, check=True)
+    repo_url = f"file://{src}"
+    monkeypatch.setattr(git_installer, "allowed_hosts", lambda: [""])
+
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/install-from-git",
+                            json={"repoUrl": repo_url},
+                            headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 422
+    assert list(plugins_dir.iterdir()) == []          # nothing landed inside PLUGINS_DIR
+    assert not (tmp_path / "escaped").exists()         # and nothing escaped it either
+
+
+def test_install_from_git_rejects_failed_readiness(sample_plugins, tmp_path, monkeypatch):
+    """A readiness-gate failure (e.g. an unresolvable dependency) is rejected — and the on-disk
+    folder is removed, not left half-installed."""
+    import subprocess
+    from app.core import kernel_state, setup_state, git_installer
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+
+    src = tmp_path / "src"
+    src.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t.co"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=src, check=True)
+    (src / "manifest.json").write_text(
+        '{"id":"crm","name":"CRM","version":"1.0.0","coreVersion":"*",'
+        '"dependencies":["nope-not-a-real-plugin"]}', encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=src, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=src, check=True)
+    repo_url = f"file://{src}"
+    monkeypatch.setattr(git_installer, "allowed_hosts", lambda: [""])
+
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/install-from-git",
+                            json={"repoUrl": repo_url},
+                            headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 422
+    assert not (plugins_dir / "crm").exists()   # rolled back, not half-installed
+
+
+def test_install_from_git_rejects_invalid_manifest(sample_plugins, tmp_path, monkeypatch):
+    """A manifest missing a required field (e.g. no 'name') is rejected by plugin_loader._validate,
+    routed through the same generic-error path — and cleaned up."""
+    import subprocess
+    from app.core import kernel_state, setup_state, git_installer
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+
+    src = tmp_path / "src"
+    src.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t.co"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=src, check=True)
+    (src / "manifest.json").write_text(
+        '{"id":"crm","version":"1.0.0","coreVersion":"*"}', encoding="utf-8")  # no 'name'
+    subprocess.run(["git", "add", "."], cwd=src, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=src, check=True)
+    repo_url = f"file://{src}"
+    monkeypatch.setattr(git_installer, "allowed_hosts", lambda: [""])
+
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/install-from-git",
+                            json={"repoUrl": repo_url},
+                            headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 422
+    assert not (plugins_dir / "crm").exists()
+
+
+def test_install_from_git_rejects_missing_id(sample_plugins, tmp_path, monkeypatch):
+    """A manifest.json with no 'id' field is rejected (422) before any move to PLUGINS_DIR happens."""
+    import subprocess
+    from app.core import kernel_state, setup_state, git_installer
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+
+    src = tmp_path / "src"
+    src.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t.co"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=src, check=True)
+    (src / "manifest.json").write_text(
+        '{"name":"CRM","version":"1.0.0","coreVersion":"*"}', encoding="utf-8")  # no 'id'
+    subprocess.run(["git", "add", "."], cwd=src, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=src, check=True)
+    repo_url = f"file://{src}"
+    monkeypatch.setattr(git_installer, "allowed_hosts", lambda: [""])
+
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/install-from-git",
+                            json={"repoUrl": repo_url},
+                            headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 422
+    assert list(plugins_dir.iterdir()) == []
+
+
+def test_install_from_git_requires_plugins_manage_permission(sample_plugins, tmp_path, monkeypatch):
+    """No/invalid session token → 401, matching the other mutation routes' auth gate."""
+    from app.core import kernel_state, setup_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/install-from-git", json={"repoUrl": "https://github.com/acme/crm.git"})
+    assert resp.status_code == 401
+
+
+# --- readiness gate on the existing /install path ------------------------------------------------------
+
+def test_existing_install_endpoint_also_runs_the_readiness_gate(sample_plugins, tmp_path, monkeypatch):
+    from app.core import kernel_state, setup_state, plugin_readiness
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    monkeypatch.setattr(plugin_readiness, "check",
+                         lambda *a, **k: plugin_readiness.ReadinessResult(passed=False, reasons=("nope",)))
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/sample/install",
+                            headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 422
+
+
+def test_existing_install_endpoint_still_succeeds_when_readiness_passes(sample_plugins, tmp_path, monkeypatch):
+    """Regression guard for the readiness-gate addition: a normal install (no readiness failures)
+    must still succeed exactly as before."""
+    from app.core import kernel_state, setup_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/sample/install",
+                            headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    sample = next(p for p in body["plugins"] if p["id"] == "sample")
+    assert sample["state"] == "enabled"
