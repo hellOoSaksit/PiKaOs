@@ -15,6 +15,7 @@ import { FirstRun } from './screens/FirstRun.jsx';
 import { KernelOnlyShell } from './screens/KernelOnlyShell.jsx';
 import { MyDashboard } from './screens/screens-me.jsx';
 import { PluginsManager } from './screens/screens-plugins.jsx';
+import { LocalMcp } from './screens/secondary/LocalMcp.jsx';
 import { AuditLog, PermissionsCatalog, RolesPermissions, UserDetail, UserForm } from './screens/screens-rbac.jsx';
 import { AgentDrawer, Agents, Meeting, QuestBoard, QuestDrawer } from './screens/screens-secondary.jsx';
 import { SitemapAudit } from './screens/screens-sitemap.jsx';
@@ -54,6 +55,7 @@ const ROUTE_META = {
   modules: { icon: "🧩", title: "โมดูล / ปลั๊กอิน", en: "Modules / Plugins" },
   marketplace: { icon: "🛍️", title: "มาร์เก็ตเพลส", en: "Marketplace" },
   mypackages: { icon: "📦", title: "แพ็กเกจของฉัน", en: "My Packages & Share" },
+  localmcp: { icon: "🖥️", title: "Local MCP", en: "Local MCP" },
   userDetail: { icon: "👤", title: "ข้อมูลสมาชิก", en: "User" },
   settings:{ icon: "⚙️", title: "ตั้งค่าระบบ", en: "Settings" },
   library: { icon: "🧩", title: "คลังคอมโพเนนต์", en: "Component Library" },
@@ -74,7 +76,8 @@ function navContains(node, route) {
    hidden nodes, and perm-gated nodes the user can't reach, are dropped; a node with visible
    children shows a caret that collapses them. Indent grows with depth. */
 function NavNode({ node, depth, route, go, t, can, navOpen, setNavOpen }) {
-  const kids = (node.children || []).filter(c => !c.hidden && (!c.perm || (can && can(c.perm))));
+  const kids = (node.children || []).filter(c => !c.hidden && (!c.perm || (can && can(c.perm)))
+    && (!c.desktopOnly || window.pikaosDesktop?.isDesktop));
   const hasKids = kids.length > 0;
   const branchActive = kids.some(c => navContains(c, route));
   const isOpen = branchActive || (node.id in navOpen ? navOpen[node.id] : route === node.id);
@@ -640,6 +643,7 @@ function App() {
       case "modules": return guard("plugins.manage", <PluginsManager Sys={Sys} view="modules" />);
       case "marketplace": return guard("plugins.manage", <PluginsManager Sys={Sys} view="market" />);
       case "mypackages": return guard("plugins.manage", <PluginsManager Sys={Sys} view="mine" />);
+      case "localmcp": return guard("plugins.manage", <LocalMcp Sys={Sys} />);
       case "workflows": return <Workflows Sys={Sys} />;
       case "settings": return <Settings theme={theme} setTheme={setTheme} lex={lex} setLex={setLex} pickLanguage={pickLanguage} language={language} formal={formal} go={go} t={t} />;
       case "library": return <ComponentLibrary onBack={() => go("settings")} t={t} />;

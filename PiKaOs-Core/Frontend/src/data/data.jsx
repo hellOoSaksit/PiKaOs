@@ -137,6 +137,9 @@ const NAV = [
       { id: "modules", icon: "🧩", label: "โมดูล / ปลั๊กอิน", en: "Modules / Plugins", perm: "plugins.manage" },
       { id: "marketplace", icon: "🛍️", label: "มาร์เก็ตเพลส", en: "Marketplace", perm: "plugins.manage" },
       { id: "mypackages", icon: "📦", label: "แพ็กเกจของฉัน", en: "My Packages & Share", perm: "plugins.manage" },
+      // Desktop-app-only (Electron shell) — drives the main-process MCP runtime via window.pikaosDesktop;
+      // hidden on web (desktopOnly, honored by App.jsx's NavNode filter).
+      { id: "localmcp", icon: "🖥️", label: "Local MCP", en: "Local MCP", perm: "plugins.manage", desktopOnly: true },
     ]},
     { id: "permissions", icon: "🗝️", label: "แคตตาล็อกสิทธิ์", en: "Permissions", perm: "user.view.any", children: [
       { id: "roles", icon: "🔑", label: "บทบาทและสิทธิ์", en: "Roles & Access", perm: "role.manage" },
