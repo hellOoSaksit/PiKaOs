@@ -10,8 +10,11 @@ it('adds, gets, lists, removes', () => {
   r.add(def); expect(r.get('fs')?.label).toBe('Filesystem'); expect(r.list()).toHaveLength(1)
   r.remove('fs'); expect(r.get('fs')).toBeUndefined()
 })
-it('hash is stable and ignores secret values', () => {
+it('hash covers command/args/env/secretKeys but ignores label', () => {
   const r = new McpRegistry(store())
-  expect(r.hash(def)).toBe(r.hash({ ...def, label: 'renamed' }))       // label not in hash
-  expect(r.hash(def)).not.toBe(r.hash({ ...def, args: ['-y', '@x/other'] }))
+  const base = { ...def, env: { FOO: 'bar' } }
+  expect(r.hash(base)).toBe(r.hash({ ...base, label: 'renamed' }))                    // label cosmetic — ignored
+  expect(r.hash(base)).not.toBe(r.hash({ ...base, args: ['-y', '@x/other'] }))        // args matter
+  expect(r.hash(base)).not.toBe(r.hash({ ...base, env: { FOO: 'evil' } }))            // env VALUE matters (RCE guard)
+  expect(r.hash(base)).not.toBe(r.hash({ ...base, secretKeys: ['FS_TOKEN', 'EXTRA'] })) // injected-secret set matters (exfil guard)
 })
