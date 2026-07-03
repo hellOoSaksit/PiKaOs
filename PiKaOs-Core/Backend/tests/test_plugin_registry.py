@@ -86,6 +86,25 @@ def test_set_git_install_records_provenance(monkeypatch, tmp_path):
     assert registry.state_of(reg, "crm") == registry.ENABLED
 
 
+def test_set_git_install_records_the_commit_sha(monkeypatch, tmp_path):
+    from app.core import kernel_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    reg = registry.set_git_install("crm", repo_url="https://github.com/acme/crm.git",
+                                   tag="v1.0.0", version="1.0.0", sha="a" * 40)
+    assert registry.installed_sha_of(reg, "crm") == "a" * 40
+
+
+def test_installed_sha_is_none_for_a_legacy_row_without_it(monkeypatch, tmp_path):
+    """An entry written before SHA-pinning (or a symlink install) has no installedSha — reads as None,
+    never a KeyError."""
+    from app.core import kernel_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    reg = registry.set_git_install("crm", repo_url="https://github.com/acme/crm.git",
+                                   tag="v1.0.0", version="1.0.0")   # no sha=
+    assert registry.installed_sha_of(reg, "crm") is None
+    assert registry.installed_sha_of({}, "missing") is None
+
+
 def test_installed_via_defaults_to_symlink():
     reg = {"crm": {"state": registry.ENABLED}}
     assert registry.installed_via(reg, "crm") == "symlink"

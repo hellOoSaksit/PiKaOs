@@ -29,6 +29,18 @@ def test_display_fields_are_parsed():
     assert mf.screenshots == ("assets/list.png", "assets/detail.png")
 
 
+def test_norm_perm_carries_rationale_from_an_object():
+    from app.plugin_loader import _norm_perm
+    p = _norm_perm({"key": "crm.export", "name_en": "Export", "rationale": "Download customer records"})
+    assert p["key"] == "crm.export"
+    assert p["rationale"] == "Download customer records"
+
+
+def test_norm_perm_defaults_rationale_to_empty_for_a_bare_string():
+    from app.plugin_loader import _norm_perm
+    assert _norm_perm("crm.view")["rationale"] == ""
+
+
 def test_register_discovered_makes_a_manifest_visible_without_restart(monkeypatch):
     # patch BOTH the kernel source (plugin_loader) and the re-export (modules) — see conftest's
     # sample_plugins fixture — so we can assert the re-export stays in sync too.

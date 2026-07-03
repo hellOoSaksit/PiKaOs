@@ -105,7 +105,8 @@
               "key": { "type": "string", "pattern": "^[a-z][a-z0-9.-]+$" },
               "group": { "type": "string" },
               "name_th": { "type": "string" },
-              "name_en": { "type": "string" }
+              "name_en": { "type": "string" },
+              "rationale": { "type": "string", "description": "Human-readable why this permission is requested, shown at the install confirm (marketplace.md W4)." }
             }
           }
         ]

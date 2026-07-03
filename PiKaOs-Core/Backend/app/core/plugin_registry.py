@@ -66,16 +66,20 @@ def set_state(pid: str, state: str, *, version: str | None = None) -> dict[str, 
     return reg
 
 
-def set_git_install(pid: str, *, repo_url: str, tag: str, version: str) -> dict[str, dict]:
+def set_git_install(pid: str, *, repo_url: str, tag: str, version: str,
+                    sha: str | None = None) -> dict[str, dict]:
     """Upsert a plugin installed via install-from-git (§2.1): same as `set_state(..., ENABLED)` plus
-    the provenance Uninstall/Purge/update-check need — `repoUrl`/`installedTag` and
+    the provenance Uninstall/Purge/update-check need — `repoUrl`/`installedTag`/`installedSha` and
     `installedVia: "git"` (a `symlink` entry, the default, is never physically deletable — it's a
-    dev's sibling checkout)."""
+    dev's sibling checkout). `installedSha` is the IMMUTABLE pin (marketplace.md W2): a tag can be
+    force-moved, a commit SHA cannot, so the SHA is what an audit/tamper-check compares against."""
     reg = set_state(pid, ENABLED, version=version)
     entry = dict(reg[pid])
     entry["repoUrl"] = repo_url
     entry["installedVia"] = "git"
     entry["installedTag"] = tag
+    if sha is not None:
+        entry["installedSha"] = sha
     reg[pid] = entry
     kernel_state.write_json(_KEY, reg)
     return reg
@@ -96,6 +100,13 @@ def installed_tag_of(registry: dict[str, dict], pid: str) -> str | None:
     """The git tag currently checked out for `pid` — the update flow's revert-to-known-good point."""
     entry = registry.get(pid)
     return entry.get("installedTag") if isinstance(entry, dict) else None
+
+
+def installed_sha_of(registry: dict[str, dict], pid: str) -> str | None:
+    """The immutable commit SHA pinned for `pid` at install/update time (marketplace.md W2), or None
+    for a legacy row / symlink install that predates SHA-pinning."""
+    entry = registry.get(pid)
+    return entry.get("installedSha") if isinstance(entry, dict) else None
 
 
 def uninstall_git(pid: str) -> dict[str, dict]:

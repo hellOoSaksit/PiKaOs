@@ -90,12 +90,14 @@ def _satisfies(version: str, spec: str) -> bool:
 # --- discovery + validation -------------------------------------------------------------------------
 
 def _norm_perm(p: "str | dict") -> dict:
-    """Normalize a manifest permission entry to {key, group, name_th, name_en}. A bare string is a key
-    with empty metadata (still valid — the RBAC UI shows the key). An object carries the display metadata."""
+    """Normalize a manifest permission entry to {key, group, name_th, name_en, rationale}. A bare string
+    is a key with empty metadata (still valid — the RBAC UI shows the key). An object carries the display
+    metadata; `rationale` is the human-readable *why* shown at the install confirm (marketplace.md W4)."""
     if isinstance(p, str):
-        return {"key": p, "group": "", "name_th": "", "name_en": ""}
+        return {"key": p, "group": "", "name_th": "", "name_en": "", "rationale": ""}
     return {"key": p["key"], "group": p.get("group", ""),
-            "name_th": p.get("name_th", ""), "name_en": p.get("name_en", "")}
+            "name_th": p.get("name_th", ""), "name_en": p.get("name_en", ""),
+            "rationale": p.get("rationale", "")}
 
 
 def permission_catalog(enabled: set[str], manifests: dict[str, "Manifest"]) -> list[dict]:

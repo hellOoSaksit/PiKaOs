@@ -73,6 +73,115 @@ def test_install_from_git_clones_validates_and_registers(sample_plugins, tmp_pat
     assert (plugins_dir / "crm" / "manifest.json").is_file()
 
 
+def test_install_from_git_defaults_to_latest_release_tag(sample_plugins, tmp_path, monkeypatch):
+    """W1: with no `ref`, install pins the highest semver tag — NOT the default-branch HEAD. The repo's
+    HEAD carries a newer (unreleased) commit; the install must land on the tagged commit instead."""
+    import subprocess
+    from app.core import kernel_state, setup_state, git_installer
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+
+    src = tmp_path / "src"
+    src.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t.co"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=src, check=True)
+    (src / "manifest.json").write_text(
+        '{"id":"crm","name":"CRM","version":"1.0.0","coreVersion":"*"}', encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=src, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "release"], cwd=src, check=True)
+    subprocess.run(["git", "tag", "v1.0.0"], cwd=src, check=True)
+    # a newer, UNRELEASED commit on the branch HEAD — bumps version to 2.0.0 but has NO tag
+    (src / "manifest.json").write_text(
+        '{"id":"crm","name":"CRM","version":"2.0.0","coreVersion":"*"}', encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=src, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "unreleased WIP"], cwd=src, check=True)
+    repo_url = f"file://{src}"
+    monkeypatch.setattr(git_installer, "allowed_hosts", lambda: [""])
+
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/install-from-git", json={"repoUrl": repo_url},  # NO ref
+                           headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 200, resp.text
+    on_disk = (plugins_dir / "crm" / "manifest.json").read_text(encoding="utf-8")
+    assert '"1.0.0"' in on_disk and '"2.0.0"' not in on_disk   # pinned the tag, not HEAD
+    reg = registry.read()
+    assert reg["crm"]["installedTag"] == "v1.0.0"
+    assert len(reg["crm"]["installedSha"]) == 40                # W2: commit SHA recorded
+
+
+def test_install_from_git_refuses_bare_head_without_allow_head(sample_plugins, tmp_path, monkeypatch):
+    """W1: a repo with NO release tag and no explicit override is refused — installing a moving branch
+    HEAD is exactly the supply-chain risk the policy forbids."""
+    import subprocess
+    from app.core import kernel_state, setup_state, git_installer
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+
+    src = tmp_path / "src"
+    src.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t.co"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=src, check=True)
+    (src / "manifest.json").write_text(
+        '{"id":"crm","name":"CRM","version":"1.0.0","coreVersion":"*"}', encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=src, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "no tags here"], cwd=src, check=True)
+    repo_url = f"file://{src}"
+    monkeypatch.setattr(git_installer, "allowed_hosts", lambda: [""])
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/install-from-git", json={"repoUrl": repo_url},
+                           headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 422
+    assert "tag" in resp.json()["detail"].lower()
+    assert list(plugins_dir.iterdir()) == []      # nothing installed
+
+
+def test_install_from_git_allows_head_when_explicitly_opted_in(sample_plugins, tmp_path, monkeypatch):
+    """The dev escape hatch: allowHead=true installs the default-branch HEAD of a tagless repo."""
+    import subprocess
+    from app.core import kernel_state, setup_state, git_installer
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+
+    src = tmp_path / "src"
+    src.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t.co"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=src, check=True)
+    (src / "manifest.json").write_text(
+        '{"id":"crm","name":"CRM","version":"1.0.0","coreVersion":"*"}', encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=src, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "head only"], cwd=src, check=True)
+    repo_url = f"file://{src}"
+    monkeypatch.setattr(git_installer, "allowed_hosts", lambda: [""])
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/install-from-git",
+                           json={"repoUrl": repo_url, "allowHead": True},
+                           headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 200, resp.text
+    reg = registry.read()
+    assert reg["crm"]["installedVia"] == "git"
+    assert len(reg["crm"]["installedSha"]) == 40   # SHA still pinned even for a HEAD install
+
+
 def test_install_from_git_rolls_back_when_registry_persistence_fails(sample_plugins, tmp_path, monkeypatch):
     """`register_discovered` + `registry.set_git_install` run after the last cleanup boundary — if either
     raises (e.g. a kernel-state I/O failure persisting the registry), the endpoint must not leave a
@@ -109,7 +218,7 @@ def test_install_from_git_rolls_back_when_registry_persistence_fails(sample_plug
     from app import plugin_loader
     with TestClient(main.app) as client:
         resp = client.post("/api/plugins/install-from-git",
-                            json={"repoUrl": repo_url},
+                            json={"repoUrl": repo_url, "allowHead": True},   # tagless repo: opt into HEAD
                             headers={"Authorization": "Bearer a-session-token"})
     assert resp.status_code == 500
     assert not (plugins_dir / "crm").exists()          # on-disk folder rolled back
@@ -154,7 +263,7 @@ def test_install_from_git_rejects_missing_manifest(sample_plugins, tmp_path, mon
     import app.main as main
     with TestClient(main.app) as client:
         resp = client.post("/api/plugins/install-from-git",
-                            json={"repoUrl": repo_url},
+                            json={"repoUrl": repo_url, "allowHead": True},   # tagless repo: reach the manifest check
                             headers={"Authorization": "Bearer a-session-token"})
     assert resp.status_code == 422
     assert list(plugins_dir.iterdir()) == []   # nothing left on disk
@@ -187,7 +296,7 @@ def test_install_from_git_rejects_duplicate_plugin(sample_plugins, tmp_path, mon
     import app.main as main
     with TestClient(main.app) as client:
         resp = client.post("/api/plugins/install-from-git",
-                            json={"repoUrl": repo_url},
+                            json={"repoUrl": repo_url, "allowHead": True},   # tagless repo: opt into HEAD
                             headers={"Authorization": "Bearer a-session-token"})
     assert resp.status_code == 409
 
@@ -244,7 +353,7 @@ def test_install_from_git_rejects_path_traversal_id(sample_plugins, tmp_path, mo
     import app.main as main
     with TestClient(main.app) as client:
         resp = client.post("/api/plugins/install-from-git",
-                            json={"repoUrl": repo_url},
+                            json={"repoUrl": repo_url, "allowHead": True},   # tagless repo: reach the id guard
                             headers={"Authorization": "Bearer a-session-token"})
     assert resp.status_code == 422
     assert list(plugins_dir.iterdir()) == []          # nothing landed inside PLUGINS_DIR
@@ -279,7 +388,7 @@ def test_install_from_git_rejects_failed_readiness(sample_plugins, tmp_path, mon
     import app.main as main
     with TestClient(main.app) as client:
         resp = client.post("/api/plugins/install-from-git",
-                            json={"repoUrl": repo_url},
+                            json={"repoUrl": repo_url, "allowHead": True},   # tagless repo: reach the readiness gate
                             headers={"Authorization": "Bearer a-session-token"})
     assert resp.status_code == 422
     assert not (plugins_dir / "crm").exists()   # rolled back, not half-installed
@@ -312,7 +421,7 @@ def test_install_from_git_rejects_invalid_manifest(sample_plugins, tmp_path, mon
     import app.main as main
     with TestClient(main.app) as client:
         resp = client.post("/api/plugins/install-from-git",
-                            json={"repoUrl": repo_url},
+                            json={"repoUrl": repo_url, "allowHead": True},   # tagless repo: reach _validate
                             headers={"Authorization": "Bearer a-session-token"})
     assert resp.status_code == 422
     assert not (plugins_dir / "crm").exists()
@@ -344,7 +453,7 @@ def test_install_from_git_rejects_missing_id(sample_plugins, tmp_path, monkeypat
     import app.main as main
     with TestClient(main.app) as client:
         resp = client.post("/api/plugins/install-from-git",
-                            json={"repoUrl": repo_url},
+                            json={"repoUrl": repo_url, "allowHead": True},   # tagless repo: reach the id check
                             headers={"Authorization": "Bearer a-session-token"})
     assert resp.status_code == 422
     assert list(plugins_dir.iterdir()) == []
@@ -439,7 +548,7 @@ def test_check_update_reports_a_newer_tag(sample_plugins, tmp_path, monkeypatch)
         resp = client.get("/api/plugins/sample/check-update",
                            headers={"Authorization": "Bearer a-session-token"})
     assert resp.status_code == 200, resp.text
-    assert resp.json() == {"latestVersion": "v1.3.0", "hasUpdate": True}
+    assert resp.json() == {"latestVersion": "v1.3.0", "hasUpdate": True, "tagMoved": False}
 
 
 def test_check_update_reports_no_update_when_already_current(sample_plugins, tmp_path, monkeypatch):
@@ -455,7 +564,7 @@ def test_check_update_reports_no_update_when_already_current(sample_plugins, tmp
         resp = client.get("/api/plugins/sample/check-update",
                            headers={"Authorization": "Bearer a-session-token"})
     assert resp.status_code == 200, resp.text
-    assert resp.json() == {"latestVersion": "v1.2.3", "hasUpdate": False}
+    assert resp.json() == {"latestVersion": "v1.2.3", "hasUpdate": False, "tagMoved": False}
 
 
 def test_check_update_404s_for_a_non_git_installed_plugin(sample_plugins, tmp_path, monkeypatch):
@@ -529,7 +638,7 @@ def test_update_fetches_new_tag_revalidates_and_updates_registry(sample_plugins,
 
         check_resp = client.get("/api/plugins/crm/check-update", headers=headers)
         assert check_resp.status_code == 200, check_resp.text
-        assert check_resp.json() == {"latestVersion": "v1.1.0", "hasUpdate": True}
+        assert check_resp.json() == {"latestVersion": "v1.1.0", "hasUpdate": True, "tagMoved": False}
 
         resp = client.post("/api/plugins/crm/update", headers=headers)
     assert resp.status_code == 200, resp.text
@@ -541,6 +650,110 @@ def test_update_fetches_new_tag_revalidates_and_updates_registry(sample_plugins,
     reg = registry.read()
     assert reg["crm"]["installedTag"] == "v1.1.0"
     assert reg["crm"]["version"] == "1.1.0"
+
+
+def test_update_records_the_new_commit_sha(sample_plugins, tmp_path, monkeypatch):
+    """After an update the registry's installedSha advances to the NEW tag's commit — the pin stays
+    accurate across updates (W2)."""
+    from app.core import kernel_state, setup_state, git_installer
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    headers = {"Authorization": "Bearer a-session-token"}
+
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        src, repo_url = _install_crm_via_git(client, tmp_path, monkeypatch, headers)
+        sha_before = registry.read()["crm"]["installedSha"]
+
+        (src / "manifest.json").write_text(
+            '{"id":"crm","name":"CRM","version":"1.1.0","coreVersion":"*"}', encoding="utf-8")
+        _git(src, "add", ".")
+        _git(src, "commit", "-q", "-m", "bump")
+        _git(src, "tag", "v1.1.0")
+
+        resp = client.post("/api/plugins/crm/update", headers=headers)
+    assert resp.status_code == 200, resp.text
+    sha_after = registry.read()["crm"]["installedSha"]
+    assert len(sha_after) == 40
+    assert sha_after != sha_before                          # advanced to the new commit
+    assert sha_after == git_installer.remote_tag_sha(repo_url, "v1.1.0")
+
+
+def test_check_update_flags_a_force_moved_tag(sample_plugins, tmp_path, monkeypatch):
+    """W2: the installed tag was force-moved to a different commit after we pinned it — check-update
+    compares the recorded installedSha against the tag's CURRENT remote SHA and flags the mismatch."""
+    from app.core import kernel_state, setup_state, git_installer
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    registry.set_git_install("sample", repo_url="https://github.com/acme/sample.git",
+                             tag="v1.2.3", version="1.2.3", sha="a" * 40)
+    monkeypatch.setattr(git_installer, "latest_tag", lambda url: "v1.2.3")   # no newer version
+    monkeypatch.setattr(git_installer, "remote_tag_sha", lambda url, tag: "b" * 40)  # tag now points elsewhere
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.get("/api/plugins/sample/check-update",
+                          headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["tagMoved"] is True
+    assert body["hasUpdate"] is False        # same tag name — the "update" is really a tamper warning
+
+
+def test_check_update_does_not_flag_an_unmoved_tag(sample_plugins, tmp_path, monkeypatch):
+    from app.core import kernel_state, setup_state, git_installer
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    registry.set_git_install("sample", repo_url="https://github.com/acme/sample.git",
+                             tag="v1.2.3", version="1.2.3", sha="a" * 40)
+    monkeypatch.setattr(git_installer, "latest_tag", lambda url: "v1.2.3")
+    monkeypatch.setattr(git_installer, "remote_tag_sha", lambda url, tag: "a" * 40)  # unchanged
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.get("/api/plugins/sample/check-update",
+                          headers={"Authorization": "Bearer a-session-token"})
+    assert resp.json()["tagMoved"] is False
+
+
+def test_check_update_tag_moved_false_when_no_sha_recorded(sample_plugins, tmp_path, monkeypatch):
+    """A legacy row with no installedSha can't be tamper-checked — never a false alarm."""
+    from app.core import kernel_state, setup_state, git_installer
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    registry.set_git_install("sample", repo_url="https://github.com/acme/sample.git",
+                             tag="v1.2.3", version="1.2.3")     # no sha
+    monkeypatch.setattr(git_installer, "latest_tag", lambda url: "v1.3.0")
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.get("/api/plugins/sample/check-update",
+                          headers={"Authorization": "Bearer a-session-token"})
+    body = resp.json()
+    assert body["tagMoved"] is False
+    assert body["hasUpdate"] is True         # a genuine newer tag still reports normally
+
+
+def test_view_exposes_permission_info_and_installed_sha(sample_plugins, tmp_path, monkeypatch):
+    """PluginOut surfaces per-permission {key,name,rationale} for the install-confirm UI, and the
+    pinned installedSha for a git-installed plugin — without breaking the flat `permissions` list."""
+    from app.core import kernel_state
+    from app.core import plugin_registry as registry
+    from app.core.routers.plugins import _view
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    reg = registry.set_git_install("sample", repo_url="https://github.com/acme/sample.git",
+                                   tag="v1.2.3", version="1.2.3", sha="c" * 40)
+    out = _view(reg=reg, active=set())
+    sample = next(p for p in out if p.id == "sample")
+    assert sample.permissions == ["sample.manage"]          # unchanged flat list
+    assert sample.installedSha == "c" * 40
+    assert [pi["key"] for pi in sample.permissionInfo] == ["sample.manage"]
+    assert all("rationale" in pi for pi in sample.permissionInfo)
 
 
 def test_update_returns_422_when_the_remote_has_no_tags(sample_plugins, tmp_path, monkeypatch):

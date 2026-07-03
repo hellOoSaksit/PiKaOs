@@ -55,11 +55,13 @@ class PluginOut(BaseModel):
     active_now: bool                # mounted in this running process?
     restart_required: bool          # desired state (enabled) ≠ active_now
     dependencies: list[str]
-    permissions: list[str]
+    permissions: list[str]          # flat key list (unchanged — kept for existing callers)
+    permissionInfo: list[dict] = [] # per-permission {key, name, rationale} for the install-confirm UI
     description: str = ""
     icon: str | None = None
     repoUrl: str | None = None      # None for a dev-symlinked plugin — no remote to show/check-update against
     installedVia: str = "symlink"   # "symlink" (dev sibling checkout) | "git" (install-from-git / update)
+    installedSha: str | None = None # W2: the immutable commit pin for a git-installed plugin
 
 
 class InstallPlanOut(BaseModel):
@@ -77,12 +79,14 @@ class ActionOut(BaseModel):
 
 class InstallFromGitIn(BaseModel):
     repoUrl: str
-    ref: str | None = None          # a tag to pin to; None = the repo's default branch HEAD
+    ref: str | None = None          # a tag/ref to pin to; None = resolve the latest release tag (W1)
+    allowHead: bool = False         # opt-in escape hatch: install a tagless repo's default-branch HEAD
 
 
 class CheckUpdateOut(BaseModel):
     latestVersion: str | None
     hasUpdate: bool
+    tagMoved: bool = False           # W2: the INSTALLED tag's remote commit no longer matches our pin
 
 
 class GitCredentialIn(BaseModel):
@@ -100,9 +104,13 @@ def _view(reg: dict[str, dict], active: set[str]) -> list[PluginOut]:
             restart_required=(state == registry.ENABLED) != is_active,
             dependencies=list(mf.dependencies),
             permissions=[p["key"] for p in mf.permissions],
+            permissionInfo=[{"key": p["key"],
+                             "name": p.get("name_en") or p["key"],
+                             "rationale": p.get("rationale", "")} for p in mf.permissions],
             description=mf.description, icon=mf.icon,
             repoUrl=registry.repo_url_of(reg, pid),
             installedVia=registry.installed_via(reg, pid),
+            installedSha=registry.installed_sha_of(reg, pid),
         ))
     return out
 
@@ -191,8 +199,21 @@ async def install_from_git(
     stack trace ever reaches the client (rule 10)."""
     from ... import plugin_loader
 
+    # W1 — resolve the ref to install. An explicit `ref` is honoured as-is. With no ref we pin the
+    # latest release TAG rather than the moving default-branch HEAD (installing `main` is the supply-
+    # chain risk the policy forbids, marketplace.md W1). A repo with no release tag is refused unless
+    # the caller explicitly opts into a HEAD install (`allowHead`) — the dev escape hatch.
+    ref = body.ref
+    if ref is None:
+        ref = git_installer.latest_tag(body.repoUrl)
+        if ref is None and not body.allowHead:
+            raise HTTPException(
+                status_code=422,
+                detail="repository has no release tag to pin to — publish a semver tag, or set "
+                       "allowHead to install its default branch (unpinned, not recommended)")
+
     try:
-        staging = git_installer.clone_to_staging(body.repoUrl, body.ref)
+        staging = git_installer.clone_to_staging(body.repoUrl, ref)   # ref None ⇒ default HEAD (allowHead)
     except git_installer.GitInstallError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
@@ -240,8 +261,10 @@ async def install_from_git(
     # in-process registration and the on-disk folder before surfacing a generic 500.
     try:
         plugin_loader.register_discovered(manifest)
-        tag = body.ref or git_installer.latest_tag(body.repoUrl) or manifest.version
-        reg = registry.set_git_install(pid, repo_url=body.repoUrl, tag=tag, version=manifest.version)
+        sha = git_installer.head_sha(target_dir)             # W2: pin the immutable commit
+        tag = ref or manifest.version                         # ref is the resolved tag (or None ⇒ HEAD)
+        reg = registry.set_git_install(pid, repo_url=body.repoUrl, tag=tag,
+                                       version=manifest.version, sha=sha)
     except Exception as e:
         plugin_loader.deregister_discovered(pid)   # no-op if register_discovered never got that far
         shutil.rmtree(target_dir, ignore_errors=True)
@@ -296,7 +319,18 @@ async def check_update(
     latest = git_installer.latest_tag(repo_url) if repo_url else None
     current = _manifests()[plugin_id].version
     has_update = bool(latest and latest.lstrip("v") != current.lstrip("v"))
-    return CheckUpdateOut(latestVersion=latest, hasUpdate=has_update)
+
+    # W2 tamper check: if we recorded a commit SHA at install/update, re-resolve the INSTALLED tag's
+    # current remote SHA and flag a mismatch — the tag was force-moved to a different commit after we
+    # pinned it. Skipped (never a false alarm) for a legacy row with no recorded SHA.
+    tag_moved = False
+    pinned_sha = registry.installed_sha_of(reg, plugin_id)
+    installed_tag = registry.installed_tag_of(reg, plugin_id)
+    if repo_url and pinned_sha and installed_tag:
+        current_remote_sha = git_installer.remote_tag_sha(repo_url, installed_tag)
+        tag_moved = bool(current_remote_sha and current_remote_sha != pinned_sha)
+
+    return CheckUpdateOut(latestVersion=latest, hasUpdate=has_update, tagMoved=tag_moved)
 
 
 @router.post("/{plugin_id}/update", response_model=ActionOut)
@@ -358,7 +392,9 @@ async def update(
     # (back to `old_tag`) rather than tearing the plugin down.
     try:
         plugin_loader.register_discovered(manifest)
-        reg = registry.set_git_install(plugin_id, repo_url=repo_url, tag=tag, version=manifest.version)
+        sha = git_installer.head_sha(plugin_dir)             # W2: re-pin to the updated tag's commit
+        reg = registry.set_git_install(plugin_id, repo_url=repo_url, tag=tag,
+                                       version=manifest.version, sha=sha)
     except Exception as e:
         plugin_loader.register_discovered(old_manifest)
         _revert_checkout(plugin_dir, repo_url, old_tag)
