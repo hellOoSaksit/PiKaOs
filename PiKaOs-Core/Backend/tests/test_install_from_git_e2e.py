@@ -77,6 +77,9 @@ def test_full_lifecycle(tmp_path, monkeypatch, sample_plugins):
         assert resp.status_code == 200
         assert not (plugins_dir / "crm").exists()
         assert registry.state_of(registry.read(), "crm") == registry.PENDING_PURGE
+        # Verify DB-provenance actually survives uninstall
+        assert registry.repo_url_of(registry.read(), "crm") is not None
+        assert registry.installed_tag_of(registry.read(), "crm") is not None
 
         # Purge without a purge() hook is refused, not silently skipped. crm is PENDING_PURGE now, so
         # (unlike the brief's original draft assumed) purge()'s checks do NOT short-circuit before the
