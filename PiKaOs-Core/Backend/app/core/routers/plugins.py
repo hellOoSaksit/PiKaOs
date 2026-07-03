@@ -411,7 +411,17 @@ async def purge(
         raise HTTPException(status_code=503,
                              detail="the postgres tool is not enabled — cannot purge without a DB engine")
 
-    mod = importlib.import_module(f"app.plugins.{plugin_id}")
+    # `uninstall()` already deleted this plugin's on-disk folder before Purge is ever reachable (its
+    # design, above) — if this process never imported the package before (install-from-git → uninstall →
+    # purge in one session, or a restart happened between uninstall and a retried purge), the code this
+    # import would need is simply gone. Guarded on its own, separate from `purge_fn(...)`'s try/except
+    # below: an import failure here is "can't even find the hook", not "the hook itself misbehaved".
+    try:
+        mod = importlib.import_module(f"app.plugins.{plugin_id}")
+    except (ModuleNotFoundError, ImportError) as e:
+        raise HTTPException(status_code=422,
+                             detail=f"'{plugin_id}' has no importable code left — its purge() hook "
+                                    f"cannot be resolved") from e
     purge_fn = getattr(mod, "purge", None)
     if purge_fn is None:
         raise HTTPException(status_code=422,

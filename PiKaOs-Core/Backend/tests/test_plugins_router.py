@@ -933,6 +933,44 @@ def test_purge_leaves_the_plugin_pending_purge_when_the_hook_itself_raises(sampl
     assert registry.state_of(registry.read(), "crm") == registry.PENDING_PURGE   # left retryable
 
 
+def test_purge_returns_a_clean_error_when_the_plugins_module_is_unimportable(sample_plugins, tmp_path, monkeypatch):
+    """task-9-review Finding 2: `uninstall()` already deletes a git-installed plugin's on-disk code
+    before Purge is ever reachable — so if this process never imported the package before (install →
+    uninstall → purge in one session, or a restart between uninstall and a retried purge),
+    `importlib.import_module(f"app.plugins.{plugin_id}")` raises `ModuleNotFoundError` for code that no
+    longer exists. Previously unguarded — this fell through to Starlette's generic 500 handler "by
+    accident".
+
+    ENABLED_MODULES=* in this test env means `TestClient.__enter__` (lifespan) itself imports every
+    registered manifest id, "crm" included — so it needs a stub in `sys.modules` to boot cleanly (same as
+    the other purge tests). The stub is removed again right after startup (`monkeypatch.delitem`, before
+    the purge call) so that by the time `purge()` runs, `app.plugins.crm` is genuinely absent from both
+    `sys.modules` and the real filesystem (no such folder under `app/plugins/`) — a real, not simulated,
+    `ModuleNotFoundError`."""
+    import sys
+    from types import ModuleType
+    from app.core import kernel_state, setup_state
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.plugin_loader as plugin_loader
+    mf = plugin_loader.Manifest(id="crm", name="CRM", version="1.0.0", coreVersion="*")
+    plugin_loader.register_discovered(mf)
+    registry.set_git_install("crm", repo_url="https://github.com/acme/crm.git", tag="v1.0.0", version="1.0.0")
+    registry.uninstall_git("crm")
+    monkeypatch.setitem(sys.modules, "app.plugins.crm", ModuleType("app.plugins.crm"))  # boot-time only
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        monkeypatch.delitem(sys.modules, "app.plugins.crm", raising=False)  # code is "gone" from here on
+        _bind_fake_postgres(client, object())
+        resp = client.post("/api/plugins/crm/purge", headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 422
+    assert "traceback" not in resp.text.lower()
+    assert registry.state_of(registry.read(), "crm") == registry.PENDING_PURGE   # left retryable
+    assert "crm" in plugin_loader.PLUGIN_MANIFESTS   # never deregistered — purge() hook never even ran
+
+
 def test_purge_requires_plugins_manage_permission(sample_plugins, tmp_path, monkeypatch):
     from app.core import kernel_state, setup_state
     monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))

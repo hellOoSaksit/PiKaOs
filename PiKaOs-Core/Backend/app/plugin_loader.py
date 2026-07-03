@@ -208,10 +208,25 @@ def discover() -> dict[str, Manifest]:
 
 def topo_order(ids: set[str], manifests: dict[str, Manifest]) -> list[str]:
     """Topologically sort `ids` so each plugin comes after its `dependencies` (§4). A cycle is a hard
-    failure. Ties broken alphabetically for a deterministic, reproducible boot order."""
+    failure. Ties broken alphabetically for a deterministic, reproducible boot order.
+
+    An id in `ids` that is no longer in `manifests` is silently skipped rather than raising `KeyError`
+    on `manifests[pid]` — mirrors `plugin_registry._closure()`'s existing "ignore deps absent from
+    manifests" precedent. This matters because callers can legitimately hold a STALE `ids` set: e.g.
+    `main.py:lifespan` snapshots `enabled_optional_modules()` once at process start and reuses that same
+    local variable at shutdown, but a plugin present at boot can be Purged mid-process (`purge()` calls
+    `deregister_discovered()`, which mutates `PLUGIN_MANIFESTS` — the very dict passed in here) — by
+    teardown time the purged id is in the stale `enabled` set but no longer in `manifests`. There is
+    nothing meaningful left to order/boot/shut down for an id that no longer structurally exists as a
+    plugin in this process, so skipping it (instead of crashing the whole ordering — and with it every
+    OTHER still-valid plugin's shutdown) is correct, not a swallowed bug. Every current caller already
+    intersects its `ids` against the CURRENT manifest catalog before calling in (`enabled_optional_modules()`
+    filters against `OPTIONAL_MODULE_NAMES`; `_closure()` filters against `manifests` itself) — so in every
+    calling context except this stale-snapshot-after-purge one, this filter is a no-op."""
     order: list[str] = []
     visiting: set[str] = set()
     done: set[str] = set()
+    live_ids = {pid for pid in ids if pid in manifests}
 
     def visit(pid: str, trail: tuple[str, ...]) -> None:
         if pid in done:
@@ -221,13 +236,13 @@ def topo_order(ids: set[str], manifests: dict[str, Manifest]) -> list[str]:
             raise ManifestError(f"plugin dependency cycle: {cycle}")
         visiting.add(pid)
         for dep in sorted(manifests[pid].dependencies):
-            if dep in ids:  # only order among the enabled set
+            if dep in live_ids:  # only order among the (still-live) enabled set
                 visit(dep, trail + (pid,))
         visiting.discard(pid)
         done.add(pid)
         order.append(pid)
 
-    for pid in sorted(ids):
+    for pid in sorted(live_ids):
         visit(pid, ())
     return order
 
