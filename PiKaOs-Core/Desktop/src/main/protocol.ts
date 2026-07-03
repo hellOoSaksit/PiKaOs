@@ -1,5 +1,5 @@
 import { protocol, net } from 'electron'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 // Must run at module load, before app 'ready' — registerSchemesAsPrivileged is a no-op afterward.
@@ -17,7 +17,11 @@ export function registerAppProtocol(distDir: string) {
     if (url.host !== 'pikaos') return new Response('forbidden', { status: 403 })
     const rel = url.pathname === '/' ? '/index.html' : url.pathname
     const filePath = join(distDir, rel)
-    if (!filePath.startsWith(distDir)) return new Response('forbidden', { status: 403 }) // traversal guard
+    // Traversal guard — require distDir + separator (or the dir itself), so a sibling like
+    // /app/frontend-evil can't pass a bare startsWith('/app/frontend') check.
+    if (filePath !== distDir && !filePath.startsWith(distDir + sep)) {
+      return new Response('forbidden', { status: 403 })
+    }
     return net.fetch(pathToFileURL(filePath).toString())
       .catch(() => net.fetch(pathToFileURL(join(distDir, 'index.html')).toString())) // SPA fallback
   })

@@ -46,14 +46,18 @@ export function AppBoot({ children }) {
     try { stored = localStorage.getItem(BOOT_KEY); } catch (e) { /* ignore */ }
     (async () => {
       if (window.pikaosDesktop?.isDesktop) {
-        const { apiBaseUrl } = await window.pikaosDesktop.config.get();
-        configureTransport({
-          apiBase: apiBaseUrl,
-          tokenProvider: {
-            get: () => window.pikaosDesktop.auth.getAccessToken(),
-            refresh: async () => !!(await window.pikaosDesktop.auth.getAccessToken()),
-          },
-        });
+        // Configure the desktop transport in its own try so a config.get() rejection can't also
+        // abort the version fetch below and stall boot — the version fetch must always run.
+        try {
+          const { apiBaseUrl } = await window.pikaosDesktop.config.get();
+          configureTransport({
+            apiBase: apiBaseUrl,
+            tokenProvider: {
+              get: () => window.pikaosDesktop.auth.getAccessToken(),
+              refresh: async () => !!(await window.pikaosDesktop.auth.getAccessToken()),
+            },
+          });
+        } catch (e) { /* desktop transport unconfigured; version fetch + boot still proceed */ }
       }
       return getVersion();
     })()
