@@ -27,3 +27,14 @@ it('getAccessToken refreshes with the stored refresh token when expired', async 
   expect(fetchMock.mock.calls[0][1].headers['X-Refresh-Token']).toBe('R1')
   expect(vault.get('auth.refresh')).toBe('R2')      // rotated
 })
+
+it('refresh failure deletes the vault key and returns null', async () => {
+  const vault = vaultDouble(); vault.set('auth.refresh', 'R1')
+  const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({}) })
+  vi.stubGlobal('fetch', fetchMock)
+  const b = new SessionBroker(vault, () => 'https://be')
+  expect(await b.getAccessToken()).toBeNull()
+  expect(vault.get('auth.refresh')).toBeNull()        // vault key deleted, no stale access
+  expect(await b.getAccessToken()).toBeNull()          // no refresh token left, no extra fetch
+  expect(fetchMock).toHaveBeenCalledOnce()
+})
