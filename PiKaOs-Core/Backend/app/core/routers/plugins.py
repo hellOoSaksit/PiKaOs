@@ -17,11 +17,12 @@ import logging
 import shutil
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from .. import git_installer, plugin_readiness
 from .. import plugin_registry as registry
+from ..contracts import POSTGRES_CONNECTION
 from ..identity import UserLike, get_current_user, require_perm
 
 log = logging.getLogger("pikaos.plugins.router")
@@ -369,8 +370,60 @@ async def uninstall(
     plugin_id: str,
     user: UserLike = Depends(require_perm("plugins.manage")),
 ) -> ActionOut:
-    """Uninstall — forget the registry row (back to *available*). First cut keeps the plugin's tables
-    (per-plugin down migration is P4); destructive table drop will gate on a typed-name confirm then."""
+    """Uninstall: for a git-installed plugin, deletes its on-disk code entirely and moves it to
+    PENDING_PURGE (registry keeps `repoUrl` so Purge can still find it) — DB tables are untouched.
+    For a dev-symlinked plugin (unchanged, first-cut behavior): forgets the registry row only, code
+    stays (it's the dev's own sibling checkout)."""
+    from ... import plugin_loader
+
     _require_known(plugin_id)
+    reg = registry.read()
+    if registry.installed_via(reg, plugin_id) == "git":
+        shutil.rmtree(plugin_loader.PLUGINS_DIR / plugin_id, ignore_errors=True)
+        reg = registry.uninstall_git(plugin_id)
+        return _action_response(reg)
     reg = registry.remove(plugin_id)
+    return _action_response(reg)
+
+
+@router.post("/{plugin_id}/purge", response_model=ActionOut)
+async def purge(
+    plugin_id: str,
+    request: Request,
+    user: UserLike = Depends(require_perm("plugins.manage")),
+) -> ActionOut:
+    """Destructive, separate from Uninstall (§8/§9): only for a plugin already PENDING_PURGE (its code
+    is already gone — Uninstall must run first). Resolves the DB engine off the postgres Tool's
+    `postgres.Connection` binding and calls the plugin's optional `purge(engine)` export to drop its own
+    tables, then forgets it for good (manifest + registry). A plugin without a `purge` export can't be
+    purged yet — clear 422, not a silent no-op. A `purge_fn` that itself raises (a buggy drop_all) leaves
+    the plugin PENDING_PURGE so it can be retried — it is never treated as success."""
+    import importlib
+
+    from ... import plugin_loader
+
+    reg = registry.read()
+    if registry.state_of(reg, plugin_id) != registry.PENDING_PURGE:
+        raise HTTPException(status_code=422, detail=f"'{plugin_id}' is not pending purge")
+
+    conn = request.app.state.container.resolve(POSTGRES_CONNECTION)
+    if not conn or not conn.get("engine"):
+        raise HTTPException(status_code=503,
+                             detail="the postgres tool is not enabled — cannot purge without a DB engine")
+
+    mod = importlib.import_module(f"app.plugins.{plugin_id}")
+    purge_fn = getattr(mod, "purge", None)
+    if purge_fn is None:
+        raise HTTPException(status_code=422,
+                             detail=f"'{plugin_id}' does not declare a purge() hook — its data cannot be dropped yet")
+    try:
+        purge_fn(conn["engine"])
+    except Exception as e:
+        # A buggy plugin's purge() failing partway must never be mistaken for success — leave the
+        # registry PENDING_PURGE (retryable) rather than deregistering an only-partially-dropped plugin.
+        log.exception("plugin '%s': purge() hook failed", plugin_id)
+        raise HTTPException(status_code=500, detail="plugin purge failed") from e
+
+    plugin_loader.deregister_discovered(plugin_id)
+    reg = registry.purge_complete(plugin_id)
     return _action_response(reg)

@@ -248,6 +248,9 @@ def load_router(plugin_id: str) -> APIRouter:
 #   register(ctx)  — bind its provided contracts into ctx.container (NO cross-plugin calls yet, §10)
 #   boot(ctx)      — subscribe to events / wire listeners, in dependency order (§10)
 #   shutdown(ctx)  — release / flush / deregister, in REVERSE dependency order (§10)
+#   purge(engine)  — drop this plugin's OWN tables (e.g. `Base.metadata.drop_all`). Called ONLY by the
+#                    Purge action (install-from-git design §8/§9), never at boot. A plugin that omits
+#                    it cannot be Purged yet — Uninstall (code removal, DB kept) still works either way.
 #   jobs           — a list of arq job callables the worker should run when this plugin is enabled
 # All optional: a pure-router plugin (like knowledge today for routes) needs none of them. Every
 # lifecycle call is fault-isolated (§8): a raised exception marks that plugin degraded, never the rest.

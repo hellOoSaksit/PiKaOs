@@ -734,3 +734,210 @@ def test_update_still_returns_a_clean_error_when_the_revert_itself_raises_a_non_
 
     reg = registry.read()
     assert reg["crm"]["installedTag"] == "v1.0.0"       # registry still reflects the pre-update state
+
+
+# --- uninstall / purge ---------------------------------------------------------------------------------
+
+def test_uninstall_symlink_plugin_forgets_the_registry_row_but_keeps_code(sample_plugins, tmp_path, monkeypatch):
+    """Default (dev-symlink, unchanged first-cut) install: uninstall only forgets the registry row (back
+    to available) — the on-disk folder is a dev's own sibling checkout and must never be touched."""
+    from app.core import kernel_state, setup_state
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    registry.set_state("sample", registry.ENABLED, version="1.2.3")
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.delete("/api/plugins/sample", headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 200, resp.text
+    assert "sample" not in registry.read()   # forgotten entirely, back to available
+
+
+def test_uninstall_git_plugin_removes_code_but_registry_stays_pending_purge(sample_plugins, tmp_path, monkeypatch):
+    from app.core import kernel_state, setup_state
+    from app.core import plugin_registry as registry
+    import sys
+    from types import ModuleType
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.plugin_loader as plugin_loader
+    plugins_dir = tmp_path / "plugins"
+    (plugins_dir / "crm").mkdir(parents=True)
+    (plugins_dir / "crm" / "manifest.json").write_text('{}', encoding="utf-8")
+    monkeypatch.setattr(plugin_loader, "PLUGINS_DIR", plugins_dir)
+    mf = plugin_loader.Manifest(id="crm", name="CRM", version="1.0.0", coreVersion="*")
+    plugin_loader.register_discovered(mf)
+    registry.set_git_install("crm", repo_url="https://github.com/acme/crm.git", tag="v1.0.0", version="1.0.0")
+    # ENABLED_MODULES=* in this environment means the lifespan actually imports every registered manifest
+    # id, "crm" included — it needs a real (stub) module on sys.modules, exactly like the purge tests below.
+    monkeypatch.setitem(sys.modules, "app.plugins.crm", ModuleType("app.plugins.crm"))
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.delete("/api/plugins/crm", headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 200, resp.text
+    assert not (plugins_dir / "crm").exists()          # code removed
+    reg = registry.read()
+    assert registry.state_of(reg, "crm") == registry.PENDING_PURGE
+    assert registry.repo_url_of(reg, "crm") is not None  # provenance kept for Purge
+
+
+def test_uninstall_requires_plugins_manage_permission(sample_plugins, tmp_path, monkeypatch):
+    from app.core import kernel_state, setup_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.delete("/api/plugins/sample")
+    assert resp.status_code == 401
+
+
+def _bind_fake_postgres(client, engine):
+    """Bind a fake `postgres.Connection` directly on the (already-built, per-test) container — the
+    postgres Tool itself is out of scope here; only the shape `purge()`'s resolution needs matters."""
+    from app.core.contracts import POSTGRES_CONNECTION
+    client.app.state.container.bind(POSTGRES_CONNECTION, {"engine": engine, "session_factory": None})
+
+
+def test_purge_calls_the_plugins_purge_hook_then_forgets_the_plugin(sample_plugins, tmp_path, monkeypatch):
+    from app.core import kernel_state, setup_state
+    from app.core import plugin_registry as registry
+    import sys
+    from types import ModuleType
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.plugin_loader as plugin_loader
+
+    fake_engine = object()
+    called = []
+    mod = ModuleType("app.plugins.crm")
+    mod.purge = lambda engine: called.append(engine)
+    monkeypatch.setitem(sys.modules, "app.plugins.crm", mod)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        # Registered AFTER the lifespan's boot-time `enabled` snapshot is taken (ENABLED_MODULES=* in
+        # this env would otherwise fold "crm" into that snapshot) — a successful purge deregisters "crm"
+        # from PLUGIN_MANIFESTS again before teardown, and teardown's shutdown_plugins() walks the SAME
+        # stale `enabled` snapshot against the CURRENT PLUGIN_MANIFESTS, so "crm" must never be in it.
+        mf = plugin_loader.Manifest(id="crm", name="CRM", version="1.0.0", coreVersion="*")
+        plugin_loader.register_discovered(mf)
+        registry.set_git_install("crm", repo_url="https://github.com/acme/crm.git", tag="v1.0.0", version="1.0.0")
+        registry.uninstall_git("crm")
+        _bind_fake_postgres(client, fake_engine)
+        resp = client.post("/api/plugins/crm/purge", headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 200, resp.text
+    assert called == [fake_engine]                        # purge(engine) got the real resolved engine
+    assert "crm" not in registry.read()
+    assert "crm" not in plugin_loader.PLUGIN_MANIFESTS     # manifest catalog entry deregistered too
+
+
+def test_purge_without_a_purge_hook_returns_a_clear_error(sample_plugins, tmp_path, monkeypatch):
+    from app.core import kernel_state, setup_state
+    from app.core import plugin_registry as registry
+    import sys
+    from types import ModuleType
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.plugin_loader as plugin_loader
+    mf = plugin_loader.Manifest(id="crm", name="CRM", version="1.0.0", coreVersion="*")
+    plugin_loader.register_discovered(mf)
+    registry.set_git_install("crm", repo_url="https://github.com/acme/crm.git", tag="v1.0.0", version="1.0.0")
+    registry.uninstall_git("crm")
+    monkeypatch.setitem(sys.modules, "app.plugins.crm", ModuleType("app.plugins.crm"))  # no purge attr
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        _bind_fake_postgres(client, object())
+        resp = client.post("/api/plugins/crm/purge", headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 422
+    assert "purge" in resp.json()["detail"].lower()
+    assert registry.state_of(registry.read(), "crm") == registry.PENDING_PURGE   # left retryable
+
+
+def test_purge_rejects_a_plugin_that_is_not_pending_purge(sample_plugins, tmp_path, monkeypatch):
+    """Guards against purging an actively-enabled plugin's tables — purge only ever runs after
+    Uninstall has already moved a git-installed plugin to PENDING_PURGE."""
+    from app.core import kernel_state, setup_state
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    registry.set_git_install("sample", repo_url="https://github.com/acme/sample.git",
+                              tag="v1.2.3", version="1.2.3")
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/sample/purge", headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 422
+
+
+def test_purge_returns_a_clean_error_when_the_postgres_tool_is_not_bound(sample_plugins, tmp_path, monkeypatch):
+    """No `postgres.Connection` bound (the tool isn't enabled in this process) — purge can't drop
+    tables it has no engine for. Must be a clean, generic error, never an AttributeError/500."""
+    from app.core import kernel_state, setup_state
+    from app.core import plugin_registry as registry
+    import sys
+    from types import ModuleType
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.plugin_loader as plugin_loader
+    mf = plugin_loader.Manifest(id="crm", name="CRM", version="1.0.0", coreVersion="*")
+    plugin_loader.register_discovered(mf)
+    registry.set_git_install("crm", repo_url="https://github.com/acme/crm.git", tag="v1.0.0", version="1.0.0")
+    registry.uninstall_git("crm")
+    called = []
+    mod = ModuleType("app.plugins.crm")
+    mod.purge = lambda engine: called.append(engine)
+    monkeypatch.setitem(sys.modules, "app.plugins.crm", mod)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        # no postgres tool bound — container has nothing under POSTGRES_CONNECTION
+        resp = client.post("/api/plugins/crm/purge", headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 503
+    assert "traceback" not in resp.text.lower()
+    assert called == []                                   # never even attempted
+    assert registry.state_of(registry.read(), "crm") == registry.PENDING_PURGE
+
+
+def test_purge_leaves_the_plugin_pending_purge_when_the_hook_itself_raises(sample_plugins, tmp_path, monkeypatch):
+    """A buggy plugin's purge(engine) (e.g. drop_all fails partway) must not be treated as success —
+    the plugin stays PENDING_PURGE so an operator can retry, rather than being silently forgotten with
+    orphaned tables left behind."""
+    from app.core import kernel_state, setup_state
+    from app.core import plugin_registry as registry
+    import sys
+    from types import ModuleType
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.plugin_loader as plugin_loader
+    mf = plugin_loader.Manifest(id="crm", name="CRM", version="1.0.0", coreVersion="*")
+    plugin_loader.register_discovered(mf)
+    registry.set_git_install("crm", repo_url="https://github.com/acme/crm.git", tag="v1.0.0", version="1.0.0")
+    registry.uninstall_git("crm")
+
+    def _boom(engine):
+        raise RuntimeError("simulated drop_all failure")
+    mod = ModuleType("app.plugins.crm")
+    mod.purge = _boom
+    monkeypatch.setitem(sys.modules, "app.plugins.crm", mod)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        _bind_fake_postgres(client, object())
+        resp = client.post("/api/plugins/crm/purge", headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 500
+    assert "traceback" not in resp.text.lower()
+    assert "crm" in plugin_loader.PLUGIN_MANIFESTS          # not deregistered
+    assert registry.state_of(registry.read(), "crm") == registry.PENDING_PURGE   # left retryable
+
+
+def test_purge_requires_plugins_manage_permission(sample_plugins, tmp_path, monkeypatch):
+    from app.core import kernel_state, setup_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/sample/purge")
+    assert resp.status_code == 401
