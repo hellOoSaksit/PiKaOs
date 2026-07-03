@@ -198,9 +198,21 @@ async def install_from_git(
         shutil.rmtree(target_dir, ignore_errors=True)
         raise HTTPException(status_code=422, detail=str(e)) from e
 
-    plugin_loader.register_discovered(manifest)
-    tag = body.ref or git_installer.latest_tag(body.repoUrl) or manifest.version
-    reg = registry.set_git_install(pid, repo_url=body.repoUrl, tag=tag, version=manifest.version)
+    # Everything past this point still has to honour "never a half-installed plugin" (§2.2), even though
+    # there's no ManifestError to catch here — `register_discovered` mutates in-process state and
+    # `set_git_install` persists to the kernel-state JSON file, and either can raise on a genuinely
+    # unexpected failure (e.g. a disk I/O error writing the registry). If that happens after
+    # `register_discovered` already succeeded, the process would otherwise believe the plugin is loaded
+    # while the registry disagrees — an inconsistent state that outlives the request. Roll back both the
+    # in-process registration and the on-disk folder before surfacing a generic 500.
+    try:
+        plugin_loader.register_discovered(manifest)
+        tag = body.ref or git_installer.latest_tag(body.repoUrl) or manifest.version
+        reg = registry.set_git_install(pid, repo_url=body.repoUrl, tag=tag, version=manifest.version)
+    except Exception as e:
+        plugin_loader.deregister_discovered(pid)   # no-op if register_discovered never got that far
+        shutil.rmtree(target_dir, ignore_errors=True)
+        raise HTTPException(status_code=500, detail="plugin install failed to finalize") from e
     return _action_response(reg)
 
 

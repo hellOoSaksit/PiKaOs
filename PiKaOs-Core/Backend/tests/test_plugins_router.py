@@ -10,6 +10,8 @@ through, and FastAPI's response-model validation 500'd on the first plugin with 
 """
 from __future__ import annotations
 
+import shutil
+
 from starlette.testclient import TestClient
 
 from app.core import kernel_state, setup_state
@@ -69,6 +71,49 @@ def test_install_from_git_clones_validates_and_registers(sample_plugins, tmp_pat
     crm = next(p for p in body["plugins"] if p["id"] == "crm")
     assert crm["state"] == "enabled"
     assert (plugins_dir / "crm" / "manifest.json").is_file()
+
+
+def test_install_from_git_rolls_back_when_registry_persistence_fails(sample_plugins, tmp_path, monkeypatch):
+    """`register_discovered` + `registry.set_git_install` run after the last cleanup boundary — if either
+    raises (e.g. a kernel-state I/O failure persisting the registry), the endpoint must not leave a
+    half-installed plugin behind: neither the on-disk folder nor the in-process registration may survive.
+    Simulates `set_git_install` raising (after `register_discovered` has already succeeded) and asserts
+    both are rolled back."""
+    import subprocess
+    from app.core import kernel_state, setup_state, git_installer
+    from app.core import plugin_registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+
+    src = tmp_path / "src"
+    src.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t.co"], cwd=src, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=src, check=True)
+    (src / "manifest.json").write_text(
+        '{"id":"crm","name":"CRM","version":"1.0.0","coreVersion":"*"}', encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=src, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=src, check=True)
+    repo_url = f"file://{src}"
+    monkeypatch.setattr(git_installer, "allowed_hosts", lambda: [""])
+
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+
+    def _boom(*a, **k):
+        raise OSError("simulated kernel_state.write_json I/O failure")
+    monkeypatch.setattr(plugin_registry, "set_git_install", _boom)
+
+    import app.main as main
+    from app import plugin_loader
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/install-from-git",
+                            json={"repoUrl": repo_url},
+                            headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 500
+    assert not (plugins_dir / "crm").exists()          # on-disk folder rolled back
+    assert "crm" not in plugin_loader.PLUGIN_MANIFESTS  # in-process registration rolled back too
 
 
 def test_install_from_git_rejects_disallowed_host(sample_plugins, tmp_path, monkeypatch):
@@ -150,9 +195,23 @@ def test_install_from_git_rejects_duplicate_plugin(sample_plugins, tmp_path, mon
 def test_install_from_git_rejects_path_traversal_id(sample_plugins, tmp_path, monkeypatch):
     """A manifest.json whose 'id' isn't a valid plugin-id shape (e.g. contains '..' / '/') must never
     reach the filesystem move — `target_dir = PLUGINS_DIR / pid` would otherwise let the clone land
-    outside PLUGINS_DIR entirely."""
+    outside PLUGINS_DIR entirely.
+
+    Why this test is shaped the way it is (revert-detection): a naive version of this test — just
+    asserting a 422 and an empty PLUGINS_DIR — would pass IDENTICALLY even if the router-level `_ID_RE`
+    check below were deleted. That's because `plugin_loader._validate()` independently re-checks the same
+    id shape, but only AFTER `shutil.move` has already placed the folder — and the existing except-block
+    cleanup then removes it from wherever it actually landed, producing the same observable 422 +
+    empty-directory outcome either way. So instead we monkeypatch `shutil.move` itself (the call the
+    endpoint uses to place the clone into PLUGINS_DIR) to blow up if it is EVER invoked with the
+    traversal-shaped destination. That directly proves the early check runs BEFORE any filesystem call —
+    if someone deletes it, `shutil.move` would be reached with the bad path and the guard below would
+    raise, failing this test loudly (as an unhandled exception, not a clean 422) instead of silently
+    passing.
+    """
     import subprocess
     from app.core import kernel_state, setup_state, git_installer
+    from app.core.routers import plugins as plugins_router
     monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
     setup_state.write("PIKA-ABCD-2345", "a-session-token")
 
@@ -171,6 +230,16 @@ def test_install_from_git_rejects_path_traversal_id(sample_plugins, tmp_path, mo
     plugins_dir = tmp_path / "plugins"
     plugins_dir.mkdir()
     monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+
+    real_move = shutil.move
+
+    def _guarded_move(src_path, dst_path, *a, **k):
+        if ".." in str(dst_path):
+            raise AssertionError("shutil.move must not be called with an unvalidated (traversal-shaped) id")
+        return real_move(src_path, dst_path, *a, **k)
+
+    # patched on the router's `shutil` reference (same module object the endpoint calls through)
+    monkeypatch.setattr(plugins_router.shutil, "move", _guarded_move)
 
     import app.main as main
     with TestClient(main.app) as client:
