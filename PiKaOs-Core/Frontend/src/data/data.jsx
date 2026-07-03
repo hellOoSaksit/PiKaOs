@@ -133,12 +133,15 @@ const NAV = [
   // src/plugins/knowledge) and merged into the nav default by data-nav.defaultNav — not hardcoded here.
   { group: "ผู้ดูแลระบบ", items: [
     { id: "admin", icon: "👥", label: "จัดการผู้ใช้", en: "User Management", perm: "user.view.any" },
-    { id: "toolsmgr", icon: "🧰", label: "จัดการเครื่องมือ", en: "Tools", perm: "options.manage" },
+    { id: "toolsmgr", icon: "🧰", label: "จัดการเครื่องมือ", en: "Tools", perm: "options.manage", children: [
+      { id: "modules", icon: "🧩", label: "โมดูล / ปลั๊กอิน", en: "Modules / Plugins", perm: "plugins.manage" },
+      { id: "marketplace", icon: "🛍️", label: "มาร์เก็ตเพลส", en: "Marketplace", perm: "plugins.manage" },
+      { id: "mypackages", icon: "📦", label: "แพ็กเกจของฉัน", en: "My Packages & Share", perm: "plugins.manage" },
+    ]},
     { id: "permissions", icon: "🗝️", label: "แคตตาล็อกสิทธิ์", en: "Permissions", perm: "user.view.any", children: [
       { id: "roles", icon: "🔑", label: "บทบาทและสิทธิ์", en: "Roles & Access", perm: "role.manage" },
     ]},
     { id: "audit", icon: "📋", label: "บันทึกการตรวจสอบ", en: "Audit Log", perm: "audit.view" },
-    { id: "modules", icon: "🧩", label: "โมดูล / ปลั๊กอิน", en: "Modules / Plugins", perm: "plugins.manage" },
     { id: "settings", icon: "⚙️", label: "ตั้งค่าระบบ", en: "Settings" },
     { id: "history", icon: "🗂️", label: "ประวัติงาน", en: "Quest Log" },
     { id: "watch", icon: "🛡️", label: "ระบบเฝ้าระวัง", en: "Watchtower" },

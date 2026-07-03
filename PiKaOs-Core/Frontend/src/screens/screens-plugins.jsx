@@ -7,7 +7,6 @@
 import React, { useEffect, useState } from 'react';
 
 import { Btn, Empty, HelpNote, PageHead, Panel } from '../components/components.jsx';
-import Segmented from '../components/ui/Segmented.jsx';
 import * as api from '../lib/api.js';
 
 const STATE_BADGE = {
@@ -125,7 +124,13 @@ function InstallPlanModal({ plan, target, T, busy, onConfirm, onCancel }) {
   );
 }
 
-export function PluginsManager({ Sys }) {
+/* Modules admin — one component, three sibling nav screens under "Tools" (data.jsx: toolsmgr children).
+   `view` picks which screen this instance renders:
+     'modules' — the installed/discovered plugin list + manage actions
+     'market'  — the Marketplace placeholder (no plugin list needed)
+     'mine'    — install-from-git + git credentials + the (disabled) Share affordance
+     'all'     — mine + modules stacked, for the nav-less bootstrap shell (KernelOnlyShell) */
+export function PluginsManager({ Sys, view = 'modules' }) {
   const { T, can } = Sys;
   const may = can('plugins.manage');
   const [plugins, setPlugins] = useState(null);   // null = loading
@@ -137,7 +142,6 @@ export function PluginsManager({ Sys }) {
   const [gitRef, setGitRef] = useState('');
   const [allowHead, setAllowHead] = useState(false);
   const [updates, setUpdates] = useState({});      // { [pluginId]: { latestVersion, hasUpdate, tagMoved } }
-  const [tab, setTab] = useState('plugins');       // submenu: 'plugins' | 'market' | 'mine'
 
   // Sharing to the market lives in the Auth plugin (kernel is zero-DB — identity can't live in Core);
   // the Share affordance is gated on that plugin being installed + enabled (drafted, not built yet).
@@ -148,7 +152,8 @@ export function PluginsManager({ Sys }) {
     try { setPlugins(await api.listPlugins()); }
     catch (e) { setErr(e.message || 'load failed'); setPlugins([]); }
   };
-  useEffect(() => { load(); }, []);
+  // The Marketplace view is a static placeholder — it needs no plugin list, so skip the fetch there.
+  useEffect(() => { if (view !== 'market') load(); }, [view]);
 
   // After the list loads, poll each git-installed plugin for a newer version (best-effort — a
   // failed check just leaves that row without an update badge, no error surfaced).
@@ -207,53 +212,64 @@ export function PluginsManager({ Sys }) {
     finally { setBusy(null); }
   };
 
+  // Marketplace — a static placeholder, independent of the plugin list (renders without waiting on a load).
+  if (view === 'market') {
+    return (
+      <div className="content-pad fade-in" data-no-lex>
+        <PageHead
+          kicker={T('Administration · Marketplace', 'ผู้ดูแลระบบ · มาร์เก็ตเพลส')}
+          title={T('Marketplace', 'มาร์เก็ตเพลส')}
+          desc={T('Browse & add packages from the catalog. Starts with MCP servers.',
+                  'เลือกดูและเพิ่มแพ็กเกจจากแคตตาล็อก · เริ่มจาก MCP server')} />
+        <Empty icon="🛍️" title={T('Marketplace — coming soon', 'มาร์เก็ตเพลส — เร็วๆ นี้')}
+          sub={T('Browse & add packages. Starts with MCP servers.', 'เลือกดู/เพิ่มแพ็กเกจ · เริ่มจาก MCP server')} />
+      </div>
+    );
+  }
+
   if (plugins === null) {
     return <div className="content-pad"><Empty icon="🧩" title={T('Loading modules…', 'กำลังโหลดโมดูล…')} /></div>;
   }
 
+  const showMine = view === 'mine' || view === 'all';
+  const showModules = view === 'modules' || view === 'all';
+
   return (
     <div className="content-pad fade-in" data-no-lex>
-      <PageHead
-        kicker={T('Administration · Plugins', 'ผู้ดูแลระบบ · ปลั๊กอิน')}
-        title={T('Modules / Plugins', 'โมดูล / ปลั๊กอิน')}
-        desc={T('Choose which features this deployment runs. Installing a feature also pulls in anything it depends on (e.g. RAG needs AI); a dependency that is already installed is reused, never installed twice.',
-                'เลือกว่าระบบนี้จะเปิดฟีเจอร์ไหน · การติดตั้งฟีเจอร์จะดึงสิ่งที่มันพึ่งพามาด้วย (เช่น RAG ต้องการ AI) · ตัวที่ติดตั้งแล้วจะถูกใช้ซ้ำ ไม่ลงซ้ำ')}
-        actions={<Btn kind="ghost" sm icon="↻" onClick={load}>{T('Refresh', 'รีเฟรช')}</Btn>} />
-
-      <div style={{ margin: '4px 0 14px' }}>
-        <Segmented value={tab} onChange={setTab} options={[
-          { value: 'plugins', label: T('Plugins', 'ปลั๊กอิน') },
-          { value: 'market',  label: T('Marketplace', 'มาร์เก็ตเพลส') },
-          { value: 'mine',    label: T('My Packages & Share', 'แพ็กเกจของฉัน') },
-        ]} />
-      </div>
-
-      {/* Global notices — kept above the tab body so a restart/error is visible on any tab. */}
+      {/* Global notices — a restart/error from either section surfaces here. */}
       {restartHint && <HelpNote>{T('Saved. Restart the backend to apply — modules mount at startup (restart-to-apply).',
         'บันทึกแล้ว · รีสตาร์ท backend เพื่อให้มีผล — โมดูลถูกโหลดตอนเริ่มระบบ')}</HelpNote>}
       {err && <HelpNote>{T('Error: ', 'ผิดพลาด: ')}{err}</HelpNote>}
 
-      {tab === 'plugins' && (
-        plugins.length === 0
-          ? <Empty icon="🧩" title={T('No plugins discovered', 'ไม่พบปลั๊กอิน')} sub={T('This is a Base-only build.', 'บิลด์นี้เป็น Base ล้วน')} />
-          : <div style={{ display: 'grid', gap: 12 }}>
-              {plugins.map(p => (
-                <PluginRow key={p.id} p={p} T={T} may={may} busy={busy === p.id}
-                  onInstall={() => startInstall(p.id)} onEnable={() => act(p.id, api.enablePlugin)}
-                  onDisable={() => act(p.id, api.disablePlugin)} onUninstall={() => act(p.id, api.uninstallPlugin)}
-                  onPurge={() => act(p.id, api.purgePlugin)}
-                  onCheckUpdate={() => act(p.id, api.updatePlugin)} updateInfo={updates[p.id]} />
-              ))}
-            </div>
-      )}
-
-      {tab === 'market' && (
-        <Empty icon="🛍️" title={T('Marketplace — coming soon', 'มาร์เก็ตเพลส — เร็วๆ นี้')}
-          sub={T('Browse & add packages. Starts with MCP servers.', 'เลือกดู/เพิ่มแพ็กเกจ · เริ่มจาก MCP server')} />
-      )}
-
-      {tab === 'mine' && (
+      {showModules && (
         <>
+          <PageHead
+            kicker={T('Administration · Plugins', 'ผู้ดูแลระบบ · ปลั๊กอิน')}
+            title={T('Modules / Plugins', 'โมดูล / ปลั๊กอิน')}
+            desc={T('Choose which features this deployment runs. Installing a feature also pulls in anything it depends on (e.g. RAG needs AI); a dependency that is already installed is reused, never installed twice.',
+                    'เลือกว่าระบบนี้จะเปิดฟีเจอร์ไหน · การติดตั้งฟีเจอร์จะดึงสิ่งที่มันพึ่งพามาด้วย (เช่น RAG ต้องการ AI) · ตัวที่ติดตั้งแล้วจะถูกใช้ซ้ำ ไม่ลงซ้ำ')}
+            actions={<Btn kind="ghost" sm icon="↻" onClick={load}>{T('Refresh', 'รีเฟรช')}</Btn>} />
+          {plugins.length === 0
+            ? <Empty icon="🧩" title={T('No plugins discovered', 'ไม่พบปลั๊กอิน')} sub={T('This is a Base-only build.', 'บิลด์นี้เป็น Base ล้วน')} />
+            : <div style={{ display: 'grid', gap: 12 }}>
+                {plugins.map(p => (
+                  <PluginRow key={p.id} p={p} T={T} may={may} busy={busy === p.id}
+                    onInstall={() => startInstall(p.id)} onEnable={() => act(p.id, api.enablePlugin)}
+                    onDisable={() => act(p.id, api.disablePlugin)} onUninstall={() => act(p.id, api.uninstallPlugin)}
+                    onPurge={() => act(p.id, api.purgePlugin)}
+                    onCheckUpdate={() => act(p.id, api.updatePlugin)} updateInfo={updates[p.id]} />
+                ))}
+              </div>}
+        </>
+      )}
+
+      {showMine && (
+        <>
+          <PageHead
+            kicker={T('Administration · My Packages', 'ผู้ดูแลระบบ · แพ็กเกจของฉัน')}
+            title={T('My Packages & Share', 'แพ็กเกจของฉัน')}
+            desc={T('Install a package straight from a git URL. Sharing your own packages to the Marketplace is coming soon.',
+                    'ติดตั้งแพ็กเกจจากลิงก์ git โดยตรง · การแชร์แพ็กเกจของคุณขึ้นมาร์เก็ตเพลสจะมาเร็วๆ นี้')} />
           {may ? (
             <>
               <Panel>

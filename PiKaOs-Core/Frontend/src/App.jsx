@@ -52,6 +52,8 @@ const ROUTE_META = {
   workflows: { icon: "⚗️", title: "เวิร์กโฟลว์", en: "Workflows" },
   audit:   { icon: "📋", title: "บันทึกการตรวจสอบ", en: "Audit Log" },
   modules: { icon: "🧩", title: "โมดูล / ปลั๊กอิน", en: "Modules / Plugins" },
+  marketplace: { icon: "🛍️", title: "มาร์เก็ตเพลส", en: "Marketplace" },
+  mypackages: { icon: "📦", title: "แพ็กเกจของฉัน", en: "My Packages & Share" },
   userDetail: { icon: "👤", title: "ข้อมูลสมาชิก", en: "User" },
   settings:{ icon: "⚙️", title: "ตั้งค่าระบบ", en: "Settings" },
   library: { icon: "🧩", title: "คลังคอมโพเนนต์", en: "Component Library" },
@@ -635,7 +637,9 @@ function App() {
       case "roles": return guard("role.manage", <RolesPermissions Sys={Sys} />);
       case "permissions": return guard("user.view.any", <PermissionsCatalog Sys={Sys} />);
       case "audit": return guard("audit.view", <AuditLog Sys={Sys} />);
-      case "modules": return guard("plugins.manage", <PluginsManager Sys={Sys} />);
+      case "modules": return guard("plugins.manage", <PluginsManager Sys={Sys} view="modules" />);
+      case "marketplace": return guard("plugins.manage", <PluginsManager Sys={Sys} view="market" />);
+      case "mypackages": return guard("plugins.manage", <PluginsManager Sys={Sys} view="mine" />);
       case "workflows": return <Workflows Sys={Sys} />;
       case "settings": return <Settings theme={theme} setTheme={setTheme} lex={lex} setLex={setLex} pickLanguage={pickLanguage} language={language} formal={formal} go={go} t={t} />;
       case "library": return <ComponentLibrary onBack={() => go("settings")} t={t} />;

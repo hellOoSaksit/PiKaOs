@@ -46,7 +46,8 @@ export function KernelOnlyShell({ language }) {
           </div>
           <div className="topbar-spacer" />
         </header>
-        <div className="content"><div className="content-pad"><PluginsManager Sys={Sys} /></div></div>
+        {/* No sidebar nav here → show install (mine) + the module list (modules) on one page. */}
+        <div className="content"><div className="content-pad"><PluginsManager Sys={Sys} view="all" /></div></div>
       </div>
     </div>
   );
