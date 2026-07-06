@@ -3,10 +3,12 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 
+from .. import setup_state
 from ..config import settings
 from ..contracts import POSTGRES_CONNECTION, REDIS_CONNECTION, STORAGE
 from ..identity import provider_for
-from ..schemas import HealthOut, PluginHealth, VersionOut
+from ..instance import instance_id
+from ..schemas import CapabilitiesOut, HealthOut, PluginCapability, PluginHealth, VersionOut
 
 router = APIRouter(prefix="/api", tags=["health"])
 
@@ -31,6 +33,28 @@ async def version() -> VersionOut:
     trigger a needless auto-rollback) and for the SPA's version-skew reload (release-and-rollback.md
     §4/§7). Stays HTTP 200 as long as the app process can serve."""
     return VersionOut(version=settings.app_version, build=settings.build_hash, name=settings.app_name)
+
+
+@router.get("/capabilities", response_model=CapabilitiesOut)
+async def capabilities(request: Request) -> CapabilitiesOut:
+    """C1 capability handshake (spec §2) — public: a client must read `authMode` BEFORE it can
+    authenticate. The plugin list is public only when the server is open (everyone is admin anyway)
+    or outside production or to an authenticated caller — the Fix-SEC-10 recon discipline /health
+    already follows."""
+    mode = "open" if setup_state.read_auth_mode() == "open" else "login"
+    plugins: list[PluginCapability] = []
+    if mode == "open" or not settings.is_production or await _is_authenticated(request):
+        states_provider = getattr(request.app.state, "plugin_states", None)
+        rows = states_provider() if states_provider is not None else []
+        plugins = [
+            PluginCapability(id=r["id"], version=r.get("version"), frontend=None)
+            for r in rows
+            if r.get("state") == "active"
+        ]
+    return CapabilitiesOut(
+        v=1, instanceId=instance_id(), authMode=mode,
+        version=settings.app_version, build=settings.build_hash, plugins=plugins,
+    )
 
 
 @router.get("/health", response_model=HealthOut)
