@@ -1,60 +1,14 @@
-/* PiKaOs — SETTINGS: visual theme + language/vocabulary picker (decoupled),
-   and the reusable API-connections panel.
+/* PiKaOs — SETTINGS: visual theme + language/vocabulary picker (decoupled).
    ไม่ hardcode ภาษา/รูปแบบคำศัพท์ — สแกนจาก src/data/i18n/*.json (เมตาในแต่ละไฟล์):
-   LEX_LANGS = รายการภาษา (ตัดซ้ำแล้ว) · stylesForLang(code) = ทุกรูปแบบคำศัพท์ของภาษานั้น */
-import React from 'react';
-const { useState, useEffect } = React;
+   LEX_LANGS = รายการภาษา (ตัดซ้ำแล้ว) · stylesForLang(code) = ทุกรูปแบบคำศัพท์ของภาษานั้น
+   (LLM API keys live in the tools screen via the backend /llm/connections flow — F4.) */
 import { Btn, PageHead, Panel } from '../../components/components.jsx';
-import { Select } from '../../components/ui/Dropdown.jsx';
 import { LEX_LANGS, langByCode, stylesForLang, packById } from '../../lib/i18n.jsx';
-import { API_PROVIDERS, loadApiKeys, maskKey, saveApiKeys } from '../../lib/store.jsx';
 
 const THEME_CARDS = [
   { key: "pro",      name: "กลางวัน", en: "Day",   bg: "#f4f6f8", chips: ["#4361ee", "#ffffff", "#111726"] },
   { key: "pro-dark", name: "กลางคืน", en: "Night", bg: "#111419", chips: ["#6076f6", "#171a21", "#e8eaef"] },
 ];
-
-function ApiConnections({ t, bare }) {
-  const [keys, setKeys] = useState(() => (window.loadApiKeys ? loadApiKeys() : []));
-  const [name, setName] = useState("");
-  const [provider, setProvider] = useState(API_PROVIDERS[0].key);
-  const [secret, setSecret] = useState("");
-  useEffect(() => { saveApiKeys(keys); }, [keys]);
-  const add = () => {
-    const n = name.trim(); if (!n || !secret.trim()) return;
-    setKeys(prev => [...prev, { id: "api" + Date.now().toString(36), name: n, provider, key: secret.trim() }]);
-    setName(""); setSecret("");
-  };
-  const remove = (id) => setKeys(prev => prev.filter(k => k.id !== id));
-  return (
-    <Panel title={bare ? null : t("api.title")} en={bare ? null : "API CONNECTIONS"} icon={bare ? null : "🔌"} right={bare ? null : <span className="mono faint" style={{ fontSize: 11 }}>{t("api.count", { n: keys.length })}</span>}>
-      <div className="muted" style={{ fontSize: 12.5, marginBottom: 12, lineHeight: 1.6 }}>{t("api.desc")}</div>
-      {keys.length > 0 && (
-        <div className="api-list">
-          {keys.map(k => (
-            <div key={k.id} className="api-row">
-              <span className="api-ic">🔑</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="api-name">{k.name}</div>
-                <div className="mono faint" style={{ fontSize: 11 }}>{(API_PROVIDERS.find(p => p.key === k.provider) || {}).label || k.provider} · {maskKey(k.key)}</div>
-              </div>
-              <button className="api-del" title={t("api.del")} onClick={() => remove(k.id)}>🗑</button>
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="api-add">
-        <input className="bf-input" placeholder={t("api.namePh")} value={name} onChange={e => setName(e.target.value)} />
-        <div className="api-add-row">
-          <Select value={provider} onChange={setProvider} minWidth={150}
-            options={API_PROVIDERS.map(p => ({ value: p.key, label: p.label }))} />
-          <input className="bf-input" type="password" placeholder={t("api.secretPh")} value={secret} onChange={e => setSecret(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} />
-          <Btn kind="gold" sm icon="➕" onClick={add}>{t("common.add")}</Btn>
-        </div>
-      </div>
-    </Panel>
-  );
-}
 
 function Settings({ theme, setTheme, lex, setLex, pickLanguage, language, formal, go, t }) {
   const curTheme = THEME_CARDS.find(c => c.key === theme) || THEME_CARDS[0];
@@ -141,4 +95,4 @@ function Settings({ theme, setTheme, lex, setLex, pickLanguage, language, formal
   );
 }
 
-export { THEME_CARDS, ApiConnections, Settings };
+export { THEME_CARDS, Settings };

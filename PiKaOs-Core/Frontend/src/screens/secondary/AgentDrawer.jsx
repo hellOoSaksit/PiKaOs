@@ -9,7 +9,6 @@ import { st, setSt } from './st.js';
 /* ---------------- AGENT DRAWER ---------------- */
 function AgentDrawer({ a, onClose, onEdit, onDelete, t }) {
   setSt(t);
-  const apiName = a.apiKeyId ? ((window.__apiKeys || []).find(k => k.id === a.apiKeyId) || {}).name : null;
   let roomName = null;
   try { if (a.homeRoom) { const rs = (JSON.parse(localStorage.getItem("guildos.rooms.v2") || "{}").rooms) || []; roomName = (rs.find(r => r.id === a.homeRoom) || {}).name || null; } } catch (e) { }
   const core = (window.loadCoreRules ? loadCoreRules() : []);
@@ -40,7 +39,7 @@ function AgentDrawer({ a, onClose, onEdit, onDelete, t }) {
           {a.desc && <p style={{ margin: 0, color: "var(--ink-2)", fontSize: 13.5, lineHeight: 1.6 }}>{a.desc}</p>}
 
           <div className="kv">
-            <div className="kv-item"><div className="kv-label">{st("ad.model")}</div><div className="kv-val" style={{ fontSize: 12.5, fontFamily: "var(--font-mono)" }}>{apiName ? "API: " + apiName : a.model}</div></div>
+            <div className="kv-item"><div className="kv-label">{st("ad.model")}</div><div className="kv-val" style={{ fontSize: 12.5, fontFamily: "var(--font-mono)" }}>{a.model}</div></div>
             <div className="kv-item"><div className="kv-label">{st("ad.homeRoom")}</div><div className="kv-val" style={{ fontSize: 13 }}>{roomName || "—"}</div></div>
           </div>
 

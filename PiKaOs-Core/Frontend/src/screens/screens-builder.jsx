@@ -393,19 +393,9 @@ function CharacterBuilder({ initial, onSave, onClose, can, archived, onRestore, 
               <input className="bf-input" value={f.role} disabled={!canConfig} onChange={e => set("role", e.target.value)} placeholder={bt("bld.f.rolePh")} />
             </Field>
 
-            <Field label={bt("bld.f.model")} hint={!canConfig ? bt("bld.f.permOnly") : (f.apiKeyId ? bt("bld.f.modelApiHint") : null)}>
-              <Select block value={f.model} disabled={!!f.apiKeyId || !canConfig} onChange={v => set("model", v)}
+            <Field label={bt("bld.f.model")} hint={!canConfig ? bt("bld.f.permOnly") : null}>
+              <Select block value={f.model} disabled={!canConfig} onChange={v => set("model", v)}
                 options={MODEL_OPTS.map(m => ({ value: m, label: m }))} />
-            </Field>
-
-            <Field label={bt("bld.f.api")} hint={canConfig ? bt("bld.f.apiHint") : bt("bld.f.permOnly")}>
-              {(window.__apiKeys || []).length ? (
-                <Select block value={f.apiKeyId || ""} disabled={!canConfig} onChange={v => set("apiKeyId", v || null)}
-                  options={[{ value: "", label: bt("bld.f.apiDefault") },
-                    ...(window.__apiKeys || []).map(a => ({ value: a.id, label: `${a.name}${a.provider ? " · " + a.provider : ""}` }))]} />
-              ) : (
-                <div className="api-empty-hint mono">{bt("bld.f.apiEmpty")}<b>{bt("bld.f.apiEmptyPath")}</b></div>
-              )}
             </Field>
 
             <Field label={bt("bld.f.desc")} hint={bt("bld.f.descHint")}>
