@@ -162,6 +162,12 @@ export async function verifySetupCode(code) {
 // rollback.md §4's SPA version-skew policy is meant to use) ---
 export async function getVersion() { return raw("/version", { auth: false }); }   // { version, build, name }
 
+// --- C1 capability handshake (capability-handshake spec §2) — public; authenticated callers may
+// see a fuller plugin list in production, so send the token when we have one (auth defaults true).
+export async function getCapabilities() { return raw("/capabilities"); }
+// The active API base — per-server client-data namespacing keys off it (spec §5).
+export function getApiBase() { return base; }
+
 // --- LLM provider config API (admin: which provider/model/key the engine uses — no-hardcode) ---
 // The API key is write-only: send it in the body to set/replace it; the server never returns it
 // (responses carry `api_key_set` only). Omit it on update to keep the stored key unchanged.
