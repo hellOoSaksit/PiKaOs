@@ -44,7 +44,7 @@ it('injects the exact CSP meta tag as the first element inside <head>', async ()
   const patched = readFileSync(indexPath, 'utf8')
   expect(patched).toContain(
     '<meta http-equiv="Content-Security-Policy" content="default-src \'self\' app://pikaos; ' +
-      "connect-src app://pikaos https: http://127.0.0.1:* http://localhost:*; img-src 'self' app://pikaos data: blob:; " +
+      "connect-src app://pikaos https: http:; img-src 'self' app://pikaos data: blob:; " +
       "style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self' blob:\">",
   )
   // must precede everything else that was already in <head>
