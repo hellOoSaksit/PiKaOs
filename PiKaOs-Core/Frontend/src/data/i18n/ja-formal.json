@@ -56,6 +56,8 @@
     "mkt.tabdesc.onlinemcp": "ネットワーク経由でホスト型 MCP サービスに接続します。",
     "mkt.tabdesc.skills": "エージェント向けの既製スキルパッケージ。",
     "mkt.soon": "{name} — 近日公開",
+    "open.owner": "オーナー",
+    "open.badge": "オープンサーバー — サインイン不要",
     "boot.starting": "{name} を起動中",
     "connect.title": "サーバーに接続",
     "connect.subtitle": "{name} サーバーのアドレスを入力してください — 例: 192.168.1.50:8000 または https://your-server.example",

@@ -6,7 +6,8 @@ import { AUDIT_SEED, ROLES_SEED, ROLE_PERMS_SEED, USERS_SEED, USER_PERMS_SEED, f
 import { TOOL_RUNS_SEED, WORKFLOWS_SEED, loadWF, saveWF } from './data/data-workflows.jsx';
 import { TOKENS, NAV, TASKS } from './data/data.jsx';
 import { loadNav, saveNav, mergeWithDefault } from './data/data-nav.jsx';
-import { getNavConfig, setNavConfig, getMySettings, setMySetting, getGlobalConfig, setGlobalConfig, setupStatus, setToken } from './lib/api.js';
+import { getNavConfig, setNavConfig, getMySettings, setMySetting, getGlobalConfig, setGlobalConfig, setupStatus, setToken, getCapabilities } from './lib/api.js';
+import { resolveShellMode } from './lib/shell-mode.js';
 import { applyGlobalConfig } from './lib/characters.jsx';
 import { Admin } from './screens/screens-admin.jsx';
 import { CharacterBuilder } from './screens/screens-builder.jsx';
@@ -102,7 +103,7 @@ function NavNode({ node, depth, route, go, t, can, navOpen, setNavOpen }) {
   );
 }
 
-function Sidebar({ route, go, t, can, nav }) {
+function Sidebar({ route, go, t, can, nav, openMode }) {
   const [navOpen, setNavOpen] = useState({});   // node id -> expanded (overrides the route-based default)
   return (
     <aside className="sidebar" data-no-lex>
@@ -128,6 +129,13 @@ function Sidebar({ route, go, t, can, nav }) {
         })}
       </nav>
       <div className="sidebar-foot">
+        {openMode && (
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '.08em',
+            color: 'var(--gold)', padding: '4px 8px', marginBottom: 8,
+            border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)' }}>
+            {t('open.badge')}
+          </div>
+        )}
         <div className="row"><span className="pulse-dot" /><span>{t("foot.online")}</span></div>
         <div className="faint">{t("foot.version", { n: (window.__chars || []).length })}</div>
       </div>
@@ -342,6 +350,15 @@ function App() {
   }, []);
   useEffect(() => { refreshBootstrap(); }, [refreshBootstrap]);
 
+  // C1 capability handshake (spec §2): the server declares authMode. 404/network (legacy or dead
+  // server) resolves as login mode so the pre-handshake flow is byte-identical (spec §2 fallback).
+  const [caps, setCaps] = useState(null);
+  useEffect(() => {
+    getCapabilities().then(setCaps).catch(() => setCaps({ v: 0, authMode: 'login' }));
+  }, []);
+  const openMode = caps?.authMode === 'open';
+  const signedIn = auth.loggedIn || openMode;
+
   const [route, setRoute] = useState("me");
   const [theme, setThemeState] = useState(() => { const t = localStorage.getItem("guild-theme"); return (t === "pro" || t === "pro-dark") ? t : "pro"; });
   // active lexicon = ภาษาที่แสดง + รูปแบบคำศัพท์ รวมเป็นชุดเดียว (รหัสชุดจาก data/lexicons/*.json)
@@ -408,35 +425,35 @@ function App() {
   useEffect(() => { saveNav(navCfg); }, [navCfg]);   // local cache for instant render next load
   // pull the shared arrangement from the server once signed in (authoritative; overrides the cache)
   useEffect(() => {
-    if (!auth.loggedIn) return;
+    if (!signedIn) return;
     let alive = true;
     getNavConfig().then(r => { if (alive && r && r.value) setNavCfg(mergeWithDefault(r.value)); }).catch(() => {});
     return () => { alive = false; };
-  }, [auth.loggedIn]);
+  }, [signedIn]);
   // per-user prefs (theme, lexicon) — load this user's saved values on sign-in (so they follow the
   // user across devices), then persist any change. localStorage stays only as an instant-render cache.
   const settingsLoaded = React.useRef(false);
   useEffect(() => {
-    if (!auth.loggedIn) return;
+    if (!signedIn) return;
     let alive = true;
     getMySettings().then(r => {
       const v = (r && r.values) || {};
       if (alive) { if (v.theme) setTheme(v.theme); if (v.lex) setLex(v.lex); }
     }).catch(() => {}).finally(() => { settingsLoaded.current = true; });
     return () => { alive = false; };
-  }, [auth.loggedIn]);
+  }, [signedIn]);
   useEffect(() => { if (settingsLoaded.current) setMySetting("theme", theme).catch(() => {}); }, [theme]);
   useEffect(() => { if (settingsLoaded.current) setMySetting("lex", lex).catch(() => {}); }, [lex]);
   // global Tools/roster config (positions/skills, tool catalog, skill docs) — shared by everyone.
   // Pull into the local cache on sign-in; admin edits push back (save* fire window.__syncGlobal).
   useEffect(() => {
-    if (!auth.loggedIn) return;
+    if (!signedIn) return;
     window.__syncGlobal = (key, value) => { if (can("options.manage")) setGlobalConfig(key, value).catch(() => {}); };
     let alive = true;
     ["options", "skill_docs", "tool_cfgs"].forEach(k =>
       getGlobalConfig(k).then(r => { if (alive && r && r.value != null) applyGlobalConfig(k, r.value); }).catch(() => {}));
     return () => { alive = false; };
-  }, [auth.loggedIn]);
+  }, [signedIn]);
   useEffect(() => { saveU("rolePerms", rolePerms); }, [rolePerms]);
   useEffect(() => { saveU("userPerms", userPerms); }, [userPerms]);
   useEffect(() => { saveU("audit", audit); }, [audit]);
@@ -491,9 +508,11 @@ function App() {
   // (currentUser.permissions) — never client seed data. Knowing a username is not permission, and there
   // is no "fall back to the seeded admin" path: a real user who isn't an admin gets a non-admin UI. An
   // admin holds every key (admin-implicit-all, resolved server-side).
-  const me = currentUser;
+  const me = currentUser || (openMode ? { username: t('open.owner'), display_name: t('open.owner'), permissions: [] } : null);
   const mePerms = React.useMemo(() => new Set(currentUser?.permissions || []), [currentUser]);
-  const can = (k) => mePerms.has(k);
+  // openMode ⇒ allow-all is the SERVER's declaration (authMode:"open"), not a client fallback — the
+  // F1 rule stands: without that server signal, permissions come only from /auth/me.
+  const can = (k) => openMode || mePerms.has(k);
   // The user/role/audit management screens below still run on demo seed data (real CRUD is a follow-up);
   // they are gated by the REAL server `can` above, so only an actual admin ever reaches them. No
   // client-side audit trail — the server owns audit.
@@ -568,12 +587,17 @@ function App() {
     if (need && !can(need)) go("me");
   }, [route, mePerms]);
 
-  if (!auth.ready || !bootstrap) return null;   // avoid flashing the setup screen while restoring a session
-  // Kernel-only (no auth plugin installed yet): a verified setup code unlocks a minimal install shell
-  // instead of the full app — there's no real Login screen yet (arrives with the auth plugin itself).
-  if (!auth.loggedIn) {
-    if (bootstrap.bootstrapAuthorized) return <KernelOnlyShell language={language} />;
-    return <FirstRun t={t} language={language} onLang={pickLanguage} onVerified={(token) => { setToken(token); refreshBootstrap(); }} />;
+  const shell = resolveShellMode({ ready: auth.ready, caps, bootstrap, loggedIn: auth.loggedIn });
+  if (shell === 'loading') return null;   // avoid flashing the setup screen while restoring
+  if (shell === 'kernel-shell') return <KernelOnlyShell language={language} />;
+  if (shell === 'firstrun') {
+    return <FirstRun t={t} language={language} onLang={pickLanguage}
+      onVerified={(token) => {
+        setToken(token);
+        refreshBootstrap();
+        // verify-code flips the server open (spec §4) — refetch so this render pass sees it
+        getCapabilities().then(setCaps).catch(() => {});
+      }} />;
   }
 
   const screen = (() => {
@@ -615,7 +639,7 @@ function App() {
   return (
     <ToastProvider>
     <div className="app" key={lex}>
-      <Sidebar route={route} go={go} t={t} can={can} nav={navCfg} />
+      <Sidebar route={route} go={go} t={t} can={can} nav={navCfg} openMode={openMode} />
       <div className="main">
         <Topbar route={route} theme={theme} setTheme={setTheme} user={username} language={language} t={t}
           me={me} roles={roles} onSignOut={auth.logout}
