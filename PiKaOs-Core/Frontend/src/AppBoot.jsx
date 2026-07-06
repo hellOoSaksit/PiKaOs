@@ -1,16 +1,25 @@
-/* PiKaOs — app-level boot gate: shows the "Starting PIKA" curtain only when the mascot bundle
-   hasn't been cached for the current server build (GET /api/version build-hash check against
-   localStorage). Mounted in main.jsx, wrapping <App/> — asset loading is independent of auth
-   state, so this sits above the whole SPA rather than inside App.jsx's own conditional returns. */
+/* PiKaOs — app-level boot gate. On desktop it first decides WHICH server to talk to (the
+   Connect-Server screen when none is saved / the saved one is unreachable / the user asked to
+   switch — connect-server spec 2026-07-06), wires the desktop transport, and only THEN runs the
+   original job: show the "Starting PIKA" curtain when the mascot bundle isn't cached for the
+   current server build (GET /api/version build-hash check against localStorage). Mounted in
+   main.jsx, wrapping <App/> — asset loading is independent of auth state, so this sits above
+   the whole SPA rather than inside App.jsx's own conditional returns. */
 import React from 'react';
 const { useState, useEffect, useRef, useCallback } = React;
 import { getVersion, configureTransport } from './lib/api.js';
 import { packById, defaultPack } from './lib/i18n.jsx';
+import { probeServer } from './lib/server-url.js';
+import { ConnectServer } from './screens/ConnectServer.jsx';
 
 const BOOT_KEY = 'pikaos.boot.v1';
 const LEX_KEY = 'guild-lex';        // same key App.jsx reads for the active lexicon/language
 const BOOT_MIN = 1300;              // minimum curtain display so the animation doesn't flash by
 const BOOT_HARD_CAP = 4000;         // never trap the user on the splash if the mascot fails to load
+
+// sessionStorage flag: '1' = show Connect-Server even when the saved server is reachable
+// (set by the "change server" link on FirstRun/Login, cleared on the next successful connect)
+export const FORCE_CONNECT_KEY = 'pikaos.forceConnect';
 
 const BOOT_MSG = { en: 'Starting PIKA', th: 'กำลังเริ่ม PIKA' };
 
@@ -23,11 +32,25 @@ function currentLanguage() {
   return pack.lang === 'en' ? 'en' : 'th';
 }
 
+// desktop transport (API base + bearer-token provider) must be wired to the main process
+// BEFORE any request fires — including the version fetch — and well before App mounts and
+// useAuth's restore() runs (App/children only mount once phase reaches 'ready')
+function wireDesktopTransport(apiBaseUrl) {
+  configureTransport({
+    apiBase: apiBaseUrl,
+    tokenProvider: {
+      get: () => window.pikaosDesktop.auth.getAccessToken(),
+      refresh: async () => !!(await window.pikaosDesktop.auth.getAccessToken()),
+    },
+  });
+}
+
 export function AppBoot({ children }) {
-  const [phase, setPhase] = useState('checking'); // 'checking' | 'booting' | 'ready'
+  const [phase, setPhase] = useState('checking'); // 'checking' | 'connect' | 'booting' | 'ready'
   const frame = useRef(null);
   const mascotReady = useRef(false);
   const bootDone = useRef(false);
+  const mounted = useRef(true);
   const t0 = useRef(0);
   const buildRef = useRef(null);
 
@@ -36,39 +59,45 @@ export function AppBoot({ children }) {
     if (w) { try { w.postMessage({ pika: method, args }, '*'); } catch (e) { /* ignore */ } }
   }, []);
 
-  // cache check: compare the server's current build hash to the one saved on the last successful boot.
-  // On desktop, the transport (API base + bearer-token provider) must be wired to the main process
-  // BEFORE any request fires — including this one — and well before App mounts and useAuth's restore()
-  // runs (App/children only mount once this component reaches phase 'ready', see below).
-  useEffect(() => {
-    let alive = true;
+  // cache check: compare the server's current build hash to the one saved on the last
+  // successful boot — shared by the auto path and the Connect-Server path
+  const versionCheck = useCallback(() => {
     let stored = null;
     try { stored = localStorage.getItem(BOOT_KEY); } catch (e) { /* ignore */ }
-    (async () => {
-      if (window.pikaosDesktop?.isDesktop) {
-        // Configure the desktop transport in its own try so a config.get() rejection can't also
-        // abort the version fetch below and stall boot — the version fetch must always run.
-        try {
-          const { apiBaseUrl } = await window.pikaosDesktop.config.get();
-          configureTransport({
-            apiBase: apiBaseUrl,
-            tokenProvider: {
-              get: () => window.pikaosDesktop.auth.getAccessToken(),
-              refresh: async () => !!(await window.pikaosDesktop.auth.getAccessToken()),
-            },
-          });
-        } catch (e) { /* desktop transport unconfigured; version fetch + boot still proceed */ }
-      }
-      return getVersion();
-    })()
+    getVersion()
       .then((v) => {
-        if (!alive) return;
+        if (!mounted.current) return;
         buildRef.current = (v && v.build) || null;
         setPhase(buildRef.current && buildRef.current === stored ? 'ready' : 'booting');
       })
-      .catch(() => { if (alive) setPhase('booting'); });
-    return () => { alive = false; };
+      .catch(() => { if (mounted.current) setPhase('booting'); });
   }, []);
+
+  useEffect(() => {
+    mounted.current = true;
+    (async () => {
+      if (window.pikaosDesktop?.isDesktop) {
+        let force = false;
+        try { force = sessionStorage.getItem(FORCE_CONNECT_KEY) === '1'; } catch (e) { /* ignore */ }
+        let cfg = null;
+        try { cfg = await window.pikaosDesktop.config.get(); } catch (e) { /* main unreachable → connect */ }
+        const hasSaved = !!cfg && Array.isArray(cfg.servers) && cfg.servers.length > 0 && !!cfg.apiBaseUrl;
+        const reachable = !force && hasSaved && await probeServer(cfg.apiBaseUrl);
+        if (!mounted.current) return;
+        if (!reachable) { setPhase('connect'); return; }   // spec: fresh / unreachable / forced
+        wireDesktopTransport(cfg.apiBaseUrl);
+      }
+      if (mounted.current) versionCheck();
+    })();
+    return () => { mounted.current = false; };
+  }, [versionCheck]);
+
+  // Connect-Server probed + saved a server → same wiring as the auto path, then normal boot
+  const onConnected = useCallback((apiBaseUrl) => {
+    try { sessionStorage.removeItem(FORCE_CONNECT_KEY); } catch (e) { /* ignore */ }
+    wireDesktopTransport(apiBaseUrl);
+    versionCheck();
+  }, [versionCheck]);
 
   // boot curtain: hold a minimum, finish once the mascot signals ready (or immediately on narrow
   // screens), hard-capped so a missing/broken iframe never traps the user.
@@ -109,6 +138,7 @@ export function AppBoot({ children }) {
   }, [phase, pika]);
 
   if (phase === 'checking') return null;
+  if (phase === 'connect') return <ConnectServer language={currentLanguage()} onConnected={onConnected} />;
   if (phase === 'ready') return children;
 
   const word = ['P', 'I', 'K', 'A'];
