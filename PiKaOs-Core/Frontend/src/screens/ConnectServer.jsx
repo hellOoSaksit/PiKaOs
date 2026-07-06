@@ -12,7 +12,7 @@ import { normalizeServerInput, probeServer } from '../lib/server-url.js';
 const DICT = {
   en: {
     title: 'Connect to your server',
-    subtitle: (name) => `Enter the address of your ${name} server — for example 192.168.1.50:8000 or https://pikaos.example.com`,
+    subtitle: (name) => `Enter the address of your ${name} server — for example 192.168.1.50:8000 or https://your-server.example`,
     placeholder: 'server URL or IP',
     connect: 'Connect',
     connecting: 'Connecting…',
@@ -26,10 +26,11 @@ const DICT = {
     errHttp: 'Plain http is allowed only for local, LAN, or VPN addresses — use https for public servers.',
     errUnreachable: 'Cannot reach a server at this address.',
     errSave: 'Connected, but saving the server failed — check the desktop logs.',
+    errDelete: 'Could not remove that server — try again.',
   },
   th: {
     title: 'เชื่อมต่อเซิร์ฟเวอร์',
-    subtitle: (name) => `กรอกที่อยู่เซิร์ฟเวอร์ ${name} ของคุณ — เช่น 192.168.1.50:8000 หรือ https://pikaos.example.com`,
+    subtitle: (name) => `กรอกที่อยู่เซิร์ฟเวอร์ ${name} ของคุณ — เช่น 192.168.1.50:8000 หรือ https://your-server.example`,
     placeholder: 'URL หรือ IP ของเซิร์ฟเวอร์',
     connect: 'เชื่อมต่อ',
     connecting: 'กำลังเชื่อมต่อ…',
@@ -43,6 +44,7 @@ const DICT = {
     errHttp: 'http ใช้ได้เฉพาะที่อยู่ local / LAN / VPN — เซิร์ฟเวอร์สาธารณะต้องใช้ https',
     errUnreachable: 'ติดต่อเซิร์ฟเวอร์ตามที่อยู่นี้ไม่ได้',
     errSave: 'เชื่อมต่อได้ แต่บันทึกเซิร์ฟเวอร์ไม่สำเร็จ — ตรวจ log ของแอป',
+    errDelete: 'ลบเซิร์ฟเวอร์ไม่สำเร็จ — ลองใหม่',
   },
 };
 
@@ -90,13 +92,21 @@ export function ConnectServer({ language, onConnected }) {
   };
 
   const removeServer = async (url) => {
-    const next = servers.filter((s) => s.url !== url);
-    setServers(next);
-    // deleting a row is list housekeeping, not a disconnect — the active URL stays
+    const prev = servers;
+    setServers(servers.filter((s) => s.url !== url));   // optimistic
+    // deleting a row is list housekeeping, not a disconnect — the active URL stays. Filter off
+    // the freshly-read config (not local state) so we persist against the real stored list, and
+    // roll the UI back if the write fails so a "deleted" row never silently returns on relaunch.
     try {
       const cfg = await window.pikaosDesktop.config.get();
-      await window.pikaosDesktop.config.set({ apiBaseUrl: cfg.apiBaseUrl, servers: next });
-    } catch (e) { /* next successful connect rewrites the list anyway */ }
+      await window.pikaosDesktop.config.set({
+        apiBaseUrl: cfg.apiBaseUrl,
+        servers: (Array.isArray(cfg.servers) ? cfg.servers : []).filter((s) => s.url !== url),
+      });
+    } catch (e) {
+      setServers(prev);        // rollback: reflect what is actually persisted
+      setError(T.errDelete);
+    }
   };
 
   const submit = (e) => { e.preventDefault(); connect(input); };
