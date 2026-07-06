@@ -1,0 +1,46 @@
+# PiKaOs — PRODUCTION kernel base compose (backend + frontend). Prod counterpart of
+# docker-compose.dev.yml. Rendered by `Backend/scripts/render_compose.py --prod`, which merges each
+# enabled tool plugin's compose.fragment.yml (db / redis+worker / minio) on top, exactly like dev —
+# output goes to docker-compose.generated.prod.yml (gitignored).
+#
+# Differs from dev by STRUCTURE only:
+#   - no source bind-mounts (immutable image, not the host checkout)
+#   - no UVICORN_RELOAD  → entrypoint runs `uvicorn --workers ${WEB_CONCURRENCY:-4}`
+#   - frontend build target = prod (nginx static bundle), not the Vite dev server
+#   - ports bound to 127.0.0.1 — a TLS edge (nginx/ALB) terminates HTTPS in front; never 0.0.0.0
+#   - no dev mock-plugin mount
+#
+# ENV MODEL (single-network): every service reads ../Backend/.env (+ ../.env.ai), same paths as dev —
+# but on a PROD host those files hold PRODUCTION values (ENVIRONMENT=production, strong JWT_SECRET /
+# SECRET_KEY, COOKIE_SECURE=true, non-default SEED_PASSWORD / MINIO / REDIS creds, WEB_CONCURRENCY).
+# The backend refuses to boot (config.production_violations) unless they are strong. Populate them on
+# the prod host from deploy/.env.prod.example. No per-service ${ref} overlay is needed now that all
+# services share one compose project — the old prod.backend/prod.data overlays were a 4-stack artifact.
+services:
+  backend:
+    build: ../Backend
+    restart: unless-stopped
+    env_file:
+      - ../Backend/.env
+      - ../.env.ai
+    # UVICORN_RELOAD deliberately absent → multi-worker uvicorn (docker-entrypoint.sh).
+    ports:
+      - "127.0.0.1:8000:8000"   # behind the TLS edge; not host-public
+    volumes:
+      - kernelstate:/app/state   # shared with the worker (from the redis fragment)
+
+  frontend:
+    build:
+      context: ../Frontend
+      target: prod               # nginx static bundle (Frontend/Dockerfile `prod` stage)
+    restart: unless-stopped
+    environment:
+      # nginx envsubst target — proxies /api + /ws to the backend over the compose network (same-origin).
+      BACKEND_URL: http://backend:8000
+    ports:
+      - "127.0.0.1:8080:80"      # behind the TLS edge
+    depends_on:
+      - backend
+
+volumes:
+  kernelstate:

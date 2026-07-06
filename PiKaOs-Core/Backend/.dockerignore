@@ -1,0 +1,32 @@
+# Keep secrets and runtime state OUT of the build context (Dockerfile does `COPY . .`).
+# Fix-SEC: without this, the gitignored real .env (JWT_SECRET, DB/MinIO creds, SEED_PASSWORD) and
+# local state bake into every image — leaked the instant an image is pushed/saved (`docker history`).
+# .env is supplied at RUNTIME via compose `env_file:`, so excluding it here does not affect boot.
+#
+# DO NOT add: requirements.lock (Dockerfile:23 installs it), docker-entrypoint.sh / worker-entrypoint.sh,
+# app/, scripts/, alembic*, tests/ (the plugin-free suite is expected to run on the built image).
+
+# secrets
+.env
+.env.*
+!.env.example
+
+# runtime state (mounted as volumes at runtime, never baked)
+state/
+data/
+
+# python / tooling caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+*.log
+
+# vcs / editor
+.git/
+.gitignore
+.vscode/
+.idea/
