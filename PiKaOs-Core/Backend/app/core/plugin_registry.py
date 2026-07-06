@@ -52,18 +52,28 @@ def enabled_ids(registry: dict[str, dict]) -> set[str]:
     return {pid for pid in registry if state_of(registry, pid) == ENABLED}
 
 
+def _as_registry(reg: object) -> dict[str, dict]:
+    """Coerce whatever the state file held into a registry map (mirrors `read()`)."""
+    return dict(reg) if isinstance(reg, dict) else {}
+
+
 def set_state(pid: str, state: str, *, version: str | None = None) -> dict[str, dict]:
-    """Upsert one plugin's state, preserving `installed_at` across transitions; returns the new map."""
-    reg = read()
-    entry = dict(reg.get(pid) or {})
-    entry["state"] = state
-    if version is not None:
-        entry["version"] = version
-    if state in (INSTALLED, ENABLED) and "installed_at" not in entry:
-        entry["installed_at"] = datetime.now(timezone.utc).isoformat()
-    reg[pid] = entry
-    kernel_state.write_json(_KEY, reg)
-    return reg
+    """Upsert one plugin's state, preserving `installed_at` across transitions; returns the new map.
+    Cross-process-atomic (K2): the read-modify-write runs under `kernel_state.update`'s flock so a
+    concurrent worker's write can't clobber this one — critical, since a lost registry write = a plugin
+    that never mounts."""
+    def mutate(reg: object) -> dict[str, dict]:
+        reg = _as_registry(reg)
+        entry = dict(reg.get(pid) or {})
+        entry["state"] = state
+        if version is not None:
+            entry["version"] = version
+        if state in (INSTALLED, ENABLED) and "installed_at" not in entry:
+            entry["installed_at"] = datetime.now(timezone.utc).isoformat()
+        reg[pid] = entry
+        return reg
+
+    return kernel_state.update(_KEY, mutate, {})
 
 
 def set_git_install(pid: str, *, repo_url: str, tag: str, version: str,
@@ -72,17 +82,24 @@ def set_git_install(pid: str, *, repo_url: str, tag: str, version: str,
     the provenance Uninstall/Purge/update-check need — `repoUrl`/`installedTag`/`installedSha` and
     `installedVia: "git"` (a `symlink` entry, the default, is never physically deletable — it's a
     dev's sibling checkout). `installedSha` is the IMMUTABLE pin (marketplace.md W2): a tag can be
-    force-moved, a commit SHA cannot, so the SHA is what an audit/tamper-check compares against."""
-    reg = set_state(pid, ENABLED, version=version)
-    entry = dict(reg[pid])
-    entry["repoUrl"] = repo_url
-    entry["installedVia"] = "git"
-    entry["installedTag"] = tag
-    if sha is not None:
-        entry["installedSha"] = sha
-    reg[pid] = entry
-    kernel_state.write_json(_KEY, reg)
-    return reg
+    force-moved, a commit SHA cannot, so the SHA is what an audit/tamper-check compares against. Done in
+    ONE flock'd update (K2) so state + provenance land atomically — no torn two-write window."""
+    def mutate(reg: object) -> dict[str, dict]:
+        reg = _as_registry(reg)
+        entry = dict(reg.get(pid) or {})
+        entry["state"] = ENABLED
+        entry["version"] = version
+        if "installed_at" not in entry:
+            entry["installed_at"] = datetime.now(timezone.utc).isoformat()
+        entry["repoUrl"] = repo_url
+        entry["installedVia"] = "git"
+        entry["installedTag"] = tag
+        if sha is not None:
+            entry["installedSha"] = sha
+        reg[pid] = entry
+        return reg
+
+    return kernel_state.update(_KEY, mutate, {})
 
 
 def installed_via(registry: dict[str, dict], pid: str) -> str:
@@ -113,12 +130,14 @@ def uninstall_git(pid: str) -> dict[str, dict]:
     """Uninstall a git-installed plugin: state → PENDING_PURGE. Provenance (`repoUrl`/`installedTag`)
     is deliberately KEPT (not `remove()`d) so Purge can still find what to drop. The caller (router)
     is responsible for the on-disk folder deletion — the registry only tracks desired state."""
-    reg = read()
-    entry = dict(reg.get(pid) or {})
-    entry["state"] = PENDING_PURGE
-    reg[pid] = entry
-    kernel_state.write_json(_KEY, reg)
-    return reg
+    def mutate(reg: object) -> dict[str, dict]:
+        reg = _as_registry(reg)
+        entry = dict(reg.get(pid) or {})
+        entry["state"] = PENDING_PURGE
+        reg[pid] = entry
+        return reg
+
+    return kernel_state.update(_KEY, mutate, {})
 
 
 def purge_complete(pid: str) -> dict[str, dict]:
@@ -128,10 +147,12 @@ def purge_complete(pid: str) -> dict[str, dict]:
 
 def remove(pid: str) -> dict[str, dict]:
     """Forget a plugin (uninstall → back to *available*); returns the new map. No table drop (see P4)."""
-    reg = read()
-    reg.pop(pid, None)
-    kernel_state.write_json(_KEY, reg)
-    return reg
+    def mutate(reg: object) -> dict[str, dict]:
+        reg = _as_registry(reg)
+        reg.pop(pid, None)
+        return reg
+
+    return kernel_state.update(_KEY, mutate, {})
 
 
 # --- dependency resolver (PURE — no state, unit-testable) -------------------------------------------
