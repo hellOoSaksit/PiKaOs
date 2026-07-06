@@ -137,3 +137,47 @@ def test_shutdown_plugins_survives_a_stale_enabled_id_purged_mid_process(monkeyp
 
     assert errors == {}                                # no crash, no spurious error for "crm"
     assert len(sample_calls) == 1                       # "sample"'s shutdown() still ran
+
+
+def test_discover_quarantines_bad_plugins_instead_of_raising(monkeypatch, tmp_path):
+    """K1: a malformed / coreVersion-incompatible / broken-dependency plugin is QUARANTINED (recorded with
+    a reason, skipped) rather than aborting discovery. discover() runs at import, so a raise would brick
+    the whole API + the plugins UI that fixes it. A valid plugin alongside the bad ones still loads."""
+    import json
+
+    plugins = tmp_path / "plugins"
+    plugins.mkdir()
+
+    def write(folder: str, manifest: dict | None = None, *, raw_text: str | None = None) -> None:
+        d = plugins / folder
+        d.mkdir()
+        (d / "manifest.json").write_text(raw_text if raw_text is not None else json.dumps(manifest))
+
+    write("good", {"id": "good", "name": "Good", "version": "0.1.0", "coreVersion": "*"})
+    write("oldcore", {"id": "oldcore", "name": "Old", "version": "0.1.0", "coreVersion": "^99.0.0"})
+    write("brokenjson", raw_text="{ not valid json ")
+    write("needsbad", {"id": "needsbad", "name": "NeedsBad", "version": "0.1.0",
+                       "coreVersion": "*", "dependencies": ["oldcore"]})
+
+    monkeypatch.setattr(plugin_loader, "PLUGINS_DIR", plugins)
+    try:
+        found = plugin_loader.discover()
+
+        assert set(found) == {"good"}                                    # the valid plugin still loads
+        assert set(plugin_loader.QUARANTINED) == {"oldcore", "brokenjson", "needsbad"}
+        assert "coreVersion" in plugin_loader.QUARANTINED["oldcore"]
+        assert "valid JSON" in plugin_loader.QUARANTINED["brokenjson"]
+        assert "quarantined" in plugin_loader.QUARANTINED["needsbad"]     # cascades from oldcore
+    finally:
+        plugin_loader.QUARANTINED.clear()                                # don't leak into other tests
+
+
+def test_plugin_states_surfaces_quarantined_with_reason(monkeypatch):
+    """/health lists a quarantined plugin (not in PLUGIN_MANIFESTS) with its reason so an operator can see
+    and fix it without shelling into the volume (K1)."""
+    monkeypatch.setattr(plugin_loader, "QUARANTINED", {"oldcore": "coreVersion '^99.0.0' excludes Core"})
+    monkeypatch.setattr(modules, "PLUGIN_MANIFESTS", {})
+    states = modules.plugin_states()
+    q = [s for s in states if s["id"] == "oldcore"]
+    assert q and q[0]["state"] == "quarantined"
+    assert "coreVersion" in q[0]["reason"]

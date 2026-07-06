@@ -102,14 +102,23 @@ def _state_of(pid: str, enabled: set[str]) -> str:
 
 def plugin_states() -> list[dict]:
     """Each discovered plugin's state for /health (§14): `active` (enabled + healthy) · `degraded`
-    (enabled but its router failed to load, §8) · `disabled` (not enabled this build), with its
-    **version read from the manifest** (never hardcoded → ties to versions.md). Lists every discovered
-    plugin — a disabled one still appears, so an operator sees the full installable surface."""
+    (enabled but its router failed to load, §8) · `disabled` (not enabled this build) · `quarantined`
+    (present on disk but its manifest failed validation — carries a `reason`, K1), with its **version read
+    from the manifest** (never hardcoded → ties to versions.md). Lists every discovered plugin — a
+    disabled or quarantined one still appears, so an operator sees the full installable surface AND why a
+    bad plugin didn't load."""
     enabled = enabled_optional_modules()
-    return [
+    states = [
         {"id": pid, "version": mf.version, "state": _state_of(pid, enabled)}
         for pid, mf in sorted(PLUGIN_MANIFESTS.items())
     ]
+    # Quarantined plugins never entered PLUGIN_MANIFESTS (they failed validation), so append them with the
+    # reason so the operator can see + fix them from /health without shelling into the volume (K1).
+    states += [
+        {"id": pid, "version": None, "state": "quarantined", "reason": reason}
+        for pid, reason in sorted(plugin_loader.QUARANTINED.items())
+    ]
+    return states
 
 
 def register_routers(app: FastAPI) -> list[str]:

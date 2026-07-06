@@ -185,26 +185,57 @@ def _validate(folder: str, raw: dict) -> Manifest:
     )
 
 
+# {folder-or-id: reason} for plugins present on disk that FAILED discovery/validation. Populated by
+# discover(); surfaced in /health (state "quarantined"). See discover() for why this is not fatal (K1).
+QUARANTINED: dict[str, str] = {}
+
+
 def discover() -> dict[str, Manifest]:
-    """Read + validate every `app/plugins/<id>/manifest.json`. Returns {id: Manifest}. A malformed
-    manifest is a hard failure (§3) — better to refuse boot than serve a half-wired build."""
+    """Read + validate every `app/plugins/<id>/manifest.json`. Returns {id: Manifest} for the plugins
+    that validated cleanly.
+
+    **Fault-isolated (K1, plugin-architecture §8).** A malformed/JSON-broken/`coreVersion`-incompatible
+    manifest — or one whose hard `dependency` is missing/quarantined — is **quarantined** (recorded in the
+    module-level `QUARANTINED` with the reason, skipped, and reported by /health) rather than raised.
+    `discover()` runs at import (`PLUGIN_MANIFESTS = discover()`), so raising here would abort app start —
+    and take down the very plugins-management UI an operator needs to remove the bad plugin. One
+    incompatible plugin after a Core version bump must degrade to "that plugin disabled with a visible
+    reason", never a bricked deployment. Structural validation itself still lives in `_validate` (which
+    raises); this function is the boundary that turns those raises into per-plugin quarantine."""
     found: dict[str, Manifest] = {}
-    if not PLUGINS_DIR.is_dir():
-        return found
-    for child in sorted(PLUGINS_DIR.iterdir()):
-        mf = child / "manifest.json"
-        if not mf.is_file():
-            continue
-        try:
-            raw = json.loads(mf.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as e:
-            raise ManifestError(f"plugin '{child.name}': manifest.json is not valid JSON — {e}") from e
-        found[child.name] = _validate(child.name, raw)
-    # every hard dependency must resolve to a known plugin (§4)
-    for m in found.values():
-        for dep in m.dependencies:
-            if dep not in found:
-                raise ManifestError(f"plugin '{m.id}': dependency '{dep}' is not an installed plugin")
+    quarantined: dict[str, str] = {}
+    if PLUGINS_DIR.is_dir():
+        for child in sorted(PLUGINS_DIR.iterdir()):
+            mf = child / "manifest.json"
+            if not mf.is_file():
+                continue
+            try:
+                raw = json.loads(mf.read_text(encoding="utf-8"))
+                found[child.name] = _validate(child.name, raw)
+            except json.JSONDecodeError as e:
+                quarantined[child.name] = f"manifest.json is not valid JSON — {e}"
+                log.error("plugin '%s' quarantined: invalid manifest JSON — %s", child.name, e)
+            except ManifestError as e:
+                quarantined[child.name] = str(e)
+                log.error("plugin '%s' quarantined: %s", child.name, e)
+    # A hard dependency must resolve to a plugin that itself validated (§4). A plugin whose dep is
+    # missing/quarantined can't wire, so it is quarantined too — iterated to a fixpoint so the failure
+    # cascades along a dependency chain (A→B→C: quarantine B ⇒ A ⇒ anything depending on A).
+    changed = True
+    while changed:
+        changed = False
+        for pid, m in list(found.items()):
+            for dep in m.dependencies:
+                if dep not in found:
+                    reason = (f"dependency '{dep}' is quarantined" if dep in quarantined
+                              else f"dependency '{dep}' is not an installed plugin")
+                    quarantined[pid] = reason
+                    log.error("plugin '%s' quarantined: %s", pid, reason)
+                    del found[pid]
+                    changed = True
+                    break
+    QUARANTINED.clear()
+    QUARANTINED.update(quarantined)
     return found
 
 
