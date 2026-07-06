@@ -13,6 +13,7 @@
 import React from 'react';
 const { useState, useEffect, useRef, useCallback } = React;
 import * as api from '../lib/api.js';
+import { FORCE_CONNECT_KEY } from '../AppBoot.jsx';
 
 const DICT = {
   en: {
@@ -25,6 +26,7 @@ const DICT = {
     codeLabel: 'Setup code',
     codePh: 'e.g.  PIKA-7F3A-K9QD',
     codeHint: 'Find it in the server console / startup logs (stdout). The code rotates on every restart.',
+    changeServer: 'Connect to a different server',
     verifyIdle: 'Continue',
     verifyLoad: 'Verifying…',
     errEmpty: 'Please enter the setup code from the server console.',
@@ -43,6 +45,7 @@ const DICT = {
     codeLabel: 'รหัสตั้งค่า',
     codePh: 'เช่น  PIKA-7F3A-K9QD',
     codeHint: 'ดูได้จากคอนโซล / log ตอนเริ่มระบบ (stdout) รหัสจะเปลี่ยนใหม่ทุกครั้งที่รีสตาร์ท',
+    changeServer: 'เปลี่ยนเซิร์ฟเวอร์',
     verifyIdle: 'ดำเนินการต่อ',
     verifyLoad: 'กำลังตรวจสอบ…',
     errEmpty: 'กรุณากรอกรหัสตั้งค่าจากคอนโซลของเซิร์ฟเวอร์',
@@ -217,6 +220,18 @@ export function FirstRun({ t, language, onLang, onVerified }) {
           <button type="submit" className="btn btn-gold" disabled={loading || ok} style={{ width: '100%', padding: 14, fontSize: 15.5 }}>
             {loading ? T.verifyLoad : T.verifyIdle}
           </button>
+
+          {window.pikaosDesktop?.isDesktop && !ok && (
+            <button type="button"
+              onClick={() => {
+                try { sessionStorage.setItem(FORCE_CONNECT_KEY, '1'); } catch (err) { /* ignore */ }
+                window.location.reload();
+              }}
+              style={{ display: 'block', margin: '18px auto 0', background: 'none', border: 0, cursor: 'pointer',
+                color: 'var(--ink-3)', fontSize: 13, textDecoration: 'underline', textUnderlineOffset: 3 }}>
+              {T.changeServer}
+            </button>
+          )}
 
           <footer style={{ marginTop: 26, paddingTop: 20, borderTop: '1px solid var(--line-soft)', display: 'flex',
             alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap', fontFamily: 'var(--font-mono)',
