@@ -75,3 +75,15 @@ export async function probeServer(apiBaseUrl, { timeoutMs = 5000 } = {}) {
     clearTimeout(timer);
   }
 }
+
+// Per-server client-data namespace key (capability-handshake spec §5): the desktop's one
+// app://pikaos origin serves EVERY server, so anything server-derived in web storage must be
+// keyed. A relative base means the web build talking to its own origin — one server, key 'web'.
+export function serverKeyFor(apiBase) {
+  try {
+    const u = new URL(apiBase);
+    return `${u.host}${u.pathname.replace(/\/+$/, '')}`;
+  } catch {
+    return 'web';
+  }
+}

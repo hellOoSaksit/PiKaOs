@@ -7,13 +7,18 @@
    the whole SPA rather than inside App.jsx's own conditional returns. */
 import React from 'react';
 const { useState, useEffect, useRef, useCallback } = React;
-import { getVersion, configureTransport } from './lib/api.js';
+import { getVersion, configureTransport, getApiBase } from './lib/api.js';
 import { packById, defaultPack, makeT } from './lib/i18n.jsx';
 import { getBrand } from './lib/brand.js';
-import { probeServer } from './lib/server-url.js';
+import { probeServer, serverKeyFor } from './lib/server-url.js';
 import { ConnectServer } from './screens/ConnectServer.jsx';
 
-const BOOT_KEY = 'pikaos.boot.v1';
+// build-hash cache key, per server (spec §5): the same desktop talks to many servers, and server
+// A's build must not satisfy server B's curtain check. Computed at USE time — the desktop transport
+// (and therefore the active base) is wired before versionCheck runs on every path.
+const bootKey = () => `pikaos.boot.v1:${serverKeyFor(getApiBase())}`;
+// one-time scrub of the old global key (same pattern as api.js's localStorage scrub)
+try { localStorage.removeItem('pikaos.boot.v1'); } catch (e) { /* ignore */ }
 const LEX_KEY = 'guild-lex';        // same key App.jsx reads for the active lexicon/language
 const BOOT_MIN = 1300;              // minimum curtain display so the animation doesn't flash by
 const BOOT_HARD_CAP = 4000;         // never trap the user on the splash if the mascot fails to load
@@ -63,7 +68,7 @@ export function AppBoot({ children }) {
   // successful boot — shared by the auto path and the Connect-Server path
   const versionCheck = useCallback(() => {
     let stored = null;
-    try { stored = localStorage.getItem(BOOT_KEY); } catch (e) { /* ignore */ }
+    try { stored = localStorage.getItem(bootKey()); } catch (e) { /* ignore */ }
     getVersion()
       .then((v) => {
         if (!mounted.current) return;
@@ -109,7 +114,7 @@ export function AppBoot({ children }) {
     const finish = () => {
       if (bootDone.current) return;
       bootDone.current = true;
-      if (buildRef.current) { try { localStorage.setItem(BOOT_KEY, buildRef.current); } catch (e) { /* ignore */ } }
+      if (buildRef.current) { try { localStorage.setItem(bootKey(), buildRef.current); } catch (e) { /* ignore */ } }
       setPhase('ready');
     };
     const tryFinish = () => {
