@@ -2,13 +2,17 @@
    the inline RichBody form input, doc seed content, and the lazy TipTap loader. */
 import React from 'react';
 const { useState, useEffect, useRef } = React;
+import { sanitizeHtml } from '../lib/sanitize.js';
 
 /* ---------------- full-page doc editor (TipTap, exec-command fallback) ---------------- */
+// TipTap is vendored (npm), lazy-imported for code-splitting — NOT from a CDN (F3): a runtime esm.sh
+// import was a supply-chain risk, broke offline/air-gapped use, and was blocked by the desktop CSP
+// (which silently dropped the app to the less-safe contentEditable fallback).
 let _tiptapP;
 function loadTiptap() {
   if (!_tiptapP) _tiptapP = (async () => {
-    const core = await import("https://esm.sh/@tiptap/core@2.11.5");
-    const sk = await import("https://esm.sh/@tiptap/starter-kit@2.11.5");
+    const core = await import("@tiptap/core");
+    const sk = await import("@tiptap/starter-kit");
     return { Editor: core.Editor, StarterKit: sk.default || sk.StarterKit };
   })();
   return _tiptapP;
@@ -34,7 +38,7 @@ function DocEditor({ docId, title, seed, onClose, tabs, activeTab, onTab }) {
       ed = new Editor({ element: elRef.current, extensions: [StarterKit], content: initial,
         onUpdate: ({ editor }) => { try { localStorage.setItem(key, editor.getHTML()); } catch (e) { } } });
       edRef.current = ed; setMode("tiptap");
-    }).catch(() => { if (dead) return; if (faRef.current) faRef.current.innerHTML = initial; setMode("fallback"); });
+    }).catch(() => { if (dead) return; if (faRef.current) faRef.current.innerHTML = sanitizeHtml(initial); setMode("fallback"); });
     return () => { dead = true; if (ed) ed.destroy(); };
   }, [docId]);
   const saveFallback = () => { try { localStorage.setItem("guildos.doc." + docId, faRef.current.innerHTML); } catch (e) { } };
@@ -45,7 +49,7 @@ function DocEditor({ docId, title, seed, onClose, tabs, activeTab, onTab }) {
       const text = String(rd.result || "");
       const html = text.split(/\n\n+/).map(p => "<p>" + p.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/\n/g, "<br>") + "</p>").join("");
       if (mode === "tiptap" && edRef.current) { edRef.current.commands.setContent(html); }
-      else if (faRef.current) { faRef.current.innerHTML = html; saveFallback(); }
+      else if (faRef.current) { faRef.current.innerHTML = sanitizeHtml(html); saveFallback(); }
     };
     rd.readAsText(fl); e.target.value = "";
   };
@@ -118,7 +122,7 @@ function RichBody({ value, onChange, placeholder, minHeight = 110 }) {
       ed = new Editor({ element: elRef.current, extensions: [StarterKit], content: initialHtml,
         onUpdate: ({ editor }) => cbRef.current && cbRef.current(editor.getText(), editor.getHTML()) });
       edRef.current = ed; setMode("tiptap");
-    }).catch(() => { if (dead) return; if (faRef.current) faRef.current.innerHTML = initialHtml; setMode("fallback"); });
+    }).catch(() => { if (dead) return; if (faRef.current) faRef.current.innerHTML = sanitizeHtml(initialHtml); setMode("fallback"); });
     return () => { dead = true; if (ed) ed.destroy(); };
   }, []);
   const emitFallback = () => { if (faRef.current && cbRef.current) cbRef.current(faRef.current.innerText, faRef.current.innerHTML); };

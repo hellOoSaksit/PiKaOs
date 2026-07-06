@@ -5,6 +5,7 @@ import { loadCoreRules } from '../../lib/characters.jsx';
 import { Avatar, Btn, StatusBadge } from '../../components/components.jsx';
 import { CharacterSprite } from '../../components/CharacterSprite.jsx';
 import { st, setSt } from './st.js';
+import { sanitizeHtml } from '../../lib/sanitize.js';
 
 /* ---------------- AGENT DRAWER ---------------- */
 function AgentDrawer({ a, onClose, onEdit, onDelete, t }) {
@@ -16,7 +17,7 @@ function AgentDrawer({ a, onClose, onEdit, onDelete, t }) {
   const mdFiles = ["SKILL.md", "TOOLS.md", "EXAMPLES.md", "REFERENCE.md", ...extra];
   const dlMd = (f) => {
     let html = ""; try { html = localStorage.getItem("guildos.doc.agent:" + a.id + ":" + f) || ""; } catch (e) { }
-    const div = document.createElement("div"); div.innerHTML = html;
+    const div = document.createElement("div"); div.innerHTML = sanitizeHtml(html);
     const txt = (div.innerText || "").trim() || ("# " + f.replace(/\.md$/, ""));
     const blob = new Blob([txt + "\n"], { type: "text/markdown;charset=utf-8" });
     const el = document.createElement("a"); el.href = URL.createObjectURL(blob); el.download = f;

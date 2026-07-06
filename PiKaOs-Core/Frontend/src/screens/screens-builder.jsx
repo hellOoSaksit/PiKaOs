@@ -10,6 +10,7 @@ import { CharacterSprite } from '../components/CharacterSprite.jsx';
 import { DOC_SEED, DocEditor, RichBody } from '../components/doc-editor.jsx';
 import { CLASS_OPTS, COLOR_OPTS } from '../lib/sprites.jsx';
 import { MODEL_OPTS, STATUS_OPTS, makeCharacter } from '../lib/store.jsx';
+import { sanitizeHtml } from '../lib/sanitize.js';
 
 /* ============================================================
    CHARACTER BUILDER — create / edit an adventurer (AI agent)
@@ -239,7 +240,7 @@ function CoreRules({ canEdit }) {
 
 /* ---- per-agent .md files (open / download / add) ---- */
 function _htmlToMd(html) {
-  const el = document.createElement("div"); el.innerHTML = html || "";
+  const el = document.createElement("div"); el.innerHTML = sanitizeHtml(html);
   const out = [];
   el.childNodes.forEach(n => {
     if (n.nodeType === 3) { const t = n.textContent.trim(); if (t) out.push(t); return; }
