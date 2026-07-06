@@ -24,6 +24,11 @@ log = logging.getLogger("pikaos.plugins.git_installer")
 _APP = "app_settings"                              # same kernel-local blob settings_config.py uses
 _ALLOWLIST_KEY = "plugin_install_allowed_hosts"     # {value: [host, ...]}
 _CREDENTIALS_KEY = "plugin_git_credentials"         # {value: {host: encrypted_token}}
+# Installer-owned keys that live in the shared `app_settings` blob. The generic `/api/settings/global/{key}`
+# routes MUST refuse these (K4): otherwise `options.manage` (weaker than `plugins.manage`) could widen the
+# RCE allowlist or overwrite credentials via PUT, and any authenticated user could read the (encrypted)
+# credential blob via GET. settings_config.py imports this to build its reserved-key denylist.
+RESERVED_SETTINGS_KEYS: frozenset[str] = frozenset({_ALLOWLIST_KEY, _CREDENTIALS_KEY})
 _STDERR_LOG_LIMIT = 2000                            # cap so one runaway git error can't flood the log
 
 

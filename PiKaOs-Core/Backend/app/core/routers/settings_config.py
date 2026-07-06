@@ -12,9 +12,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from .. import kernel_state
+from ..git_installer import RESERVED_SETTINGS_KEYS
 from ..identity import UserLike, get_current_user, require_perm
 from ..schemas import GlobalConfigOut, NavConfigIn, NavConfigOut, SettingValueIn, UserSettingsOut
 
@@ -23,6 +24,15 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 _NAV_KEY = "nav"
 _APP = "app_settings"       # {key: {"value": <json>, "updated_at": <iso>}}
 _USERS = "user_settings"    # {user_id: {key: <json>}}
+
+
+def _guard_reserved(key: str) -> None:
+    """Installer-owned keys (git allowlist / credentials) share the `app_settings` blob but MUST NOT be
+    readable or writable through this generic KV — that is a privilege side-channel around `plugins.manage`
+    (K4). Treat them as absent (404, generic) so this route never becomes a way to read credentials or
+    widen the install allowlist."""
+    if key in RESERVED_SETTINGS_KEYS:
+        raise HTTPException(status_code=404, detail="Not found")
 
 
 # --- shared (app-scoped) config over the app_settings state file ------------------------------------
@@ -96,7 +106,9 @@ async def set_my_setting(
 
 @router.get("/global/{key}", response_model=GlobalConfigOut)
 async def get_global(key: str, _: UserLike = Depends(get_current_user)) -> GlobalConfigOut:
-    """A shared config blob by key (or null). Any authenticated user can read it."""
+    """A shared config blob by key (or null). Any authenticated user can read it — except installer-owned
+    reserved keys (K4), which 404."""
+    _guard_reserved(key)
     entry = _app_get(key)
     return GlobalConfigOut(value=entry.get("value") if entry else None)
 
@@ -107,6 +119,8 @@ async def put_global(
     body: SettingValueIn,
     user: UserLike = Depends(require_perm("options.manage")),
 ) -> GlobalConfigOut:
-    """Set a shared config blob (requires options.manage). Seen by every user/device."""
+    """Set a shared config blob (requires options.manage). Seen by every user/device. Installer-owned
+    reserved keys (K4) 404 — they are managed only through the `plugins.manage`-gated installer routes."""
+    _guard_reserved(key)
     entry = _app_upsert(key, body.value)
     return GlobalConfigOut(value=entry["value"])
