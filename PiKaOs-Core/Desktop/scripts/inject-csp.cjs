@@ -6,13 +6,17 @@ const path = require('node:path')
 // Mandatory hardening (spec §9) — the bundled renderer must ship a CSP. Packaging copies
 // Frontend/dist via extraResources (electron-builder.yml: `../Frontend/dist` -> `frontend`),
 // so index.html can't get the tag at Frontend build time; this afterPack hook rewrites the
-// COPIED index.html in the packaged app instead. Verbatim from the spec (do not widen):
-//   - connect-src needs http(s) 127.0.0.1/localhost — the default backend is loopback http (F4).
+// COPIED index.html in the packaged app instead. Hardening spec §9 baseline, amended by the
+// connect-server spec (2026-07-06):
+//   - connect-src allows any http(s) host: the Connect-Server screen accepts LAN/VPN IPs and
+//     CSP host-sources cannot express IP ranges, so the fetch layer stays open here while the
+//     REAL gate lives in Desktop main's isAllowedBackendUrl (config.set) — script-src, nav-lock
+//     and the rest stay strict (connect-server spec 2026-07-06).
 //   - worker-src 'self' blob: — three.js workers.
 // If DevTools later reports a violation from a remote-loaded stylesheet/font, bundle the asset
 // into Frontend instead of loosening this policy.
 const CSP_CONTENT =
-  "default-src 'self' app://pikaos; connect-src app://pikaos https: http://127.0.0.1:* http://localhost:*; " +
+  "default-src 'self' app://pikaos; connect-src app://pikaos https: http:; " +
   "img-src 'self' app://pikaos data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self' blob:"
 
 const CSP_TAG = `<meta http-equiv="Content-Security-Policy" content="${CSP_CONTENT}">`

@@ -43,7 +43,12 @@ async function raw(path, { method = "GET", body, form, auth = true, signal, _ret
   // multipart boundary itself.
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (auth) {
-    const tok = provider ? await provider.get() : accessToken;
+    // Desktop (provider/token mode) reads the live session token from the provider; but the
+    // kernel-only setup-code bootstrap has no session yet — its token is stored via setToken().
+    // Fall back to that in-memory token when the provider yields none, so the follow-up
+    // GET /api/setup/status carries the bootstrap token and FirstRun can advance (a provider
+    // session token still wins once the user is actually logged in). Cookie mode is unchanged.
+    const tok = (provider ? await provider.get() : null) || accessToken;
     if (tok) headers["Authorization"] = `Bearer ${tok}`;
   }
 
@@ -106,6 +111,9 @@ async function tryRefresh() {
 export async function login(usernameOrEmail, password) {
   if (mode === "token" && window.pikaosDesktop) {           // desktop: main process holds the token
     const { user } = await window.pikaosDesktop.auth.login(usernameOrEmail, password);
+    // the real session now lives in the provider (SessionBroker); drop any setup-code bootstrap
+    // token still in memory so it can never resurface as the raw() fallback (see raw()'s tok line).
+    setToken(null);
     return user;
   }
   const data = await raw("/auth/login", { method: "POST", auth: false, body: { usernameOrEmail, password } });
@@ -114,7 +122,10 @@ export async function login(usernameOrEmail, password) {
 }
 
 export async function logout() {
-  if (mode === "token" && window.pikaosDesktop) { await window.pikaosDesktop.auth.logout(); return; }
+  // Clear the in-memory token in BOTH modes. Token mode never reached setToken(null) before, so a
+  // setup-code bootstrap token (set at FirstRun) lingered and raw()'s provider-null fallback would
+  // re-send it as `Bearer <bootstrap>` on post-logout requests — a stale-credential leak.
+  if (mode === "token" && window.pikaosDesktop) { await window.pikaosDesktop.auth.logout(); setToken(null); return; }
   try { await raw("/auth/logout", { method: "POST" }); } catch (e) { /* ignore */ }
   setToken(null);
 }

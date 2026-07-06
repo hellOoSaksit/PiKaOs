@@ -15,7 +15,6 @@ import { FirstRun } from './screens/FirstRun.jsx';
 import { KernelOnlyShell } from './screens/KernelOnlyShell.jsx';
 import { MyDashboard } from './screens/screens-me.jsx';
 import { PluginsManager } from './screens/screens-plugins.jsx';
-import { LocalMcp } from './screens/secondary/LocalMcp.jsx';
 import { AuditLog, PermissionsCatalog, RolesPermissions, UserDetail, UserForm } from './screens/screens-rbac.jsx';
 import { AgentDrawer, Agents, Meeting, QuestBoard, QuestDrawer } from './screens/screens-secondary.jsx';
 import { SitemapAudit } from './screens/screens-sitemap.jsx';
@@ -504,7 +503,7 @@ function App() {
   const saveNavCfg = (cfg) => { setNavCfg(cfg); setNavConfig(cfg).catch(() => {}); };
 
   const Sys = {
-    users, roles, rolePerms, userPerms, audit, me, can, T, language, go,
+    users, roles, rolePerms, userPerms, audit, me, can, T, t, language, go,
     nav: navCfg, setNav: saveNavCfg,
     workflows, toolRuns,
     toggleWorkflow: (w) => {
@@ -594,10 +593,12 @@ function App() {
       case "roles": return guard("role.manage", <RolesPermissions Sys={Sys} />);
       case "permissions": return guard("user.view.any", <PermissionsCatalog Sys={Sys} />);
       case "audit": return guard("audit.view", <AuditLog Sys={Sys} />);
+      // "install" is the sidebar parent — clicking it lands on the installed-plugins list
+      case "install": return guard("plugins.manage", <PluginsManager Sys={Sys} view="modules" />);
       case "modules": return guard("plugins.manage", <PluginsManager Sys={Sys} view="modules" />);
       case "marketplace": return guard("plugins.manage", <PluginsManager Sys={Sys} view="market" />);
       case "mypackages": return guard("plugins.manage", <PluginsManager Sys={Sys} view="mine" />);
-      case "localmcp": return guard("plugins.manage", <LocalMcp Sys={Sys} />);
+      // Local MCP moved into the Marketplace hub's "Local MCP" tab (desktop-only) — no standalone route.
       case "workflows": return <Workflows Sys={Sys} />;
       case "settings": return <Settings theme={theme} setTheme={setTheme} lex={lex} setLex={setLex} pickLanguage={pickLanguage} language={language} formal={formal} go={go} t={t} />;
       case "library": return <ComponentLibrary onBack={() => go("settings")} t={t} />;

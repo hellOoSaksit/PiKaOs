@@ -133,13 +133,14 @@ const NAV = [
   // src/plugins/knowledge) and merged into the nav default by data-nav.defaultNav — not hardcoded here.
   { group: "ผู้ดูแลระบบ", items: [
     { id: "admin", icon: "👥", label: "จัดการผู้ใช้", en: "User Management", perm: "user.view.any" },
-    { id: "toolsmgr", icon: "🧰", label: "จัดการเครื่องมือ", en: "Tools", perm: "options.manage", children: [
+    { id: "toolsmgr", icon: "🧰", label: "จัดการเครื่องมือ", en: "Tools", perm: "options.manage" },
+    // "Install" groups everything that adds/manages plugins. Clicking it lands on the Modules list
+    // (its route renders view="modules"); the children jump to each view. Local MCP is NOT a sidebar
+    // entry — it's a tab inside the Marketplace hub (desktop-only), see screens-plugins.jsx.
+    { id: "install", icon: "📥", label: "ติดตั้ง", en: "Install", perm: "plugins.manage", children: [
       { id: "modules", icon: "🧩", label: "โมดูล / ปลั๊กอิน", en: "Modules / Plugins", perm: "plugins.manage" },
       { id: "marketplace", icon: "🛍️", label: "มาร์เก็ตเพลส", en: "Marketplace", perm: "plugins.manage" },
       { id: "mypackages", icon: "📦", label: "แพ็กเกจของฉัน", en: "My Packages & Share", perm: "plugins.manage" },
-      // Desktop-app-only (Electron shell) — drives the main-process MCP runtime via window.pikaosDesktop;
-      // hidden on web (desktopOnly, honored by App.jsx's NavNode filter).
-      { id: "localmcp", icon: "🖥️", label: "Local MCP", en: "Local MCP", perm: "plugins.manage", desktopOnly: true },
     ]},
     { id: "permissions", icon: "🗝️", label: "แคตตาล็อกสิทธิ์", en: "Permissions", perm: "user.view.any", children: [
       { id: "roles", icon: "🔑", label: "บทบาทและสิทธิ์", en: "Roles & Access", perm: "role.manage" },

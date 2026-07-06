@@ -7,6 +7,8 @@
 import React, { useEffect, useState } from 'react';
 
 import { Btn, Empty, HelpNote, PageHead, Panel } from '../components/components.jsx';
+import { Segmented } from '../components/ui/index.js';
+import { LocalMcp } from './secondary/LocalMcp.jsx';
 import * as api from '../lib/api.js';
 
 const STATE_BADGE = {
@@ -131,7 +133,7 @@ function InstallPlanModal({ plan, target, T, busy, onConfirm, onCancel }) {
      'mine'    — install-from-git + git credentials + the (disabled) Share affordance
      'all'     — mine + modules stacked, for the nav-less bootstrap shell (KernelOnlyShell) */
 export function PluginsManager({ Sys, view = 'modules' }) {
-  const { T, can } = Sys;
+  const { T, t, can } = Sys;
   const may = can('plugins.manage');
   const [plugins, setPlugins] = useState(null);   // null = loading
   const [err, setErr] = useState(null);
@@ -142,6 +144,10 @@ export function PluginsManager({ Sys, view = 'modules' }) {
   const [gitRef, setGitRef] = useState('');
   const [allowHead, setAllowHead] = useState(false);
   const [updates, setUpdates] = useState({});      // { [pluginId]: { latestVersion, hasUpdate, tagMoved } }
+  // Marketplace hub tab. Local MCP controls the user's own machine → desktop-shell only, so it's
+  // absent on web and the default falls to the first web-visible tab. Hooks run unconditionally
+  // (this lives with the others, above the view-based early returns).
+  const [mktTab, setMktTab] = useState(window.pikaosDesktop?.isDesktop ? 'localmcp' : 'onlinemcp');
 
   // Sharing to the market lives in the Auth plugin (kernel is zero-DB — identity can't live in Core);
   // the Share affordance is gated on that plugin being installed + enabled (drafted, not built yet).
@@ -212,17 +218,37 @@ export function PluginsManager({ Sys, view = 'modules' }) {
     finally { setBusy(null); }
   };
 
-  // Marketplace — a static placeholder, independent of the plugin list (renders without waiting on a load).
+  // Marketplace — a 3-tab hub (Local MCP · Online MCP · Skills). Local MCP controls the user's own
+  // machine, so it's a desktop-shell-only tab (absent on web); the other two are placeholders this
+  // round. All copy comes from i18n keys (no hardcoded strings).
   if (view === 'market') {
+    const isDesktop = !!window.pikaosDesktop?.isDesktop;
+    const tabs = [
+      ...(isDesktop ? [{ value: 'localmcp' }] : []),
+      { value: 'onlinemcp' },
+      { value: 'skills' },
+    ];
+    const active = tabs.find(x => x.value === mktTab) || tabs[0];
+    // Header + tab bar in one content-pad; the tab body renders as a SIBLING so LocalMcp's own
+    // content-pad (it brings its own chrome) doesn't nest and double the padding.
     return (
-      <div className="content-pad fade-in" data-no-lex>
-        <PageHead
-          kicker={T('Administration · Marketplace', 'ผู้ดูแลระบบ · มาร์เก็ตเพลส')}
-          title={T('Marketplace', 'มาร์เก็ตเพลส')}
-          desc={T('Browse & add packages from the catalog. Starts with MCP servers.',
-                  'เลือกดูและเพิ่มแพ็กเกจจากแคตตาล็อก · เริ่มจาก MCP server')} />
-        <Empty icon="🛍️" title={T('Marketplace — coming soon', 'มาร์เก็ตเพลส — เร็วๆ นี้')}
-          sub={T('Browse & add packages. Starts with MCP servers.', 'เลือกดู/เพิ่มแพ็กเกจ · เริ่มจาก MCP server')} />
+      <div className="fade-in" data-no-lex>
+        <div className="content-pad" style={{ paddingBottom: 0 }}>
+          <PageHead kicker={t('mkt.kicker')} title={t('mkt.title')} desc={t('mkt.pagedesc')} />
+          <Segmented
+            options={tabs.map(x => ({ value: x.value, label: t('mkt.tab.' + x.value) }))}
+            value={active.value} onChange={setMktTab} />
+          <p className="faint" style={{ margin: '10px 2px 4px', fontSize: 13, lineHeight: 1.5 }}>
+            {t('mkt.tabdesc.' + active.value)}
+          </p>
+        </div>
+        {active.value === 'localmcp' && <LocalMcp Sys={Sys} />}
+        {active.value === 'onlinemcp' && (
+          <div className="content-pad"><Empty icon="🌐" title={t('mkt.soon', { name: t('mkt.tab.onlinemcp') })} sub={t('mkt.tabdesc.onlinemcp')} /></div>
+        )}
+        {active.value === 'skills' && (
+          <div className="content-pad"><Empty icon="🧠" title={t('mkt.soon', { name: t('mkt.tab.skills') })} sub={t('mkt.tabdesc.skills')} /></div>
+        )}
       </div>
     );
   }
