@@ -5,12 +5,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
-
-
-class LoginIn(BaseModel):
-    usernameOrEmail: str = Field(min_length=1)
-    password: str = Field(min_length=1)
+from pydantic import BaseModel, ConfigDict
 
 
 class NavConfigIn(BaseModel):
@@ -34,39 +29,6 @@ class GlobalConfigOut(BaseModel):
     value: Any = None   # a shared (global) config blob — shape owned by the frontend
 
 
-class ForgotIn(BaseModel):
-    usernameOrEmail: str = Field(min_length=1)
-
-
-class TokenOut(BaseModel):
-    accessToken: str
-    tokenType: str = "bearer"
-    expiresIn: int
-
-
-class UserOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    username: str
-    email: str
-    display: str
-    role: str
-    status: str
-    avatar: str
-    quota: int | None
-    period: str
-    used: int
-    last_login: datetime | None = None
-    created_at: datetime
-    permissions: list[str] = []  # server-resolved effective perms (set by /me + login)
-
-
-class LoginResult(BaseModel):
-    token: TokenOut
-    user: UserOut
-
-
 class PluginHealth(BaseModel):
     """One plugin's state for /health (plugin-architecture.md §14). `version` comes from the plugin's
     manifest (never hardcoded — ties to versions.md); `state` is active · degraded · disabled."""
@@ -77,11 +39,15 @@ class PluginHealth(BaseModel):
 
 class HealthOut(BaseModel):
     status: str
-    version: str       # app_version (versions.md registry — surfaced here per the SSOT rule)
-    build: str         # build_hash (immutable build identity)
-    db: str
-    redis: str
-    minio: str
+    # Detail fields are optional (Fix-SEC-10): an unauthenticated caller in production gets only
+    # `status` (a shallow readiness signal for load-balancer/uptime probes), while authenticated
+    # dashboards and every non-production caller get the full breakdown below. Dev + tests are
+    # unchanged because the trim only applies to production-unauthenticated requests.
+    version: str | None = None   # app_version (versions.md registry — surfaced here per the SSOT rule)
+    build: str | None = None     # build_hash (immutable build identity)
+    db: str | None = None
+    redis: str | None = None
+    minio: str | None = None
     plugins: list[PluginHealth] = []   # Core + each plugin's state + manifest version (§14)
 
 
@@ -159,47 +125,6 @@ class KnowledgeReindexOut(BaseModel):
     matched: int   # documents in scope to rebuild
     queued: int    # ingest jobs actually enqueued (best-effort; < matched on a Redis outage)
     model: str     # the embedding model they'll be (re)embedded with
-
-
-# --- runtime LLM provider config (no-hardcode — admin sets API vs Local from the UI) ---
-
-
-class LlmConnectionIn(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
-    provider: str = Field(description="ollama | openai | anthropic")
-    model: str = ""
-    base_url: str | None = None
-    api_key: str | None = None         # write-only — encrypted at rest, never returned
-
-
-class LlmConnectionUpdate(BaseModel):
-    name: str | None = None
-    provider: str | None = None
-    model: str | None = None
-    base_url: str | None = None
-    api_key: str | None = None         # omit/empty = leave the stored key unchanged
-
-
-class LlmConnectionOut(BaseModel):
-    id: uuid.UUID
-    name: str
-    provider: str
-    model: str
-    base_url: str | None = None
-    is_active: bool
-    api_key_set: bool                  # masked — true if a key is stored (the value is never sent)
-    created_at: datetime
-
-
-# Per-system LLM assignment (which connection a role uses — engine/search/summarize)
-class LlmRoleSet(BaseModel):
-    connection_id: uuid.UUID | None = None    # null = clear the binding (fall back to active)
-
-
-class LlmRoleOut(BaseModel):
-    role: str
-    connection_id: uuid.UUID | None = None
-    connection_name: str | None = None
 
 
 # Object-storage status (read-only) — surfaced in the tools tab. No secrets: access/secret keys

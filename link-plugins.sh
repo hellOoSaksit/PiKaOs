@@ -24,4 +24,14 @@ for d in "$ROOT"/PiKaOs-Plugin-*/; do
   [ -d "${d}backend"  ] && ln -sfn "../../../../$name/backend"  "$BACK/$id"  && echo "backend  ← $id ($name)"
   [ -d "${d}frontend" ] && ln -sfn "../../../../$name/frontend" "$FRONT/$id" && echo "frontend ← $id ($name)"
 done
-echo "done. (links are gitignored; Core source is untouched)"
+
+# Build-merge (kernel-redesign §2–§3): now that the plugins are linked, merge the kernel + each linked
+# plugin's requirements.txt into Backend/requirements.lock so `docker build` bakes the plugin libs into
+# the Core image (the kernel requirements.txt itself carries no datastore/feature libs). Regenerated on
+# every link so it always matches the installed plugin set. Pure-stdlib, so any python3 runs it.
+if command -v python3 >/dev/null 2>&1; then
+  python3 "$ROOT/PiKaOs-Core/Backend/scripts/render_requirements.py" || echo "warn: requirements.lock not regenerated"
+else
+  echo "warn: python3 not found on host — run scripts/render_requirements.py before build to bake plugin libs"
+fi
+echo "done. (links + requirements.lock are gitignored; Core source is untouched)"

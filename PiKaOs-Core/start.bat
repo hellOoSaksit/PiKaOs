@@ -1,22 +1,22 @@
 @echo off
 rem ===========================================================
-rem  PiKaOs launcher  (split 4-stack — the only way to run)
+rem  PiKaOs launcher  (single generated compose — the only way to run)
 rem
 rem  Flow:
 rem    1) make sure the Docker engine is running
 rem         - if not, start Docker Desktop and wait
 rem         - if it still won't come up, run fix-docker.bat and wait
-rem    2) bring up the 4 SEPARATE stacks (each its own compose project/network),
-rem       in order so each is ready before the next needs it:
-rem         data     (db, redis, minio)            -p pikaos-data
-rem         backend  (FastAPI API, hot-reload)     -p pikaos-backend   (+ sim overlay)
-rem         ai       (arq worker)                  -p pikaos-ai
-rem         frontend (Vite dev server, hot-reload) -p pikaos-frontend
-rem    3) open the app in the browser and exit
+rem    2) render deploy\docker-compose.generated.yml: the kernel base
+rem       (backend + frontend) merged with every ENABLED tool plugin's
+rem       compose.fragment.yml (Backend\scripts\render_compose.py —
+rem       kernel-redesign.md §3, install-time compose generation)
+rem    3) bring up the ONE generated stack, -p pikaos
+rem    4) open the app in the browser and exit
 rem
-rem  Stacks talk to each other over the host (host.docker.internal:<port>), like real
-rem  separate servers. Stop everything with stop.bat. Watch logs in Docker Desktop, or:
-rem    docker compose -p pikaos-frontend logs -f   (or pikaos-backend / pikaos-ai / pikaos-data)
+rem  All services share one compose network now (backend/frontend/worker/
+rem  db/redis/minio reach each other by service name — no host.docker.internal).
+rem  Stop everything with stop.bat. Watch logs:
+rem    docker compose -p pikaos -f deploy\docker-compose.generated.yml logs -f
 rem ===========================================================
 setlocal EnableExtensions
 set "ROOT=%~dp0"
@@ -30,13 +30,13 @@ echo.
 echo   ===========================================================
 echo.
 echo        .:::.   P i K a O S   .:::.
-echo        Agent-Ops Workspace launcher  (split 4-stack)
+echo        Agent-Ops Workspace launcher
 echo.
 echo   ===========================================================
 echo.
 
 rem ---- 1. Docker preflight -----------------------------------
-echo [1/3] Checking Docker engine...
+echo [1/4] Checking Docker engine...
 "%DOCKER%" info >nul 2>&1
 if %errorlevel%==0 (
   echo       Docker is already running.
@@ -76,24 +76,38 @@ exit /b 1
 echo       Docker engine OK.
 echo.
 
-rem ---- 2. bring up the 4 stacks (order matters) --------------
 pushd "%ROOT%"
 
-echo [2/3] (1/4) data stack  (db, redis, minio)...
-"%DOCKER%" compose -p pikaos-data -f deploy/docker-compose.data.yml up -d --wait
-if %errorlevel% neq 0 (echo       ERROR: data stack failed to start. & popd & pause & exit /b 1)
+rem ---- env preflight (point at setup instructions instead of failing cryptically) ----
+set "MISSING="
+if not exist "Backend\.env" set "MISSING=1"
+if not exist ".env.ai" set "MISSING=1"
+if not exist "Frontend\.env" set "MISSING=1"
+if defined MISSING (
+  echo       Missing an env file - copy Backend\.env.example / .env.ai.example / Frontend\.env.example
+  echo       to their real names first.
+  popd
+  pause
+  exit /b 1
+)
 
-echo       (2/4) backend stack (FastAPI + migrate/seed)...
-"%DOCKER%" compose -p pikaos-backend -f deploy/docker-compose.backend.yml -f deploy/docker-compose.sim.yml up -d --build --wait backend
-if %errorlevel% neq 0 (echo       ERROR: backend stack failed to start. & popd & pause & exit /b 1)
+rem ---- 2. render the compose file (base + enabled tool fragments) ----
+echo [2/4] Rendering docker-compose.generated.yml...
+python Backend\scripts\render_compose.py
+if %errorlevel% neq 0 (
+  echo       ERROR: render_compose.py failed.
+  popd & pause & exit /b 1
+)
+echo.
 
-echo       (3/4) ai stack      (arq worker)...
-"%DOCKER%" compose -p pikaos-ai -f deploy/docker-compose.ai.yml up -d --build
-if %errorlevel% neq 0 (echo       WARNING: ai/worker stack failed to start - continuing.)
-
-echo       (4/4) frontend stack (Vite dev server)...
-"%DOCKER%" compose -p pikaos-frontend -f deploy/docker-compose.frontend.dev.yml up -d --build
-if %errorlevel% neq 0 (echo       ERROR: frontend stack failed to start. & popd & pause & exit /b 1)
+rem ---- 3. bring up the ONE generated stack ------------------------
+echo [3/4] Starting the stack (build + wait for health)...
+"%DOCKER%" compose -p pikaos -f deploy\docker-compose.generated.yml up -d --build --wait
+if %errorlevel% neq 0 (
+  echo       ERROR: stack failed to start.
+  "%DOCKER%" compose -p pikaos -f deploy\docker-compose.generated.yml logs
+  popd & pause & exit /b 1
+)
 
 popd
 echo       Waiting for the backend API (so the UI doesn't load before it's ready)...
@@ -101,12 +115,12 @@ call :waitbackend 90
 if %errorlevel%==0 (echo       Backend API is ready.) else (echo       Backend not ready yet - opening anyway; reload the page in a moment.)
 echo.
 
-rem ---- 3. open the app + exit (logs are in Docker Desktop) ----
-echo [3/3] Opening http://localhost:5173 ...
+rem ---- 4. open the app + exit (logs are in Docker Desktop) ----
+echo [4/4] Opening http://localhost:5173 ...
 start "" "http://localhost:5173"
 echo.
-echo       All 4 stacks run in Docker. Stop them with stop.bat. Watch logs:
-echo         docker compose -p pikaos-frontend logs -f   (or pikaos-backend / pikaos-ai / pikaos-data)
+echo       The stack runs in Docker. Stop it with stop.bat. Watch logs:
+echo         docker compose -p pikaos -f deploy\docker-compose.generated.yml logs -f
 echo       You can close this window.
 timeout /t 3 >nul
 exit /b 0

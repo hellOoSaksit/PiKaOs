@@ -1,0 +1,47 @@
+/* PiKaOs — auth / first-run theme layer.
+   Animations + screen-specific helpers for the new split-stage auth surfaces
+   (FirstRun console-code gate now; the Login port reuses the same keyframes).
+   Tokens (--bg-*, --gold*, --ink-*, --line*, --font-*, --radius-sm) and the 3D
+   `.ltr` letters / `.btn*` primitives all come from styles.css — this file adds
+   only what those don't already provide. Ported from the Login.dc.html design. */
+
+@keyframes pikaFloat   { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes softIn      { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes zzz         { 0% { opacity: 0; transform: translateY(8px) scale(.6) rotate(-8deg); } 25% { opacity: .9; } 100% { opacity: 0; transform: translateY(-30px) scale(1.15) rotate(8deg); } }
+@keyframes popIn       { 0% { opacity: 0; transform: scale(.4); } 60% { transform: scale(1.12); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes drawCheck   { from { stroke-dashoffset: 34; } to { stroke-dashoffset: 0; } }
+@keyframes tickPop     { 0% { transform: scale(.2); } 60% { transform: scale(1.18); } 100% { transform: scale(1); } }
+@keyframes glowBreath  { 0%,100% { opacity: .65; transform: translate(-50%,-58%) scale(1); } 50% { opacity: 1; transform: translate(-50%,-58%) scale(1.06); } }
+@keyframes fieldIn     { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
+@keyframes loadFill    { 0% { width: 5%; } 70% { width: 86%; } 100% { width: 100%; } }
+@keyframes bootDots    { 0%,100% { opacity: .25; } 50% { opacity: 1; } }
+@keyframes letterBounce{ 0%,55%,100% { transform: translateY(0) scaleY(1); } 18% { transform: translateY(-20px) scaleY(1.06); } 38% { transform: translateY(0) scaleY(.9); } 46% { transform: translateY(-5px) scaleY(1); } }
+@keyframes popForward  { 0% { opacity: 0; transform: scale(.3); } 60% { opacity: 1; transform: scale(1.18); } 80% { transform: scale(.95); } 100% { transform: scale(1); } }
+
+/* green success variant of the 3D wordmark letters */
+.ltr.green { -webkit-text-stroke-color: #0a6b34; text-shadow: 0 2px 0 #15b85b, 0 4px 0 #12a150, 0 6px 0 #0e8a45, 0 8px 0 #0a6b34, 0 10px 0 #084f27, 0 16px 22px rgba(18,161,80,0.42); }
+
+/* ---- split-stage layout (shared by FirstRun + the Login port) ---- */
+.auth-screen   { position: fixed; inset: 0; display: flex; background: var(--bg-1); overflow: hidden; z-index: 50; }
+.auth-hero     { flex: 1 1 50%; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; background: linear-gradient(165deg, var(--bg-3), var(--bg-0)); overflow: hidden; }
+.auth-formpane { flex: 1 1 50%; position: relative; display: flex; align-items: center; justify-content: center; background: var(--bg-2); border-left: 1px solid var(--line); padding: 48px 60px; }
+
+/* text/code field — DS-styled input with focus ring (replaces the design's inline style-focus) */
+.auth-input {
+  width: 100%; padding: 13px 15px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--bg-1); color: var(--ink); font-size: 15px; font-family: var(--font-body);
+  outline: none; transition: border-color .15s, box-shadow .15s, background .15s;
+}
+.auth-input:focus { border-color: var(--gold); background: var(--bg-2); box-shadow: 0 0 0 3px var(--gold-glow); }
+.auth-input.mono  { font-family: var(--font-mono); letter-spacing: .12em; }
+
+/* language toggle pill (top-right) */
+.auth-lang { position: absolute; top: 22px; right: 24px; z-index: 60; display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg-2); }
+.auth-lang button { border: none; background: transparent; cursor: pointer; font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; color: var(--ink-3); padding: 5px 12px; border-radius: 999px; }
+.auth-lang button.on { background: var(--gold); color: #fff; }
+
+@media (max-width: 820px) {
+  .auth-screen   { flex-direction: column; }
+  .auth-hero     { flex: 0 0 auto; min-height: 36vh; padding: 36px 0 24px; gap: 16px; }
+  .auth-formpane { border-left: none; border-top: 1px solid var(--line); padding: 30px 22px 64px; }
+}

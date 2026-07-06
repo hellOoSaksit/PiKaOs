@@ -3,9 +3,13 @@
 Both the FastAPI app (`main.py:lifespan`) and the arq worker (`worker.py:startup`) need to build a DI
 `Container` + `EventBus` and run every enabled plugin's `register()/boot()` so their contracts (e.g.
 `postgres.Connection`, `knowledge.Retriever`) are resolvable. This module is that shared, unit-testable
-step — pass the enabled id set + the session factory, get back the wired container. Fault isolation lives
-in `plugin_loader.register_plugins` (§8): a plugin whose lifecycle raises is marked degraded, never
-crashes the caller.
+step — pass the enabled id set, get back the wired container. Fault isolation lives in
+`plugin_loader.register_plugins` (§8): a plugin whose lifecycle raises is marked degraded, never crashes
+the caller.
+
+Zero-datastore note: there is no session factory to inject anymore — the postgres Tool CREATES the engine
+in its own `register()` and binds it under `postgres.Connection`. Consumers resolve that contract from the
+container AFTER registration, so nothing needs a factory passed in.
 """
 from __future__ import annotations
 
@@ -15,19 +19,20 @@ from .container import Container
 from .events import EventBus
 
 
-def build_container(enabled: set[str], session_factory) -> tuple[Container, EventBus, "plugin_loader.LifecycleResult"]:
+def build_container(enabled: set[str]) -> tuple[Container, EventBus, "plugin_loader.LifecycleResult"]:
     """Build a fresh container+bus and register the `enabled` plugins (dependency order, fault-isolated).
     Returns (container, bus, result) where result.booted / result.degraded report the outcome."""
     container, bus = Container(), EventBus()
-    ctx = plugin_loader.PluginContext(container=container, events=bus,
-                                      session_factory=session_factory, settings=settings)
+    ctx = plugin_loader.PluginContext(container=container, events=bus, settings=settings)
     result = plugin_loader.register_plugins(enabled, plugin_loader.PLUGIN_MANIFESTS, ctx)
+    # Identity is provided by the `auth` plugin (it binds IDENTITY in register()). When auth is not
+    # enabled, IDENTITY stays unbound → the kernel identity deps fall back to BootstrapProvider (deny
+    # all data; the console code gates setup).
     return container, bus, result
 
 
-def teardown_container(container: Container, bus: EventBus, enabled: set[str], session_factory) -> dict[str, str]:
+def teardown_container(container: Container, bus: EventBus, enabled: set[str]) -> dict[str, str]:
     """Run each enabled plugin's shutdown() in reverse dependency order (§10) when the process stops — fault-isolated,
     so a misbehaving shutdown() never blocks the rest. Returns errors."""
-    ctx = plugin_loader.PluginContext(container=container, events=bus,
-                                      session_factory=session_factory, settings=settings)
+    ctx = plugin_loader.PluginContext(container=container, events=bus, settings=settings)
     return plugin_loader.shutdown_plugins(enabled, plugin_loader.PLUGIN_MANIFESTS, ctx)

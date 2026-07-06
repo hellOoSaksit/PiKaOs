@@ -1,22 +1,32 @@
 // Tiny fetch wrapper for the PiKaOs backend.
 // - prefixes VITE_API_BASE (default "/api", proxied to FastAPI in dev)
-// - attaches the access token (memory + localStorage mirror)
+// - attaches the access token (in MEMORY only — never localStorage, so XSS can't read it)
 // - sends cookies (httpOnly refresh token) with credentials: "include"
 // - on 401, refreshes once then retries the original request
 
-const BASE = (import.meta.env.VITE_API_BASE || "/api").replace(/\/$/, "");
-const TOKEN_KEY = "pikaos.access";
+let base = (import.meta.env.VITE_API_BASE || "/api").replace(/\/$/, "");
 
+// Access token lives in memory only (F2). The httpOnly refresh cookie is the durable seam: restore()
+// mints a fresh access token from it on every page load, so persisting the access token buys nothing and
+// only exposes it to XSS. Best-effort scrub of any token left by the old localStorage-mirror build.
 let accessToken = null;
-try { accessToken = localStorage.getItem(TOKEN_KEY); } catch (e) { /* ignore */ }
+try { localStorage.removeItem("pikaos.access"); } catch (e) { /* ignore */ }
+
+let mode = "cookie";                       // "cookie" (web) | "token" (desktop)
+let provider = null;                       // { get, refresh, onLogout }
+
+// Runtime transport config for the desktop shell: point at a remote base URL and/or supply a
+// token provider (bearer auth instead of the httpOnly cookie). Web keeps the defaults (cookie
+// mode, relative /api base) unless this is called.
+export function configureTransport({ apiBase, tokenProvider }) {
+  if (apiBase) base = apiBase.replace(/\/$/, "");
+  provider = tokenProvider || null;
+  mode = provider ? "token" : "cookie";
+}
 
 export function getToken() { return accessToken; }
 export function setToken(tok) {
-  accessToken = tok || null;
-  try {
-    if (tok) localStorage.setItem(TOKEN_KEY, tok);
-    else localStorage.removeItem(TOKEN_KEY);
-  } catch (e) { /* ignore */ }
+  accessToken = tok || null;   // memory only — no localStorage mirror (F2)
 }
 
 export class ApiError extends Error {
@@ -32,14 +42,17 @@ async function raw(path, { method = "GET", body, form, auth = true, signal, _ret
   // JSON body sets its content-type; a FormData (file upload) must NOT — the browser sets the
   // multipart boundary itself.
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  if (auth && accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+  if (auth) {
+    const tok = provider ? await provider.get() : accessToken;
+    if (tok) headers["Authorization"] = `Bearer ${tok}`;
+  }
 
   let res;
   try {
-    res = await fetch(BASE + path, {
+    res = await fetch(base + path, {
       method,
       headers,
-      credentials: "include",
+      ...(mode === "cookie" ? { credentials: "include" } : {}),
       signal,                                  // lets callers abort (cancel) the request
       body: form !== undefined ? form : (body !== undefined ? JSON.stringify(body) : undefined),
     });
@@ -53,7 +66,7 @@ async function raw(path, { method = "GET", body, form, auth = true, signal, _ret
 
   // transparent refresh-once on expired access token
   if (res.status === 401 && auth && !_retry && path !== "/auth/refresh") {
-    const ok = await tryRefresh();
+    const ok = await doRefresh();
     if (ok) return raw(path, { method, body, form, auth, signal, _retry: true });
   }
 
@@ -64,6 +77,11 @@ async function raw(path, { method = "GET", body, form, auth = true, signal, _ret
   if (!res.ok) throw new ApiError(res.status, data);
   return data;
 }
+
+// refresh seam: token mode delegates to the injected provider; cookie mode uses the
+// httpOnly refresh-cookie flow below. Used by raw()'s 401-retry and restore() (session
+// revive on app boot).
+async function doRefresh() { return provider ? provider.refresh() : tryRefresh(); }
 
 let refreshInFlight = null;
 async function tryRefresh() {
@@ -86,12 +104,17 @@ async function tryRefresh() {
 
 // --- auth API ---
 export async function login(usernameOrEmail, password) {
+  if (mode === "token" && window.pikaosDesktop) {           // desktop: main process holds the token
+    const { user } = await window.pikaosDesktop.auth.login(usernameOrEmail, password);
+    return user;
+  }
   const data = await raw("/auth/login", { method: "POST", auth: false, body: { usernameOrEmail, password } });
   setToken(data.token.accessToken);
   return data.user;
 }
 
 export async function logout() {
+  if (mode === "token" && window.pikaosDesktop) { await window.pikaosDesktop.auth.logout(); return; }
   try { await raw("/auth/logout", { method: "POST" }); } catch (e) { /* ignore */ }
   setToken(null);
 }
@@ -102,7 +125,7 @@ export async function me() {
 
 export async function restore() {
   // revive a session on page load using the refresh cookie
-  const ok = await tryRefresh();
+  const ok = await doRefresh();
   if (!ok) return null;
   try { return await me(); } catch (e) { return null; }
 }
@@ -110,6 +133,23 @@ export async function restore() {
 export async function forgotPassword(usernameOrEmail) {
   return raw("/auth/forgot-password", { method: "POST", auth: false, body: { usernameOrEmail } });
 }
+
+// --- first-run setup (kernel console-code gate) ---
+// The Core prints a rotating setup code to the server console (stdout) on startup; the operator
+// pastes it here to unlock the install page (Jupyter-token pattern) before any account exists.
+// setupStatus() sends whatever token is stored (auth: true, the default) — the backend reads it as an
+// OPTIONAL signal, never requires it, and reports back whether it's still a valid bootstrap session
+// (`bootstrapAuthorized`) so a stored-but-stale token (e.g. after a restart) falls back to FirstRun.
+export async function setupStatus() { return raw("/setup/status"); }   // { needsSetup, bootstrapAuthorized }
+export async function verifySetupCode(code) {
+  // unauthenticated by definition — proving the code IS the auth; verifying it hands back the
+  // session token (setToken() it on success) that unlocks the kernel-only install shell.
+  return raw("/setup/verify-code", { method: "POST", auth: false, body: { code } });
+}
+
+// --- app version / build hash (AppBoot's mascot-cache check; also the seam release-and-
+// rollback.md §4's SPA version-skew policy is meant to use) ---
+export async function getVersion() { return raw("/version", { auth: false }); }   // { version, build, name }
 
 // --- LLM provider config API (admin: which provider/model/key the engine uses — no-hardcode) ---
 // The API key is write-only: send it in the body to set/replace it; the server never returns it
@@ -127,7 +167,7 @@ export async function setLlmRole(role, connectionId) { return raw(`/llm/roles/${
 
 // --- knowledge / codex documents API (markdown-as-truth store + RAG search) ---
 // Files live in MinIO; the backend chunks + embeds them in the background (ingest_status).
-// Upload/delete need the codex.manage permission; list/get/search are any authenticated user
+// Upload/delete need the knowledge.manage permission; list/get/search are any authenticated user
 // (scoped to what the caller may read, server-side).
 export async function listDocuments({ kind, limit, offset } = {}) {
   const qs = new URLSearchParams();
@@ -152,13 +192,13 @@ export async function searchKnowledge(q, k) {
   return raw(`/knowledge/search?${qs.toString()}`);
 }
 // Ask a question and get an answer synthesized from the codex with citations (E8). Any logged-in
-// user (codex.view); scope is enforced server-side. k omitted → server default. Returns
+// user (knowledge.view); scope is enforced server-side. k omitted → server default. Returns
 // { answer, sources:[{n, document_id, document_name, heading, score}], rewritten_query, used_chunks }.
 export async function askKnowledge(question, k) {
   return raw("/knowledge/answer", { method: "POST", body: { question, ...(k ? { k } : {}) } });
 }
 // Rebuild the RAG index from the markdown source ('single rebuild command' — knowledge-rag.md §3).
-// Needs codex.manage. onlyStale=true (default) re-embeds only docs not on the current model — use
+// Needs knowledge.manage. onlyStale=true (default) re-embeds only docs not on the current model — use
 // after switching the embedder; false forces a full rebuild. Returns { matched, queued, model }.
 export async function reindexKnowledge(onlyStale = true) {
   return raw(`/knowledge/reindex?only_stale=${onlyStale ? "true" : "false"}`, { method: "POST" });
@@ -189,3 +229,16 @@ export async function installPlugin(id) { return raw(`/plugins/${id}/install`, {
 export async function enablePlugin(id) { return raw(`/plugins/${id}/enable`, { method: "POST" }); }
 export async function disablePlugin(id) { return raw(`/plugins/${id}/disable`, { method: "POST" }); }
 export async function uninstallPlugin(id) { return raw(`/plugins/${id}`, { method: "DELETE" }); }
+export async function installFromGit(repoUrl, opts = {}) {
+  const { ref, allowHead } = opts;
+  return raw("/plugins/install-from-git", {
+    method: "POST",
+    body: { repoUrl, ref: ref || undefined, allowHead: allowHead || undefined },
+  });
+}
+export async function checkPluginUpdate(id) { return raw(`/plugins/${id}/check-update`); }               // { latestVersion, hasUpdate }
+export async function updatePlugin(id) { return raw(`/plugins/${id}/update`, { method: "POST" }); }
+export async function purgePlugin(id) { return raw(`/plugins/${id}/purge`, { method: "POST" }); }         // only valid when state === 'pending_purge'
+export async function setGitCredential(host, token) {
+  return raw(`/plugins/git-credentials/${host}`, { method: "PUT", body: { token } });
+}

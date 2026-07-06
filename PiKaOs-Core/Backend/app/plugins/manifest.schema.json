@@ -90,10 +90,26 @@
     },
     "permissions": {
       "type": "array",
-      "description": "Permission keys \u2014 all prefixed with `id` (\u00a76), e.g. `crm.lead.edit`.",
+      "description": "Permissions this plugin owns, contributed to the global RBAC catalog the auth plugin seeds. A bare string is the key; an object adds RBAC-UI metadata (group + TH/EN labels). Perms are a global vocabulary (roles bind to bare keys like `user.manage`), so they are NOT id-prefixed \u2014 unlike `provides` DI tokens.",
       "items": {
-        "type": "string",
-        "pattern": "^[a-z][a-z0-9-]*\\.[a-z0-9.-]+$"
+        "oneOf": [
+          {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9.-]+$"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["key"],
+            "properties": {
+              "key": { "type": "string", "pattern": "^[a-z][a-z0-9.-]+$" },
+              "group": { "type": "string" },
+              "name_th": { "type": "string" },
+              "name_en": { "type": "string" },
+              "rationale": { "type": "string", "description": "Human-readable why this permission is requested, shown at the install confirm (marketplace.md W4)." }
+            }
+          }
+        ]
       },
       "uniqueItems": true,
       "default": []
@@ -147,6 +163,21 @@
     "migrations": {
       "type": "string",
       "description": "Path to this plugin's migrations; run in dependency order (\u00a74)."
+    },
+    "description": {
+      "type": "string",
+      "description": "One-line human description shown in the Plugins UI."
+    },
+    "icon": {
+      "type": "string",
+      "description": "Path (relative to the plugin) to an icon image shown in the Plugins UI."
+    },
+    "screenshots": {
+      "type": "array",
+      "description": "Paths (relative to the plugin) to screenshot images shown in the Plugins UI.",
+      "items": { "type": "string" },
+      "uniqueItems": true,
+      "default": []
     }
   }
 }

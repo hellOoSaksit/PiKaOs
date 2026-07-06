@@ -1,0 +1,24 @@
+appId: io.pikaos.desktop
+productName: PiKaOs Desktop
+directories:
+  output: dist
+files:
+  - out/**/*
+  - package.json
+asar: true
+# Signing deferred (unsigned build for now).
+# Bundled renderer: Frontend/dist is copied in and served via the app://pikaos protocol
+# (src/main/protocol.ts), never file://.
+extraResources:
+  - from: ../Frontend/dist
+    to: frontend
+# Mandatory hardening (spec §9) — electron-builder's native `electronFuses` key flips these via
+# @electron/fuses (already a transitive electron-builder dependency, pinned as our own devDependency
+# too) at packaging time; verify on a packaged build with `npx @electron/fuses read out/…/PiKaOs Desktop`.
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  onlyLoadAppFromAsar: true
+  enableEmbeddedAsarIntegrityValidation: true
+afterPack: scripts/inject-csp.cjs

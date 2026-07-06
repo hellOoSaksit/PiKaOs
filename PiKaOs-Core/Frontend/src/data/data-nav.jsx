@@ -20,6 +20,7 @@ function cloneItems(items) {
     ...(it.perm ? { perm: it.perm } : {}),
     ...(it.tag ? { tag: it.tag } : {}),
     ...(it.hidden ? { hidden: true } : {}),
+    ...(it.desktopOnly ? { desktopOnly: true } : {}),
     ...(it.children ? { children: cloneItems(it.children) } : {}),
   }));
 }
@@ -80,6 +81,7 @@ function mergeWithDefault(saved) {
       const out = { id: it.id, icon: d.icon };
       if (d.perm) out.perm = d.perm;
       if (d.tag) out.tag = d.tag;
+      if (d.desktopOnly) out.desktopOnly = true;
       if (it.customLabel) out.customLabel = it.customLabel;   // the only label the user owns (rename)
       if (it.hidden) out.hidden = true;
       if (it.children) out.children = prune(it.children);

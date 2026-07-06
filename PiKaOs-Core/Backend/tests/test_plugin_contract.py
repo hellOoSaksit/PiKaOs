@@ -1,69 +1,60 @@
-"""Consumer-driven contract test (plugin-architecture.md §13) — the provider's pipeline proves it still
-honors the contract its consumer depends on, across the no-import boundary.
+"""Kernel plugin-contract mechanics (plugin-architecture.md §5/§13) — the Loader's register()/DI/job
+wiring, exercised plugin-free with the synthetic `sample` (capability) + `sampletool` (tool) plugins.
 
-The engine (consumer, Core) consumes the `knowledge.Retriever` contract: the `agent_runner.Retriever`
-interface, resolved from the DI container under the `contracts.RETRIEVER` token. This test runs the
-knowledge plugin's real `register()` lifecycle and asserts the binding it produces satisfies that
-interface — so the knowledge plugin can never silently drop or reshape `retrieve_context` without this
-turning red. It also pins the removability + job-contribution wiring the worker relies on.
+This pins the *mechanism* every plugin relies on: register() binds the contract a manifest `provides`,
+a disabled plugin binds nothing + contributes no jobs (removability, §2.2), and route namespacing is
+enforced. Each real plugin owns its *own* consumer-driven contract test in its repo (e.g. knowledge
+proving it binds a `knowledge.Retriever` that satisfies the engine's interface).
 
-In-process (no DB): register() only binds a constructed retriever; we never call retrieve_context here.
+In-process (no DB): register() only binds constructed objects; nothing is called through.
 
     docker compose exec backend pytest tests/test_plugin_contract.py
 """
 from __future__ import annotations
 
-import inspect
+import pytest
 
-from app import modules, plugin_loader
-from app.core import contracts
+from app import plugin_loader
 from app.core.container import Container
 from app.core.events import EventBus
-from app.core.services.agent_runner import Retriever
 
 
 def _ctx() -> plugin_loader.PluginContext:
     return plugin_loader.PluginContext(container=Container(), events=EventBus())
 
 
-def test_knowledge_provides_retriever_contract():
+def test_register_binds_the_contract_the_manifest_provides(sample_plugins):
+    """A capability plugin's register() binds the DI contract its manifest declares in `provides`."""
     ctx = _ctx()
-    plugin_loader.register_plugins({"knowledge"}, modules.PLUGIN_MANIFESTS, ctx)
-
-    impl = ctx.container.resolve(contracts.RETRIEVER)
-    assert impl is not None, "knowledge.register() must bind the knowledge.Retriever contract"
-    # runtime_checkable Protocol: the impl must structurally satisfy the engine's interface.
-    assert isinstance(impl, Retriever), "bound retriever does not satisfy agent_runner.Retriever (§13)"
-    assert inspect.iscoroutinefunction(impl.retrieve_context), "retrieve_context must be async"
-    # the consumer's call shape is pinned: keyword params the engine passes must all exist.
-    params = inspect.signature(impl.retrieve_context).parameters
-    assert {"db", "owner_id", "run_input", "k"} <= set(params), "contract signature drifted from consumer"
+    plugin_loader.register_plugins({"sample"}, sample_plugins.manifests, ctx)
+    assert sample_plugins.sample_contract in sample_plugins.sample.provides
+    assert ctx.container.resolve(sample_plugins.sample_contract) is not None
 
 
-def test_manifest_declares_what_it_provides():
-    """The runtime binding must match the manifest's `provides` (the static contract Phase-2 validates)."""
-    mf = modules.PLUGIN_MANIFESTS["knowledge"]
-    assert contracts.RETRIEVER in mf.provides
-
-
-def test_base_only_binds_nothing_and_contributes_no_jobs():
-    """Removability at the DI/job layer: with knowledge disabled, no contract is bound and the worker
-    gets no plugin jobs — the engine's retriever resolves to None and runs without RAG (§2.2/§5)."""
+def test_tool_plugin_binds_its_connection(sample_plugins):
+    """A `kind: tool` plugin (routeless) binds its Connection contract for consumers to resolve."""
     ctx = _ctx()
-    plugin_loader.register_plugins(set(), modules.PLUGIN_MANIFESTS, ctx)
-    assert ctx.container.resolve(contracts.RETRIEVER) is None
-    assert plugin_loader.collect_jobs(set(), modules.PLUGIN_MANIFESTS) == []
+    plugin_loader.register_plugins({"sampletool"}, sample_plugins.manifests, ctx)
+    conn = ctx.container.resolve(sample_plugins.tool_contract)
+    assert conn is not None and conn["engine"] is not None and conn["session_factory"] is not None
 
 
-def test_enabled_knowledge_contributes_its_job():
-    jobs = plugin_loader.collect_jobs({"knowledge"}, modules.PLUGIN_MANIFESTS)
-    assert [j.__name__ for j in jobs] == ["ingest_document"]
+def test_base_only_binds_nothing_and_contributes_no_jobs(sample_plugins):
+    """Removability at the DI/job layer: with the plugin disabled, no contract is bound and the worker
+    gets no plugin jobs (§2.2/§5)."""
+    ctx = _ctx()
+    plugin_loader.register_plugins(set(), sample_plugins.manifests, ctx)
+    assert ctx.container.resolve(sample_plugins.sample_contract) is None
+    assert plugin_loader.collect_jobs(set(), sample_plugins.manifests) == []
+
+
+def test_enabled_plugin_contributes_its_job(sample_plugins):
+    jobs = plugin_loader.collect_jobs({"sample"}, sample_plugins.manifests)
+    assert [j.__name__ for j in jobs] == ["sample_job"]
 
 
 def test_route_must_be_namespaced_with_plugin_id():
     """§6: a plugin's declared routes must carry its id segment, so two plugins can't collide on a URL."""
-    import pytest
-
     good = {"id": "crm", "name": "CRM", "version": "0.1.0", "coreVersion": "*", "routes": ["/api/crm"]}
     plugin_loader._validate("crm", good)  # ok — namespaced
 

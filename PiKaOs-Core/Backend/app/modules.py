@@ -17,7 +17,7 @@ from fastapi import APIRouter, FastAPI
 
 from . import plugin_loader
 from .core.config import settings
-from .core.routers import auth, health, llm_config, plugins, settings_config, ws
+from .core.routers import health, plugins, setup, settings_config
 from .core.routers import storage as storage_router
 
 log = logging.getLogger("pikaos.plugins")
@@ -38,16 +38,16 @@ class Module:
     optional: bool = True
 
 
-# --- Base (Core): always on — infra + core + the agent-runtime platform (engine) --------------------
+# --- Base (Core): always on — infra + core (the kernel host: health/config/plugins) ----------------
+# The agent-runtime "engine" module + its ws/llm_config routers moved to the `ai` plugin; auth (login/RBAC)
+# is the `auth` plugin; knowledge/documents are the `knowledge` plugin. The Base is now just the shell.
 BASE_MODULES: tuple[Module, ...] = (
     Module("infra", routers=(health.router,), optional=False),
     Module(
-        "core",  # identity / access / system config every plugin relies on
-        routers=(auth.router, llm_config.router, llm_config.roles_router, storage_router.router,
-                 settings_config.router, plugins.router),
+        "core",  # access / system config the kernel serves
+        routers=(storage_router.router, settings_config.router, plugins.router, setup.router),
         optional=False,
     ),
-    Module("engine", routers=(ws.router,), optional=False),  # agent-ops runtime — part of Core
 )
 BASE_NAMES: frozenset[str] = frozenset(m.name for m in BASE_MODULES)
 
@@ -75,6 +75,15 @@ def active_modules() -> list[Module]:
     _DEGRADED.clear()
     mods = list(BASE_MODULES)
     for pid in plugin_loader.topo_order(enabled_optional_modules(), PLUGIN_MANIFESTS):
+        # A plugin that declares NO routes (`routes: []`) exposes no HTTP surface, so don't look for a
+        # `router` — mounting nothing ≠ degraded. This covers `kind: tool` plugins (postgres/minio/…,
+        # DI contract only) AND schema/contract-only capabilities (e.g. `chat` before its gateway routes
+        # exist). Only a plugin that DECLARES routes must export a matching `router`; a missing one is a
+        # real fault (degraded, §8).
+        manifest = PLUGIN_MANIFESTS.get(pid)
+        if manifest is not None and not manifest.routes:
+            mods.append(Module(name=pid, routers=()))
+            continue
         try:
             mods.append(Module(name=pid, routers=(plugin_loader.load_router(pid),)))
         except Exception as exc:  # §8 boundary — a bad plugin is degraded, not fatal
@@ -93,14 +102,23 @@ def _state_of(pid: str, enabled: set[str]) -> str:
 
 def plugin_states() -> list[dict]:
     """Each discovered plugin's state for /health (§14): `active` (enabled + healthy) · `degraded`
-    (enabled but its router failed to load, §8) · `disabled` (not enabled this build), with its
-    **version read from the manifest** (never hardcoded → ties to versions.md). Lists every discovered
-    plugin — a disabled one still appears, so an operator sees the full installable surface."""
+    (enabled but its router failed to load, §8) · `disabled` (not enabled this build) · `quarantined`
+    (present on disk but its manifest failed validation — carries a `reason`, K1), with its **version read
+    from the manifest** (never hardcoded → ties to versions.md). Lists every discovered plugin — a
+    disabled or quarantined one still appears, so an operator sees the full installable surface AND why a
+    bad plugin didn't load."""
     enabled = enabled_optional_modules()
-    return [
+    states = [
         {"id": pid, "version": mf.version, "state": _state_of(pid, enabled)}
         for pid, mf in sorted(PLUGIN_MANIFESTS.items())
     ]
+    # Quarantined plugins never entered PLUGIN_MANIFESTS (they failed validation), so append them with the
+    # reason so the operator can see + fix them from /health without shelling into the volume (K1).
+    states += [
+        {"id": pid, "version": None, "state": "quarantined", "reason": reason}
+        for pid, reason in sorted(plugin_loader.QUARANTINED.items())
+    ]
+    return states
 
 
 def register_routers(app: FastAPI) -> list[str]:

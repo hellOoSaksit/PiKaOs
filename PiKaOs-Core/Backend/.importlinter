@@ -22,10 +22,10 @@ root_package = app
 name = Core (Base) must not import any plugin (§2.1)
 type = forbidden
 # app.core = the whole Base subpackage (Phase 1b moved infra + the core/engine layers under app/core/);
-# app.{main,worker,modules,plugin_loader} = the composition seam at the app root (the future PiKaOs-App).
+# app.{main,modules,plugin_loader} = the composition seam at the app root (the future PiKaOs-App). The arq
+# worker left the kernel with the Redis extraction (it lives in the redis tool now, app.plugins.redis.worker).
 source_modules =
     app.main
-    app.worker
     app.modules
     app.plugin_loader
     app.core
@@ -34,17 +34,16 @@ forbidden_modules =
 
 [importlinter:contract:core-must-not-import-app-composition]
 name = Core (Base) must not import the App composition seam (§2.1 — Core ↛ App)
-# The composition root (main/worker/modules = the PiKaOs-App layer) wires Core + plugins together; Core
-# must never reach UP into it. `plugin_loader` is NOT in this list — the kernel-redesign moves the plugin
-# catalog (discover/topo/enabled-selection) into the kernel, so Core-side code (composition, plugin_registry,
-# the plugins router) legitimately imports it. A prior breach — core/routers/health.py importing `modules`
-# for plugin_states() — was inverted via app.state (the App registers the provider at startup).
+# The composition root (main/modules = the PiKaOs-App layer) wires Core + plugins together; Core must never
+# reach UP into it. `plugin_loader` is NOT in this list — the kernel-redesign moves the plugin catalog
+# (discover/topo/enabled-selection) into the kernel, so Core-side code (composition, plugin_registry, the
+# plugins router) legitimately imports it. A prior breach — core/routers/health.py importing `modules` for
+# plugin_states() — was inverted via app.state (the App registers the provider at startup).
 type = forbidden
 source_modules =
     app.core
 forbidden_modules =
     app.main
-    app.worker
     app.modules
 
 # NOTE: the plugin↛sibling-plugin independence contract lives in each plugin repo's own CI (see header #2),

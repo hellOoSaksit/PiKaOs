@@ -220,39 +220,18 @@ function saveWorld(arr) { try { localStorage.setItem(WORLD_KEY, JSON.stringify(a
 const newWorldObj = (type, x, y) => wobj(type, x, y);
 const zoneAt = (x, y) => ZONES.find(z => x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h);
 
-/* ---- AI API connections (named keys, managed in Settings) ---- */
-const API_KEYS_LS = "guildos.apikeys.v1";
-function loadApiKeys() {
-  try { const r = localStorage.getItem(API_KEYS_LS); return r ? JSON.parse(r) : []; } catch (e) { return []; }
-}
-function saveApiKeys(list) {
-  try { localStorage.setItem(API_KEYS_LS, JSON.stringify(list)); } catch (e) { }
-  window.__apiKeys = list;
-}
-function maskKey(k) {
-  if (!k) return ""; const s = String(k).trim();
-  return s.length <= 4 ? "••••" : "••••" + s.slice(-4);
-}
-const API_PROVIDERS = [
-  { key: "openai",    label: "OpenAI" },
-  { key: "anthropic", label: "Anthropic" },
-  { key: "google",    label: "Google" },
-  { key: "azure",     label: "Azure" },
-  { key: "custom",    label: "อื่น ๆ / Custom" },
-];
-window.__apiKeys = loadApiKeys();
+/* AI API keys are managed by the tools screen (จัดการเครื่องมือ) via the backend /llm/connections
+   flow — write-only, encrypted at rest. The old plaintext localStorage store (guildos.apikeys.v1 /
+   window.__apiKeys) was an insecure duplicate and has been removed (F4). */
 
 Object.assign(window, {
   STATUS_OPTS, MODEL_OPTS, SKILL_SUGGEST, TOOL_SUGGEST,
   makeCharacter, SAMPLE_CHARS, loadChars, saveChars, randPos, GuildCtx,
   loadArchived, saveArchived,
   ZONES, PLACEABLES, placeableOf, WORLD_SEED, loadWorld, saveWorld, newWorldObj, zoneAt,
-  loadApiKeys, saveApiKeys, maskKey, API_PROVIDERS,
 });
 
 export {
-  API_KEYS_LS,
-  API_PROVIDERS,
   ARCH_KEY,
   CHAR_KEY,
   GuildCtx,
@@ -268,16 +247,13 @@ export {
   _ensureCeo,
   _idn,
   _wid,
-  loadApiKeys,
   loadArchived,
   loadChars,
   loadWorld,
   makeCharacter,
-  maskKey,
   newWorldObj,
   placeableOf,
   randPos,
-  saveApiKeys,
   saveArchived,
   saveChars,
   saveWorld,

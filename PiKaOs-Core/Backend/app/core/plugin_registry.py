@@ -1,51 +1,48 @@
 """Plugin install registry + dependency resolver (the brain behind the install UI).
 
-The registry records each plugin's **desired state** — `installed` / `enabled` / `disabled` — persisted in
-the generic `app_settings` table under key `"plugins"` (a JSON map `{id: {state, version, installed_at}}`).
-A plugin with no row is **available** (discovered but not installed). This is the lighter of the two stores
-in plugin-lifecycle-ui.md §3 (a dedicated table is the heavier alternative); it is enough for the
-restart-to-apply model the team chose (§7 🟢): the registry is the source of truth, and the backend
-entrypoint resolves it into `ENABLED_MODULES` at boot (so what actually mounts follows the registry, but
-mounting still happens once, at import — no fragile runtime unmount). See `scripts/compute_enabled.py`.
+The registry records each plugin's **desired state** — `installed` / `enabled` / `disabled` — persisted as
+kernel local-JSON (`kernel_state` file `"plugins"`: a map `{id: {state, version, installed_at}}`). A plugin
+with no entry is **available** (discovered but not installed). It is the source of truth for the
+restart-to-apply model (plugin-lifecycle-ui.md §7 🟢): the backend entrypoint resolves it into
+`ENABLED_MODULES` at boot (so what mounts follows the registry, but mounting still happens once, at import).
+See `scripts/compute_enabled.py`.
+
+Kernel local-JSON (not a DB table): the registry is the boot-time source of truth for which plugins load —
+a chicken-and-egg with the plugin tier, and the kernel must resolve it with NO datastore (zero-datastore
+kernel). Persistence is synchronous file I/O; the JSON is tiny.
 
 The **resolver** (`resolve_install_plan`) is the dependency-request logic: clicking "Install RAG" must offer
 to install `ai` if it isn't there, and **skip it if another plugin already pulled it in** (no duplicate
-install). It is a pure function over manifests + the installed set, so it unit-tests without a DB.
-
-NOTE (first cut): install == register + enable. Running a plugin's *own* forward/down migration on
-install/uninstall is P4 ("ก้อน B") — until then a plugin's tables come from the Core baseline, so uninstall
-only forgets the row (it does not drop tables). The router says so in its docstring.
+install). It is a pure function over manifests + the installed set, so it unit-tests without any state.
 """
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
-import uuid
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
+from . import kernel_state
 from .. import plugin_loader as _loader
-from .repositories import app_settings as _repo
 
 _KEY = "plugins"
 
-# desired-state values (a missing row == AVAILABLE)
+# desired-state values (a missing entry == AVAILABLE)
 AVAILABLE = "available"
 INSTALLED = "installed"
 ENABLED = "enabled"
 DISABLED = "disabled"
+PENDING_PURGE = "pending_purge"   # uninstalled (code gone) but its DB tables are kept for Purge
 
 
-# --- persistence (async, over app_settings["plugins"]) ----------------------------------------------
+# --- persistence (kernel local-JSON, over the "plugins" state file) ---------------------------------
 
-async def read(db: AsyncSession) -> dict[str, dict]:
+def read() -> dict[str, dict]:
     """The raw registry map `{plugin_id: {state, version, installed_at}}` (empty if never written)."""
-    row = await _repo.get(db, _KEY)
-    return dict(row.value) if row and isinstance(row.value, dict) else {}
+    reg = kernel_state.read_json(_KEY, {})
+    return dict(reg) if isinstance(reg, dict) else {}
 
 
 def state_of(registry: dict[str, dict], pid: str) -> str:
-    """The desired state of `pid` given a registry map — `available` when it has no row."""
+    """The desired state of `pid` given a registry map — `available` when it has no entry."""
     entry = registry.get(pid)
     return entry.get("state", AVAILABLE) if isinstance(entry, dict) else AVAILABLE
 
@@ -55,32 +52,110 @@ def enabled_ids(registry: dict[str, dict]) -> set[str]:
     return {pid for pid in registry if state_of(registry, pid) == ENABLED}
 
 
-async def set_state(
-    db: AsyncSession, pid: str, state: str, *, version: str | None = None,
-    by: uuid.UUID | None = None,
-) -> dict[str, dict]:
-    """Upsert one plugin's state, preserving `installed_at` across transitions; returns the new map."""
-    reg = await read(db)
-    entry = dict(reg.get(pid) or {})
-    entry["state"] = state
-    if version is not None:
+def _as_registry(reg: object) -> dict[str, dict]:
+    """Coerce whatever the state file held into a registry map (mirrors `read()`)."""
+    return dict(reg) if isinstance(reg, dict) else {}
+
+
+def set_state(pid: str, state: str, *, version: str | None = None) -> dict[str, dict]:
+    """Upsert one plugin's state, preserving `installed_at` across transitions; returns the new map.
+    Cross-process-atomic (K2): the read-modify-write runs under `kernel_state.update`'s flock so a
+    concurrent worker's write can't clobber this one — critical, since a lost registry write = a plugin
+    that never mounts."""
+    def mutate(reg: object) -> dict[str, dict]:
+        reg = _as_registry(reg)
+        entry = dict(reg.get(pid) or {})
+        entry["state"] = state
+        if version is not None:
+            entry["version"] = version
+        if state in (INSTALLED, ENABLED) and "installed_at" not in entry:
+            entry["installed_at"] = datetime.now(timezone.utc).isoformat()
+        reg[pid] = entry
+        return reg
+
+    return kernel_state.update(_KEY, mutate, {})
+
+
+def set_git_install(pid: str, *, repo_url: str, tag: str, version: str,
+                    sha: str | None = None) -> dict[str, dict]:
+    """Upsert a plugin installed via install-from-git (§2.1): same as `set_state(..., ENABLED)` plus
+    the provenance Uninstall/Purge/update-check need — `repoUrl`/`installedTag`/`installedSha` and
+    `installedVia: "git"` (a `symlink` entry, the default, is never physically deletable — it's a
+    dev's sibling checkout). `installedSha` is the IMMUTABLE pin (marketplace.md W2): a tag can be
+    force-moved, a commit SHA cannot, so the SHA is what an audit/tamper-check compares against. Done in
+    ONE flock'd update (K2) so state + provenance land atomically — no torn two-write window."""
+    def mutate(reg: object) -> dict[str, dict]:
+        reg = _as_registry(reg)
+        entry = dict(reg.get(pid) or {})
+        entry["state"] = ENABLED
         entry["version"] = version
-    if state in (INSTALLED, ENABLED) and "installed_at" not in entry:
-        entry["installed_at"] = datetime.now(timezone.utc).isoformat()
-    reg[pid] = entry
-    await _repo.upsert(db, _KEY, reg, updated_by=by)
-    return reg
+        if "installed_at" not in entry:
+            entry["installed_at"] = datetime.now(timezone.utc).isoformat()
+        entry["repoUrl"] = repo_url
+        entry["installedVia"] = "git"
+        entry["installedTag"] = tag
+        if sha is not None:
+            entry["installedSha"] = sha
+        reg[pid] = entry
+        return reg
+
+    return kernel_state.update(_KEY, mutate, {})
 
 
-async def remove(db: AsyncSession, pid: str, *, by: uuid.UUID | None = None) -> dict[str, dict]:
+def installed_via(registry: dict[str, dict], pid: str) -> str:
+    """`"git"` or `"symlink"` (default) — whether Uninstall may delete the on-disk plugin folder."""
+    entry = registry.get(pid)
+    return entry.get("installedVia", "symlink") if isinstance(entry, dict) else "symlink"
+
+
+def repo_url_of(registry: dict[str, dict], pid: str) -> str | None:
+    entry = registry.get(pid)
+    return entry.get("repoUrl") if isinstance(entry, dict) else None
+
+
+def installed_tag_of(registry: dict[str, dict], pid: str) -> str | None:
+    """The git tag currently checked out for `pid` — the update flow's revert-to-known-good point."""
+    entry = registry.get(pid)
+    return entry.get("installedTag") if isinstance(entry, dict) else None
+
+
+def installed_sha_of(registry: dict[str, dict], pid: str) -> str | None:
+    """The immutable commit SHA pinned for `pid` at install/update time (marketplace.md W2), or None
+    for a legacy row / symlink install that predates SHA-pinning."""
+    entry = registry.get(pid)
+    return entry.get("installedSha") if isinstance(entry, dict) else None
+
+
+def uninstall_git(pid: str) -> dict[str, dict]:
+    """Uninstall a git-installed plugin: state → PENDING_PURGE. Provenance (`repoUrl`/`installedTag`)
+    is deliberately KEPT (not `remove()`d) so Purge can still find what to drop. The caller (router)
+    is responsible for the on-disk folder deletion — the registry only tracks desired state."""
+    def mutate(reg: object) -> dict[str, dict]:
+        reg = _as_registry(reg)
+        entry = dict(reg.get(pid) or {})
+        entry["state"] = PENDING_PURGE
+        reg[pid] = entry
+        return reg
+
+    return kernel_state.update(_KEY, mutate, {})
+
+
+def purge_complete(pid: str) -> dict[str, dict]:
+    """Purge finished — forget the plugin entirely (back to *available*, same as a normal uninstall)."""
+    return remove(pid)
+
+
+def remove(pid: str) -> dict[str, dict]:
     """Forget a plugin (uninstall → back to *available*); returns the new map. No table drop (see P4)."""
-    reg = await read(db)
-    reg.pop(pid, None)
-    await _repo.upsert(db, _KEY, reg, updated_by=by)
-    return reg
+    def mutate(reg: object) -> dict[str, dict]:
+        reg = _as_registry(reg)
+        reg.pop(pid, None)
+        return reg
+
+    return kernel_state.update(_KEY, mutate, {})
 
 
-# --- dependency resolver (PURE — no DB, unit-testable) ----------------------------------------------
+# --- dependency resolver (PURE — no state, unit-testable) -------------------------------------------
 
 def _closure(target: str, manifests: dict[str, Any]) -> set[str]:
     """`target` plus all of its transitive hard `dependencies` (ignores deps absent from `manifests`)."""
@@ -102,8 +177,8 @@ def resolve_install_plan(
 
     Returns `{target, unknown, order, already_installed, to_install}` where `order` is the target plus its
     transitive deps in topological order (deps before dependents). `already_installed` are the ones the
-    registry already has (skipped — no duplicate install, the dedupe the user asked for); `to_install` are
-    the rest, in the order they must be installed. `unknown` is true when `target` isn't a discovered plugin.
+    registry already has (skipped — no duplicate install); `to_install` are the rest, in install order.
+    `unknown` is true when `target` isn't a discovered plugin.
     """
     if target not in manifests:
         return {"target": target, "unknown": True, "order": [], "already_installed": [], "to_install": []}

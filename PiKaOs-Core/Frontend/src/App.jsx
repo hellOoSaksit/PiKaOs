@@ -2,18 +2,20 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 const { useState, useEffect } = React;
-import { AUDIT_SEED, ROLES_SEED, ROLE_PERMS_SEED, USERS_SEED, USER_PERMS_SEED, fmtTok, loadU, resolvePerms, roleByKey, saveU, userById } from './data/data-users.jsx';
+import { AUDIT_SEED, ROLES_SEED, ROLE_PERMS_SEED, USERS_SEED, USER_PERMS_SEED, fmtTok, loadU, roleByKey, saveU } from './data/data-users.jsx';
 import { TOOL_RUNS_SEED, WORKFLOWS_SEED, loadWF, saveWF } from './data/data-workflows.jsx';
 import { TOKENS, NAV, TASKS } from './data/data.jsx';
 import { loadNav, saveNav, mergeWithDefault } from './data/data-nav.jsx';
-import { getNavConfig, setNavConfig, getMySettings, setMySetting, getGlobalConfig, setGlobalConfig } from './lib/api.js';
+import { getNavConfig, setNavConfig, getMySettings, setMySetting, getGlobalConfig, setGlobalConfig, setupStatus, setToken } from './lib/api.js';
 import { applyGlobalConfig } from './lib/characters.jsx';
 import { Admin } from './screens/screens-admin.jsx';
 import { CharacterBuilder } from './screens/screens-builder.jsx';
 import { Chronicle, Mana, QuestLog, Settings, Treasury, Watchtower } from './screens/screens-extra.jsx';
-import { Login } from './screens/Login.jsx';
+import { FirstRun } from './screens/FirstRun.jsx';
+import { KernelOnlyShell } from './screens/KernelOnlyShell.jsx';
 import { MyDashboard } from './screens/screens-me.jsx';
 import { PluginsManager } from './screens/screens-plugins.jsx';
+import { LocalMcp } from './screens/secondary/LocalMcp.jsx';
 import { AuditLog, PermissionsCatalog, RolesPermissions, UserDetail, UserForm } from './screens/screens-rbac.jsx';
 import { AgentDrawer, Agents, Meeting, QuestBoard, QuestDrawer } from './screens/screens-secondary.jsx';
 import { SitemapAudit } from './screens/screens-sitemap.jsx';
@@ -21,7 +23,7 @@ import { ToolsManager } from './screens/screens-tools.jsx';
 import { ComponentLibrary } from './screens/screens-library.jsx';
 import { Workflows } from './screens/screens-workflows.jsx';
 import { useAuth } from './lib/auth.jsx';
-import { Menu } from './components/ui/Dropdown.jsx';
+import { BottomUtilityBar } from './components/ui/BottomUtilityBar.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
 import { SAMPLE_CHARS, loadArchived, loadChars, randPos, saveArchived, saveChars } from './lib/store.jsx';
 import { UILoadingHost, UIModalHost } from './lib/ui-modal.jsx';
@@ -50,6 +52,9 @@ const ROUTE_META = {
   workflows: { icon: "⚗️", title: "เวิร์กโฟลว์", en: "Workflows" },
   audit:   { icon: "📋", title: "บันทึกการตรวจสอบ", en: "Audit Log" },
   modules: { icon: "🧩", title: "โมดูล / ปลั๊กอิน", en: "Modules / Plugins" },
+  marketplace: { icon: "🛍️", title: "มาร์เก็ตเพลส", en: "Marketplace" },
+  mypackages: { icon: "📦", title: "แพ็กเกจของฉัน", en: "My Packages & Share" },
+  localmcp: { icon: "🖥️", title: "Local MCP", en: "Local MCP" },
   userDetail: { icon: "👤", title: "ข้อมูลสมาชิก", en: "User" },
   settings:{ icon: "⚙️", title: "ตั้งค่าระบบ", en: "Settings" },
   library: { icon: "🧩", title: "คลังคอมโพเนนต์", en: "Component Library" },
@@ -70,7 +75,8 @@ function navContains(node, route) {
    hidden nodes, and perm-gated nodes the user can't reach, are dropped; a node with visible
    children shows a caret that collapses them. Indent grows with depth. */
 function NavNode({ node, depth, route, go, t, can, navOpen, setNavOpen }) {
-  const kids = (node.children || []).filter(c => !c.hidden && (!c.perm || (can && can(c.perm))));
+  const kids = (node.children || []).filter(c => !c.hidden && (!c.perm || (can && can(c.perm)))
+    && (!c.desktopOnly || window.pikaosDesktop?.isDesktop));
   const hasKids = kids.length > 0;
   const branchActive = kids.some(c => navContains(c, route));
   const isOpen = branchActive || (node.id in navOpen ? navOpen[node.id] : route === node.id);
@@ -286,46 +292,7 @@ function ProfileMenu({ me, roles, t, onSignOut, onSaveProfile }) {
   );
 }
 
-/* ---------------- View-as (impersonation preview) ---------------- */
-/* Admin-only control to preview the app exactly as another user sees it.
-   Gated upstream by realCan("user.manage"); the banner+exit ride on the
-   REAL identity so a preview can never trap you. */
-function ViewAsControl({ viewAs }) {
-  const { users, roles, realMe, onPick, T, t } = viewAs;
-  const items = users
-    .filter(u => u.id !== realMe.id)
-    .map(u => {
-      const r = roleByKey(roles, u.role);
-      return {
-        label: <span className="va-pick"><span className="va-pick-av">{u.avatar}</span>
-          <span className="va-pick-name">{u.display}</span>
-          <span className={`va-pick-role badge ${r.color || ""}`}>{T(r.en, r.th)}</span></span>,
-        onSelect: () => onPick(u.id),
-      };
-    });
-  return (
-    <div className="viewas-ctl" title={t("viewas.hint")}>
-      <Menu label={<span className="va-trigger">👁️ {t("viewas.enter")}</span>} items={items} minWidth={150} />
-    </div>
-  );
-}
-
-/* The persistent banner shown while previewing as someone, with the exit. */
-function ViewAsBanner({ user, roles, onExit, t, T }) {
-  const r = roleByKey(roles, user.role);
-  return (
-    <div className="viewas-banner" data-no-lex role="status">
-      <span className="vb-eye">👁️</span>
-      <span className="vb-text">
-        {t("viewas.banner")} <b>{user.avatar} {user.display}</b>
-        <span className={`badge ${r.color || ""}`} style={{ marginLeft: 6 }}>{T(r.en, r.th)}</span>
-      </span>
-      <button className="vb-exit" onClick={onExit}>✕ {t("viewas.exit")}</button>
-    </div>
-  );
-}
-
-function Topbar({ route, theme, setTheme, user, language, viewAs, t, me, roles, onSignOut, onSaveProfile }) {
+function Topbar({ route, theme, setTheme, user, language, t, me, roles, onSignOut, onSaveProfile }) {
   const m = ROUTE_META[route] || ROUTE_META.me;   // me is always Base — safe fallback if a plugin (e.g. world→hall) is disabled
   const title = t("route." + route + ".title");
   const live = route === "hall" || route === "meeting" || route === "world";
@@ -339,7 +306,6 @@ function Topbar({ route, theme, setTheme, user, language, viewAs, t, me, roles, 
         {live && <span className="live-badge" style={{ marginLeft: 6 }}><span className="pulse-dot" />LIVE</span>}
       </div>
       <div className="topbar-spacer" />
-      {viewAs && <ViewAsControl viewAs={viewAs} />}
       <div className="tb-stat" data-no-lex>
         <span className="tbs-ico">🔵</span>
         <span className="tbs-num">{(TOKENS.balance/1000).toFixed(1)}K</span>
@@ -366,6 +332,17 @@ function App() {
   const auth = useAuth();                                  // { user, ready, loggedIn, login, logout }
   const currentUser = auth.user;                           // backend account or null
   const username = currentUser?.username || "somchai";     // for the topbar avatar label
+
+  // Kernel-only bootstrap gate (no auth plugin installed yet — 2026-07-02-bootstrap-install-shell-
+  // design.md): a stored session token from a verified setup code unlocks a minimal install shell.
+  // `null` = not checked yet (avoid flashing FirstRun before we know); re-checked after FirstRun's
+  // onVerified stores a fresh token, so a page load with a still-valid token skips straight past it.
+  const [bootstrap, setBootstrap] = useState(null);
+  const refreshBootstrap = React.useCallback(() => {
+    setupStatus().then(setBootstrap).catch(() => setBootstrap({ needsSetup: false, bootstrapAuthorized: false }));
+  }, []);
+  useEffect(() => { refreshBootstrap(); }, [refreshBootstrap]);
+
   const [route, setRoute] = useState("me");
   const [theme, setThemeState] = useState(() => { const t = localStorage.getItem("guild-theme"); return (t === "pro" || t === "pro-dark") ? t : "pro"; });
   // active lexicon = ภาษาที่แสดง + รูปแบบคำศัพท์ รวมเป็นชุดเดียว (รหัสชุดจาก data/lexicons/*.json)
@@ -407,9 +384,6 @@ function App() {
   const [audit, setAudit] = useState(() => loadU("audit", AUDIT_SEED));
   const [workflows, setWorkflows] = useState(() => loadWF("workflows", WORKFLOWS_SEED));
   const [toolRuns, setToolRuns] = useState(() => loadWF("runs", TOOL_RUNS_SEED));
-  // slug used by the (still client-side) RBAC seed: "u_somchai" etc.
-  const currentUserId = currentUser ? ("u_" + currentUser.username) : "u_somchai";
-  const [viewAs, setViewAs] = useState(null);   // user id being previewed (in-memory only — never persisted)
   const [userSel, setUserSel] = useState(null);         // selected user id (detail)
   const [userForm, setUserForm] = useState(null);       // null | {} | user
 
@@ -512,21 +486,19 @@ function App() {
     setBuilder(null);
   };
 
-  // ---- resolve current user + permissions ----
+  // ---- current user + permissions come from the SERVER (F1) ----
   const T = (en, th) => language === "en" ? en : th;
-  // REAL identity — never affected by "view as". The view-as entry + exit ride on this,
-  // so previewing as a viewer can never trap you (you keep your real ability to leave).
-  const realMe = userById(users, currentUserId) || users[0];
-  const realPerms = resolvePerms(realMe.role, rolePerms, userPerms[realMe.id]);
-  const realCan = (k) => realPerms.has(k);
-  // EFFECTIVE identity — who you're previewing as (their role + their own overrides), or yourself.
-  const viewUser = viewAs ? userById(users, viewAs) : null;
-  const viewingAs = (viewUser && viewUser.id !== realMe.id) ? viewUser : null;
-  const me = viewUser || realMe;
-  const mePerms = resolvePerms(me.role, rolePerms, userPerms[me.id]);
+  // The signed-in identity and its effective permissions are whatever the backend `/auth/me` returned
+  // (currentUser.permissions) — never client seed data. Knowing a username is not permission, and there
+  // is no "fall back to the seeded admin" path: a real user who isn't an admin gets a non-admin UI. An
+  // admin holds every key (admin-implicit-all, resolved server-side).
+  const me = currentUser;
+  const mePerms = React.useMemo(() => new Set(currentUser?.permissions || []), [currentUser]);
   const can = (k) => mePerms.has(k);
-  const logAudit = (action, targetType, target, meta) =>
-    setAudit(prev => [{ id: "ev" + Date.now(), actor: currentUserId, action, targetType, target, meta, time: T("just now", "เมื่อสักครู่") }, ...prev]);
+  // The user/role/audit management screens below still run on demo seed data (real CRUD is a follow-up);
+  // they are gated by the REAL server `can` above, so only an actual admin ever reaches them. No
+  // client-side audit trail — the server owns audit.
+  const logAudit = () => {};
 
   // persist a nav edit: update the UI now + push to the shared server config (best-effort)
   const saveNavCfg = (cfg) => { setNavCfg(cfg); setNavConfig(cfg).catch(() => {}); };
@@ -595,10 +567,15 @@ function App() {
   useEffect(() => {
     const need = ROUTE_PERM[route];
     if (need && !can(need)) go("me");
-  }, [route, viewAs, rolePerms, userPerms]);
+  }, [route, mePerms]);
 
-  if (!auth.ready) return null;   // avoid flashing the login screen while restoring a session
-  if (!auth.loggedIn) return <Login onLogin={auth.login} t={t} language={language} onLang={pickLanguage} />;
+  if (!auth.ready || !bootstrap) return null;   // avoid flashing the setup screen while restoring a session
+  // Kernel-only (no auth plugin installed yet): a verified setup code unlocks a minimal install shell
+  // instead of the full app — there's no real Login screen yet (arrives with the auth plugin itself).
+  if (!auth.loggedIn) {
+    if (bootstrap.bootstrapAuthorized) return <KernelOnlyShell language={language} />;
+    return <FirstRun t={t} language={language} onLang={pickLanguage} onVerified={(token) => { setToken(token); refreshBootstrap(); }} />;
+  }
 
   const screen = (() => {
     const guard = (perm, el) => can(perm) ? el : <MyDashboard Sys={Sys} onAgent={setAgentSel} onQuest={setQuestSel} />;
@@ -617,7 +594,10 @@ function App() {
       case "roles": return guard("role.manage", <RolesPermissions Sys={Sys} />);
       case "permissions": return guard("user.view.any", <PermissionsCatalog Sys={Sys} />);
       case "audit": return guard("audit.view", <AuditLog Sys={Sys} />);
-      case "modules": return guard("plugins.manage", <PluginsManager Sys={Sys} />);
+      case "modules": return guard("plugins.manage", <PluginsManager Sys={Sys} view="modules" />);
+      case "marketplace": return guard("plugins.manage", <PluginsManager Sys={Sys} view="market" />);
+      case "mypackages": return guard("plugins.manage", <PluginsManager Sys={Sys} view="mine" />);
+      case "localmcp": return guard("plugins.manage", <LocalMcp Sys={Sys} />);
       case "workflows": return <Workflows Sys={Sys} />;
       case "settings": return <Settings theme={theme} setTheme={setTheme} lex={lex} setLex={setLex} pickLanguage={pickLanguage} language={language} formal={formal} go={go} t={t} />;
       case "library": return <ComponentLibrary onBack={() => go("settings")} t={t} />;
@@ -638,9 +618,7 @@ function App() {
       <div className="main">
         <Topbar route={route} theme={theme} setTheme={setTheme} user={username} language={language} t={t}
           me={me} roles={roles} onSignOut={auth.logout}
-          onSaveProfile={(u) => setUsers(prev => prev.map(x => x.id === currentUserId ? { ...x, ...u } : x))}
-          viewAs={realCan("user.manage") ? { users, roles, realMe, current: viewingAs, onPick: setViewAs, T, t } : null} />
-        {viewingAs && <ViewAsBanner user={viewingAs} roles={roles} onExit={() => setViewAs(null)} t={t} T={T} />}
+          onSaveProfile={() => { /* profile edit is a follow-up: needs a backend PATCH /auth/me — demo no-op */ }} />
         <div className="content">{screen}</div>
       </div>
       {userForm && <UserForm Sys={Sys} initial={userForm.id ? userForm : null} onClose={() => setUserForm(null)} />}
@@ -649,6 +627,13 @@ function App() {
         onDelete={async (id) => { const c = chars.find(x => x.id === id); if (c && c.locked) { await window.uiAlert({ title: t("ad.cantDelTitle"), message: t("ad.ceoLockedAlert") }); return; } setAgentSel(null); S.remove(id); }} />}
       {questSel && <QuestDrawer q={questSel} onClose={() => setQuestSel(null)} t={t} onAgent={(a) => { setQuestSel(null); setAgentSel(a); }} />}
       {builder && <CharacterBuilder initial={builder.id ? builder : null} onSave={saveChar} onClose={() => setBuilder(null)} can={can} archived={archived} t={t} onRestore={(id) => { S.restore(id); setBuilder(null); }} />}
+      <BottomUtilityBar
+        t={t} route={route} onHome={() => go("me")} me={me}
+        theme={theme} onToggleTheme={() => setTheme(theme === "pro" ? "pro-dark" : "pro")}
+        onSignOut={auth.logout}
+        notifications={[]} chatThreads={[]}
+        onAdd={() => Sys.openBuilder()}
+      />
       <UIModalHost />
       <UILoadingHost />
     </div>

@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     # in Backend/.env so plugin code is exercised. See app/modules.py for the registry.
     enabled_modules: str = ""
 
+    # --- kernel local-JSON state (zero-datastore kernel) ---
+    # Where the kernel persists its OWN state as JSON — the plugin install registry (read at boot to
+    # resolve ENABLED_MODULES, so the kernel needs no DB to know its plugin set), the shared nav/global
+    # config, and per-user prefs. MUST be a persistent volume shared by the backend + worker (both read
+    # the registry). See app/core/kernel_state.py.
+    kernel_state_dir: str = "/app/state"
+
     # --- database (async SQLAlchemy / asyncpg) ---
     database_url: str = "postgresql+asyncpg://pikaos:pikaos@db:5432/pikaos"
 
@@ -155,18 +162,8 @@ class Settings(BaseSettings):
     anthropic_version: str = "2023-06-01"
     anthropic_default_model: str = "claude-opus-4-8"
 
-    # --- Telegram channel (features/telegram-integration.md) ---
-    # The bot TOKEN is NOT here (no-hardcode) — it lives encrypted in telegram_connections, set from
-    # the UI. These are only transport tunables. Base is overridable for tests/proxy.
-    telegram_api_base: str = "https://api.telegram.org"
-    # Long-poll hold time for getUpdates (polling mode) — 30–60s avoids hammering Telegram.
-    telegram_poll_timeout_s: float = 50.0
-    # Per-call HTTP timeout for Bot API requests (must exceed telegram_poll_timeout_s for getUpdates).
-    telegram_request_timeout_s: float = 60.0
-    # Reply formatting — MarkdownV2 (escape user content) or HTML; "" = plain text.
-    telegram_parse_mode: str = "MarkdownV2"
-    # Public base URL of THIS deployment (e.g. https://app.example.com) — used to build the
-    # setWebhook callback URL in webhook mode. Empty → webhook mode can't self-register (polling only).
+    # Public base URL of THIS deployment (e.g. https://app.example.com) — used to build absolute
+    # callback URLs (e.g. a channel provider's webhook). Empty → callers can't self-register a webhook.
     public_base_url: str = ""
 
     # --- CORS (frontend dev origin) ---
@@ -202,6 +199,11 @@ class Settings(BaseSettings):
             problems.append("SEED_PASSWORD is the dev default — change it")
         if self.minio_secret_key in _DEV_MINIO_SECRETS:
             problems.append("MINIO_SECRET_KEY is the dev default — change it")
+        # Fix-SEC-06: CORS runs with allow_credentials=True (main.py), so a "*" origin would let ANY
+        # site make credentialed cross-origin calls. Browsers reject literal "*"+credentials, but some
+        # stacks reflect the origin — forbid the wildcard outright and require an explicit allowlist.
+        if "*" in self.cors_list:
+            problems.append("CORS_ORIGINS contains '*' — a wildcard origin with credentials is unsafe; list explicit origins in production")
         # Redis holds sessions, the perms cache, and the job queue; an unauthenticated Redis exposed
         # across servers is fully readable. Require a password in production (empty is fine in dev,
         # where Redis is only reachable on the private compose network).

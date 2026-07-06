@@ -9,15 +9,14 @@
 
    Modules:
      extra/dashboards.jsx  Mana · Treasury · Chronicle · QuestLog · Watchtower
-     extra/settings.jsx    Settings (theme/language) + ApiConnections panel
+     extra/settings.jsx    Settings (theme/language)
 */
 import { Mana, Treasury, Chronicle, QuestLog, Watchtower } from './extra/dashboards.jsx';
-import { THEME_CARDS, ApiConnections, Settings } from './extra/settings.jsx';
+import { THEME_CARDS, Settings } from './extra/settings.jsx';
 
 Object.assign(window, { Mana, Treasury, Chronicle, Settings, QuestLog, Watchtower });
 
 export {
-  ApiConnections,
   Chronicle,
   Mana,
   QuestLog,

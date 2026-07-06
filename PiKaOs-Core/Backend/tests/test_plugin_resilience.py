@@ -1,7 +1,7 @@
 """Plugin resilience + config gates — proves §8 (fault isolation), §10 (shutdown), §11 (config).
 
-Pure (no DB): drives the Loader lifecycle with in-memory fake plugin modules and the real knowledge
-manifest, so it runs in the normal pytest job alongside test_isolation/test_modules.
+Pure (no DB): drives the Loader lifecycle with in-memory fake plugin modules and the synthetic
+`sample` plugin (conftest), so it runs plugin-free alongside test_isolation/test_modules.
 
     docker compose exec backend pytest tests/test_plugin_resilience.py
 """
@@ -77,43 +77,51 @@ def test_shutdown_failure_is_isolated(monkeypatch):
 
 # --- §8 + §14 router-mount isolation surfaces as a degraded /health state ---------------------------
 
-def test_router_mount_failure_marks_degraded_not_fatal(monkeypatch):
-    monkeypatch.setattr(settings, "enabled_modules", "knowledge")
+def test_router_mount_failure_marks_degraded_not_fatal(sample_plugins, monkeypatch):
+    monkeypatch.setattr(settings, "enabled_modules", "sample")
 
     def boom(pid):
         raise RuntimeError("bad router import")
 
     monkeypatch.setattr(plugin_loader, "load_router", boom)
     names = [m.name for m in modules.active_modules()]
-    assert "infra" in names and "core" in names and "engine" in names, "Base survives a bad plugin"
-    assert "knowledge" not in names, "the failed plugin mounts no routes"
+    assert "infra" in names and "core" in names, "Base survives a bad plugin"
+    assert "sample" not in names, "the failed plugin mounts no routes"
     states = {p["id"]: p["state"] for p in modules.plugin_states()}
-    assert states["knowledge"] == "degraded"
+    assert states["sample"] == "degraded"
 
 
-def test_plugin_states_active_then_disabled(monkeypatch):
-    monkeypatch.setattr(settings, "enabled_modules", "knowledge")
+def test_plugin_states_active_then_disabled(sample_plugins, monkeypatch):
+    monkeypatch.setattr(settings, "enabled_modules", "sample")
     modules.active_modules()
-    assert {p["id"]: p["state"] for p in modules.plugin_states()}["knowledge"] == "active"
+    assert {p["id"]: p["state"] for p in modules.plugin_states()}["sample"] == "active"
     monkeypatch.setattr(settings, "enabled_modules", "")
     modules.active_modules()
-    assert {p["id"]: p["state"] for p in modules.plugin_states()}["knowledge"] == "disabled"
+    assert {p["id"]: p["state"] for p in modules.plugin_states()}["sample"] == "disabled"
 
 
 # --- §11 schema-validated, config-driven plugin config ----------------------------------------------
 
-def test_load_config_returns_schema_defaults():
-    cfg = plugin_loader.load_config(modules.PLUGIN_MANIFESTS["knowledge"])
-    assert cfg == {"top_k": 5, "min_score": 0.0}
+def test_load_config_returns_schema_defaults(tmp_path, monkeypatch):
+    # a plugin's effective config = the `default`s declared in its config.schema.json (§11).
+    (tmp_path / "cfgplug").mkdir()
+    (tmp_path / "cfgplug" / "config.schema.json").write_text(
+        '{"properties": {"top_k": {"default": 5}, "min_score": {"default": 0.0}}}', encoding="utf-8")
+    monkeypatch.setattr(plugin_loader, "PLUGINS_DIR", tmp_path)
+    mf = plugin_loader.Manifest(id="cfgplug", name="cfg", version="0.1.0", coreVersion="*",
+                                config_schema="config.schema.json")
+    assert plugin_loader.load_config(mf) == {"top_k": 5, "min_score": 0.0}
 
 
 def test_load_config_empty_when_no_schema():
     assert plugin_loader.load_config(_mf("x")) == {}
 
 
-def test_register_passes_plugin_config_via_ctx(monkeypatch):
+def test_register_passes_plugin_config_via_ctx(sample_plugins, monkeypatch):
     seen: dict = {}
     plugin = SimpleNamespace(register=lambda c: seen.update(c.config))
-    monkeypatch.setattr(plugin_loader, "_import_enabled", lambda e, m: [("knowledge", plugin)])
-    plugin_loader.register_plugins({"knowledge"}, modules.PLUGIN_MANIFESTS, _ctx())
-    assert seen == {"top_k": 5, "min_score": 0.0}
+    monkeypatch.setattr(plugin_loader, "_import_enabled", lambda e, m: [("sample", plugin)])
+    monkeypatch.setattr(plugin_loader, "load_config",
+                        lambda mf: {"top_k": 5} if mf.id == "sample" else {})
+    plugin_loader.register_plugins({"sample"}, sample_plugins.manifests, _ctx())
+    assert seen == {"top_k": 5}
