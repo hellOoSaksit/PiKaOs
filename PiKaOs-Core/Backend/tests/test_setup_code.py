@@ -198,3 +198,27 @@ def test_bootstrap_token_unlocks_the_plugins_list_route(tmp_state, client):
 def test_plugins_route_still_401s_without_a_token(tmp_state, client):
     resp = client.get("/api/plugins")
     assert resp.status_code == 401
+
+
+# --- auth mode + setup-completed flags (open-mode spec §4, phase 1) --------------------------------
+
+def test_auth_mode_defaults_to_login(tmp_state):
+    assert setup_state.read_auth_mode() == "login"
+
+
+def test_auth_mode_roundtrips(tmp_state):
+    setup_state.write_auth_mode("open")
+    assert setup_state.read_auth_mode() == "open"
+    setup_state.write_auth_mode("setup")
+    assert setup_state.read_auth_mode() == "setup"
+
+
+def test_auth_mode_unknown_value_reads_as_login(tmp_state):
+    kernel_state.write_json("auth_mode", {"mode": "banana"})
+    assert setup_state.read_auth_mode() == "login"
+
+
+def test_setup_completed_roundtrips(tmp_state):
+    assert setup_state.is_setup_completed() is False
+    setup_state.mark_setup_completed()
+    assert setup_state.is_setup_completed() is True

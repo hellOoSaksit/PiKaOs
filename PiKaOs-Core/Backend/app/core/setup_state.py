@@ -86,7 +86,42 @@ def verify_session_token(candidate: str | None) -> bool:
     return hmac.compare_digest(candidate, token)
 
 
+# --- optional-auth open mode (capability-handshake spec §4) -----------------------------------------
+# The boot entrypoint (scripts/generate_setup_code.py) decides this boot's mode ONCE and persists it
+# here so every worker process reads the same value: "login" (auth plugin enabled), "open" (no auth +
+# first-run setup completed — BootstrapProvider grants everyone), "setup" (no auth, setup pending —
+# the console code gates). `setup_completed` is the durable fact the boot decision derives from.
+
+_MODE_KEY = "auth_mode"
+_COMPLETED_KEY = "setup_completed"
+_MODES = ("login", "open", "setup")
+
+
+def write_auth_mode(mode: str) -> None:
+    """Persist this boot's auth mode for all workers. Callers pass one of `_MODES`."""
+    kernel_state.write_json(_MODE_KEY, {"mode": mode})
+
+
+def read_auth_mode() -> str:
+    """This boot's auth mode; absent/unknown reads as "login" — the fail-closed default (a server
+    must never accidentally open itself because a state file is missing or mangled)."""
+    data = kernel_state.read_json(_MODE_KEY, None)
+    mode = data.get("mode") if isinstance(data, dict) else None
+    return mode if mode in _MODES else "login"
+
+
+def mark_setup_completed() -> None:
+    """Durable: first-run setup finished once on this server (survives restarts on the state volume)."""
+    kernel_state.write_json(_COMPLETED_KEY, {"done": True})
+
+
+def is_setup_completed() -> bool:
+    data = kernel_state.read_json(_COMPLETED_KEY, None)
+    return bool(isinstance(data, dict) and data.get("done"))
+
+
 __all__ = [
     "generate_code", "generate_session_token", "write", "clear",
     "read_code", "read_session_token", "verify_code", "verify_session_token",
+    "write_auth_mode", "read_auth_mode", "mark_setup_completed", "is_setup_completed",
 ]
