@@ -24,6 +24,12 @@ services:
     volumes:
       - ../Backend:/app          # hot-reload: code edits on the host reflect in the container
       - kernelstate:/app/state   # kernel local-JSON state (plugin registry + nav + user prefs)
+      # dev-only: the mock TEST plugin's repo, mounted at the path its gitignored symlink resolves to
+      # (Backend/app/plugins/mock -> ../../../../PiKaOs-Plugin-Mock/backend → /PiKaOs-Plugin-Mock/backend
+      # inside /app). Lets the loader discover ONE harmless plugin so the Modules screen has a row to
+      # exercise. Real tool plugins stay undiscovered here (they need their sidecars); mount them the same
+      # way when a dev stack should run them for real.
+      - ../../PiKaOs-Plugin-Mock:/PiKaOs-Plugin-Mock:ro
 
   frontend:
     build:
