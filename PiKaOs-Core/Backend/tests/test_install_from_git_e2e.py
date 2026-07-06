@@ -20,6 +20,7 @@ from starlette.testclient import TestClient
 from app.core import git_installer, kernel_state, setup_state
 from app.core import plugin_registry as registry
 from app.core.contracts import POSTGRES_CONNECTION
+from tests.conftest import seed_manifest
 
 
 def _tagged_repo(tmp_path, tag, extra_files=None):
@@ -56,6 +57,9 @@ def test_full_lifecycle(tmp_path, monkeypatch, sample_plugins):
         assert resp.status_code == 200, resp.text
         assert (plugins_dir / "crm").is_dir()
         assert registry.installed_via(registry.read(), "crm") == "git"
+        # install is restart-to-apply (B3-H2): the manifest only enters the catalog at the next boot's
+        # discover() — seed that post-restart state so the rest of the lifecycle can act on the plugin
+        seed_manifest(plugin_loader.Manifest(id="crm", name="CRM", version="1.0.0", coreVersion="*"))
 
         # publish v1.1.0 on the same origin, then check-update + update
         (src / "manifest.json").write_text(
@@ -70,7 +74,9 @@ def test_full_lifecycle(tmp_path, monkeypatch, sample_plugins):
         resp = client.post("/api/plugins/crm/update", headers=headers)
         assert resp.status_code == 200, resp.text
         crm = next(p for p in resp.json()["plugins"] if p["id"] == "crm")
-        assert crm["version"] == "1.1.0"
+        # the response row shows the RUNNING (old) manifest until the restart applies the update
+        assert crm["version"] == "1.0.0"
+        assert registry.read()["crm"]["version"] == "1.1.0"   # ...but the registry already advanced
 
         # uninstall: code gone, DB-provenance kept, state = pending_purge
         resp = client.delete("/api/plugins/crm", headers=headers)

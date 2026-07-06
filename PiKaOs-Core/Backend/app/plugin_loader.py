@@ -435,20 +435,12 @@ def _sync_modules_reexport() -> None:
     modules.OPTIONAL_MODULE_NAMES = OPTIONAL_MODULE_NAMES
 
 
-def register_discovered(manifest: Manifest) -> None:
-    """Make a freshly-installed plugin's manifest visible to THIS process's `_manifests()` lookups
-    without a restart (install-from-git design §2.2) — `discover()` runs once at import, so a plugin
-    cloned onto disk afterwards needs this to appear in install-plan/install/list-plugins calls in the
-    same process. Mounting its ROUTER still needs a restart (unchanged restart-to-apply model)."""
-    global PLUGIN_MANIFESTS, OPTIONAL_MODULE_NAMES
-    PLUGIN_MANIFESTS = {**PLUGIN_MANIFESTS, manifest.id: manifest}
-    OPTIONAL_MODULE_NAMES = tuple(sorted(PLUGIN_MANIFESTS))
-    _sync_modules_reexport()
-
-
 def deregister_discovered(pid: str) -> None:
     """Remove a plugin from THIS process's manifest catalog after its on-disk folder is deleted
-    (Purge of a git-installed plugin, §2.2/§8) — mirrors `register_discovered`."""
+    (Purge of a git-installed plugin, §2.2/§8). Per-worker cleanup only — other uvicorn workers keep
+    the stale entry until the next restart's `discover()`, which is also why the reverse direction has
+    no equivalent: installs never register in-process (B3-H2), a new plugin becomes visible only via
+    restart, so every worker always agrees on what exists."""
     global PLUGIN_MANIFESTS, OPTIONAL_MODULE_NAMES
     PLUGIN_MANIFESTS = {k: v for k, v in PLUGIN_MANIFESTS.items() if k != pid}
     OPTIONAL_MODULE_NAMES = tuple(sorted(PLUGIN_MANIFESTS))

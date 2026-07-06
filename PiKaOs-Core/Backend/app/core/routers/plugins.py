@@ -193,10 +193,12 @@ async def install_from_git(
     """Install a plugin straight from a git remote (install-from-git design §2.2). Clones `body.repoUrl`
     (optionally pinned to `body.ref`, a tag) into a staging dir — never straight into PLUGINS_DIR — then
     validates its manifest and runs the same readiness gate as `install()`, moves it into PLUGINS_DIR,
-    registers it with the running process (no restart needed to see it), and marks it enabled with its
-    git provenance. Any failure past the clone discards the staging/target dir — never a half-installed
-    plugin on disk or in the registry (§2.2). Errors are generic: no raw filesystem path, git stderr, or
-    stack trace ever reaches the client (rule 10)."""
+    and marks it enabled with its git provenance. The plugin becomes VISIBLE (list/enable/update) only
+    after the next restart's `discover()` — restart-to-apply, same as router mounting (B3-H2: an
+    in-process registration would be one worker's private state; under `--workers N` the other workers
+    would never see it). Any failure past the clone discards the staging/target dir — never a
+    half-installed plugin on disk or in the registry (§2.2). Errors are generic: no raw filesystem path,
+    git stderr, or stack trace ever reaches the client (rule 10)."""
     from ... import plugin_loader
 
     # W1 — resolve the ref to install. An explicit `ref` is honoured as-is. With no ref we pin the
@@ -253,23 +255,23 @@ async def install_from_git(
         raise HTTPException(status_code=422, detail=str(e)) from e
 
     # Everything past this point still has to honour "never a half-installed plugin" (§2.2), even though
-    # there's no ManifestError to catch here — `register_discovered` mutates in-process state and
-    # `set_git_install` persists to the kernel-state JSON file, and either can raise on a genuinely
-    # unexpected failure (e.g. a disk I/O error writing the registry). If that happens after
-    # `register_discovered` already succeeded, the process would otherwise believe the plugin is loaded
-    # while the registry disagrees — an inconsistent state that outlives the request. Roll back both the
-    # in-process registration and the on-disk folder before surfacing a generic 500.
+    # there's no ManifestError to catch here — `set_git_install` persists to the kernel-state JSON file
+    # and can raise on a genuinely unexpected failure (e.g. a disk I/O error writing the registry). Roll
+    # back the on-disk folder before surfacing a generic 500; there is no in-process registration to
+    # undo (B3-H2: visibility is restart-to-apply).
     try:
-        plugin_loader.register_discovered(manifest)
         sha = git_installer.head_sha(target_dir)             # W2: pin the immutable commit
         tag = ref or manifest.version                         # ref is the resolved tag (or None ⇒ HEAD)
         reg = registry.set_git_install(pid, repo_url=body.repoUrl, tag=tag,
                                        version=manifest.version, sha=sha)
     except Exception as e:
-        plugin_loader.deregister_discovered(pid)   # no-op if register_discovered never got that far
         shutil.rmtree(target_dir, ignore_errors=True)
         raise HTTPException(status_code=500, detail="plugin install failed to finalize") from e
-    return _action_response(reg)
+    out = _action_response(reg)
+    # `_view` renders only discovered manifests — the plugin just installed isn't among them until the
+    # restart, so its own pending visibility is what makes a restart required, not any row's flag.
+    out.restart_required = True
+    return out
 
 
 def _require_git_installed(reg: dict[str, dict], plugin_id: str) -> None:
@@ -356,7 +358,6 @@ async def update(
     _require_git_installed(reg, plugin_id)
     repo_url = registry.repo_url_of(reg, plugin_id)
     old_tag = registry.installed_tag_of(reg, plugin_id)
-    old_manifest = _manifests()[plugin_id]
 
     tag = git_installer.latest_tag(repo_url) if repo_url else None
     if not tag:
@@ -385,21 +386,22 @@ async def update(
         _revert_checkout(plugin_dir, repo_url, old_tag)
         raise HTTPException(status_code=422, detail=str(e)) from e
 
-    # Same rationale as install_from_git's rollback (§2.2): `register_discovered` mutates in-process
-    # state and `set_git_install` persists to the kernel-state JSON file; either can raise on a genuinely
-    # unexpected failure. Unlike a fresh install there's a known-good prior state to restore to, so the
-    # revert here restores BOTH the in-process manifest (back to `old_manifest`) and the on-disk checkout
-    # (back to `old_tag`) rather than tearing the plugin down.
+    # Same rationale as install_from_git's rollback (§2.2): `set_git_install` persists to the
+    # kernel-state JSON file and can raise on a genuinely unexpected failure. Unlike a fresh install
+    # there's a known-good prior state to restore to, so the revert puts the on-disk checkout back on
+    # `old_tag` rather than tearing the plugin down. The in-process manifest was never touched (B3-H2:
+    # the running code — and every worker's catalog — stays on the old version until the restart).
     try:
-        plugin_loader.register_discovered(manifest)
         sha = git_installer.head_sha(plugin_dir)             # W2: re-pin to the updated tag's commit
         reg = registry.set_git_install(plugin_id, repo_url=repo_url, tag=tag,
                                        version=manifest.version, sha=sha)
     except Exception as e:
-        plugin_loader.register_discovered(old_manifest)
         _revert_checkout(plugin_dir, repo_url, old_tag)
         raise HTTPException(status_code=500, detail="plugin update failed to finalize") from e
-    return _action_response(reg)
+    out = _action_response(reg)
+    # the updated code isn't running (and `_view` still shows the old manifest) until the restart
+    out.restart_required = True
+    return out
 
 
 @router.post("/{plugin_id}/enable", response_model=ActionOut)

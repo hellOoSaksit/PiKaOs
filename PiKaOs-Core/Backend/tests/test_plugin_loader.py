@@ -41,23 +41,6 @@ def test_norm_perm_defaults_rationale_to_empty_for_a_bare_string():
     assert _norm_perm("crm.view")["rationale"] == ""
 
 
-def test_register_discovered_makes_a_manifest_visible_without_restart(monkeypatch):
-    # patch BOTH the kernel source (plugin_loader) and the re-export (modules) — see conftest's
-    # sample_plugins fixture — so we can assert the re-export stays in sync too.
-    for target in (plugin_loader, modules):
-        monkeypatch.setattr(target, "PLUGIN_MANIFESTS", {})
-        monkeypatch.setattr(target, "OPTIONAL_MODULE_NAMES", ())
-    mf = plugin_loader._validate("crm", {
-        "id": "crm", "name": "CRM", "version": "0.1.0", "coreVersion": "*",
-    })
-    plugin_loader.register_discovered(mf)
-    assert plugin_loader.PLUGIN_MANIFESTS["crm"] is mf
-    assert "crm" in plugin_loader.OPTIONAL_MODULE_NAMES
-    # the re-export in `modules` must reflect the same update, not a stale import-time snapshot
-    assert modules.PLUGIN_MANIFESTS["crm"] is mf
-    assert "crm" in modules.OPTIONAL_MODULE_NAMES
-
-
 def test_deregister_discovered_removes_it(monkeypatch):
     mf = plugin_loader._validate("crm", {
         "id": "crm", "name": "CRM", "version": "0.1.0", "coreVersion": "*",

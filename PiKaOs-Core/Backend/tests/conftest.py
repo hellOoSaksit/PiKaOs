@@ -27,6 +27,16 @@ TOOL_CONTRACT = "sampletool.Connection"
 SAMPLE_ROUTE = "/api/sample/ping"
 
 
+def seed_manifest(mf) -> None:
+    """Drop a manifest into the live catalog exactly as boot-time ``discover()`` would — installs no
+    longer register in-process (B3-H2: visibility is restart-to-apply), so a test that acts on an
+    installed plugin seeds the post-restart state itself. The rebind is undone by ``sample_plugins``'s
+    monkeypatch teardown, same as ``register_discovered``'s used to be."""
+    plugin_loader.PLUGIN_MANIFESTS = {**plugin_loader.PLUGIN_MANIFESTS, mf.id: mf}
+    plugin_loader.OPTIONAL_MODULE_NAMES = tuple(sorted(plugin_loader.PLUGIN_MANIFESTS))
+    plugin_loader._sync_modules_reexport()
+
+
 def _make_sample_module() -> ModuleType:
     mod = ModuleType("app.plugins.sample")
     router = APIRouter()

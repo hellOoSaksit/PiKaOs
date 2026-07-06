@@ -16,6 +16,7 @@ from starlette.testclient import TestClient
 
 from app.core import kernel_state, setup_state
 from app.core.routers.plugins import _view
+from tests.conftest import seed_manifest as _seed_manifest
 
 
 def test_view_serializes_permission_objects_down_to_key_strings(sample_plugins):
@@ -38,7 +39,10 @@ def test_plugins_endpoint_returns_200_with_a_bootstrap_token(sample_plugins, tmp
 
 # --- install-from-git ---------------------------------------------------------------------------------
 
-def test_install_from_git_clones_validates_and_registers(sample_plugins, tmp_path, monkeypatch):
+def test_install_from_git_clones_validates_and_is_restart_to_apply(sample_plugins, tmp_path, monkeypatch):
+    """A successful install lands on disk + in the registry, but the manifest catalog is untouched —
+    the plugin becomes visible only after the next restart's discover() (B3-H2: an in-process
+    registration would be one worker's private state under `--workers N`)."""
     import subprocess
     from app.core import kernel_state, setup_state, git_installer
     monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
@@ -68,9 +72,14 @@ def test_install_from_git_clones_validates_and_registers(sample_plugins, tmp_pat
                             headers={"Authorization": "Bearer a-session-token"})
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    crm = next(p for p in body["plugins"] if p["id"] == "crm")
-    assert crm["state"] == "enabled"
-    assert (plugins_dir / "crm" / "manifest.json").is_file()
+    assert (plugins_dir / "crm" / "manifest.json").is_file()          # on disk
+    from app.core import plugin_registry as registry
+    assert registry.state_of(registry.read(), "crm") == registry.ENABLED   # in the registry
+    # ...but NOT in the live catalog (or the response's plugin list) until the restart discovers it
+    from app import plugin_loader
+    assert "crm" not in plugin_loader.PLUGIN_MANIFESTS
+    assert all(p["id"] != "crm" for p in body["plugins"])
+    assert body["restart_required"] is True
 
 
 def test_install_from_git_defaults_to_latest_release_tag(sample_plugins, tmp_path, monkeypatch):
@@ -183,11 +192,10 @@ def test_install_from_git_allows_head_when_explicitly_opted_in(sample_plugins, t
 
 
 def test_install_from_git_rolls_back_when_registry_persistence_fails(sample_plugins, tmp_path, monkeypatch):
-    """`register_discovered` + `registry.set_git_install` run after the last cleanup boundary — if either
-    raises (e.g. a kernel-state I/O failure persisting the registry), the endpoint must not leave a
-    half-installed plugin behind: neither the on-disk folder nor the in-process registration may survive.
-    Simulates `set_git_install` raising (after `register_discovered` has already succeeded) and asserts
-    both are rolled back."""
+    """`registry.set_git_install` runs after the last cleanup boundary — if it raises (e.g. a
+    kernel-state I/O failure persisting the registry), the endpoint must not leave a half-installed
+    plugin behind: the on-disk folder may not survive, and the manifest catalog must stay untouched
+    (install never registers in-process — B3-H2 restart-to-apply)."""
     import subprocess
     from app.core import kernel_state, setup_state, git_installer
     from app.core import plugin_registry
@@ -222,7 +230,7 @@ def test_install_from_git_rolls_back_when_registry_persistence_fails(sample_plug
                             headers={"Authorization": "Bearer a-session-token"})
     assert resp.status_code == 500
     assert not (plugins_dir / "crm").exists()          # on-disk folder rolled back
-    assert "crm" not in plugin_loader.PLUGIN_MANIFESTS  # in-process registration rolled back too
+    assert "crm" not in plugin_loader.PLUGIN_MANIFESTS  # catalog untouched (never registered in-process)
 
 
 def test_install_from_git_rejects_disallowed_host(sample_plugins, tmp_path, monkeypatch):
@@ -511,7 +519,9 @@ def _git(cwd, *args):
 def _install_crm_via_git(client, tmp_path, monkeypatch, headers, *, version="1.0.0", tag="v1.0.0"):
     """Real git repo, cloned in through the actual install-from-git endpoint — so the resulting plugin
     directory is a genuine git working copy with an `origin` remote, exactly what `fetch_and_checkout`
-    needs for the update tests below (mirrors Task 5/7's local-file-remote pattern; not a mock)."""
+    needs for the update tests below (mirrors Task 5/7's local-file-remote pattern; not a mock).
+    Also seeds the installed manifest into the catalog (the restart-to-apply step the endpoint no
+    longer does), so the caller can immediately update/uninstall the plugin."""
     import subprocess
     from app.core import git_installer
 
@@ -532,6 +542,8 @@ def _install_crm_via_git(client, tmp_path, monkeypatch, headers, *, version="1.0
     resp = client.post("/api/plugins/install-from-git", json={"repoUrl": repo_url, "ref": tag},
                         headers=headers)
     assert resp.status_code == 200, resp.text
+    import app.plugin_loader as plugin_loader
+    _seed_manifest(plugin_loader.Manifest(id="crm", name="CRM", version=version, coreVersion="*"))
     return src, repo_url
 
 
@@ -644,7 +656,10 @@ def test_update_fetches_new_tag_revalidates_and_updates_registry(sample_plugins,
     assert resp.status_code == 200, resp.text
     body = resp.json()
     crm = next(p for p in body["plugins"] if p["id"] == "crm")
-    assert crm["version"] == "1.1.0"
+    # the response's plugin row still shows the RUNNING (old) manifest — the new code/version applies
+    # only after the restart (B3-H2); disk + registry already carry the new version below
+    assert crm["version"] == "1.0.0"
+    assert body["restart_required"] is True
     assert (plugins_dir / "crm" / "manifest.json").read_text(encoding="utf-8").find('"1.1.0"') != -1
 
     reg = registry.read()
@@ -851,12 +866,12 @@ def test_update_reverts_the_checkout_when_the_new_tags_manifest_is_invalid(sampl
 
 def test_update_rolls_back_manifest_and_checkout_when_registry_persistence_fails(sample_plugins, tmp_path, monkeypatch):
     """Mirrors `test_install_from_git_rolls_back_when_registry_persistence_fails` (Finding 1): the new
-    tag's manifest is valid and passes readiness, so `fetch_and_checkout` + `register_discovered` both
-    succeed for the NEW manifest — then `registry.set_git_install` raises (simulating a kernel-state I/O
-    failure persisting the registry). Unlike install-from-git there's a known-good prior version here, so
-    the finalize-failure branch must restore BOTH the in-process manifest (back to the OLD one) and the
-    on-disk checkout (back to the OLD tag) rather than tearing the plugin down — never leave the process
-    believing it's on the new version while disk/registry disagree (§3: a restart must still boot)."""
+    tag's manifest is valid and passes readiness, so `fetch_and_checkout` succeeds for the NEW tag —
+    then `registry.set_git_install` raises (simulating a kernel-state I/O failure persisting the
+    registry). Unlike install-from-git there's a known-good prior version here, so the finalize-failure
+    branch must put the on-disk checkout back on the OLD tag rather than tearing the plugin down —
+    never leave disk on a version the registry never recorded (§3: a restart must still boot). The
+    in-process manifest needs no restoring: update never touches it (B3-H2 restart-to-apply)."""
     from app.core import kernel_state, setup_state
     from app.core import plugin_registry as registry
     monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
@@ -892,7 +907,7 @@ def test_update_rolls_back_manifest_and_checkout_when_registry_persistence_fails
     assert '"1.1.0"' not in on_disk                     # on-disk code reverted off the new tag
     assert '"1.0.0"' in on_disk                         # ...and back onto the old, known-good one
 
-    assert plugin_loader.PLUGIN_MANIFESTS["crm"].version == "1.0.0"   # in-process manifest restored
+    assert plugin_loader.PLUGIN_MANIFESTS["crm"].version == "1.0.0"   # in-process manifest never touched
 
     reg = registry.read()
     assert reg["crm"]["installedTag"] == "v1.0.0"       # registry never advanced past the old tag
@@ -980,7 +995,7 @@ def test_uninstall_git_plugin_removes_code_but_registry_stays_pending_purge(samp
     (plugins_dir / "crm" / "manifest.json").write_text('{}', encoding="utf-8")
     monkeypatch.setattr(plugin_loader, "PLUGINS_DIR", plugins_dir)
     mf = plugin_loader.Manifest(id="crm", name="CRM", version="1.0.0", coreVersion="*")
-    plugin_loader.register_discovered(mf)
+    _seed_manifest(mf)
     registry.set_git_install("crm", repo_url="https://github.com/acme/crm.git", tag="v1.0.0", version="1.0.0")
     # ENABLED_MODULES=* in this environment means the lifespan actually imports every registered manifest
     # id, "crm" included — it needs a real (stub) module on sys.modules, exactly like the purge tests below.
@@ -1008,7 +1023,7 @@ def _pending_purge_crm(tmp_path, monkeypatch):
     setup_state.write("PIKA-ABCD-2345", "a-session-token")
     import app.plugin_loader as plugin_loader
     mf = plugin_loader.Manifest(id="crm", name="CRM", version="1.0.0", coreVersion="*")
-    plugin_loader.register_discovered(mf)
+    _seed_manifest(mf)
     registry.set_git_install("crm", repo_url="https://github.com/acme/crm.git", tag="v1.0.0", version="1.0.0")
     registry.uninstall_git("crm")
     # ENABLED_MODULES=* in this environment means the lifespan actually imports every registered manifest
@@ -1091,12 +1106,12 @@ def test_purge_calls_the_plugins_purge_hook_then_forgets_the_plugin(sample_plugi
 
     import app.main as main
     with TestClient(main.app) as client:
-        # Registered AFTER the lifespan's boot-time `enabled` snapshot is taken (ENABLED_MODULES=* in
+        # Seeded AFTER the lifespan's boot-time `enabled` snapshot is taken (ENABLED_MODULES=* in
         # this env would otherwise fold "crm" into that snapshot) — a successful purge deregisters "crm"
         # from PLUGIN_MANIFESTS again before teardown, and teardown's shutdown_plugins() walks the SAME
         # stale `enabled` snapshot against the CURRENT PLUGIN_MANIFESTS, so "crm" must never be in it.
         mf = plugin_loader.Manifest(id="crm", name="CRM", version="1.0.0", coreVersion="*")
-        plugin_loader.register_discovered(mf)
+        _seed_manifest(mf)
         registry.set_git_install("crm", repo_url="https://github.com/acme/crm.git", tag="v1.0.0", version="1.0.0")
         registry.uninstall_git("crm")
         _bind_fake_postgres(client, fake_engine)
@@ -1116,7 +1131,7 @@ def test_purge_without_a_purge_hook_returns_a_clear_error(sample_plugins, tmp_pa
     setup_state.write("PIKA-ABCD-2345", "a-session-token")
     import app.plugin_loader as plugin_loader
     mf = plugin_loader.Manifest(id="crm", name="CRM", version="1.0.0", coreVersion="*")
-    plugin_loader.register_discovered(mf)
+    _seed_manifest(mf)
     registry.set_git_install("crm", repo_url="https://github.com/acme/crm.git", tag="v1.0.0", version="1.0.0")
     registry.uninstall_git("crm")
     monkeypatch.setitem(sys.modules, "app.plugins.crm", ModuleType("app.plugins.crm"))  # no purge attr
@@ -1157,7 +1172,7 @@ def test_purge_returns_a_clean_error_when_the_postgres_tool_is_not_bound(sample_
     setup_state.write("PIKA-ABCD-2345", "a-session-token")
     import app.plugin_loader as plugin_loader
     mf = plugin_loader.Manifest(id="crm", name="CRM", version="1.0.0", coreVersion="*")
-    plugin_loader.register_discovered(mf)
+    _seed_manifest(mf)
     registry.set_git_install("crm", repo_url="https://github.com/acme/crm.git", tag="v1.0.0", version="1.0.0")
     registry.uninstall_git("crm")
     called = []
@@ -1187,7 +1202,7 @@ def test_purge_leaves_the_plugin_pending_purge_when_the_hook_itself_raises(sampl
     setup_state.write("PIKA-ABCD-2345", "a-session-token")
     import app.plugin_loader as plugin_loader
     mf = plugin_loader.Manifest(id="crm", name="CRM", version="1.0.0", coreVersion="*")
-    plugin_loader.register_discovered(mf)
+    _seed_manifest(mf)
     registry.set_git_install("crm", repo_url="https://github.com/acme/crm.git", tag="v1.0.0", version="1.0.0")
     registry.uninstall_git("crm")
 
@@ -1229,7 +1244,7 @@ def test_purge_returns_a_clean_error_when_the_plugins_module_is_unimportable(sam
     setup_state.write("PIKA-ABCD-2345", "a-session-token")
     import app.plugin_loader as plugin_loader
     mf = plugin_loader.Manifest(id="crm", name="CRM", version="1.0.0", coreVersion="*")
-    plugin_loader.register_discovered(mf)
+    _seed_manifest(mf)
     registry.set_git_install("crm", repo_url="https://github.com/acme/crm.git", tag="v1.0.0", version="1.0.0")
     registry.uninstall_git("crm")
     monkeypatch.setitem(sys.modules, "app.plugins.crm", ModuleType("app.plugins.crm"))  # boot-time only
