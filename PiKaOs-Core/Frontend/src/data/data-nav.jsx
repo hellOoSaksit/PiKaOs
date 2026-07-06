@@ -8,7 +8,10 @@
 import { NAV } from './data.jsx';
 import { PLUGIN_NAV } from '../plugins/index.jsx';
 
-const NAV_KEY = "guildos-nav-v1";
+// v2: introduced the "Install" parent (Modules / Marketplace / My Packages) + made Tools a leaf +
+// moved Local MCP into the Marketplace hub. mergeWithDefault preserves a saved arrangement, so the
+// key is bumped to discard the old v1 layout and give everyone the new default structure.
+const NAV_KEY = "guildos-nav-v2";
 export const MAX_DEPTH = 3;                 // Main(0) -> Sub(1) -> Sub(2)
 
 /* ---- default config: a deep clone of the static NAV (route metadata lives in code) ----
