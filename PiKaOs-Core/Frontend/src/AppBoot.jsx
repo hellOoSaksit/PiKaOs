@@ -8,7 +8,8 @@
 import React from 'react';
 const { useState, useEffect, useRef, useCallback } = React;
 import { getVersion, configureTransport } from './lib/api.js';
-import { packById, defaultPack } from './lib/i18n.jsx';
+import { packById, defaultPack, makeT } from './lib/i18n.jsx';
+import { getBrand } from './lib/brand.js';
 import { probeServer } from './lib/server-url.js';
 import { ConnectServer } from './screens/ConnectServer.jsx';
 
@@ -21,15 +22,14 @@ const BOOT_HARD_CAP = 4000;         // never trap the user on the splash if the 
 // (set by the "change server" link on FirstRun/Login, cleared on the next successful connect)
 export const FORCE_CONNECT_KEY = 'pikaos.forceConnect';
 
-const BOOT_MSG = { en: 'Starting PIKA', th: 'กำลังเริ่ม PIKA' };
-
 // mirrors App.jsx's own lex -> language resolution, kept independent so AppBoot doesn't need
-// App.jsx's internal state (it wraps App, it isn't rendered inside it)
+// App.jsx's internal state (it wraps App, it isn't rendered inside it). Returns the real language
+// code (not collapsed to en/th) so makeT can resolve packs like ja for the pre-App boot screens.
 function currentLanguage() {
   let lex = null;
   try { lex = localStorage.getItem(LEX_KEY); } catch (e) { /* ignore */ }
   const pack = (lex && packById(lex)) || defaultPack() || {};
-  return pack.lang === 'en' ? 'en' : 'th';
+  return pack.lang || 'en';
 }
 
 // desktop transport (API base + bearer-token provider) must be wired to the main process
@@ -141,8 +141,11 @@ export function AppBoot({ children }) {
   if (phase === 'connect') return <ConnectServer language={currentLanguage()} onConnected={onConnected} />;
   if (phase === 'ready') return children;
 
-  const word = ['P', 'I', 'K', 'A'];
-  const bootMsg = BOOT_MSG[currentLanguage()];
+  // brand + copy from the white-label seam / i18n packs — never a hardcoded literal here (the
+  // seam exists so a white-label build renames the wordmark and message in one place)
+  const brand = getBrand();
+  const word = brand.wordmarkLetters;
+  const bootMsg = makeT(currentLanguage())('boot.starting', { name: brand.name });
   return (
     <>
       <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', flexDirection: 'column',

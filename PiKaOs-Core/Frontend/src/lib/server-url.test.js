@@ -19,6 +19,12 @@ it('loopback http carries no plain-http warning', () => {
   expect(normalizeServerInput('localhost:8000').plainHttp).toBe(false);
 });
 
+it('the whole loopback range 127.0.0.0/8 is warning-exempt, not just 127.0.0.1', () => {
+  // same machine → the http hop never crosses a wire, so no "unencrypted" warning
+  expect(normalizeServerInput('127.0.0.2:8000').plainHttp).toBe(false);
+  expect(normalizeServerInput('127.1.2.3:8000').plainHttp).toBe(false);
+});
+
 it('VPN-overlay range (Tailscale 100.64.0.0/10) rides http, with the warning', () => {
   expect(normalizeServerInput('100.101.1.2:8000')).toEqual({ url: 'http://100.101.1.2:8000/api', plainHttp: true });
 });

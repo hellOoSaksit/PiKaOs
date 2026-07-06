@@ -7,51 +7,16 @@
 import React from 'react';
 const { useState, useEffect } = React;
 import { getBrand } from '../lib/brand.js';
+import { makeT } from '../lib/i18n.jsx';
 import { normalizeServerInput, probeServer } from '../lib/server-url.js';
 
-const DICT = {
-  en: {
-    title: 'Connect to your server',
-    subtitle: (name) => `Enter the address of your ${name} server — for example 192.168.1.50:8000 or https://your-server.example`,
-    placeholder: 'server URL or IP',
-    connect: 'Connect',
-    connecting: 'Connecting…',
-    savedTitle: 'Saved servers',
-    neverUsed: 'not used yet',
-    edit: 'Edit',
-    remove: 'Delete',
-    warnHttp: 'Unencrypted connection (http) — use only on a trusted network.',
-    errEmpty: 'Enter a server address.',
-    errInvalid: 'That address is not a valid URL or IP.',
-    errHttp: 'Plain http is allowed only for local, LAN, or VPN addresses — use https for public servers.',
-    errUnreachable: 'Cannot reach a server at this address.',
-    errSave: 'Connected, but saving the server failed — check the desktop logs.',
-    errDelete: 'Could not remove that server — try again.',
-  },
-  th: {
-    title: 'เชื่อมต่อเซิร์ฟเวอร์',
-    subtitle: (name) => `กรอกที่อยู่เซิร์ฟเวอร์ ${name} ของคุณ — เช่น 192.168.1.50:8000 หรือ https://your-server.example`,
-    placeholder: 'URL หรือ IP ของเซิร์ฟเวอร์',
-    connect: 'เชื่อมต่อ',
-    connecting: 'กำลังเชื่อมต่อ…',
-    savedTitle: 'เซิร์ฟเวอร์ที่บันทึกไว้',
-    neverUsed: 'ยังไม่เคยใช้',
-    edit: 'แก้ไข',
-    remove: 'ลบ',
-    warnHttp: 'การเชื่อมต่อไม่เข้ารหัส (http) — ใช้ได้เฉพาะเครือข่ายที่ไว้ใจ',
-    errEmpty: 'กรุณากรอกที่อยู่เซิร์ฟเวอร์',
-    errInvalid: 'ที่อยู่นี้ไม่ใช่ URL หรือ IP ที่ถูกต้อง',
-    errHttp: 'http ใช้ได้เฉพาะที่อยู่ local / LAN / VPN — เซิร์ฟเวอร์สาธารณะต้องใช้ https',
-    errUnreachable: 'ติดต่อเซิร์ฟเวอร์ตามที่อยู่นี้ไม่ได้',
-    errSave: 'เชื่อมต่อได้ แต่บันทึกเซิร์ฟเวอร์ไม่สำเร็จ — ตรวจ log ของแอป',
-    errDelete: 'ลบเซิร์ฟเวอร์ไม่สำเร็จ — ลองใหม่',
-  },
-};
-
-const ERR_KEY = { empty: 'errEmpty', invalid: 'errInvalid', http_not_allowed: 'errHttp' };
+// normalizeServerInput throws Error('empty'|'invalid'|'http_not_allowed') → the matching i18n key
+const ERR_KEY = { empty: 'connect.errEmpty', invalid: 'connect.errInvalid', http_not_allowed: 'connect.errHttp' };
 
 export function ConnectServer({ language, onConnected }) {
-  const T = DICT[DICT[language] ? language : 'en'];
+  // standalone i18n: this screen renders above <App/> (AppBoot wraps App), before Sys.t exists —
+  // makeT resolves through the same JSON packs with the 4-level fallback, so no strings are hardcoded
+  const t = makeT(language);
   const brand = getBrand();
 
   const [input, setInput] = useState('');
@@ -76,17 +41,17 @@ export function ConnectServer({ language, onConnected }) {
     if (busy) return;
     let target;
     try { target = normalizeServerInput(raw); }
-    catch (e) { setError(T[ERR_KEY[e.message] || 'errInvalid']); return; }
+    catch (e) { setError(t(ERR_KEY[e.message] || 'connect.errInvalid')); return; }
     setBusy(true); setError('');
     try {
-      if (!(await probeServer(target.url))) { setError(T.errUnreachable); return; }
+      if (!(await probeServer(target.url))) { setError(t('connect.errUnreachable')); return; }
       // upsert: this server becomes the newest row; the main process re-validates every
       // entry, dedupes by url, and caps the list (spec "save rule": only a successful
       // probe ever writes)
       const next = [{ url: target.url, lastUsedAt: new Date().toISOString() },
                     ...servers.filter((s) => s.url !== target.url)];
       try { await window.pikaosDesktop.config.set({ apiBaseUrl: target.url, servers: next }); }
-      catch (e) { setError(T.errSave); return; }
+      catch (e) { setError(t('connect.errSave')); return; }
       onConnected(target.url);
     } finally { setBusy(false); }
   };
@@ -94,18 +59,21 @@ export function ConnectServer({ language, onConnected }) {
   const removeServer = async (url) => {
     const prev = servers;
     setServers(servers.filter((s) => s.url !== url));   // optimistic
-    // deleting a row is list housekeeping, not a disconnect — the active URL stays. Filter off
-    // the freshly-read config (not local state) so we persist against the real stored list, and
-    // roll the UI back if the write fails so a "deleted" row never silently returns on relaunch.
+    // deleting a row is list housekeeping, not a disconnect. Filter off the freshly-read config
+    // (not local state) so we persist against the real stored list, and roll the UI back if the
+    // write fails so a "deleted" row never silently returns on relaunch.
     try {
       const cfg = await window.pikaosDesktop.config.get();
-      await window.pikaosDesktop.config.set({
-        apiBaseUrl: cfg.apiBaseUrl,
-        servers: (Array.isArray(cfg.servers) ? cfg.servers : []).filter((s) => s.url !== url),
-      });
+      const remaining = (Array.isArray(cfg.servers) ? cfg.servers : []).filter((s) => s.url !== url);
+      // if the deleted row IS the active server, repoint apiBaseUrl to the next saved one — otherwise
+      // AppBoot would auto-connect on the next launch to a server the user just deleted (and which no
+      // longer appears in the list to delete again). No rows left → apiBaseUrl is moot: AppBoot needs
+      // servers.length > 0 to auto-connect, so it falls through to this Connect-Server screen anyway.
+      const nextActive = cfg.apiBaseUrl === url ? (remaining[0]?.url ?? cfg.apiBaseUrl) : cfg.apiBaseUrl;
+      await window.pikaosDesktop.config.set({ apiBaseUrl: nextActive, servers: remaining });
     } catch (e) {
       setServers(prev);        // rollback: reflect what is actually persisted
-      setError(T.errDelete);
+      setError(t('connect.errDelete'));
     }
   };
 
@@ -122,32 +90,32 @@ export function ConnectServer({ language, onConnected }) {
           </div>}
 
       <h1 style={{ fontFamily: 'var(--font-head)', fontWeight: 700, fontSize: 26, margin: '26px 0 8px',
-        color: 'var(--ink)', letterSpacing: '-0.02em' }}>{T.title}</h1>
+        color: 'var(--ink)', letterSpacing: '-0.02em' }}>{t('connect.title')}</h1>
       <p style={{ margin: '0 0 24px', color: 'var(--ink-3)', fontSize: 14, lineHeight: 1.55,
         textAlign: 'center', maxWidth: 420 }}>
-        {T.subtitle(brand.name)}
+        {t('connect.subtitle', { name: brand.name })}
       </p>
 
       <form onSubmit={submit} noValidate style={{ width: '100%', maxWidth: 420 }}>
         <input className="auth-input mono" type="text" autoFocus spellCheck={false} autoComplete="off"
-          value={input} placeholder={T.placeholder} disabled={busy} aria-label={T.placeholder}
+          value={input} placeholder={t('connect.placeholder')} disabled={busy} aria-label={t('connect.placeholder')}
           onChange={(e) => onChange(e.target.value)} />
         {warn && !error && (
-          <p style={{ margin: '8px 0 0', fontSize: 12.5, color: 'var(--gold)' }}>{T.warnHttp}</p>
+          <p style={{ margin: '8px 0 0', fontSize: 12.5, color: 'var(--gold)' }}>{t('connect.warnHttp')}</p>
         )}
         {error && (
           <p role="alert" style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--crimson-deep)' }}>{error}</p>
         )}
         <button type="submit" className="btn btn-gold" disabled={busy}
           style={{ width: '100%', padding: 13, fontSize: 15, marginTop: 14 }}>
-          {busy ? T.connecting : T.connect}
+          {busy ? t('connect.connecting') : t('connect.connect')}
         </button>
       </form>
 
       {servers.length > 0 && (
         <div style={{ width: '100%', maxWidth: 420, marginTop: 34 }}>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '.16em',
-            textTransform: 'uppercase', color: 'var(--ink-4)', marginBottom: 10 }}>{T.savedTitle}</div>
+            textTransform: 'uppercase', color: 'var(--ink-4)', marginBottom: 10 }}>{t('connect.savedTitle')}</div>
           {servers.map((s) => (
             <div key={s.url} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
               border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-2)',
@@ -156,14 +124,14 @@ export function ConnectServer({ language, onConnected }) {
                 style={{ flex: 1, textAlign: 'left', background: 'none', border: 0, cursor: 'pointer', padding: 0 }}>
                 <div className="mono" style={{ fontSize: 13, color: 'var(--ink)' }}>{s.url}</div>
                 <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>
-                  {s.lastUsedAt ? new Date(s.lastUsedAt).toLocaleString() : T.neverUsed}
+                  {s.lastUsedAt ? new Date(s.lastUsedAt).toLocaleString() : t('connect.neverUsed')}
                 </div>
               </button>
-              <button type="button" title={T.edit} aria-label={`${T.edit} ${s.url}`} disabled={busy}
+              <button type="button" title={t('connect.edit')} aria-label={`${t('connect.edit')} ${s.url}`} disabled={busy}
                 onClick={() => onChange(s.url)}
                 style={{ background: 'none', border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)',
                   color: 'var(--ink-3)', cursor: 'pointer', padding: '4px 8px', fontSize: 12 }}>✎</button>
-              <button type="button" title={T.remove} aria-label={`${T.remove} ${s.url}`} disabled={busy}
+              <button type="button" title={t('connect.remove')} aria-label={`${t('connect.remove')} ${s.url}`} disabled={busy}
                 onClick={() => removeServer(s.url)}
                 style={{ background: 'none', border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)',
                   color: 'var(--crimson-deep)', cursor: 'pointer', padding: '4px 8px', fontSize: 12 }}>🗑</button>

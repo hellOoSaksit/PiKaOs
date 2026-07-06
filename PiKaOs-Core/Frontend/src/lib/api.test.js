@@ -37,3 +37,35 @@ it('falls back to the setToken() bootstrap token when the desktop provider has n
   await api.setupStatus();
   expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer BOOTSTRAP_1');
 });
+
+it('desktop logout clears the in-memory bootstrap token so it cannot resurface as a fallback', async () => {
+  // Regression: token mode used to `return` before setToken(null), so the setup-code bootstrap
+  // token lingered — after logout, raw()'s provider-null fallback re-sent it as `Bearer <bootstrap>`.
+  const api = await import('./api.js');
+  const authLogout = vi.fn().mockResolvedValue(undefined);
+  vi.stubGlobal('window', { pikaosDesktop: { auth: { logout: authLogout } } });
+  api.configureTransport({ apiBase: 'https://be.example', tokenProvider: { get: vi.fn().mockResolvedValue(null), refresh: vi.fn() } });
+  api.setToken('BOOTSTRAP_1');
+
+  await api.logout();
+  expect(authLogout).toHaveBeenCalledOnce();
+  expect(api.getToken()).toBe(null);
+
+  // a follow-up authed request (provider still empty) must NOT carry the stale bootstrap token
+  const fetchMock = vi.fn().mockResolvedValue({ status: 200, ok: true, text: async () => '{}' });
+  vi.stubGlobal('fetch', fetchMock);
+  await api.setupStatus();
+  expect(fetchMock.mock.calls[0][1].headers.Authorization).toBeUndefined();
+});
+
+it('desktop login drops any leftover bootstrap token (the provider becomes the only source)', async () => {
+  const api = await import('./api.js');
+  const authLogin = vi.fn().mockResolvedValue({ user: { id: 'u1' } });
+  vi.stubGlobal('window', { pikaosDesktop: { auth: { login: authLogin } } });
+  api.configureTransport({ apiBase: 'https://be.example', tokenProvider: { get: vi.fn().mockResolvedValue(null), refresh: vi.fn() } });
+  api.setToken('BOOTSTRAP_1');
+
+  const user = await api.login('someone', 'pw');
+  expect(user).toEqual({ id: 'u1' });
+  expect(api.getToken()).toBe(null);
+});

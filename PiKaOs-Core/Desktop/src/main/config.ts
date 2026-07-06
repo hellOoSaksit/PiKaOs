@@ -56,10 +56,22 @@ export function isAllowedBackendUrl(apiBaseUrl: string): boolean {
 
 export function getBackendConfig(): BackendConfig {
   if (!existsSync(path())) return DEFAULT
-  const parsed = JSON.parse(readFileSync(path(), 'utf8'))
+  // a corrupt / truncated / hand-edited file must not throw out of a read path (that would brick
+  // every boot with no recovery) — treat anything unparseable as "never configured" so AppBoot
+  // falls through to the Connect-Server screen.
+  let parsed: any
+  try {
+    parsed = JSON.parse(readFileSync(path(), 'utf8'))
+  } catch {
+    return DEFAULT
+  }
+  if (!parsed || typeof parsed !== 'object') return DEFAULT
   // back-compat: a pre-list one-field file becomes its own first row, so an already-configured
-  // machine keeps auto-connecting instead of being re-prompted by the Connect-Server screen
+  // machine keeps auto-connecting instead of being re-prompted by the Connect-Server screen —
+  // but only if that URL still satisfies the policy (the read path must not smuggle a disallowed
+  // host past the gate setBackendConfig enforces on write).
   if (!Array.isArray(parsed.servers)) {
+    if (typeof parsed.apiBaseUrl !== 'string' || !isAllowedBackendUrl(parsed.apiBaseUrl)) return DEFAULT
     return { apiBaseUrl: parsed.apiBaseUrl, servers: [{ url: parsed.apiBaseUrl, lastUsedAt: null }] }
   }
   return parsed

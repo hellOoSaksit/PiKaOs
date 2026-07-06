@@ -83,6 +83,32 @@ it('back-compat: a pre-list one-field file becomes its own first server row', as
   })
 })
 
+const DEFAULT_CFG = { apiBaseUrl: 'http://127.0.0.1:8000/api', servers: [] }
+
+it('a corrupt / truncated backend.json falls back to DEFAULT instead of throwing (read path never bricks boot)', async () => {
+  const { writeFileSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  writeFileSync(join(userDataDir, 'backend.json'), '{ "apiBaseUrl": "http://127.0.0.1')   // truncated
+  const { getBackendConfig } = await import('../src/main/config')
+  expect(getBackendConfig()).toEqual(DEFAULT_CFG)
+})
+
+it('a JSON literal that is not an object (null/number) falls back to DEFAULT', async () => {
+  const { writeFileSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  writeFileSync(join(userDataDir, 'backend.json'), 'null')
+  const { getBackendConfig } = await import('../src/main/config')
+  expect(getBackendConfig()).toEqual(DEFAULT_CFG)
+})
+
+it('back-compat one-field file with a DISALLOWED url is not trusted — the read path enforces the policy too', async () => {
+  const { writeFileSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  writeFileSync(join(userDataDir, 'backend.json'), JSON.stringify({ apiBaseUrl: 'http://8.8.8.8/api' }))
+  const { getBackendConfig } = await import('../src/main/config')
+  expect(getBackendConfig()).toEqual(DEFAULT_CFG)   // falls through to Connect-Server, not the disallowed host
+})
+
 it('persists the server list, rejecting any disallowed entry', async () => {
   const { setBackendConfig, getBackendConfig } = await import('../src/main/config')
   const servers = [{ url: 'https://a.example/api', lastUsedAt: '2026-07-06T04:00:00Z' }]

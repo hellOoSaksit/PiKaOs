@@ -25,6 +25,14 @@ export function isHttpAllowedHost(hostname) {
   return HTTP_OK_RANGES.some(([net, bits]) => (n >>> (32 - bits)) === (net >>> (32 - bits)));
 }
 
+// loopback = 127.0.0.0/8 (or localhost): same machine, the http hop never crosses a wire, so it's
+// exempt from the "unencrypted" warning — unlike a LAN/VPN http host, which does cross a link.
+function isLoopbackHost(hostname) {
+  if (hostname === 'localhost') return true;
+  const n = ipv4ToInt(hostname);
+  return n !== null && (n >>> 24) === 0x7f;
+}
+
 // trim → default scheme (http only for trusted-hop hosts, https otherwise) → force the /api
 // base. Returns { url, plainHttp } — plainHttp drives the "unencrypted" warning (loopback is
 // exempt: same machine, nothing crosses a wire). Throws Error('empty'|'invalid'|'http_not_allowed').
@@ -47,7 +55,7 @@ export function normalizeServerInput(raw) {
   if (!path.endsWith('/api')) path += '/api';
   return {
     url: `${u.protocol}//${u.host}${path}`,
-    plainHttp: u.protocol === 'http:' && u.hostname !== '127.0.0.1' && u.hostname !== 'localhost',
+    plainHttp: u.protocol === 'http:' && !isLoopbackHost(u.hostname),
   };
 }
 
