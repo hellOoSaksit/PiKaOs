@@ -222,3 +222,29 @@ def test_setup_completed_roundtrips(tmp_state):
     assert setup_state.is_setup_completed() is False
     setup_state.mark_setup_completed()
     assert setup_state.is_setup_completed() is True
+
+
+# --- boot decision: generate_setup_code.main() writes this boot's auth_mode ----
+
+def test_boot_with_auth_enabled_sets_login_mode_and_no_code(tmp_state, monkeypatch):
+    monkeypatch.setenv("ENABLED_MODULES", "auth")
+    generate_setup_code.main()
+    assert setup_state.read_auth_mode() == "login"
+    assert setup_state.read_code() is None
+
+
+def test_boot_after_setup_completed_opens_without_code_or_banner(tmp_state, monkeypatch, capsys):
+    monkeypatch.setenv("ENABLED_MODULES", "")
+    setup_state.mark_setup_completed()
+    generate_setup_code.main()
+    assert setup_state.read_auth_mode() == "open"
+    assert setup_state.read_code() is None
+    assert capsys.readouterr().out == ""          # open boots silently — nothing to paste
+
+
+def test_fresh_boot_prints_code_and_sets_setup_mode(tmp_state, monkeypatch, capsys):
+    monkeypatch.setenv("ENABLED_MODULES", "")
+    generate_setup_code.main()
+    assert setup_state.read_auth_mode() == "setup"
+    assert setup_state.read_code() is not None
+    assert "PIKA-" in capsys.readouterr().out
