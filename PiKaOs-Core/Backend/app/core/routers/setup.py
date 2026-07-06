@@ -52,7 +52,10 @@ async def status(request: Request) -> StatusOut:
 async def verify_code(body: VerifyIn) -> VerifyOut:
     """Check `body.code` against the current boot's setup code. On success, returns the session token
     the frontend then sends as a Bearer token — `identity.BootstrapProvider` accepts it as a synthetic
-    admin, the only way to reach `plugins.manage`-gated routes before any auth plugin exists."""
+    admin. Success ALSO completes first-run setup (open-mode spec §4): the flag is durable, and this
+    boot's mode flips to "open" immediately so the operator lands in the full app without a restart."""
     if not setup_state.verify_code(body.code):
         raise HTTPException(status_code=401, detail="invalid setup code")
+    setup_state.mark_setup_completed()
+    setup_state.write_auth_mode("open")
     return VerifyOut(ok=True, token=setup_state.read_session_token())

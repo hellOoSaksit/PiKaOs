@@ -13,6 +13,7 @@ import asyncio
 import re
 
 import pytest
+from fastapi import FastAPI
 from starlette.testclient import TestClient
 
 from app.core import kernel_state, setup_state
@@ -248,3 +249,31 @@ def test_fresh_boot_prints_code_and_sets_setup_mode(tmp_state, monkeypatch, caps
     assert setup_state.read_auth_mode() == "setup"
     assert setup_state.read_code() is not None
     assert "PIKA-" in capsys.readouterr().out
+
+
+def test_verify_code_flips_server_open(tmp_state):
+    from app.core.routers import setup as setup_router
+
+    setup_state.write(CODE, TOKEN)
+    app = FastAPI()
+    app.include_router(setup_router.router)
+    client = TestClient(app)
+
+    r = client.post("/api/setup/verify-code", json={"code": CODE})
+    assert r.status_code == 200
+    assert setup_state.is_setup_completed() is True
+    assert setup_state.read_auth_mode() == "open"
+
+
+def test_wrong_code_flips_nothing(tmp_state):
+    from app.core.routers import setup as setup_router
+
+    setup_state.write(CODE, TOKEN)
+    app = FastAPI()
+    app.include_router(setup_router.router)
+    client = TestClient(app)
+
+    r = client.post("/api/setup/verify-code", json={"code": "PIKA-WRNG-WRNG"})
+    assert r.status_code == 401
+    assert setup_state.is_setup_completed() is False
+    assert setup_state.read_auth_mode() == "login"
