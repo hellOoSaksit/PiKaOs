@@ -2,7 +2,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 const { useState, useEffect } = React;
-import { AUDIT_SEED, ROLES_SEED, ROLE_PERMS_SEED, USERS_SEED, USER_PERMS_SEED, fmtTok, loadU, resolvePerms, roleByKey, saveU, userById } from './data/data-users.jsx';
+import { AUDIT_SEED, ROLES_SEED, ROLE_PERMS_SEED, USERS_SEED, USER_PERMS_SEED, fmtTok, loadU, roleByKey, saveU } from './data/data-users.jsx';
 import { TOOL_RUNS_SEED, WORKFLOWS_SEED, loadWF, saveWF } from './data/data-workflows.jsx';
 import { TOKENS, NAV, TASKS } from './data/data.jsx';
 import { loadNav, saveNav, mergeWithDefault } from './data/data-nav.jsx';
@@ -23,7 +23,6 @@ import { ToolsManager } from './screens/screens-tools.jsx';
 import { ComponentLibrary } from './screens/screens-library.jsx';
 import { Workflows } from './screens/screens-workflows.jsx';
 import { useAuth } from './lib/auth.jsx';
-import { Menu } from './components/ui/Dropdown.jsx';
 import { BottomUtilityBar } from './components/ui/BottomUtilityBar.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
 import { SAMPLE_CHARS, loadArchived, loadChars, randPos, saveArchived, saveChars } from './lib/store.jsx';
@@ -293,46 +292,7 @@ function ProfileMenu({ me, roles, t, onSignOut, onSaveProfile }) {
   );
 }
 
-/* ---------------- View-as (impersonation preview) ---------------- */
-/* Admin-only control to preview the app exactly as another user sees it.
-   Gated upstream by realCan("user.manage"); the banner+exit ride on the
-   REAL identity so a preview can never trap you. */
-function ViewAsControl({ viewAs }) {
-  const { users, roles, realMe, onPick, T, t } = viewAs;
-  const items = users
-    .filter(u => u.id !== realMe.id)
-    .map(u => {
-      const r = roleByKey(roles, u.role);
-      return {
-        label: <span className="va-pick"><span className="va-pick-av">{u.avatar}</span>
-          <span className="va-pick-name">{u.display}</span>
-          <span className={`va-pick-role badge ${r.color || ""}`}>{T(r.en, r.th)}</span></span>,
-        onSelect: () => onPick(u.id),
-      };
-    });
-  return (
-    <div className="viewas-ctl" title={t("viewas.hint")}>
-      <Menu label={<span className="va-trigger">👁️ {t("viewas.enter")}</span>} items={items} minWidth={150} />
-    </div>
-  );
-}
-
-/* The persistent banner shown while previewing as someone, with the exit. */
-function ViewAsBanner({ user, roles, onExit, t, T }) {
-  const r = roleByKey(roles, user.role);
-  return (
-    <div className="viewas-banner" data-no-lex role="status">
-      <span className="vb-eye">👁️</span>
-      <span className="vb-text">
-        {t("viewas.banner")} <b>{user.avatar} {user.display}</b>
-        <span className={`badge ${r.color || ""}`} style={{ marginLeft: 6 }}>{T(r.en, r.th)}</span>
-      </span>
-      <button className="vb-exit" onClick={onExit}>✕ {t("viewas.exit")}</button>
-    </div>
-  );
-}
-
-function Topbar({ route, theme, setTheme, user, language, viewAs, t, me, roles, onSignOut, onSaveProfile }) {
+function Topbar({ route, theme, setTheme, user, language, t, me, roles, onSignOut, onSaveProfile }) {
   const m = ROUTE_META[route] || ROUTE_META.me;   // me is always Base — safe fallback if a plugin (e.g. world→hall) is disabled
   const title = t("route." + route + ".title");
   const live = route === "hall" || route === "meeting" || route === "world";
@@ -346,7 +306,6 @@ function Topbar({ route, theme, setTheme, user, language, viewAs, t, me, roles, 
         {live && <span className="live-badge" style={{ marginLeft: 6 }}><span className="pulse-dot" />LIVE</span>}
       </div>
       <div className="topbar-spacer" />
-      {viewAs && <ViewAsControl viewAs={viewAs} />}
       <div className="tb-stat" data-no-lex>
         <span className="tbs-ico">🔵</span>
         <span className="tbs-num">{(TOKENS.balance/1000).toFixed(1)}K</span>
@@ -425,9 +384,6 @@ function App() {
   const [audit, setAudit] = useState(() => loadU("audit", AUDIT_SEED));
   const [workflows, setWorkflows] = useState(() => loadWF("workflows", WORKFLOWS_SEED));
   const [toolRuns, setToolRuns] = useState(() => loadWF("runs", TOOL_RUNS_SEED));
-  // slug used by the (still client-side) RBAC seed: "u_somchai" etc.
-  const currentUserId = currentUser ? ("u_" + currentUser.username) : "u_somchai";
-  const [viewAs, setViewAs] = useState(null);   // user id being previewed (in-memory only — never persisted)
   const [userSel, setUserSel] = useState(null);         // selected user id (detail)
   const [userForm, setUserForm] = useState(null);       // null | {} | user
 
@@ -530,21 +486,19 @@ function App() {
     setBuilder(null);
   };
 
-  // ---- resolve current user + permissions ----
+  // ---- current user + permissions come from the SERVER (F1) ----
   const T = (en, th) => language === "en" ? en : th;
-  // REAL identity — never affected by "view as". The view-as entry + exit ride on this,
-  // so previewing as a viewer can never trap you (you keep your real ability to leave).
-  const realMe = userById(users, currentUserId) || users[0];
-  const realPerms = resolvePerms(realMe.role, rolePerms, userPerms[realMe.id]);
-  const realCan = (k) => realPerms.has(k);
-  // EFFECTIVE identity — who you're previewing as (their role + their own overrides), or yourself.
-  const viewUser = viewAs ? userById(users, viewAs) : null;
-  const viewingAs = (viewUser && viewUser.id !== realMe.id) ? viewUser : null;
-  const me = viewUser || realMe;
-  const mePerms = resolvePerms(me.role, rolePerms, userPerms[me.id]);
+  // The signed-in identity and its effective permissions are whatever the backend `/auth/me` returned
+  // (currentUser.permissions) — never client seed data. Knowing a username is not permission, and there
+  // is no "fall back to the seeded admin" path: a real user who isn't an admin gets a non-admin UI. An
+  // admin holds every key (admin-implicit-all, resolved server-side).
+  const me = currentUser;
+  const mePerms = React.useMemo(() => new Set(currentUser?.permissions || []), [currentUser]);
   const can = (k) => mePerms.has(k);
-  const logAudit = (action, targetType, target, meta) =>
-    setAudit(prev => [{ id: "ev" + Date.now(), actor: currentUserId, action, targetType, target, meta, time: T("just now", "เมื่อสักครู่") }, ...prev]);
+  // The user/role/audit management screens below still run on demo seed data (real CRUD is a follow-up);
+  // they are gated by the REAL server `can` above, so only an actual admin ever reaches them. No
+  // client-side audit trail — the server owns audit.
+  const logAudit = () => {};
 
   // persist a nav edit: update the UI now + push to the shared server config (best-effort)
   const saveNavCfg = (cfg) => { setNavCfg(cfg); setNavConfig(cfg).catch(() => {}); };
@@ -613,7 +567,7 @@ function App() {
   useEffect(() => {
     const need = ROUTE_PERM[route];
     if (need && !can(need)) go("me");
-  }, [route, viewAs, rolePerms, userPerms]);
+  }, [route, mePerms]);
 
   if (!auth.ready || !bootstrap) return null;   // avoid flashing the setup screen while restoring a session
   // Kernel-only (no auth plugin installed yet): a verified setup code unlocks a minimal install shell
@@ -664,9 +618,7 @@ function App() {
       <div className="main">
         <Topbar route={route} theme={theme} setTheme={setTheme} user={username} language={language} t={t}
           me={me} roles={roles} onSignOut={auth.logout}
-          onSaveProfile={(u) => setUsers(prev => prev.map(x => x.id === currentUserId ? { ...x, ...u } : x))}
-          viewAs={realCan("user.manage") ? { users, roles, realMe, current: viewingAs, onPick: setViewAs, T, t } : null} />
-        {viewingAs && <ViewAsBanner user={viewingAs} roles={roles} onExit={() => setViewAs(null)} t={t} T={T} />}
+          onSaveProfile={() => { /* profile edit is a follow-up: needs a backend PATCH /auth/me — demo no-op */ }} />
         <div className="content">{screen}</div>
       </div>
       {userForm && <UserForm Sys={Sys} initial={userForm.id ? userForm : null} onClose={() => setUserForm(null)} />}
