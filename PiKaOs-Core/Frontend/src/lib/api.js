@@ -1,14 +1,16 @@
 // Tiny fetch wrapper for the PiKaOs backend.
 // - prefixes VITE_API_BASE (default "/api", proxied to FastAPI in dev)
-// - attaches the access token (memory + localStorage mirror)
+// - attaches the access token (in MEMORY only — never localStorage, so XSS can't read it)
 // - sends cookies (httpOnly refresh token) with credentials: "include"
 // - on 401, refreshes once then retries the original request
 
 let base = (import.meta.env.VITE_API_BASE || "/api").replace(/\/$/, "");
-const TOKEN_KEY = "pikaos.access";
 
+// Access token lives in memory only (F2). The httpOnly refresh cookie is the durable seam: restore()
+// mints a fresh access token from it on every page load, so persisting the access token buys nothing and
+// only exposes it to XSS. Best-effort scrub of any token left by the old localStorage-mirror build.
 let accessToken = null;
-try { accessToken = localStorage.getItem(TOKEN_KEY); } catch (e) { /* ignore */ }
+try { localStorage.removeItem("pikaos.access"); } catch (e) { /* ignore */ }
 
 let mode = "cookie";                       // "cookie" (web) | "token" (desktop)
 let provider = null;                       // { get, refresh, onLogout }
@@ -24,11 +26,7 @@ export function configureTransport({ apiBase, tokenProvider }) {
 
 export function getToken() { return accessToken; }
 export function setToken(tok) {
-  accessToken = tok || null;
-  try {
-    if (tok) localStorage.setItem(TOKEN_KEY, tok);
-    else localStorage.removeItem(TOKEN_KEY);
-  } catch (e) { /* ignore */ }
+  accessToken = tok || null;   // memory only — no localStorage mirror (F2)
 }
 
 export class ApiError extends Error {
