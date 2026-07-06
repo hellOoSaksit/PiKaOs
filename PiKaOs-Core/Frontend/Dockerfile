@@ -35,6 +35,8 @@ EXPOSE 80
 
 # Liveness probe (release-and-rollback.md §2): nginx is healthy once it serves the SPA entrypoint.
 # wget ships in nginx:alpine (busybox) — no extra package. Local-only, so the upstream API being
-# down doesn't fail the frontend's own health.
+# down doesn't fail the frontend's own health. Probe 127.0.0.1, NOT localhost: /etc/hosts maps
+# localhost to ::1 first and busybox wget tries IPv6, but nginx binds IPv4-only (`listen 80;`) —
+# a localhost probe is connection-refused forever and marks a perfectly healthy container unhealthy.
 HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=3 \
-    CMD wget -qO /dev/null http://localhost:80/ || exit 1
+    CMD wget -qO /dev/null http://127.0.0.1:80/ || exit 1
