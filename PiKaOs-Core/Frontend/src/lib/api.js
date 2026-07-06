@@ -43,7 +43,12 @@ async function raw(path, { method = "GET", body, form, auth = true, signal, _ret
   // multipart boundary itself.
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (auth) {
-    const tok = provider ? await provider.get() : accessToken;
+    // Desktop (provider/token mode) reads the live session token from the provider; but the
+    // kernel-only setup-code bootstrap has no session yet — its token is stored via setToken().
+    // Fall back to that in-memory token when the provider yields none, so the follow-up
+    // GET /api/setup/status carries the bootstrap token and FirstRun can advance (a provider
+    // session token still wins once the user is actually logged in). Cookie mode is unchanged.
+    const tok = (provider ? await provider.get() : null) || accessToken;
     if (tok) headers["Authorization"] = `Bearer ${tok}`;
   }
 

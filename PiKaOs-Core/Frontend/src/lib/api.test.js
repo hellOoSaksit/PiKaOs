@@ -20,3 +20,20 @@ it('uses the injected token provider for Authorization + refresh', async () => {
   expect(fetchMock.mock.calls[0][1].credentials).toBeUndefined();   // no cookies in token mode
   expect(data).toEqual({ ok: true });
 });
+
+it('falls back to the setToken() bootstrap token when the desktop provider has none', async () => {
+  // Desktop kernel-only bootstrap: the setup-code flow stores its token via setToken(), but the
+  // SessionBroker-backed provider has no session yet (no login). The request must still carry the
+  // bootstrap token — otherwise GET /api/setup/status comes back bootstrapAuthorized:false and the
+  // FirstRun screen never advances to the KernelOnlyShell.
+  const api = await import('./api.js');
+  const get = vi.fn().mockResolvedValue(null);   // provider empty: no logged-in session
+  api.configureTransport({ apiBase: 'https://be.example', tokenProvider: { get, refresh: vi.fn() } });
+  api.setToken('BOOTSTRAP_1');
+
+  const fetchMock = vi.fn().mockResolvedValue({ status: 200, ok: true, text: async () => '{"needsSetup":true,"bootstrapAuthorized":true}' });
+  vi.stubGlobal('fetch', fetchMock);
+
+  await api.setupStatus();
+  expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer BOOTSTRAP_1');
+});
