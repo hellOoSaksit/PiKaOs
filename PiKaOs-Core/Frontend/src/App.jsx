@@ -3,7 +3,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 const { useState, useEffect } = React;
 import { AUDIT_SEED, ROLES_SEED, ROLE_PERMS_SEED, USERS_SEED, USER_PERMS_SEED, fmtTok, loadU, roleByKey, saveU } from './data/data-users.jsx';
-import { TOKENS, NAV, TASKS } from './data/data.jsx';
+import { NAV } from './data/data.jsx';
 import { loadNav, saveNav, mergeWithDefault } from './data/data-nav.jsx';
 import { getNavConfig, setNavConfig, getMySettings, setMySetting, getGlobalConfig, setGlobalConfig, setupStatus, setToken, getCapabilities } from './lib/api.js';
 import { resolveShellMode } from './lib/shell-mode.js';
@@ -33,18 +33,11 @@ const I18N_DEFAULT_PACK = (LEX_PACKS.find(p => p.lang === DEFAULT_LANG && p.styl
 
 const ROUTE_META = {
   home:    { icon: "🏠", title: "หน้าหลัก", en: "Home" },
-  me:      { icon: "🧭", title: "แดชบอร์ดของฉัน", en: "My Dashboard" },
-  agents:  { icon: "🎭", title: "เหล่าเอเจนต์", en: "Adventurers" },
-  quests:  { icon: "📜", title: "กระดานงาน", en: "Quest Board" },
-  meeting: { icon: "💬", title: "ห้องประชุม Agent", en: "Council" },
-  sitemap: { icon: "🗺️", title: "ตรวจไซต์แมพ", en: "Sitemap Match" },
-  mana:    { icon: "🔵", title: "โทเคน (Token)", en: "Mana" },
-  treasury:{ icon: "💰", title: "งบประมาณ", en: "Treasury" },
-  stats:   { icon: "📊", title: "สถิติการทำงาน", en: "Chronicle" },
   admin:   { icon: "👥", title: "จัดการผู้ใช้", en: "User Management" },
   toolsmgr:{ icon: "🧰", title: "จัดการเครื่องมือ", en: "Tools" },
   roles:   { icon: "🔑", title: "บทบาทและสิทธิ์", en: "Roles & Access" },
-  workflows: { icon: "⚗️", title: "เวิร์กโฟลว์", en: "Workflows" },
+  permissions: { icon: "🗝️", title: "แคตตาล็อกสิทธิ์", en: "Permissions" },
+  install: { icon: "📥", title: "ติดตั้ง", en: "Install" },
   audit:   { icon: "📋", title: "บันทึกการตรวจสอบ", en: "Audit Log" },
   modules: { icon: "🧩", title: "โมดูล / ปลั๊กอิน", en: "Modules / Plugins" },
   marketplace: { icon: "🛍️", title: "มาร์เก็ตเพลส", en: "Marketplace" },
@@ -53,8 +46,6 @@ const ROUTE_META = {
   userDetail: { icon: "👤", title: "ข้อมูลสมาชิก", en: "User" },
   settings:{ icon: "⚙️", title: "ตั้งค่าระบบ", en: "Settings" },
   library: { icon: "🧩", title: "คลังคอมโพเนนต์", en: "Component Library" },
-  history: { icon: "🗂️", title: "ประวัติงาน", en: "Quest Log" },
-  watch:   { icon: "🛡️", title: "ระบบเฝ้าระวัง", en: "Watchtower" },
   ...PLUGIN_ROUTE_META,   // plugin routes contribute their own topbar metadata (Phase 6 seam)
 };
 
@@ -132,7 +123,7 @@ function Sidebar({ route, go, t, can, nav, openMode }) {
           </div>
         )}
         <div className="row"><span className="pulse-dot" /><span>{t("foot.online")}</span></div>
-        <div className="faint">{t("foot.version", { n: (window.__chars || []).length })}</div>
+        <div className="faint">{t("foot.version")}</div>
       </div>
     </aside>
   );
@@ -190,7 +181,7 @@ function Av({ a, fallback = "🧙" }) { return isAvImg(a) ? <img className="av-i
 function ProfileMenu({ me, roles, t, onSignOut, onSaveProfile }) {
   const [open, setOpen] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
-  const [draft, setDraft] = useState({ display: me.display, email: me.email || "", avatar: me.avatar });
+  const [draft, setDraft] = useState({ display: me.display || me.display_name || me.username || "", email: me.email || "", avatar: me.avatar || "🧙" });
   const [dirty, setDirty] = useState(false);
   const [avPick, setAvPick] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -308,17 +299,6 @@ function Topbar({ route, theme, setTheme, user, language, t, me, roles, onSignOu
         {live && <span className="live-badge" style={{ marginLeft: 6 }}><span className="pulse-dot" />LIVE</span>}
       </div>
       <div className="topbar-spacer" />
-      <div className="tb-stat" data-no-lex>
-        <span className="tbs-ico">🔵</span>
-        <span className="tbs-num">{(TOKENS.balance/1000).toFixed(1)}K</span>
-        <span className="tbs-lbl">{t("topbar.tokens")}</span>
-      </div>
-      {window.TodoBell
-        ? <window.TodoBell t={t} formal={false} activeCount={TASKS.filter(q => q.status === "active").length} route={route} />
-        : <div className="tb-stat">
-            <span className="tbs-ico">📜</span>
-            <span className="tbs-lbl">{t("topbar.tasks")}</span>
-          </div>}
       <div className="theme-toggle">
         <button className={theme === "pro" ? "on" : ""} onClick={() => setTheme("pro")} title={t("theme.day")}>☀️</button>
         <button className={theme === "pro-dark" ? "on" : ""} onClick={() => setTheme("pro-dark")} title={t("theme.night")}>🌙</button>

@@ -99,6 +99,8 @@
     "nav.settings": "設定",
     "nav.history": "タスク履歴",
     "nav.watch": "モニタリング",
+    "route.home.title": "ホーム",
+    "route.install.title": "インストール",
     "route.me.title": "マイダッシュボード",
     "route.hall.title": "概要",
     "route.agents.title": "エージェント",
