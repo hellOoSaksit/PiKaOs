@@ -508,7 +508,15 @@ function App() {
   // (currentUser.permissions) — never client seed data. Knowing a username is not permission, and there
   // is no "fall back to the seeded admin" path: a real user who isn't an admin gets a non-admin UI. An
   // admin holds every key (admin-implicit-all, resolved server-side).
-  const me = currentUser || (openMode ? { username: t('open.owner'), display_name: t('open.owner'), permissions: [] } : null);
+  // Open mode grants a synthetic owner (spec §4). It must carry the full user shape the app's screens
+  // read — MyDashboard greets `me.display.split(...)` and reads quota/used/avatar/role — or the default
+  // landing crashes to a blank page before the post-login data effects ever run. quota:null ⇒ unlimited
+  // (fmtTok→∞, usagePct→0); roleByKey is null-safe. Cosmetic fields only; permissions still come from
+  // the server signal (openMode ⇒ allow-all), never client seed data (F1).
+  const me = currentUser || (openMode ? {
+    username: t('open.owner'), display_name: t('open.owner'), display: t('open.owner'),
+    email: '', avatar: '🧙', role: 'admin', quota: null, used: 0, period: 'weekly', permissions: [],
+  } : null);
   const mePerms = React.useMemo(() => new Set(currentUser?.permissions || []), [currentUser]);
   // openMode ⇒ allow-all is the SERVER's declaration (authMode:"open"), not a client fallback — the
   // F1 rule stands: without that server signal, permissions come only from /auth/me.
