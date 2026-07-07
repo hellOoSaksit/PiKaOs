@@ -192,7 +192,7 @@ function ProfileMenu({ me, roles, t, onSignOut, onSaveProfile }) {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
-  useEffect(() => { if (open) { setDraft({ display: me.display, email: me.email || "", avatar: me.avatar }); setDirty(false); setAvPick(false); setSaved(false); } }, [open]);
+  useEffect(() => { if (open) { setDraft({ display: me.display || me.display_name || me.username || "", email: me.email || "", avatar: me.avatar || "🧙" }); setDirty(false); setAvPick(false); setSaved(false); } }, [open]);
   const role = roleByKey(roles, me.role) || { en: me.role, th: me.role, color: "" };
   const roleLabel = (t.lang === "en") ? role.en : role.th;
   const quota = me.quota, used = me.used || 0;
