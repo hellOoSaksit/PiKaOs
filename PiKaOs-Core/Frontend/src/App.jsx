@@ -63,7 +63,7 @@ const ROUTE_META = {
   ...PLUGIN_ROUTE_META,   // plugin routes contribute their own topbar metadata (Phase 6 seam)
 };
 
-const NAV_GROUP_KEY = { "ศูนย์บัญชาการ": "command", "ความรู้และความทรงจำ": "knowledge", "ทรัพยากร": "resources", "ผู้ดูแลระบบ": "admin" };
+const NAV_GROUP_KEY = { "หน้าหลัก": "home", "ศูนย์บัญชาการ": "command", "ความรู้และความทรงจำ": "knowledge", "ทรัพยากร": "resources", "ผู้ดูแลระบบ": "admin" };
 
 // does this node, or any descendant, match the current route? → keep that branch expanded
 function navContains(node, route) {

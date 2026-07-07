@@ -120,17 +120,9 @@ const TREASURY = {
 };
 
 const NAV = [
-  { group: "ศูนย์บัญชาการ", items: [
-    { id: "me", icon: "🧭", label: "แดชบอร์ดของฉัน", en: "My Dashboard" },
-    { id: "agents", icon: "🎭", label: "ห้อง Agent", en: "Adventurers" },
-    { id: "quests", icon: "📜", label: "กระดานงาน", en: "Quest Board", tag: "4" },
-    // "world" (World State) is now contributed by the world plugin (Phase 6 seam, src/plugins/world)
-    // and merged into this group by data-nav.defaultNav — not hardcoded here.
-    { id: "workflows", icon: "⚗️", label: "เวิร์กโฟลว์", en: "Workflows" },
-    { id: "sitemap", icon: "🗺️", label: "ตรวจไซต์แมพ", en: "Sitemap Match" },
+  { group: "หน้าหลัก", items: [
+    { id: "home", icon: "🏠", label: "หน้าหลัก", en: "Home" },
   ]},
-  // "ความรู้และความทรงจำ" (codex · search) is now contributed by the knowledge plugin (Phase 6 seam,
-  // src/plugins/knowledge) and merged into the nav default by data-nav.defaultNav — not hardcoded here.
   { group: "ผู้ดูแลระบบ", items: [
     { id: "admin", icon: "👥", label: "จัดการผู้ใช้", en: "User Management", perm: "user.view.any" },
     { id: "toolsmgr", icon: "🧰", label: "จัดการเครื่องมือ", en: "Tools", perm: "options.manage" },
@@ -147,8 +139,6 @@ const NAV = [
     ]},
     { id: "audit", icon: "📋", label: "บันทึกการตรวจสอบ", en: "Audit Log", perm: "audit.view" },
     { id: "settings", icon: "⚙️", label: "ตั้งค่าระบบ", en: "Settings" },
-    { id: "history", icon: "🗂️", label: "ประวัติงาน", en: "Quest Log" },
-    { id: "watch", icon: "🛡️", label: "ระบบเฝ้าระวัง", en: "Watchtower" },
   ]},
 ];
 

@@ -288,6 +288,8 @@
     "bld.doc.open": "เปิด/แก้ไข",
     "bld.doc.add": "＋ เพิ่มไฟล์ .md",
     "topbar.tasks": "งาน",
+    "navgroup.home": "หน้าหลัก",
+    "nav.home": "หน้าหลัก",
     "navgroup.command": "การทำงานหลัก",
     "nav.me": "แดชบอร์ดของฉัน",
     "nav.agents": "จัดการเอเจนต์",

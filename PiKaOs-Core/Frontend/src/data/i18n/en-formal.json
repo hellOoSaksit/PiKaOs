@@ -351,6 +351,8 @@
     "summary.catLabel": "category",
     "item.addVocab.title": "Add “{term}” as a word for {canon} and treat it as matched",
     "topbar.tasks": "Tasks",
+    "navgroup.home": "Home",
+    "nav.home": "Home",
     "navgroup.command": "Workspace",
     "nav.me": "My Dashboard",
     "nav.agents": "Agents",

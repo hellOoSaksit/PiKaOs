@@ -46,6 +46,8 @@
     "topbar.viewAs": "ユーザー視点",
     "theme.day": "ライト",
     "theme.night": "ダーク",
+    "navgroup.home": "ホーム",
+    "nav.home": "ホーム",
     "nav.me": "マイダッシュボード",
     "nav.agents": "エージェント",
     "nav.quests": "タスクボード",
