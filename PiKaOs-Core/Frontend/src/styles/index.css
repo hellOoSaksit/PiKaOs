@@ -4,7 +4,6 @@
 @import './components.css';   /* page/cards/login/builder + PiKaOs motion layer */
 @import './world.css';        /* world/rooms, modals, badges, chat, sitemap */
 @import './kit-overlays.css';  /* new-look confirm/loading/notification popups */
-@import './dashboard.css';
 @import './rbac.css';
 @import './fx.css';
 @import './login.css';        /* first-run console-code gate (split-stage auth surface) */
