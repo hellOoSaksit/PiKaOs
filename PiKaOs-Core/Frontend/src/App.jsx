@@ -585,7 +585,7 @@ function App() {
   useEffect(() => {
     const need = ROUTE_PERM[route];
     if (need && !can(need)) go("me");
-  }, [route, mePerms]);
+  }, [route, mePerms, openMode]);   // openMode flips can() to allow-all — re-check when caps arrive
 
   const shell = resolveShellMode({ ready: auth.ready, caps, bootstrap, loggedIn: auth.loggedIn });
   if (shell === 'loading') return null;   // avoid flashing the setup screen while restoring
