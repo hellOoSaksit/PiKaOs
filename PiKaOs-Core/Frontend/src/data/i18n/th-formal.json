@@ -301,6 +301,8 @@
     "mkt.tabdesc.onlinemcp": "เชื่อมต่อบริการ MCP ที่โฮสต์ผ่านเครือข่าย",
     "mkt.tabdesc.skills": "ชุดทักษะสำเร็จรูปสำหรับเอเจนต์",
     "mkt.soon": "{name} — เร็ว ๆ นี้",
+    "open.owner": "เจ้าของระบบ",
+    "open.badge": "เซิร์ฟเวอร์แบบเปิด — ไม่ต้องเข้าสู่ระบบ",
     "boot.starting": "กำลังเริ่ม {name}",
     "connect.title": "เชื่อมต่อเซิร์ฟเวอร์",
     "connect.subtitle": "กรอกที่อยู่เซิร์ฟเวอร์ {name} ของคุณ — เช่น 192.168.1.50:8000 หรือ https://your-server.example",

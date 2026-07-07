@@ -13,6 +13,7 @@ import asyncio
 import re
 
 import pytest
+from fastapi import FastAPI
 from starlette.testclient import TestClient
 
 from app.core import kernel_state, setup_state
@@ -198,3 +199,81 @@ def test_bootstrap_token_unlocks_the_plugins_list_route(tmp_state, client):
 def test_plugins_route_still_401s_without_a_token(tmp_state, client):
     resp = client.get("/api/plugins")
     assert resp.status_code == 401
+
+
+# --- auth mode + setup-completed flags (open-mode spec §4, phase 1) --------------------------------
+
+def test_auth_mode_defaults_to_login(tmp_state):
+    assert setup_state.read_auth_mode() == "login"
+
+
+def test_auth_mode_roundtrips(tmp_state):
+    setup_state.write_auth_mode("open")
+    assert setup_state.read_auth_mode() == "open"
+    setup_state.write_auth_mode("setup")
+    assert setup_state.read_auth_mode() == "setup"
+
+
+def test_auth_mode_unknown_value_reads_as_login(tmp_state):
+    kernel_state.write_json("auth_mode", {"mode": "banana"})
+    assert setup_state.read_auth_mode() == "login"
+
+
+def test_setup_completed_roundtrips(tmp_state):
+    assert setup_state.is_setup_completed() is False
+    setup_state.mark_setup_completed()
+    assert setup_state.is_setup_completed() is True
+
+
+# --- boot decision: generate_setup_code.main() writes this boot's auth_mode ----
+
+def test_boot_with_auth_enabled_sets_login_mode_and_no_code(tmp_state, monkeypatch):
+    monkeypatch.setenv("ENABLED_MODULES", "auth")
+    generate_setup_code.main()
+    assert setup_state.read_auth_mode() == "login"
+    assert setup_state.read_code() is None
+
+
+def test_boot_after_setup_completed_opens_without_code_or_banner(tmp_state, monkeypatch, capsys):
+    monkeypatch.setenv("ENABLED_MODULES", "")
+    setup_state.mark_setup_completed()
+    generate_setup_code.main()
+    assert setup_state.read_auth_mode() == "open"
+    assert setup_state.read_code() is None
+    assert capsys.readouterr().out == ""          # open boots silently — nothing to paste
+
+
+def test_fresh_boot_prints_code_and_sets_setup_mode(tmp_state, monkeypatch, capsys):
+    monkeypatch.setenv("ENABLED_MODULES", "")
+    generate_setup_code.main()
+    assert setup_state.read_auth_mode() == "setup"
+    assert setup_state.read_code() is not None
+    assert "PIKA-" in capsys.readouterr().out
+
+
+def test_verify_code_flips_server_open(tmp_state):
+    from app.core.routers import setup as setup_router
+
+    setup_state.write(CODE, TOKEN)
+    app = FastAPI()
+    app.include_router(setup_router.router)
+    client = TestClient(app)
+
+    r = client.post("/api/setup/verify-code", json={"code": CODE})
+    assert r.status_code == 200
+    assert setup_state.is_setup_completed() is True
+    assert setup_state.read_auth_mode() == "open"
+
+
+def test_wrong_code_flips_nothing(tmp_state):
+    from app.core.routers import setup as setup_router
+
+    setup_state.write(CODE, TOKEN)
+    app = FastAPI()
+    app.include_router(setup_router.router)
+    client = TestClient(app)
+
+    r = client.post("/api/setup/verify-code", json={"code": "PIKA-WRNG-WRNG"})
+    assert r.status_code == 401
+    assert setup_state.is_setup_completed() is False
+    assert setup_state.read_auth_mode() == "login"

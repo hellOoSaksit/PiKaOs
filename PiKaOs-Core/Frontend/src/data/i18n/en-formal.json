@@ -364,6 +364,8 @@
     "mkt.tabdesc.onlinemcp": "Connect to hosted MCP services over the network.",
     "mkt.tabdesc.skills": "Ready-made skill packages for agents.",
     "mkt.soon": "{name} — coming soon",
+    "open.owner": "Owner",
+    "open.badge": "Open server — no sign-in",
     "boot.starting": "Starting {name}",
     "connect.title": "Connect to your server",
     "connect.subtitle": "Enter the address of your {name} server — for example 192.168.1.50:8000 or https://your-server.example",

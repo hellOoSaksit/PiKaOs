@@ -1,5 +1,5 @@
 import { it, expect, vi } from 'vitest';
-import { normalizeServerInput, probeServer } from './server-url.js';
+import { normalizeServerInput, probeServer, serverKeyFor } from './server-url.js';
 
 it('bare private IP gets http + the /api base', () => {
   expect(normalizeServerInput(' 192.168.1.50:8000 ')).toEqual({ url: 'http://192.168.1.50:8000/api', plainHttp: true });
@@ -49,4 +49,10 @@ it('probeServer: true on 200 JSON (kernel "degraded" counts), false on error', a
   expect(await probeServer('http://127.0.0.1:8000/api')).toBe(false);
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('refused')));
   expect(await probeServer('http://127.0.0.1:8000/api')).toBe(false);
+});
+
+it('serverKeyFor: absolute base → host+path key; relative base → the web origin key', () => {
+  expect(serverKeyFor('http://192.168.1.50:8000/api')).toBe('192.168.1.50:8000/api');
+  expect(serverKeyFor('https://x.example/api/')).toBe('x.example/api');
+  expect(serverKeyFor('/api')).toBe('web');
 });

@@ -59,6 +59,25 @@ class VersionOut(BaseModel):
     name: str          # app_name
 
 
+class PluginCapability(BaseModel):
+    """One installed+active plugin as the C1 handshake reports it (capability-handshake spec §2).
+    `frontend` stays None until catalog FE distribution (phase 3) fills it."""
+    id: str
+    version: str | None = None
+    frontend: dict | None = None
+
+
+class CapabilitiesOut(BaseModel):
+    """C1 capability handshake — the first thing a client reads off a server. ADDITIVE-ONLY:
+    fields are never removed or re-meaninged (spec §2)."""
+    v: int
+    instanceId: str
+    authMode: str            # "open" | "login" — computed server-side (C3)
+    version: str
+    build: str
+    plugins: list[PluginCapability] = []
+
+
 # --- knowledge / document store (markdown-as-truth — docs/architecture/knowledge-rag.md) ---
 
 

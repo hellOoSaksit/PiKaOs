@@ -66,12 +66,18 @@ _BOOTSTRAP_ADMIN = _SyntheticUser(id=UUID(int=0), role=ADMIN_ROLE, status="activ
 
 
 class BootstrapProvider:
-    """No auth plugin installed/enabled: denies everyone EXCEPT a caller bearing the current boot's
-    setup-code session token (`setup_state.verify_session_token`), who authenticates as a synthetic
-    admin — install-page-only access until a real `auth` plugin takes over."""
+    """No auth plugin installed/enabled: denies everyone EXCEPT (a) a caller bearing the current
+    boot's setup-code session token, or (b) any caller at all when this boot's auth mode is "open"
+    (optional-auth, spec §4) — both authenticate as the synthetic admin."""
 
     async def authenticate(self, token: str | None) -> "UserLike | None":
         if token and setup_state.verify_session_token(token):
+            return _BOOTSTRAP_ADMIN
+        # Optional-auth open mode (capability-handshake spec §4): no auth plugin + first-run setup
+        # completed ⇒ the SERVER declares every caller the owner-admin. Decided once per boot by the
+        # entrypoint; a bound real provider replaces this class entirely, so "open" can never shadow
+        # real auth. Absent/unknown state reads as "login" (fail-closed) — see setup_state.
+        if setup_state.read_auth_mode() == "open":
             return _BOOTSTRAP_ADMIN
         return None
 

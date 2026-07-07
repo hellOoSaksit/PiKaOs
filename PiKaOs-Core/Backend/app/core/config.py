@@ -166,8 +166,12 @@ class Settings(BaseSettings):
     # callback URLs (e.g. a channel provider's webhook). Empty → callers can't self-register a webhook.
     public_base_url: str = ""
 
-    # --- CORS (frontend dev origin) ---
-    cors_origins: str = "http://localhost:5173"
+    # --- CORS (allowed browser origins) ---
+    # `http://localhost:5173` = the web Frontend dev server; `app://pikaos` = the desktop shell's
+    # fixed renderer origin (Desktop/src/main/protocol.ts) — every desktop client fetches the API
+    # cross-origin from that scheme, so the kernel must allow it out of the box or the Connect-Server
+    # probe fails with no ACAO header. Product constants, not per-deploy; extend via CORS_ORIGINS env.
+    cors_origins: str = "http://localhost:5173,app://pikaos"
 
     # default password for seeded users (dev only)
     seed_password: str = "pikaos123"
