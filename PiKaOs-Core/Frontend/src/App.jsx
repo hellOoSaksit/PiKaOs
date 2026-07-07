@@ -3,29 +3,23 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 const { useState, useEffect } = React;
 import { AUDIT_SEED, ROLES_SEED, ROLE_PERMS_SEED, USERS_SEED, USER_PERMS_SEED, fmtTok, loadU, roleByKey, saveU } from './data/data-users.jsx';
-import { TOOL_RUNS_SEED, WORKFLOWS_SEED, loadWF, saveWF } from './data/data-workflows.jsx';
 import { TOKENS, NAV, TASKS } from './data/data.jsx';
 import { loadNav, saveNav, mergeWithDefault } from './data/data-nav.jsx';
 import { getNavConfig, setNavConfig, getMySettings, setMySetting, getGlobalConfig, setGlobalConfig, setupStatus, setToken, getCapabilities } from './lib/api.js';
 import { resolveShellMode } from './lib/shell-mode.js';
 import { applyGlobalConfig } from './lib/characters.jsx';
 import { Admin } from './screens/screens-admin.jsx';
-import { CharacterBuilder } from './screens/screens-builder.jsx';
-import { Chronicle, Mana, QuestLog, Settings, Treasury, Watchtower } from './screens/screens-extra.jsx';
+import { Settings } from './screens/screens-extra.jsx';
 import { FirstRun } from './screens/FirstRun.jsx';
 import { KernelOnlyShell } from './screens/KernelOnlyShell.jsx';
-import { MyDashboard } from './screens/screens-me.jsx';
+import { KernelHome } from './screens/KernelHome.jsx';
 import { PluginsManager } from './screens/screens-plugins.jsx';
 import { AuditLog, PermissionsCatalog, RolesPermissions, UserDetail, UserForm } from './screens/screens-rbac.jsx';
-import { AgentDrawer, Agents, Meeting, QuestBoard, QuestDrawer } from './screens/screens-secondary.jsx';
-import { SitemapAudit } from './screens/screens-sitemap.jsx';
 import { ToolsManager } from './screens/screens-tools.jsx';
 import { ComponentLibrary } from './screens/screens-library.jsx';
-import { Workflows } from './screens/screens-workflows.jsx';
 import { useAuth } from './lib/auth.jsx';
 import { BottomUtilityBar } from './components/ui/BottomUtilityBar.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
-import { SAMPLE_CHARS, loadArchived, loadChars, randPos, saveArchived, saveChars } from './lib/store.jsx';
 import { UILoadingHost, UIModalHost } from './lib/ui-modal.jsx';
 import { makeT, DEFAULT_LANG, DEFAULT_STYLE, packById, defaultPack, defaultPackForLang, LEX_PACKS } from './lib/i18n.jsx';
 import { renderPluginRoute, PLUGIN_ROUTE_META } from './plugins/index.jsx';
@@ -38,6 +32,7 @@ const I18N_DEFAULT_PACK = (LEX_PACKS.find(p => p.lang === DEFAULT_LANG && p.styl
    ============================================================ */
 
 const ROUTE_META = {
+  home:    { icon: "🏠", title: "หน้าหลัก", en: "Home" },
   me:      { icon: "🧭", title: "แดชบอร์ดของฉัน", en: "My Dashboard" },
   agents:  { icon: "🎭", title: "เหล่าเอเจนต์", en: "Adventurers" },
   quests:  { icon: "📜", title: "กระดานงาน", en: "Quest Board" },
@@ -300,7 +295,7 @@ function ProfileMenu({ me, roles, t, onSignOut, onSaveProfile }) {
 }
 
 function Topbar({ route, theme, setTheme, user, language, t, me, roles, onSignOut, onSaveProfile }) {
-  const m = ROUTE_META[route] || ROUTE_META.me;   // me is always Base — safe fallback if a plugin (e.g. world→hall) is disabled
+  const m = ROUTE_META[route] || ROUTE_META.home;   // home is the kernel landing — safe fallback if a plugin route is disabled
   const title = t("route." + route + ".title");
   const live = route === "hall" || route === "meeting" || route === "world";
   const tEn = makeT("en", "formal");
@@ -359,7 +354,7 @@ function App() {
   const openMode = caps?.authMode === 'open';
   const signedIn = auth.loggedIn || openMode;
 
-  const [route, setRoute] = useState("me");
+  const [route, setRoute] = useState("home");
   const [theme, setThemeState] = useState(() => { const t = localStorage.getItem("guild-theme"); return (t === "pro" || t === "pro-dark") ? t : "pro"; });
   // active lexicon = ภาษาที่แสดง + รูปแบบคำศัพท์ รวมเป็นชุดเดียว (รหัสชุดจาก data/lexicons/*.json)
   const [lex, setLexState] = useState(() => {
@@ -375,11 +370,6 @@ function App() {
     return I18N_DEFAULT_PACK;   // ผู้ใช้ใหม่ → ภาษา/รูปแบบเริ่มต้นตาม i18n (English + Formal)
   });
   const lastByLang = React.useRef({});
-  const [agentSel, setAgentSel] = useState(null);
-  const [questSel, setQuestSel] = useState(null);
-  const [chars, setChars] = useState(() => loadChars());
-  const [archived, setArchived] = useState(() => loadArchived());
-  const [builder, setBuilder] = useState(null);   // null | {} | {existing char}
 
   // ---- RBAC / users (Phase 4) ----
   const [users, setUsers] = useState(() => loadU("users", USERS_SEED));
@@ -398,8 +388,6 @@ function App() {
   });
   const [userPerms, setUserPerms] = useState(() => loadU("userPerms", USER_PERMS_SEED));
   const [audit, setAudit] = useState(() => loadU("audit", AUDIT_SEED));
-  const [workflows, setWorkflows] = useState(() => loadWF("workflows", WORKFLOWS_SEED));
-  const [toolRuns, setToolRuns] = useState(() => loadWF("runs", TOOL_RUNS_SEED));
   const [userSel, setUserSel] = useState(null);         // selected user id (detail)
   const [userForm, setUserForm] = useState(null);       // null | {} | user
 
@@ -418,8 +406,6 @@ function App() {
     if (target) setLex(target);
   };
   useEffect(() => { document.documentElement.setAttribute("data-theme", theme); }, [theme]);
-  useEffect(() => { saveChars(chars); }, [chars]);
-  useEffect(() => { saveArchived(archived); window.__archived = archived; }, [archived]);
   useEffect(() => { saveU("users", users); }, [users]);
   useEffect(() => { saveU("roles", roles); }, [roles]);
   useEffect(() => { saveNav(navCfg); }, [navCfg]);   // local cache for instant render next load
@@ -457,9 +443,6 @@ function App() {
   useEffect(() => { saveU("rolePerms", rolePerms); }, [rolePerms]);
   useEffect(() => { saveU("userPerms", userPerms); }, [userPerms]);
   useEffect(() => { saveU("audit", audit); }, [audit]);
-  useEffect(() => { saveWF("workflows", workflows); }, [workflows]);
-  useEffect(() => { window.__workflows = workflows; }, [workflows]);
-  useEffect(() => { saveWF("runs", toolRuns); }, [toolRuns]);
   // ทุกอย่างมาจากชุดที่กำลังใช้ — ภาษา/โหมดองค์กร derive จากข้อมูลในไฟล์ ไม่มี hardcode
   const activePack = packById(lex) || defaultPack() || {};
   const language = activePack.lang || "th";
@@ -468,13 +451,8 @@ function App() {
   const t = makeT(language, styleKey);                // t("some.key", { var }) — ไม่ hardcode
   lastByLang.current[language] = lex;   // จำสไตล์ล่าสุดของภาษาปัจจุบัน
 
-  // expose live roster to data.jsx getters / byId
-  window.__chars = chars;
-  window.__charById = Object.fromEntries(chars.map(c => [c.id, c]));
-
   const go = (r) => {
     // closing every open overlay/popup when navigating away
-    setAgentSel(null); setQuestSel(null); setBuilder(null);
     setUserForm(null); setUserSel(null);
     try { window.dispatchEvent(new Event("guildos-route-change")); } catch (e) { }
     try { document.body.classList.remove("nav-open"); } catch (e) { }
@@ -484,39 +462,16 @@ function App() {
   };
   window.__guildGo = go;
 
-  const S = {
-    chars,
-    byId: (id) => chars.find(c => c.id === id),
-    add: (c) => setChars(prev => [...prev, c]),
-    update: (c) => setChars(prev => prev.map(x => x.id === c.id ? c : x)),
-    remove: (id) => { const c = (window.__chars || []).find(x => x.id === id); if (c && c.locked) { try { window.uiAlert({ title: "ลบไม่ได้", message: "Agent CEO เป็นตำแหน่งตายตัว ลบไม่ได้ทุกสิทธิ์ (รวมถึงผู้ดูแลระบบ)" }); } catch (e) { } return; } setChars(prev => prev.filter(x => x.id !== id)); if (c) setArchived(a => [c, ...a.filter(x => x.id !== id)]); },
-    archived,
-    restore: (id) => { const c = (window.__archived || []).find(x => x.id === id); if (c) setChars(cs => cs.find(x => x.id === id) ? cs : [...cs, { ...c, pos: randPos() }]); setArchived(a => a.filter(x => x.id !== id)); },
-    purge: (id) => setArchived(a => a.filter(x => x.id !== id)),
-    openBuilder: (initial) => setBuilder(initial || {}),
-    loadSamples: () => setChars(SAMPLE_CHARS.map(c => ({ ...c, pos: randPos() }))),
-  };
-
-  const saveChar = (c) => {
-    if (chars.find(x => x.id === c.id)) S.update(c); else S.add(c);
-    setBuilder(null);
-  };
-
   // ---- current user + permissions come from the SERVER (F1) ----
   const T = (en, th) => language === "en" ? en : th;
   // The signed-in identity and its effective permissions are whatever the backend `/auth/me` returned
   // (currentUser.permissions) — never client seed data. Knowing a username is not permission, and there
   // is no "fall back to the seeded admin" path: a real user who isn't an admin gets a non-admin UI. An
   // admin holds every key (admin-implicit-all, resolved server-side).
-  // Open mode grants a synthetic owner (spec §4). It must carry the full user shape the app's screens
-  // read — MyDashboard greets `me.display.split(...)` and reads quota/used/avatar/role — or the default
-  // landing crashes to a blank page before the post-login data effects ever run. quota:null ⇒ unlimited
-  // (fmtTok→∞, usagePct→0); roleByKey is null-safe. Cosmetic fields only; permissions still come from
-  // the server signal (openMode ⇒ allow-all), never client seed data (F1).
-  const me = currentUser || (openMode ? {
-    username: t('open.owner'), display_name: t('open.owner'), display: t('open.owner'),
-    email: '', avatar: '🧙', role: 'admin', quota: null, used: 0, period: 'weekly', permissions: [],
-  } : null);
+  // Open mode grants a synthetic owner (spec §4). KernelHome doesn't read cosmetic profile fields, so
+  // this is minimal: identity label + empty permissions. Permissions still come from the server signal
+  // (openMode ⇒ allow-all via `can`), never client seed data (F1).
+  const me = currentUser || (openMode ? { username: t('open.owner'), display_name: t('open.owner'), permissions: [] } : null);
   const mePerms = React.useMemo(() => new Set(currentUser?.permissions || []), [currentUser]);
   // openMode ⇒ allow-all is the SERVER's declaration (authMode:"open"), not a client fallback — the
   // F1 rule stands: without that server signal, permissions come only from /auth/me.
@@ -532,19 +487,6 @@ function App() {
   const Sys = {
     users, roles, rolePerms, userPerms, audit, me, can, T, t, language, go,
     nav: navCfg, setNav: saveNavCfg,
-    workflows, toolRuns,
-    toggleWorkflow: (w) => {
-      setWorkflows(prev => prev.map(x => x.id === w.id ? { ...x, enabled: !x.enabled } : x));
-      logAudit("workflow.toggle", "workflow", w.id, (w.enabled ? "− disabled" : "+ enabled"));
-    },
-    recordRun: (wf, input, res) => {
-      const run = { id: "tr_" + Date.now(), wf: wf.id, agent: null, quest: null,
-        status: res.status, started: { en: "just now", th: "เมื่อสักครู่" }, dur: res.dur,
-        input, output: res.output, error: res.error };
-      setToolRuns(prev => [run, ...prev]);
-      setWorkflows(prev => prev.map(x => x.id === wf.id ? { ...x, runs: (x.runs || 0) + 1, lastStatus: res.status } : x));
-    },
-    openBuilder: S.openBuilder,
     openUserForm: (u) => setUserForm(u || {}),
     saveUser: (f, edit) => {
       if (edit) { setUsers(prev => prev.map(x => x.id === f.id ? { ...x, ...f } : x)); logAudit("user.update", "user", f.id, T("profile updated", "แก้ไขโปรไฟล์")); }
@@ -592,7 +534,7 @@ function App() {
   const ROUTE_PERM = { admin: "user.view.any", userDetail: "user.view.any", roles: "role.manage", permissions: "user.view.any", audit: "audit.view" };
   useEffect(() => {
     const need = ROUTE_PERM[route];
-    if (need && !can(need)) go("me");
+    if (need && !can(need)) go("home");
   }, [route, mePerms, openMode]);   // openMode flips can() to allow-all — re-check when caps arrive
 
   const shell = resolveShellMode({ ready: auth.ready, caps, bootstrap, loggedIn: auth.loggedIn });
@@ -609,19 +551,12 @@ function App() {
   }
 
   const screen = (() => {
-    const guard = (perm, el) => can(perm) ? el : <MyDashboard Sys={Sys} onAgent={setAgentSel} onQuest={setQuestSel} />;
+    const guard = (perm, el) => can(perm) ? el : <KernelHome Sys={Sys} caps={caps} go={go} />;
     switch (route) {
-      case "me": return <MyDashboard Sys={Sys} onAgent={setAgentSel} onQuest={setQuestSel} />;
-      case "agents": return <Agents onAgent={setAgentSel} S={S} can={can} t={t} />;
-      case "quests": return <QuestBoard onQuest={setQuestSel} can={can} t={t} />;
-      case "meeting": return <Meeting S={S} t={t} />;
-      case "sitemap": return <SitemapAudit t={t} lang={language} can={can} actor={me.display_name || me.username || "ผู้ใช้"} />;
-      case "mana": return <Mana S={S} t={t} />;
-      case "treasury": return <Treasury t={t} />;
-      case "stats": return <Chronicle S={S} t={t} />;
+      case "home": return <KernelHome Sys={Sys} caps={caps} go={go} />;
       case "admin": return guard("user.view.any", <Admin Sys={Sys} onUser={(id) => { setUserSel(id); go("userDetail"); }} />);
       case "toolsmgr": return guard("options.manage", <ToolsManager can={can} t={t} Sys={Sys} />);
-      case "userDetail": return guard("user.view.any", <UserDetail Sys={Sys} userId={userSel} onAgent={setAgentSel} />);
+      case "userDetail": return guard("user.view.any", <UserDetail Sys={Sys} userId={userSel} />);
       case "roles": return guard("role.manage", <RolesPermissions Sys={Sys} />);
       case "permissions": return guard("user.view.any", <PermissionsCatalog Sys={Sys} />);
       case "audit": return guard("audit.view", <AuditLog Sys={Sys} />);
@@ -631,15 +566,12 @@ function App() {
       case "marketplace": return guard("plugins.manage", <PluginsManager Sys={Sys} view="market" />);
       case "mypackages": return guard("plugins.manage", <PluginsManager Sys={Sys} view="mine" />);
       // Local MCP moved into the Marketplace hub's "Local MCP" tab (desktop-only) — no standalone route.
-      case "workflows": return <Workflows Sys={Sys} />;
       case "settings": return <Settings theme={theme} setTheme={setTheme} lex={lex} setLex={setLex} pickLanguage={pickLanguage} language={language} formal={formal} go={go} t={t} />;
       case "library": return <ComponentLibrary onBack={() => go("settings")} t={t} />;
-      case "history": return <QuestLog t={t} />;
-      case "watch": return <Watchtower t={t} />;
       default: {
-        // a route owned by an enabled plugin (Phase 6 seam) — else fall back to the dashboard.
-        const pluginEl = renderPluginRoute(route, { t, can, language, S, onAgent: setAgentSel });
-        return pluginEl || <MyDashboard Sys={Sys} onAgent={setAgentSel} onQuest={setQuestSel} />;
+        // a route owned by an enabled plugin (Phase 6 seam) — else fall back to kernel Home.
+        const pluginEl = renderPluginRoute(route, { t, can, language });
+        return pluginEl || <KernelHome Sys={Sys} caps={caps} go={go} />;
       }
     }
   })();
@@ -655,17 +587,11 @@ function App() {
         <div className="content">{screen}</div>
       </div>
       {userForm && <UserForm Sys={Sys} initial={userForm.id ? userForm : null} onClose={() => setUserForm(null)} />}
-      {agentSel && <AgentDrawer a={agentSel} onClose={() => setAgentSel(null)} t={t}
-        onEdit={(c) => { setAgentSel(null); setBuilder(c); }}
-        onDelete={async (id) => { const c = chars.find(x => x.id === id); if (c && c.locked) { await window.uiAlert({ title: t("ad.cantDelTitle"), message: t("ad.ceoLockedAlert") }); return; } setAgentSel(null); S.remove(id); }} />}
-      {questSel && <QuestDrawer q={questSel} onClose={() => setQuestSel(null)} t={t} onAgent={(a) => { setQuestSel(null); setAgentSel(a); }} />}
-      {builder && <CharacterBuilder initial={builder.id ? builder : null} onSave={saveChar} onClose={() => setBuilder(null)} can={can} archived={archived} t={t} onRestore={(id) => { S.restore(id); setBuilder(null); }} />}
       <BottomUtilityBar
-        t={t} route={route} onHome={() => go("me")} me={me}
+        t={t} route={route} onHome={() => go("home")} me={me}
         theme={theme} onToggleTheme={() => setTheme(theme === "pro" ? "pro-dark" : "pro")}
         onSignOut={auth.logout}
         notifications={[]} chatThreads={[]}
-        onAdd={() => Sys.openBuilder()}
       />
       <UIModalHost />
       <UILoadingHost />
