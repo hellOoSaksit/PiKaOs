@@ -7,13 +7,20 @@ import DatePicker from '../components/ui/DatePicker.jsx';
 import SaveBar from '../components/ui/SaveBar.jsx';
 import { ACTION_META, PERMISSIONS, fmtTok, ownerOf, resolvePerms, roleByKey, usagePct, userById } from '../data/data-users.jsx';
 import { Admin, RoleBadge, StatusPill } from './screens-admin.jsx';
-import { Field } from './screens-builder.jsx';
-import { Agents } from './screens-secondary.jsx';
 
 /* ============================================================
    RBAC SCREENS — User detail, Roles & Permissions, Audit log,
    and the User form modal. All bilingual via Sys.T, data-no-lex.
    ============================================================ */
+
+function Field({ label, hint, children }) {
+  return (
+    <div className="bf">
+      <label className="bf-label">{label}{hint && <span className="bf-hint">{hint}</span>}</label>
+      {children}
+    </div>
+  );
+}
 
 /* ---------------- USER FORM (create / edit) ---------------- */
 function UserForm({ Sys, initial, onClose }) {
