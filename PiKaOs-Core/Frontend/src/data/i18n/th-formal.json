@@ -21,6 +21,17 @@
     "formal": true
   },
   "translations": {
+    "home.title": "PiKaOS",
+    "home.subtitle": "พื้นที่ทำงานเคอร์เนล — ติดตั้งปลั๊กอินเพื่อเพิ่มความสามารถ",
+    "home.serverGroup": "เซิร์ฟเวอร์",
+    "home.version": "เวอร์ชัน",
+    "home.mode": "โหมด",
+    "home.modeOpen": "เปิด (ไม่ต้องเข้าสู่ระบบ)",
+    "home.modeLogin": "ต้องเข้าสู่ระบบ",
+    "home.instance": "อินสแตนซ์",
+    "home.modulesGroup": "โมดูลที่ติดตั้งแล้ว",
+    "home.modulesNone": "ยังไม่มีโมดูลที่ติดตั้ง",
+    "home.goInstall": "ไปหน้าติดตั้ง",
     "head.kicker": "เครื่องมือ · จับคู่ไซต์แมพ",
     "head.title": "ตรวจไซต์แมพ",
     "head.desc": "นำคำศัพท์ของไซต์แมพมาจับคู่กับคำบนหน้าเว็บ — ถึงเขียนต่างกันก็รู้ว่าคืออันเดียวกัน",

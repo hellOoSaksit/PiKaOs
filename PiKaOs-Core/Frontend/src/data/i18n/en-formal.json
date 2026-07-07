@@ -21,6 +21,17 @@
     "formal": false
   },
   "translations": {
+    "home.title": "PiKaOS",
+    "home.subtitle": "Kernel workspace — install plugins to add features.",
+    "home.serverGroup": "Server",
+    "home.version": "Version",
+    "home.mode": "Mode",
+    "home.modeOpen": "Open (no login)",
+    "home.modeLogin": "Login required",
+    "home.instance": "Instance",
+    "home.modulesGroup": "Installed modules",
+    "home.modulesNone": "No modules installed yet.",
+    "home.goInstall": "Open Install",
     "head.kicker": "Tools · Sitemap Match",
     "head.title": "Sitemap Match",
     "head.desc": "Match our sitemap vocabulary against terms on a web page — even when the wording differs but means the same.",
