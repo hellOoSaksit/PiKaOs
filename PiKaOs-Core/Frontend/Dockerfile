@@ -25,7 +25,7 @@ RUN npm run build          # → /app/dist
 # --- prod: serve the static bundle via nginx; proxy /api + /ws to ${BACKEND_URL} (same-origin, so
 #     no CORS). BACKEND_URL is substituted at container start (nginx:alpine runs envsubst on the
 #     template); only that var is filtered so nginx's own $host/$uri survive. ---
-FROM nginx:1.27-alpine AS prod
+FROM nginx:1.31-alpine AS prod
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 ENV BACKEND_URL=http://backend:8000
