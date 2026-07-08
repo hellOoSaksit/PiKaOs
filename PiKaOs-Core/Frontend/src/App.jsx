@@ -438,7 +438,7 @@ function App() {
       case "library": return <ComponentLibrary onBack={() => go("settings")} t={t} />;
       default: {
         // a route owned by an enabled plugin (Phase 6 seam) — else fall back to kernel Home.
-        const pluginEl = renderPluginRoute(route, { t, can, language, go });
+        const pluginEl = renderPluginRoute(route, { t, can, language, go, me });
         return pluginEl || <KernelHome Sys={Sys} caps={caps} go={go} />;
       }
     }
