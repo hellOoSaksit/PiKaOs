@@ -41,8 +41,10 @@ function toOllama(messages: ChatMessage[]) {
 }
 
 // No "DOM" lib in this tsconfig means res.json() returns unknown — type the response body
-// locally, same pattern as anthropic.ts's AnthropicResponseBody.
-type OllamaToolCall = { function: { name: string; arguments: Record<string, unknown> } }
+// locally, same pattern as anthropic.ts's AnthropicResponseBody. Fields are optional (not the
+// required shape a well-formed response would have) because the vendor body is untrusted input —
+// parseOllamaToolCall below is what actually validates each entry before it becomes a ToolCall.
+type OllamaToolCall = { function?: { name?: string; arguments?: Record<string, unknown> } }
 type OllamaResponseBody = { message?: { content?: string; tool_calls?: OllamaToolCall[] } }
 
 // Module-scope, not a per-#send()-call local: the agent loop calls complete() once per turn of a
@@ -53,6 +55,20 @@ type OllamaResponseBody = { message?: { content?: string; tool_calls?: OllamaToo
 // but nothing guarantees every future consumer of ToolCall.id treats it as scoped-to-one-turn, so
 // keep ids globally unique for the process lifetime rather than lean on that assumption holding.
 let nextOllamaToolCallId = 0
+
+// A malformed tool_calls entry (missing `function`, or `function` present but missing `name`) is
+// untrusted vendor data, not a program bug — locally-run models are the most likely of the three
+// adapters to emit one. Dereferencing c.function.name directly (the old shape) throws a raw
+// TypeError inside .map(), which — because the map sits inside the single returned object literal
+// — rejects the WHOLE complete() call and discards the response text and every other valid tool
+// call in the same turn, not just the bad entry. Same "filter, don't throw" reasoning as
+// openai.ts's parseOpenAiToolCall / anthropic.ts's tool_use block filter. Returns null for
+// anything that doesn't parse; callers filter nulls out. The id is only synthesized for entries
+// that are actually kept, so a dropped entry never burns a slot in the id sequence.
+function parseOllamaToolCall(c: OllamaToolCall): { id: string; name: string; arguments: Record<string, unknown> } | null {
+  if (typeof c.function?.name !== 'string') return null
+  return { id: `ollama_${nextOllamaToolCallId++}`, name: c.function.name, arguments: c.function.arguments ?? {} }
+}
 
 export class OllamaProvider implements LlmProvider {
   async complete(messages: ChatMessage[], tools: ToolSpec[], opts: CompleteOpts): Promise<CompleteResult> {
@@ -78,7 +94,9 @@ export class OllamaProvider implements LlmProvider {
     const msg = body.message ?? {}
     return {
       text: msg.content ?? '',
-      toolCalls: (msg.tool_calls ?? []).map((c) => ({ id: `ollama_${nextOllamaToolCallId++}`, name: c.function.name, arguments: c.function.arguments ?? {} })),
+      toolCalls: (msg.tool_calls ?? [])
+        .map(parseOllamaToolCall)
+        .filter((c): c is { id: string; name: string; arguments: Record<string, unknown> } => c !== null),
     }
   }
 }

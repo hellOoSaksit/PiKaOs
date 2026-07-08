@@ -107,3 +107,66 @@ it('ollama: synthesized tool-call ids do not repeat across turns of the same con
   const r2 = await provider.complete([{ role: 'user', content: 'b' }], [], { model: 'llama3.3', apiKey: null, signal: SIG })
   expect(r1.toolCalls[0].id).not.toBe(r2.toolCalls[0].id)
 })
+
+// Regression for the malformed-tool_calls finding: ollama.ts used to type OllamaToolCall with
+// required fields and dereference c.function.name directly inside .map() — a `{}` entry (missing
+// `function`) throws a raw TypeError there. Because the map sits inside the single returned object
+// literal, that throw rejects the whole complete() call, discarding the response text and every
+// OTHER valid tool call in the same turn, not just the bad entry. Same "filter, don't throw"
+// reasoning as openai.ts's parseOpenAiToolCall / anthropic.ts's tool_use filter — locally-run
+// models are the most likely of the three vendors to emit a malformed call.
+it('ollama: a tool_calls entry missing `function` is skipped, not thrown; text and valid siblings survive', async () => {
+  fetchMock.mockResolvedValue(new Response(JSON.stringify({
+    message: { content: 'partial answer', tool_calls: [{ function: { name: 'f', arguments: { a: 1 } } }, {}] },
+  }), { status: 200 }))
+  const r = await new OllamaProvider().complete([{ role: 'user', content: 'hi' }], [], { model: 'llama3.3', apiKey: null, signal: SIG })
+  expect(r.text).toBe('partial answer')
+  expect(r.toolCalls).toHaveLength(1)
+  expect(r.toolCalls[0]).toMatchObject({ name: 'f', arguments: { a: 1 } })
+})
+
+// An entry with `function` present but `name` absent doesn't throw today — it silently yields
+// {id, name: undefined, arguments}, violating ToolCall.name: string for every downstream consumer.
+// Must be dropped like any other malformed entry, not passed through with an undefined name.
+it('ollama: an entry with `function` present but `name` missing is dropped, not emitted with name: undefined', async () => {
+  fetchMock.mockResolvedValue(new Response(JSON.stringify({
+    message: { content: '', tool_calls: [{ function: { arguments: { a: 1 } } }] },
+  }), { status: 200 }))
+  const r = await new OllamaProvider().complete([{ role: 'user', content: 'hi' }], [], { model: 'llama3.3', apiKey: null, signal: SIG })
+  expect(r.toolCalls).toEqual([])
+})
+
+// Mirrors openai.ts's exact edge-case behavior: an entry whose `arguments` is absent must still
+// yield `{}`, not be discarded — an argument-less tool call is a legitimate call (e.g. a
+// zero-parameter tool), and dropping it would make the loop read "the model answered with nothing."
+it('ollama: an entry with a valid name but no arguments is kept, with arguments: {}', async () => {
+  fetchMock.mockResolvedValue(new Response(JSON.stringify({
+    message: { content: '', tool_calls: [{ function: { name: 'no_args_tool' } }] },
+  }), { status: 200 }))
+  const r = await new OllamaProvider().complete([{ role: 'user', content: 'hi' }], [], { model: 'llama3.3', apiKey: null, signal: SIG })
+  expect(r.toolCalls).toEqual([{ id: expect.any(String), name: 'no_args_tool', arguments: {} }])
+})
+
+// Regression for the id-counter: dropped entries must not burn a synthesized id. If they did, the
+// gap would be invisible in any single call but would desync the id sequence from "one id per kept
+// tool call" the moment anything (logging, a pending-call map) assumes that invariant. Verified by
+// bracketing an all-malformed call between two single-valid-entry calls and checking the kept ids
+// are sequential, not skipped by the 3 drops in between.
+it('ollama: dropped entries do not consume a synthesized id', async () => {
+  const provider = new OllamaProvider()
+  const respond = (tool_calls: unknown[]) => new Response(JSON.stringify({ message: { content: '', tool_calls } }), { status: 200 })
+
+  fetchMock.mockImplementationOnce(async () => respond([{ function: { name: 'baseline' } }]))
+  const r1 = await provider.complete([{ role: 'user', content: 'a' }], [], { model: 'llama3.3', apiKey: null, signal: SIG })
+
+  fetchMock.mockImplementationOnce(async () => respond([{}, {}, {}])) // all malformed, nothing kept
+  const r2 = await provider.complete([{ role: 'user', content: 'b' }], [], { model: 'llama3.3', apiKey: null, signal: SIG })
+  expect(r2.toolCalls).toEqual([])
+
+  fetchMock.mockImplementationOnce(async () => respond([{ function: { name: 'next' } }]))
+  const r3 = await provider.complete([{ role: 'user', content: 'c' }], [], { model: 'llama3.3', apiKey: null, signal: SIG })
+
+  const baselineNum = Number(r1.toolCalls[0].id.split('_')[1])
+  const nextNum = Number(r3.toolCalls[0].id.split('_')[1])
+  expect(nextNum).toBe(baselineNum + 1)
+})
