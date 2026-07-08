@@ -253,9 +253,6 @@
 .login-lang button:hover { color: var(--ink); }
 .login-lang button.on { background: var(--gold-grad); color: #fff; box-shadow: 0 0 8px var(--gold-glow); }
 
-/* hide the body-level off-canvas hamburger (#nav-burger / .nav-scrim from fx.js) on the login screen */
-body.on-login .nav-burger, body.on-login .nav-scrim { display: none !important; }
-
 /* login — cute underwater scene (replaces the dot grid; pure CSS/SVG, no Three.js → instant paint) */
 .login-underwater { background: #0a3a52; }
 .login-underwater::before { content: none; }          /* drop the dot-grid fade over the scene */
@@ -329,11 +326,6 @@ body.on-login .nav-burger, body.on-login .nav-scrim { display: none !important; 
 .login-back { background: none; border: none; cursor: pointer; font-family: var(--font-body); font-size: 12.5px; font-weight: 500; color: var(--gold-bright); transition: transform .25s cubic-bezier(.34,2.2,.6,1); }
 .login-back:hover { text-decoration: underline; }
 .login-back:active { transform: scale(.88); transition-duration: .05s; }
-
-/* ---------- Theme toggle — kit segmented ---------- */
-.theme-toggle { display: inline-flex; background: var(--bg-3); border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px; }
-.theme-toggle button { border: none; background: transparent; width: 32px; height: 26px; border-radius: 999px; cursor: pointer; color: var(--ink-3); font-size: 13px; display: inline-flex; align-items: center; justify-content: center; }
-.theme-toggle button.on { background: var(--bg-2); color: var(--gold-bright); box-shadow: var(--shadow-raised); }
 
 /* topbar mini stats */
 .tb-stat { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--bg-2); }
@@ -506,9 +498,7 @@ select.bf-input { cursor: pointer; }
   .tab { transition: transform .25s var(--spring), background .14s, color .14s; }
   .tab:active { transition-duration: .05s; transform: scale(.93); }
 
-  /* theme toggle + small icon buttons */
-  .theme-toggle button { transition: transform .25s var(--spring), background .14s, color .14s; }
-  .theme-toggle button:active { transition-duration: .05s; transform: scale(.86); }
+  /* small icon buttons */
   .admin-iconbtn, .drawer-close, .rule-del, .alert-dismiss { transition: transform .25s var(--spring), background .14s, color .14s, border-color .14s; }
   .admin-iconbtn:active, .drawer-close:active, .rule-del:active, .alert-dismiss:active { transition-duration: .05s; transform: scale(.86); }
 
@@ -538,7 +528,7 @@ select.bf-input { cursor: pointer; }
 /* segmented active also applies without motion */
 .seg-btn.on { background: var(--bg-2); color: var(--gold-bright); box-shadow: var(--shadow-raised); }
 /* focus discipline — always the 3px gold ring, never an outline */
-.seg-btn:focus-visible, .tab:focus-visible, .theme-toggle button:focus-visible,
+.seg-btn:focus-visible, .tab:focus-visible,
 .admin-iconbtn:focus-visible, .agent-card:focus-visible, .quest-card:focus-visible,
 .codex-row:focus-visible, .theme-card:focus-visible, .lex-card:focus-visible {
   outline: none; box-shadow: 0 0 0 3px var(--gold-glow);
@@ -672,9 +662,9 @@ select.bf-input { cursor: pointer; }
   border-radius: 8px; cursor: pointer; font-size: 13px; display: grid; place-items: center; transition: background .14s, color .14s, border-color .14s; }
 .tool-collapse:hover { background: color-mix(in srgb, var(--gold) 12%, var(--bg-3)); color: var(--gold-bright); border-color: var(--gold-deep); }
 
-/* profile modal (avatar account — full-screen centered, never clipped) */
+/* Profile modal (avatar account — full-screen centered, never clipped).
+   Owned by the auth plugin's profile.jsx; Core keeps the rules because Core plugins ship no CSS. */
 .profile-wrap { position: relative; }
-.profile-trigger { cursor: pointer; border: none; padding: 0; }
 .profile-overlay { position: fixed; inset: 0; z-index: 4000; background: rgba(6,8,12,.62); backdrop-filter: blur(3px);
   display: flex; align-items: flex-start; justify-content: center; padding: 70px 24px 28px; overflow-y: auto; animation: fadeIn .14s ease; }
 .profile-modal { position: relative; width: 460px; max-width: calc(100vw - 40px); margin: auto;
@@ -692,8 +682,7 @@ select.bf-input { cursor: pointer; }
 .pm-av-btn:hover { border-color: var(--gold-deep); }
 .pm-av-edit { position: absolute; right: -3px; bottom: -3px; width: 22px; height: 22px; border-radius: 50%; background: var(--gold-grad);
   color: #fff; font-size: 11px; display: grid; place-items: center; border: 2px solid var(--bg-2); }
-.av-img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.profile-trigger .av-img { border-radius: inherit; }
+.av-img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: inherit; }
 .pm-avpick { margin-top: 14px; padding: 12px; background: var(--bg-1); border: 1px solid var(--line-soft); border-radius: var(--radius); }
 .pm-av-upload { width: 100%; padding: 9px; border-radius: var(--radius); border: 1px dashed var(--line); background: var(--bg-2);
   color: var(--ink); font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .14s, border-color .14s; }

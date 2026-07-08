@@ -4,7 +4,8 @@
    ships the parallel list below — a plugin's UI appears only when it is enabled here.
 
    A plugin module default-exports a descriptor:
-     { id, routes: [ { id, meta:{icon,title,en}, render(ctx) } ], nav: [ { group, items:[{id,icon,perm?}] } ] }
+     { id, routes: [ { id, meta:{icon,title,en}, render(ctx) } ], nav: [ { group, items:[{id,icon,perm?}] } ],
+       profile?: (ctx) => JSX }
    `render(ctx)` receives the Core seams it asked for (t · can · language · …); the plugin owns the wiring
    so Core never needs to know each screen's prop shape.
 
@@ -53,6 +54,14 @@ export const PLUGIN_ROUTE_META = Object.fromEntries(
 
 /** Sidebar groups/items each plugin contributes — merged into the nav default (data-nav.js). */
 export const PLUGIN_NAV = PLUGINS.flatMap(p => p.nav || []);
+
+/** The utility bar's account control, if any plugin owns identity. Kernel-only Core has no notion of a
+ *  signed-in person, so it renders no profile button at all rather than a decorative one — the auth
+ *  plugin brings the whole control with it. First plugin to claim the slot wins (identity is singular). */
+export function renderPluginProfile(ctx) {
+  const owner = PLUGINS.find(p => typeof p.profile === 'function');
+  return owner ? owner.profile(ctx) : null;
+}
 
 /** RBAC permission descriptors ({key,group,th,en}) each plugin OWNS — merged onto the Core/kernel catalog
  *  so the RBAC screen + admin grant show exactly the perms of the installed plugins (plugin-architecture
