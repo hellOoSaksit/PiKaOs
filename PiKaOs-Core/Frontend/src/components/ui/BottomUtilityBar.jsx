@@ -3,10 +3,9 @@ import { UtilityBarButton } from './UtilityBarButton.jsx';
 import { PopoverPanel } from './PopoverPanel.jsx';
 import { Icon } from './icons.jsx';
 
-const isAvImg = (a) => typeof a === 'string' && (a.startsWith('data:') || a.startsWith('http'));
-
 // The bar's buttons size their own glyph (no CSS slot owns it), so `size` is explicit here.
 const ICONS = {
+  nav: <Icon name="menu" size={23} />,
   home: <Icon name="home" size={23} />,
   search: <Icon name="search" size={23} />,
   notifications: <Icon name="notifications" size={23} />,
@@ -15,13 +14,14 @@ const ICONS = {
 };
 
 /**
- * Global floating utility bar — home/search/notifications/add/chat/profile.
+ * Global floating utility bar — nav/home/search/notifications/add/chat, plus the account control
+ * when a plugin owns identity (`profile`; kernel-only Core passes null and the slot disappears).
  * Separate from the nested content-nav (data-nav.jsx/Sidebar in App.jsx),
  * which stays its own component per the shell/nav design (they're
- * fundamentally different shapes: flat 6-slot bar vs 3-level tree).
+ * fundamentally different shapes: flat bar vs 3-level tree).
  */
 export function BottomUtilityBar({
-  t, route, onHome, me, theme, onToggleTheme, onSignOut,
+  t, route, onHome, onToggleNav, profile = null,
   notifications = [], chatThreads = [], onSearch, onAdd, showLabels = false,
 }) {
   const [active, setActive] = useState(route === 'me' ? 'home' : null);
@@ -51,6 +51,13 @@ export function BottomUtilityBar({
     <>
       {openPop && <div className="utility-bar-overlay" onClick={closePop} />}
       <div className="utility-bar">
+        {/* the sidebar's other control: narrows/widens it on desktop, opens the drawer on mobile */}
+        <UtilityBarButton
+          icon={ICONS.nav} title={t('utilitybar.nav')} label={t('utilitybar.nav')}
+          showLabel={showLabels}
+          onClick={() => { setOpenPop(null); onToggleNav && onToggleNav(); }}
+        />
+
         <UtilityBarButton
           icon={ICONS.home} title={t('utilitybar.home')} label={t('utilitybar.home')}
           showLabel={showLabels} active={active === 'home'}
@@ -131,42 +138,11 @@ export function BottomUtilityBar({
           </PopoverPanel>
         </div>
 
-        <div className="ub-divider" />
-
-        <div style={{ position: 'relative' }}>
-          <button
-            type="button"
-            className={'ub-profile-btn' + (openPop === 'profile' ? ' open' : '')}
-            title={t('utilitybar.profile')}
-            onClick={() => togglePop('profile')}
-          >
-            <span className="ub-avatar-wrap">
-              {isAvImg(me.avatar) ? <img src={me.avatar} alt="" style={{ width: '100%', height: '100%', borderRadius: 11, objectFit: 'cover' }} /> : <span>{me.avatar || '🧙'}</span>}
-            </span>
-          </button>
-          <PopoverPanel open={openPop === 'profile'} onClose={closePop} anchor="right" width={276}>
-            <div className="pop-head" style={{ background: 'var(--raised-grad)' }}>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontFamily: 'var(--font-head)', fontWeight: 700, fontSize: 15 }}>{me.display}</div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>@{me.username}</div>
-              </div>
-            </div>
-            <div style={{ padding: 8 }}>
-              <button type="button" className="pop-foot" style={{ borderTop: 'none', textAlign: 'left' }} onClick={closePop}>
-                {t('utilitybar.profile.viewProfile')}
-              </button>
-              <button type="button" className="pop-foot" style={{ borderTop: 'none', textAlign: 'left' }} onClick={closePop}>
-                {t('utilitybar.profile.settings')}
-              </button>
-              <button type="button" className="pop-foot" style={{ borderTop: 'none', textAlign: 'left' }} onClick={onToggleTheme}>
-                {theme === 'pro' ? t('theme.night') : t('theme.day')}
-              </button>
-              <button type="button" className="pop-foot" style={{ borderTop: 'none', textAlign: 'left', color: 'var(--crimson)' }} onClick={() => { closePop(); onSignOut && onSignOut(); }}>
-                {t('profile.signOut')}
-              </button>
-            </div>
-          </PopoverPanel>
-        </div>
+        {/* identity is a plugin's to own: no auth plugin, no account control (and no divider) */}
+        {profile && <>
+          <div className="ub-divider" />
+          {profile}
+        </>}
       </div>
     </>
   );

@@ -60,6 +60,7 @@
   --radius-sm: 10px;
 
   --sidebar-w: 256px;
+  --sidebar-rail-w: 68px;   /* the collapsed sidebar; --rail-w below is the RIGHT-hand rail */
   --rail-w: 360px;
 
   /* spring easings — cartoon "physical button" motion (define once) */
@@ -103,8 +104,8 @@
 [data-theme="pro"] .ornate::before, [data-theme="pro"] .ornate::after,
 [data-theme="pro-dark"] .ornate::before, [data-theme="pro-dark"] .ornate::after { display: none; }
 [data-theme="pro"] .sidebar::after, [data-theme="pro-dark"] .sidebar::after { opacity: 0; }
-[data-theme="pro"] .brand-crest, [data-theme="pro"] .login-crest,
-[data-theme="pro-dark"] .brand-crest, [data-theme="pro-dark"] .login-crest { box-shadow: var(--shadow-raised); }
+[data-theme="pro"] .login-crest,
+[data-theme="pro-dark"] .login-crest { box-shadow: var(--shadow-raised); }
 [data-theme="pro"] .display, [data-theme="pro"] .kicker,
 [data-theme="pro-dark"] .display, [data-theme="pro-dark"] .kicker { letter-spacing: .08em; }
 [data-theme="pro"] .worldmap.mmo { background: radial-gradient(120% 120% at 50% 0%, #eef3fb, #e3e9f2 75%); }
@@ -115,7 +116,6 @@
 [data-theme="pro"] .login-card, [data-theme="pro-dark"] .login-card,
 [data-theme="pro"] .login-crest, [data-theme="pro-dark"] .login-crest,
 [data-theme="pro"] .builder, [data-theme="pro-dark"] .builder,
-[data-theme="pro"] .brand-crest, [data-theme="pro-dark"] .brand-crest,
 [data-theme="pro"] .nav-item.active, [data-theme="pro-dark"] .nav-item.active,
 [data-theme="pro"] .hermes-pop, [data-theme="pro-dark"] .hermes-pop,
 [data-theme="pro"] .hermes-fulltab, [data-theme="pro-dark"] .hermes-fulltab,
@@ -256,6 +256,29 @@ body {
     var(--bg-1);
 }
 
+/* Rail is a desktop affordance only — below the drawer breakpoint shell-nav.js never sets it
+   (fx.css turns the sidebar into an off-canvas drawer there, where a 68px rail means nothing). */
+@media (min-width: 981px) {
+  .app[data-nav="rail"] { grid-template-columns: var(--sidebar-rail-w) 1fr; }
+  @media (prefers-reduced-motion: no-preference) {
+    .app { transition: grid-template-columns .24s cubic-bezier(.4, 0, .2, 1); }
+  }
+  /* everything that needs horizontal room simply isn't there; the icon carries the row,
+     the label becomes its tooltip, and the group rules become the only structure left */
+  .app[data-nav="rail"] .brand-id,
+  .app[data-nav="rail"] .nav-label,
+  .app[data-nav="rail"] .ni-label,
+  .app[data-nav="rail"] .ni-tag,
+  .app[data-nav="rail"] .open-badge,
+  .app[data-nav="rail"] .sf-text { display: none; }
+  .app[data-nav="rail"] .brand { justify-content: center; padding: 20px 0 18px; gap: 0; }
+  .app[data-nav="rail"] .brand-logo { cursor: pointer; }
+  .app[data-nav="rail"] .nav { padding: 14px 10px 16px; }
+  .app[data-nav="rail"] .nav-item { justify-content: center; gap: 0; padding: 10px 0; }
+  .app[data-nav="rail"] .nav-group + .nav-group { margin-top: 12px; padding-top: 12px; }
+  .app[data-nav="rail"] .sidebar-foot { align-items: center; padding: 12px 0; }
+}
+
 /* ---------- Sidebar ---------- */
 .sidebar {
   position: relative;
@@ -278,22 +301,22 @@ body {
   padding: 20px 20px 18px;
   border-bottom: 1px solid var(--line-soft);
 }
-.brand-crest {
-  width: 38px; height: 38px; flex: 0 0 38px;
-  display: grid; place-items: center;
-  border-radius: 9px;
-  background: var(--raised-grad);
-  border: 1px solid var(--gold-deep);
-  box-shadow: var(--shadow-raised), 0 0 18px -6px var(--gold-glow);
-  color: var(--gold-bright);
-  font-size: 20px;
-}
-/* small 3D Mitr brand logo */
+.brand-id { flex: 1; min-width: 0; }
+/* small 3D Mitr brand logo — also the rail's toggle, where there's no room for a second control */
 .brand-logo {
   flex: 0 0 38px; width: 38px; height: 42px;
   display: grid; place-items: center; padding-top: 2px;
-  cursor: default;
+  background: none; border: 0; cursor: default;
 }
+.brand-toggle {
+  flex: 0 0 30px; width: 30px; height: 30px;
+  display: grid; place-items: center;
+  background: none; border: 1px solid transparent; border-radius: var(--radius-sm);
+  color: var(--ink-4); cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.brand-toggle:hover { background: var(--bg-3); border-color: var(--line); color: var(--ink); }
+.brand-toggle > svg { width: 18px; height: 18px; }
 .brand-logo .ltr {
   font-size: 34px;
   -webkit-text-stroke-width: 3px;
@@ -307,7 +330,8 @@ body {
 .brand-sub { font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); letter-spacing: .08em; margin-top: 2px; }
 
 .nav { flex: 1; overflow-y: auto; padding: 14px 12px 16px; }
-.nav-group + .nav-group { margin-top: 18px; }
+/* the rule between groups is what survives into the rail, where the kicker can't fit */
+.nav-group + .nav-group { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line-soft); }
 .nav-label {
   font-family: var(--font-display);
   font-size: 10px; font-weight: 600;
@@ -322,29 +346,26 @@ body {
   position: relative;
   display: flex; align-items: center; gap: 11px;
   padding: 9px 11px;
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   color: var(--ink-2);
   cursor: pointer;
   font-size: 14px;
-  border: 1px solid transparent;
-  transition: background .14s, color .14s, border-color .14s;
+  transition: background .14s, color .14s;
   user-select: none;
 }
 /* font-size still applies: the slot also renders a raw glyph when a plugin hasn't migrated to icon names */
 .nav-item .ni-icon { width: 18px; flex: 0 0 18px; display: inline-flex; align-items: center; justify-content: center; opacity: .85; font-size: 15px; }
 .nav-item .ni-icon > svg { width: 18px; height: 18px; }
+.nav-item .ni-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-item:hover { background: var(--bg-3); color: var(--ink); }
+/* the selected row is a filled pill, not a bordered card with an edge marker — one flat surface,
+   the accent carried by the text and icon alone */
 .nav-item.active {
-  background: var(--raised-grad);
+  background: var(--bg-4);
   color: var(--gold-bright);
-  border-color: var(--gold-deep);
-  box-shadow: var(--shadow-raised);
+  font-weight: 600;
 }
-.nav-item.active::before {
-  content: ""; position: absolute; left: -1px; top: 7px; bottom: 7px; width: 3px;
-  border-radius: 3px; background: var(--gold-grad);
-  box-shadow: 0 0 10px var(--gold-glow);
-}
+.nav-item.active .ni-icon { opacity: 1; }
 .nav-item .ni-tag {
   margin-left: auto; font-family: var(--font-mono); font-size: 10px;
   color: var(--ink); background: var(--bg-4); border: 1px solid var(--line);
@@ -396,6 +417,11 @@ body {
   display: flex; flex-direction: column; gap: 5px;
 }
 .sidebar-foot .row { display: flex; align-items: center; gap: 7px; }
+.open-badge {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .08em;
+  color: var(--gold); padding: 4px 8px; margin-bottom: 8px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+}
 .pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--emerald); box-shadow: 0 0 0 0 var(--emerald); animation: pulse 2.4s infinite; }
 @keyframes pulse {
   0% { box-shadow: 0 0 0 0 rgba(127,164,90,.55); }
@@ -406,14 +432,15 @@ body {
 /* ---------- Main column ---------- */
 .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
 
+/* Nothing but the route title lives here now (theme moved to Settings, identity to the utility bar),
+   so the bar carries less height and a flat surface rather than a gradient. */
 .topbar {
   position: relative; z-index: 20;   /* lift topbar (+ its dropdowns) above .content, which paints later */
-  height: 62px; flex: 0 0 62px;
+  height: 54px; flex: 0 0 54px;
   display: flex; align-items: center; gap: 16px;
   padding: 0 22px;
-  border-bottom: 1px solid var(--line);
-  background: linear-gradient(180deg, var(--bg-2), color-mix(in srgb, var(--bg-1) 80%, transparent));
-  backdrop-filter: blur(4px);
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--bg-1);
 }
 .topbar-title { display: flex; align-items: center; gap: 11px; min-width: 0; }
 .topbar-title .tt-icon { font-size: 18px; color: var(--ink-3); display: inline-flex; align-items: center; }

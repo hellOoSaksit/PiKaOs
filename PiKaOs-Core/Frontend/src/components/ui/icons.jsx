@@ -1,7 +1,7 @@
-/* PiKaOs icon set — 55 line icons on a 24x24 grid, 1.8 stroke, round caps/joins.
-   Source of truth: PiKaOs-Docs/design-system/"Icon System.dc.html" (46 icons) plus 9 drawn
-   for kernel routes the sheet didn't cover (key, tools, puzzle, components, package, monitor,
-   clipboard-list, book, globe).
+/* PiKaOs icon set — 56 line icons on a 24x24 grid, 1.8 stroke, round caps/joins.
+   Source of truth: PiKaOs-Docs/design-system/"Icon System.dc.html" (46 icons) plus 10 drawn
+   for shell surfaces the sheet didn't cover (key, tools, puzzle, components, package, monitor,
+   clipboard-list, book, globe, sidebar).
 
    Monochrome by construction: paths never carry their own colour, they inherit `currentColor`,
    so one icon serves both themes. Semantic colour is the caller's choice via `tone` — never
@@ -70,6 +70,7 @@ const PATHS = {
   "view": <><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></>,
   "clock": <><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></>,
   "location": <><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></>,
+  "sidebar": <><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></>,
   "monitor": <><rect x="3.5" y="4.5" width="17" height="11.5" rx="2.5"/><path d="M12 16v4"/><path d="M8.5 20h7"/></>,
   /* system */
   "tools": <path d="m14.6 6.4 3.1-3.1a5.3 5.3 0 0 0-7 7L4.6 16.4a2 2 0 1 0 2.9 2.9l6.1-6.1a5.3 5.3 0 0 0 7-7l-3.1 3.1-2.4-.5-.5-2.4z"/>,

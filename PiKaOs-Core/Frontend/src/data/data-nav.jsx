@@ -109,6 +109,12 @@ function loadNav() {
 function saveNav(cfg) { try { localStorage.setItem(NAV_KEY, JSON.stringify(cfg)); } catch {} return cfg; }
 function resetNav() { try { localStorage.removeItem(NAV_KEY); } catch {} return defaultNav(); }
 
+/* Rail vs full width is a per-viewer preference, not part of the admin's shared arrangement —
+   hence its own key. `resetNav` deliberately leaves it alone. */
+const COLLAPSED_KEY = "guildos-nav-collapsed";
+function loadNavCollapsed() { try { return localStorage.getItem(COLLAPSED_KEY) === "1"; } catch { return false; } }
+function saveNavCollapsed(v) { try { localStorage.setItem(COLLAPSED_KEY, v ? "1" : "0"); } catch {} return v; }
+
 /* ---- tree edits (each returns a NEW cfg; clone-then-mutate keeps them immutable) ---- */
 function moveUp(cfg, id) {
   const c = _clone(cfg); const loc = _locateInCfg(c, id);
@@ -176,6 +182,7 @@ function reorderBefore(cfg, id, targetId) {
 
 export {
   defaultNav, loadNav, saveNav, resetNav, mergeWithDefault,
+  loadNavCollapsed, saveNavCollapsed,
   moveUp, moveDown, indent, outdent, canIndent, canOutdent,
   toggleHidden, rename, reorderBefore,
 };

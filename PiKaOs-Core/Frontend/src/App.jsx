@@ -1,11 +1,11 @@
 /* PiKaOs — ES module (migrated from PiKaOs-Core/app.jsx). */
 import React from 'react';
-import { createPortal } from 'react-dom';
 const { useState, useEffect } = React;
 import { NAV } from './data/data.jsx';
 import { loadNav, saveNav, mergeWithDefault } from './data/data-nav.jsx';
 import { getNavConfig, setNavConfig, getMySettings, setMySetting, getGlobalConfig, setGlobalConfig, setupStatus, setToken, getCapabilities } from './lib/api.js';
 import { resolveShellMode } from './lib/shell-mode.js';
+import { useShellNav } from './lib/shell-nav.js';
 import { applyGlobalConfig } from './lib/characters.jsx';
 import { Settings } from './screens/screens-extra.jsx';
 import { FirstRun } from './screens/FirstRun.jsx';
@@ -16,11 +16,11 @@ import { ToolsManager } from './screens/screens-tools.jsx';
 import { ComponentLibrary } from './screens/screens-library.jsx';
 import { useAuth } from './lib/auth.jsx';
 import { BottomUtilityBar } from './components/ui/BottomUtilityBar.jsx';
-import { renderIcon } from './components/ui/icons.jsx';
+import { Icon, renderIcon } from './components/ui/icons.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
 import { UILoadingHost, UIModalHost } from './lib/ui-modal.jsx';
 import { makeT, DEFAULT_LANG, DEFAULT_STYLE, packById, defaultPack, defaultPackForLang, LEX_PACKS } from './lib/i18n.jsx';
-import { renderPluginRoute, PLUGIN_ROUTE_META } from './plugins/index.jsx';
+import { renderPluginRoute, renderPluginProfile, PLUGIN_ROUTE_META } from './plugins/index.jsx';
 
 // ชุดเริ่มต้นตอนเปิดแอป = master ของ i18n (English + Formal — มาจาก flag isDefault* ในไฟล์ ไม่ hardcode)
 const I18N_DEFAULT_PACK = (LEX_PACKS.find(p => p.lang === DEFAULT_LANG && p.styleKey === DEFAULT_STYLE) || defaultPack() || {}).id || "english_pro";
@@ -52,29 +52,36 @@ function navContains(node, route) {
 
 /* one sidebar row + its (recursive) children — supports up to 3 levels (Main -> Sub -> Sub).
    hidden nodes, and perm-gated nodes the user can't reach, are dropped; a node with visible
-   children shows a caret that collapses them. Indent grows with depth. */
-function NavNode({ node, depth, route, go, t, can, navOpen, setNavOpen }) {
+   children shows a caret that collapses them. Indent grows with depth.
+
+   In the rail there is no room for a label, so a row is just its icon: the label becomes the
+   tooltip, and a parent's children are unreachable until the rail widens — clicking one widens it. */
+function NavNode({ node, depth, route, go, t, can, navOpen, setNavOpen, rail, onExpandShell }) {
   const kids = (node.children || []).filter(c => !c.hidden && (!c.perm || (can && can(c.perm)))
     && (!c.desktopOnly || window.pikaosDesktop?.isDesktop));
   const hasKids = kids.length > 0;
   const branchActive = kids.some(c => navContains(c, route));
   const isOpen = branchActive || (node.id in navOpen ? navOpen[node.id] : route === node.id);
+  const label = node.customLabel || t("nav." + node.id);
   return (
     <React.Fragment>
       <div className={`nav-item ${depth > 0 ? "nav-subitem" : ""} ${route === node.id ? "active" : ""}`}
-        style={depth > 0 ? { marginLeft: depth * 16 } : undefined} onClick={() => go(node.id)}>
+        style={depth > 0 && !rail ? { marginLeft: depth * 16 } : undefined}
+        title={rail ? label : undefined}
+        onClick={() => { if (rail && hasKids) onExpandShell(); go(node.id); }}>
         <span className="ni-icon">{renderIcon(node.icon)}</span>
-        <span style={{ flex: 1 }}>{node.customLabel || t("nav." + node.id)}</span>
+        <span className="ni-label">{label}</span>
         {node.tag && <span className={`ni-tag ${node.tag === "live" ? "alert" : ""}`}>{node.tag === "live" ? "● LIVE" : node.tag}</span>}
-        {hasKids && (
+        {hasKids && !rail && (
           <button type="button" className={`nav-caret ${isOpen ? "open" : ""}`} aria-label="toggle submenu"
             onClick={(e) => { e.stopPropagation(); setNavOpen(o => ({ ...o, [node.id]: !isOpen })); }}>▾</button>
         )}
       </div>
-      {hasKids && (
+      {hasKids && !rail && (
         <div className={`nav-sub ${isOpen ? "open" : ""}`}>
           {kids.map(c => (
-            <NavNode key={c.id} node={c} depth={depth + 1} route={route} go={go} t={t} can={can} navOpen={navOpen} setNavOpen={setNavOpen} />
+            <NavNode key={c.id} node={c} depth={depth + 1} route={route} go={go} t={t} can={can}
+              navOpen={navOpen} setNavOpen={setNavOpen} rail={rail} onExpandShell={onExpandShell} />
           ))}
         </div>
       )}
@@ -82,16 +89,27 @@ function NavNode({ node, depth, route, go, t, can, navOpen, setNavOpen }) {
   );
 }
 
-function Sidebar({ route, go, t, can, nav, openMode }) {
+function Sidebar({ route, go, t, can, nav, openMode, rail, onToggle }) {
   const [navOpen, setNavOpen] = useState({});   // node id -> expanded (overrides the route-based default)
+  const toggleLabel = t(rail ? "nav.expand" : "nav.collapse");
   return (
     <aside className="sidebar" data-no-lex>
       <div className="brand">
-        <span className="brand-logo"><span className="ltr">P</span></span>
-        <div>
+        {/* in the rail the logo IS the toggle — there's no width for a second control */}
+        <button type="button" className="brand-logo" onClick={rail ? onToggle : undefined}
+          title={rail ? toggleLabel : undefined} aria-label={rail ? toggleLabel : undefined}>
+          <span className="ltr">P</span>
+        </button>
+        <div className="brand-id">
           <div className="brand-name">{t("brand.name")}</div>
           <div className="brand-sub">{t("brand.sub")}</div>
         </div>
+        {!rail && (
+          <button type="button" className="brand-toggle" onClick={onToggle}
+            title={toggleLabel} aria-label={toggleLabel}>
+            <Icon name="sidebar" />
+          </button>
+        )}
       </div>
       <nav className="nav">
         {(nav || NAV).map(g => {
@@ -101,164 +119,23 @@ function Sidebar({ route, go, t, can, nav, openMode }) {
             <div className="nav-group" key={g.group}>
               <div className="nav-label">{t("navgroup." + (NAV_GROUP_KEY[g.group] || g.group))}</div>
               {items.map(it => (
-                <NavNode key={it.id} node={it} depth={0} route={route} go={go} t={t} can={can} navOpen={navOpen} setNavOpen={setNavOpen} />
+                <NavNode key={it.id} node={it} depth={0} route={route} go={go} t={t} can={can}
+                  navOpen={navOpen} setNavOpen={setNavOpen} rail={rail} onExpandShell={onToggle} />
               ))}
             </div>
           );
         })}
       </nav>
       <div className="sidebar-foot">
-        {openMode && (
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '.08em',
-            color: 'var(--gold)', padding: '4px 8px', marginBottom: 8,
-            border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)' }}>
-            {t('open.badge')}
-          </div>
-        )}
-        <div className="row"><span className="pulse-dot" /><span>{t("foot.online")}</span></div>
-        <div className="faint">{t("foot.version")}</div>
+        {openMode && <div className="open-badge">{t('open.badge')}</div>}
+        <div className="row"><span className="pulse-dot" /><span className="sf-text">{t("foot.online")}</span></div>
+        <div className="faint sf-text">{t("foot.version")}</div>
       </div>
     </aside>
   );
 }
 
-/* ---- Profile popup (avatar → account card: identity, personal tokens, change password, sign out) ---- */
-/* render overlays at <body> so the topbar's stacking context can't clip/overlap them */
-function portalBody(node) {
-  try { if (typeof createPortal === "function") return createPortal(node, document.body); } catch (e) { }
-  try { return ReactDOM.createPortal(node, document.body); } catch (e) { }
-  return node;
-}
-function ChangePwModal({ t, onClose }) {
-  const [cur, setCur] = useState(""); const [nw, setNw] = useState(""); const [cf, setCf] = useState("");
-  const [err, setErr] = useState(""); const [done, setDone] = useState(false);
-  const submit = () => {
-    if (!cur) { setErr(t("pw.errCurrent")); return; }
-    if (nw.length < 6) { setErr(t("pw.errShort")); return; }
-    if (nw !== cf) { setErr(t("pw.errMatch")); return; }
-    setDone(true); setTimeout(onClose, 1150);
-  };
-  return portalBody(
-    <div className="uim-overlay" onClick={onClose} data-no-lex style={{ zIndex: 4200 }}>
-      <div className="uim" onClick={e => e.stopPropagation()} style={{ width: 380 }}>
-        {done ? (
-          <div style={{ textAlign: "center", padding: "12px 0" }}>
-            <div style={{ fontSize: 40 }}>✅</div>
-            <div className="uim-title" style={{ marginTop: 8 }}>{t("pw.success")}</div>
-          </div>
-        ) : (<>
-          <div className="uim-title">🔑 {t("pw.title")}</div>
-          <div className="pp-pwform">
-            <label className="bf-label">{t("pw.current")}</label>
-            <input className="uim-input" type="password" value={cur} onChange={e => { setCur(e.target.value); setErr(""); }} autoFocus />
-            <label className="bf-label">{t("pw.new")}</label>
-            <input className="uim-input" type="password" value={nw} onChange={e => { setNw(e.target.value); setErr(""); }} />
-            <label className="bf-label">{t("pw.confirm")}</label>
-            <input className="uim-input" type="password" value={cf} onChange={e => { setCf(e.target.value); setErr(""); }} onKeyDown={e => e.key === "Enter" && submit()} />
-            {err && <div className="uim-warn">{err}</div>}
-          </div>
-          <div className="uim-actions">
-            <button className="uim-btn ghost" onClick={onClose}>{t("pw.cancel")}</button>
-            <button className="uim-btn primary" onClick={submit}>{t("pw.save")}</button>
-          </div>
-        </>)}
-      </div>
-    </div>
-  );
-}
-
-const AV_PRESETS = ["🧙", "🦉", "🛠️", "📜", "👁️", "🌙", "🧑‍💻", "🦊", "🐼", "🚀", "🎯", "🧠"];
-const isAvImg = (a) => typeof a === "string" && (a.startsWith("data:") || a.startsWith("http"));
-function Av({ a, fallback = "🧙" }) { return isAvImg(a) ? <img className="av-img" src={a} alt="" /> : <span>{a || fallback}</span>; }
-
-function ProfileMenu({ me, t, onSignOut, onSaveProfile }) {
-  const [open, setOpen] = useState(false);
-  const [pwOpen, setPwOpen] = useState(false);
-  const [draft, setDraft] = useState({ display: me.display || me.display_name || me.username || "", email: me.email || "", avatar: me.avatar || "🧙" });
-  const [dirty, setDirty] = useState(false);
-  const [avPick, setAvPick] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const fileRef = React.useRef(null);
-  const ref = React.useRef(null);
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, []);
-  useEffect(() => { if (open) { setDraft({ display: me.display || me.display_name || me.username || "", email: me.email || "", avatar: me.avatar || "🧙" }); setDirty(false); setAvPick(false); setSaved(false); } }, [open]);
-  const accent = "var(--gold)";
-  const setField = (k, v) => { setDraft(d => ({ ...d, [k]: v })); setDirty(true); setSaved(false); };
-  const onFile = (e) => {
-    const f = e.target.files && e.target.files[0]; e.target.value = "";
-    if (!f) return; const rd = new FileReader(); rd.onload = () => setField("avatar", rd.result); rd.readAsDataURL(f);
-    setAvPick(false);
-  };
-  const save = () => {
-    if (!dirty) return;
-    onSaveProfile && onSaveProfile({ display: (draft.display || "").trim() || me.display, email: (draft.email || "").trim(), avatar: draft.avatar });
-    setDirty(false); setSaved(true); setTimeout(() => setSaved(false), 1800);
-  };
-  return (
-    <div className="profile-wrap" ref={ref} data-no-lex>
-      <button className="avatar sm profile-trigger" style={{ "--av": "var(--gold)", color: "var(--gold-bright)" }} title={me.display} onClick={() => setOpen(o => !o)}>
-        <Av a={me.avatar} />
-      </button>
-      {open && portalBody(
-        <div className="profile-overlay" onClick={() => setOpen(false)} data-no-lex>
-          <div className="profile-modal" onClick={e => e.stopPropagation()}>
-            <button className="profile-close" onClick={() => setOpen(false)} title="✕">✕</button>
-            <div className="pm-kicker mono">{t("profile.title")}</div>
-            <div className="pm-head">
-              <div className="pm-avwrap">
-                <button className="pm-av pm-av-btn" style={{ background: `color-mix(in srgb, ${accent} 18%, transparent)` }} onClick={() => setAvPick(v => !v)} title={t("profile.editAvatar")}>
-                  <Av a={draft.avatar} />
-                  <span className="pm-av-edit">✎</span>
-                </button>
-              </div>
-              <div className="pm-id">
-                <input className="pm-name-input" value={draft.display} onChange={e => setField("display", e.target.value)} placeholder={t("profile.namePh")} aria-label={t("profile.name")} />
-                <div className="pm-sub">
-                  <span className="pm-username mono">@{me.username}</span>
-                </div>
-              </div>
-            </div>
-            {avPick && (
-              <div className="pm-avpick">
-                <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={onFile} />
-                <button className="pm-av-upload" onClick={() => fileRef.current && fileRef.current.click()}>📷 {t("profile.upload")}</button>
-                <div className="pm-av-or">{t("profile.choose")}</div>
-                <div className="pm-av-emos">
-                  {AV_PRESETS.map(e => (
-                    <button key={e} className={"pm-av-emo" + (draft.avatar === e ? " on" : "")} onClick={() => { setField("avatar", e); setAvPick(false); }}>{e}</button>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="pm-grid">
-              <div className="pm-field pm-field-full">
-                <span className="pm-flabel">{t("profile.email")}</span>
-                <input className="pm-input" type="email" value={draft.email} onChange={e => setField("email", e.target.value)} placeholder={t("profile.emailPh")} />
-              </div>
-              <div className="pm-field"><span className="pm-flabel">{t("profile.username")}</span><span className="pm-fval mono">@{me.username}</span></div>
-              <div className="pm-field"><span className="pm-flabel">{t("profile.status")}</span><span className="pm-fval">{me.status === "suspended" ? t("profile.suspended") : t("profile.active")}</span></div>
-              <div className="pm-field"><span className="pm-flabel">{t("profile.joined")}</span><span className="pm-fval">{me.joined || "—"}</span></div>
-            </div>
-            <button className={"pm-save" + (dirty ? " on" : "") + (saved ? " saved" : "")} onClick={save} disabled={!dirty && !saved}>
-              {saved ? "✓ " + t("profile.saved") : t("profile.save")}
-            </button>
-            <div className="pm-actions">
-              <button className="pp-btn" onClick={() => { setPwOpen(true); }}><span>🔑</span>{t("profile.changePw")}</button>
-              <button className="pp-btn danger" onClick={() => { setOpen(false); onSignOut && onSignOut(); }}><span>🚪</span>{t("profile.signOut")}</button>
-            </div>
-          </div>
-        </div>
-      )}
-      {pwOpen && <ChangePwModal t={t} onClose={() => setPwOpen(false)} />}
-    </div>
-  );
-}
-
-function Topbar({ route, theme, setTheme, user, language, t, me, onSignOut, onSaveProfile }) {
+function Topbar({ route, language, t }) {
   const m = ROUTE_META[route] || ROUTE_META.home;   // home is the kernel landing — safe fallback if a plugin route is disabled
   const title = t("route." + route + ".title");
   const live = route === "hall" || route === "meeting" || route === "world";
@@ -272,13 +149,6 @@ function Topbar({ route, theme, setTheme, user, language, t, me, onSignOut, onSa
         {live && <span className="live-badge" style={{ marginLeft: 6 }}><span className="pulse-dot" />LIVE</span>}
       </div>
       <div className="topbar-spacer" />
-      <div className="theme-toggle">
-        <button className={theme === "pro" ? "on" : ""} onClick={() => setTheme("pro")} title={t("theme.day")}>☀️</button>
-        <button className={theme === "pro-dark" ? "on" : ""} onClick={() => setTheme("pro-dark")} title={t("theme.night")}>🌙</button>
-      </div>
-      {me
-        ? <ProfileMenu me={me} t={t} onSignOut={onSignOut} onSaveProfile={onSaveProfile} />
-        : <div className="avatar sm" style={{ "--av": "var(--gold)", color: "var(--gold-bright)" }} title={user}><span>🧙</span></div>}
     </header>
   );
 }
@@ -286,7 +156,6 @@ function Topbar({ route, theme, setTheme, user, language, t, me, onSignOut, onSa
 function App() {
   const auth = useAuth();                                  // { user, ready, loggedIn, login, logout }
   const currentUser = auth.user;                           // backend account or null
-  const username = currentUser?.username || "somchai";     // for the topbar avatar label
 
   // Kernel-only bootstrap gate (no auth plugin installed yet — 2026-07-02-bootstrap-install-shell-
   // design.md): a stored session token from a verified setup code unlocks a minimal install shell.
@@ -325,6 +194,7 @@ function App() {
   const lastByLang = React.useRef({});
 
   const [navCfg, setNavCfg] = useState(() => loadNav());   // global sidebar arrangement (admin-set, shared)
+  const { rail: navRail, drawerOpen, toggle: toggleNav, closeDrawer } = useShellNav();
 
   const setTheme = (t) => { setThemeState(t); localStorage.setItem("guild-theme", t); };
   // เลือก "รูปแบบคำศัพท์" ตรง ๆ ด้วยรหัสชุด
@@ -384,7 +254,7 @@ function App() {
   const go = (r) => {
     // closing every open overlay/popup when navigating away
     try { window.dispatchEvent(new Event("guildos-route-change")); } catch (e) { }
-    try { document.body.classList.remove("nav-open"); } catch (e) { }
+    closeDrawer();   // choosing a destination dismisses the small-screen drawer
     setRoute(r);
     document.querySelector(".content")?.scrollTo(0, 0);
     if (r === "search") { const h = window.uiLoading && window.uiLoading({ title: "กำลังเชื่อมต่อคลังความรู้…", message: "ผู้ควบคุมกลาง Recall" }); setTimeout(() => h && h.close(), 820); }
@@ -447,18 +317,17 @@ function App() {
 
   return (
     <ToastProvider>
-    <div className="app" key={lex}>
-      <Sidebar route={route} go={go} t={t} can={can} nav={navCfg} openMode={openMode} />
+    <div className="app" key={lex} data-nav={navRail ? "rail" : "full"} data-drawer={drawerOpen ? "open" : undefined}>
+      <Sidebar route={route} go={go} t={t} can={can} nav={navCfg} openMode={openMode}
+        rail={navRail} onToggle={toggleNav} />
+      <div className="nav-scrim" onClick={closeDrawer} />
       <div className="main">
-        <Topbar route={route} theme={theme} setTheme={setTheme} user={username} language={language} t={t}
-          me={me} onSignOut={auth.logout}
-          onSaveProfile={() => { /* profile edit is a follow-up: needs a backend PATCH /auth/me — demo no-op */ }} />
+        <Topbar route={route} language={language} t={t} />
         <div className="content">{screen}</div>
       </div>
       <BottomUtilityBar
-        t={t} route={route} onHome={() => go("home")} me={me}
-        theme={theme} onToggleTheme={() => setTheme(theme === "pro" ? "pro-dark" : "pro")}
-        onSignOut={auth.logout}
+        t={t} route={route} onHome={() => go("home")} onToggleNav={toggleNav}
+        profile={renderPluginProfile({ t, me, onSignOut: auth.logout })}
         notifications={[]} chatThreads={[]}
       />
       <UIModalHost />

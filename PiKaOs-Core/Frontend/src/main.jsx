@@ -11,7 +11,6 @@ import './lib/ui-modal.jsx';
 import './lib/notify.jsx';
 import App from './App.jsx';
 import { AppBoot } from './AppBoot.jsx';
-import './lib/fx.js';
 
 // restore saved theme (pro | pro-dark) before first paint
 try {
