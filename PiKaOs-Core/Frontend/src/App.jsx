@@ -2,19 +2,16 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 const { useState, useEffect } = React;
-import { AUDIT_SEED, ROLES_SEED, ROLE_PERMS_SEED, USERS_SEED, USER_PERMS_SEED, fmtTok, loadU, roleByKey, saveU } from './data/data-users.jsx';
 import { NAV } from './data/data.jsx';
 import { loadNav, saveNav, mergeWithDefault } from './data/data-nav.jsx';
 import { getNavConfig, setNavConfig, getMySettings, setMySetting, getGlobalConfig, setGlobalConfig, setupStatus, setToken, getCapabilities } from './lib/api.js';
 import { resolveShellMode } from './lib/shell-mode.js';
 import { applyGlobalConfig } from './lib/characters.jsx';
-import { Admin } from './screens/screens-admin.jsx';
 import { Settings } from './screens/screens-extra.jsx';
 import { FirstRun } from './screens/FirstRun.jsx';
 import { KernelOnlyShell } from './screens/KernelOnlyShell.jsx';
 import { KernelHome } from './screens/KernelHome.jsx';
 import { PluginsManager } from './screens/screens-plugins.jsx';
-import { AuditLog, PermissionsCatalog, RolesPermissions, UserDetail, UserForm } from './screens/screens-rbac.jsx';
 import { ToolsManager } from './screens/screens-tools.jsx';
 import { ComponentLibrary } from './screens/screens-library.jsx';
 import { useAuth } from './lib/auth.jsx';
@@ -178,7 +175,7 @@ const AV_PRESETS = ["🧙", "🦉", "🛠️", "📜", "👁️", "🌙", "🧑�
 const isAvImg = (a) => typeof a === "string" && (a.startsWith("data:") || a.startsWith("http"));
 function Av({ a, fallback = "🧙" }) { return isAvImg(a) ? <img className="av-img" src={a} alt="" /> : <span>{a || fallback}</span>; }
 
-function ProfileMenu({ me, roles, t, onSignOut, onSaveProfile }) {
+function ProfileMenu({ me, t, onSignOut, onSaveProfile }) {
   const [open, setOpen] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
   const [draft, setDraft] = useState({ display: me.display || me.display_name || me.username || "", email: me.email || "", avatar: me.avatar || "🧙" });
@@ -193,13 +190,7 @@ function ProfileMenu({ me, roles, t, onSignOut, onSaveProfile }) {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
   useEffect(() => { if (open) { setDraft({ display: me.display || me.display_name || me.username || "", email: me.email || "", avatar: me.avatar || "🧙" }); setDirty(false); setAvPick(false); setSaved(false); } }, [open]);
-  const role = roleByKey(roles, me.role) || { en: me.role, th: me.role, color: "" };
-  const roleLabel = (t.lang === "en") ? role.en : role.th;
-  const quota = me.quota, used = me.used || 0;
-  const remaining = quota == null ? null : Math.max(0, quota - used);
-  const pct = quota == null ? 0 : Math.min(100, Math.round(used / quota * 100));
-  const periodKey = me.period === "monthly" ? "profile.period.monthly" : "profile.period.weekly";
-  const accent = role.color || "var(--gold)";
+  const accent = "var(--gold)";
   const setField = (k, v) => { setDraft(d => ({ ...d, [k]: v })); setDirty(true); setSaved(false); };
   const onFile = (e) => {
     const f = e.target.files && e.target.files[0]; e.target.value = "";
@@ -231,7 +222,6 @@ function ProfileMenu({ me, roles, t, onSignOut, onSaveProfile }) {
               <div className="pm-id">
                 <input className="pm-name-input" value={draft.display} onChange={e => setField("display", e.target.value)} placeholder={t("profile.namePh")} aria-label={t("profile.name")} />
                 <div className="pm-sub">
-                  <span className="pp-role" style={{ color: accent, background: `color-mix(in srgb, ${accent} 14%, transparent)`, borderColor: `color-mix(in srgb, ${accent} 36%, transparent)` }}>{roleLabel}</span>
                   <span className="pm-username mono">@{me.username}</span>
                 </div>
               </div>
@@ -253,22 +243,9 @@ function ProfileMenu({ me, roles, t, onSignOut, onSaveProfile }) {
                 <span className="pm-flabel">{t("profile.email")}</span>
                 <input className="pm-input" type="email" value={draft.email} onChange={e => setField("email", e.target.value)} placeholder={t("profile.emailPh")} />
               </div>
-              <div className="pm-field"><span className="pm-flabel">{t("profile.role")}</span><span className="pm-fval">{roleLabel}</span></div>
               <div className="pm-field"><span className="pm-flabel">{t("profile.username")}</span><span className="pm-fval mono">@{me.username}</span></div>
               <div className="pm-field"><span className="pm-flabel">{t("profile.status")}</span><span className="pm-fval">{me.status === "suspended" ? t("profile.suspended") : t("profile.active")}</span></div>
               <div className="pm-field"><span className="pm-flabel">{t("profile.joined")}</span><span className="pm-fval">{me.joined || "—"}</span></div>
-            </div>
-            <div className="pp-tokens">
-              <div className="pp-tok-head">
-                <span className="pp-tok-title">🔵 {t("profile.tokens")}</span>
-                <span className="pp-tok-period mono">{t(periodKey)}</span>
-              </div>
-              <div className="pp-bar"><div className={"pp-bar-fill" + (pct >= 90 ? " hot" : "")} style={{ width: (quota == null ? 6 : pct) + "%" }} /></div>
-              <div className="pp-tok-row">
-                <span><b>{fmtTok(used)}</b> {t("profile.used")}</span>
-                <span>{quota == null ? t("profile.unlimited") : <span><b>{fmtTok(remaining)}</b> {t("profile.remaining")}</span>}</span>
-              </div>
-              <div className="pp-tok-quota mono">{t("profile.quota")}: {quota == null ? "∞" : fmtTok(quota)}</div>
             </div>
             <button className={"pm-save" + (dirty ? " on" : "") + (saved ? " saved" : "")} onClick={save} disabled={!dirty && !saved}>
               {saved ? "✓ " + t("profile.saved") : t("profile.save")}
@@ -285,7 +262,7 @@ function ProfileMenu({ me, roles, t, onSignOut, onSaveProfile }) {
   );
 }
 
-function Topbar({ route, theme, setTheme, user, language, t, me, roles, onSignOut, onSaveProfile }) {
+function Topbar({ route, theme, setTheme, user, language, t, me, onSignOut, onSaveProfile }) {
   const m = ROUTE_META[route] || ROUTE_META.home;   // home is the kernel landing — safe fallback if a plugin route is disabled
   const title = t("route." + route + ".title");
   const live = route === "hall" || route === "meeting" || route === "world";
@@ -304,7 +281,7 @@ function Topbar({ route, theme, setTheme, user, language, t, me, roles, onSignOu
         <button className={theme === "pro-dark" ? "on" : ""} onClick={() => setTheme("pro-dark")} title={t("theme.night")}>🌙</button>
       </div>
       {me
-        ? <ProfileMenu me={me} roles={roles} t={t} onSignOut={onSignOut} onSaveProfile={onSaveProfile} />
+        ? <ProfileMenu me={me} t={t} onSignOut={onSignOut} onSaveProfile={onSaveProfile} />
         : <div className="avatar sm" style={{ "--av": "var(--gold)", color: "var(--gold-bright)" }} title={user}><span>🧙</span></div>}
     </header>
   );
@@ -351,25 +328,7 @@ function App() {
   });
   const lastByLang = React.useRef({});
 
-  // ---- RBAC / users (Phase 4) ----
-  const [users, setUsers] = useState(() => loadU("users", USERS_SEED));
-  const [roles, setRoles] = useState(() => loadU("roles", ROLES_SEED));
   const [navCfg, setNavCfg] = useState(() => loadNav());   // global sidebar arrangement (admin-set, shared)
-  const [rolePerms, setRolePerms] = useState(() => {
-    const loaded = loadU("rolePerms", ROLE_PERMS_SEED);
-    // migrate: ensure newer room.* permissions exist per seed (union, never removes)
-    const out = { ...loaded };
-    for (const rk of Object.keys(ROLE_PERMS_SEED)) {
-      const cur = new Set(out[rk] || []);
-      ROLE_PERMS_SEED[rk].filter(k => /^room\.|^character\.|^options\./.test(k)).forEach(k => cur.add(k));
-      out[rk] = [...cur];
-    }
-    return out;
-  });
-  const [userPerms, setUserPerms] = useState(() => loadU("userPerms", USER_PERMS_SEED));
-  const [audit, setAudit] = useState(() => loadU("audit", AUDIT_SEED));
-  const [userSel, setUserSel] = useState(null);         // selected user id (detail)
-  const [userForm, setUserForm] = useState(null);       // null | {} | user
 
   const setTheme = (t) => { setThemeState(t); localStorage.setItem("guild-theme", t); };
   // เลือก "รูปแบบคำศัพท์" ตรง ๆ ด้วยรหัสชุด
@@ -386,8 +345,6 @@ function App() {
     if (target) setLex(target);
   };
   useEffect(() => { document.documentElement.setAttribute("data-theme", theme); }, [theme]);
-  useEffect(() => { saveU("users", users); }, [users]);
-  useEffect(() => { saveU("roles", roles); }, [roles]);
   useEffect(() => { saveNav(navCfg); }, [navCfg]);   // local cache for instant render next load
   // pull the shared arrangement from the server once signed in (authoritative; overrides the cache)
   useEffect(() => {
@@ -420,9 +377,6 @@ function App() {
       getGlobalConfig(k).then(r => { if (alive && r && r.value != null) applyGlobalConfig(k, r.value); }).catch(() => {}));
     return () => { alive = false; };
   }, [signedIn]);
-  useEffect(() => { saveU("rolePerms", rolePerms); }, [rolePerms]);
-  useEffect(() => { saveU("userPerms", userPerms); }, [userPerms]);
-  useEffect(() => { saveU("audit", audit); }, [audit]);
   // ทุกอย่างมาจากชุดที่กำลังใช้ — ภาษา/โหมดองค์กร derive จากข้อมูลในไฟล์ ไม่มี hardcode
   const activePack = packById(lex) || defaultPack() || {};
   const language = activePack.lang || "th";
@@ -433,7 +387,6 @@ function App() {
 
   const go = (r) => {
     // closing every open overlay/popup when navigating away
-    setUserForm(null); setUserSel(null);
     try { window.dispatchEvent(new Event("guildos-route-change")); } catch (e) { }
     try { document.body.classList.remove("nav-open"); } catch (e) { }
     setRoute(r);
@@ -456,66 +409,11 @@ function App() {
   // openMode ⇒ allow-all is the SERVER's declaration (authMode:"open"), not a client fallback — the
   // F1 rule stands: without that server signal, permissions come only from /auth/me.
   const can = (k) => openMode || mePerms.has(k);
-  // The user/role/audit management screens below still run on demo seed data (real CRUD is a follow-up);
-  // they are gated by the REAL server `can` above, so only an actual admin ever reaches them. No
-  // client-side audit trail — the server owns audit.
-  const logAudit = () => {};
 
   // persist a nav edit: update the UI now + push to the shared server config (best-effort)
   const saveNavCfg = (cfg) => { setNavCfg(cfg); setNavConfig(cfg).catch(() => {}); };
 
-  const Sys = {
-    users, roles, rolePerms, userPerms, audit, me, can, T, t, language, go,
-    nav: navCfg, setNav: saveNavCfg,
-    openUserForm: (u) => setUserForm(u || {}),
-    saveUser: (f, edit) => {
-      if (edit) { setUsers(prev => prev.map(x => x.id === f.id ? { ...x, ...f } : x)); logAudit("user.update", "user", f.id, T("profile updated", "แก้ไขโปรไฟล์")); }
-      else {
-        const id = "u_" + String(f.username || ("user" + Date.now())).toLowerCase();
-        setUsers(prev => [...prev, { ...f, id, used: 0, lastLogin: T("never", "ยังไม่เข้า"), joined: T("just now", "เพิ่งสร้าง") }]);
-        logAudit("user.create", "user", id, T(roleByKey(roles, f.role).en, roleByKey(roles, f.role).th));
-      }
-    },
-    toggleSuspend: (u) => {
-      const next = u.status === "active" ? "suspended" : "active";
-      setUsers(prev => prev.map(x => x.id === u.id ? { ...x, status: next } : x));
-      logAudit(next === "suspended" ? "user.suspend" : "user.update", "user", u.id, next === "suspended" ? T("suspended", "ระงับบัญชี") : T("restored", "คืนสถานะ"));
-    },
-    setRole: (u, role) => { setUsers(prev => prev.map(x => x.id === u.id ? { ...x, role } : x)); logAudit("role.update", "user", u.id, "→ " + T(roleByKey(roles, role).en, roleByKey(roles, role).th)); },
-    setQuota: (u, q) => { setUsers(prev => prev.map(x => x.id === u.id ? { ...x, quota: q } : x)); logAudit("quota.update", "user", u.id, q == null ? T("unlimited", "ไม่จำกัด") : fmtTok(q)); },
-    resetUsage: (u) => setUsers(prev => prev.map(x => x.id === u.id ? { ...x, used: 0 } : x)),
-    setUserPerm: (u, key, effect) => {
-      setUserPerms(prev => {
-        const cur = { ...(prev[u.id] || {}) };
-        if (effect == null) delete cur[key]; else cur[key] = effect;
-        return { ...prev, [u.id]: cur };
-      });
-      if (effect) logAudit(effect === "grant" ? "permission.grant" : "permission.deny", "user", u.id, (effect === "grant" ? "+ " : "− ") + key);
-    },
-    setRolePerm: (roleKey, key, on) => {
-      setRolePerms(prev => {
-        const cur = new Set(prev[roleKey] || []);
-        if (on) cur.add(key); else cur.delete(key);
-        return { ...prev, [roleKey]: [...cur] };
-      });
-      logAudit("role.update", "role", roleKey, (on ? "+ " : "− ") + key);
-    },
-    addRole: () => {
-      const key = "role_" + Date.now();
-      window.uiPrompt({ title: T("New role", "เพิ่มบทบาท"), placeholder: T("Role name", "ชื่อบทบาท") }).then(name => {
-        if (!name) return;
-        setRoles(prev => [...prev, { key, th: name, en: name, desc: "", system: false, color: "" }]);
-        setRolePerms(prev => ({ ...prev, [key]: [] }));
-      });
-    },
-  };
-
-  // auto-redirect away from a protected route the current (possibly switched) role can't see
-  const ROUTE_PERM = { admin: "user.view.any", userDetail: "user.view.any", roles: "role.manage", permissions: "user.view.any", audit: "audit.view" };
-  useEffect(() => {
-    const need = ROUTE_PERM[route];
-    if (need && !can(need)) go("home");
-  }, [route, mePerms, openMode]);   // openMode flips can() to allow-all — re-check when caps arrive
+  const Sys = { t, T, can, me, go, language, nav: navCfg, setNav: saveNavCfg };
 
   const shell = resolveShellMode({ ready: auth.ready, caps, bootstrap, loggedIn: auth.loggedIn });
   if (shell === 'loading') return null;   // avoid flashing the setup screen while restoring
@@ -534,12 +432,7 @@ function App() {
     const guard = (perm, el) => can(perm) ? el : <KernelHome Sys={Sys} caps={caps} go={go} />;
     switch (route) {
       case "home": return <KernelHome Sys={Sys} caps={caps} go={go} />;
-      case "admin": return guard("user.view.any", <Admin Sys={Sys} onUser={(id) => { setUserSel(id); go("userDetail"); }} />);
       case "toolsmgr": return guard("options.manage", <ToolsManager can={can} t={t} Sys={Sys} />);
-      case "userDetail": return guard("user.view.any", <UserDetail Sys={Sys} userId={userSel} />);
-      case "roles": return guard("role.manage", <RolesPermissions Sys={Sys} />);
-      case "permissions": return guard("user.view.any", <PermissionsCatalog Sys={Sys} />);
-      case "audit": return guard("audit.view", <AuditLog Sys={Sys} />);
       // "install" is the sidebar parent — clicking it lands on the installed-plugins list
       case "install": return guard("plugins.manage", <PluginsManager Sys={Sys} view="modules" />);
       case "modules": return guard("plugins.manage", <PluginsManager Sys={Sys} view="modules" />);
@@ -550,7 +443,7 @@ function App() {
       case "library": return <ComponentLibrary onBack={() => go("settings")} t={t} />;
       default: {
         // a route owned by an enabled plugin (Phase 6 seam) — else fall back to kernel Home.
-        const pluginEl = renderPluginRoute(route, { t, can, language });
+        const pluginEl = renderPluginRoute(route, { t, can, language, go });
         return pluginEl || <KernelHome Sys={Sys} caps={caps} go={go} />;
       }
     }
@@ -562,11 +455,10 @@ function App() {
       <Sidebar route={route} go={go} t={t} can={can} nav={navCfg} openMode={openMode} />
       <div className="main">
         <Topbar route={route} theme={theme} setTheme={setTheme} user={username} language={language} t={t}
-          me={me} roles={roles} onSignOut={auth.logout}
+          me={me} onSignOut={auth.logout}
           onSaveProfile={() => { /* profile edit is a follow-up: needs a backend PATCH /auth/me — demo no-op */ }} />
         <div className="content">{screen}</div>
       </div>
-      {userForm && <UserForm Sys={Sys} initial={userForm.id ? userForm : null} onClose={() => setUserForm(null)} />}
       <BottomUtilityBar
         t={t} route={route} onHome={() => go("home")} me={me}
         theme={theme} onToggleTheme={() => setTheme(theme === "pro" ? "pro-dark" : "pro")}
