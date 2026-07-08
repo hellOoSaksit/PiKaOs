@@ -2,6 +2,14 @@ import type { SecretVault } from './vault'
 
 const KEY = 'auth.refresh'
 
+// fetch's json() is `unknown` — name the shape the auth endpoints actually return so the
+// broker reads it type-checked rather than casting at each call site.
+type AuthResponse = {
+  token: { accessToken: string; expiresIn?: number }
+  refreshToken?: string
+  user?: unknown
+}
+
 /**
  * Main-process custody of the refresh token. The renderer never sees the
  * refresh token — only short-lived access tokens via getAccessToken().
@@ -20,7 +28,7 @@ export class SessionBroker {
     return { 'Content-Type': 'application/json', 'X-Client-Mode': 'token', ...extra }
   }
 
-  private absorb(body: any) {
+  private absorb(body: AuthResponse) {
     this.access = body.token.accessToken
     this.expiresAt = Date.now() + (body.token.expiresIn ?? 900) * 1000
     if (body.refreshToken) this.vault.set(KEY, body.refreshToken)
@@ -33,7 +41,7 @@ export class SessionBroker {
       body: JSON.stringify({ usernameOrEmail: u, password: p }),
     })
     if (!r.ok) throw new Error(`login ${r.status}`)
-    const body = await r.json()
+    const body = await r.json() as AuthResponse
     this.absorb(body)
     return { user: body.user }
   }
@@ -47,7 +55,7 @@ export class SessionBroker {
       headers: this.headers({ 'X-Refresh-Token': rt }),
     })
     if (!r.ok) { this.vault.delete(KEY); this.access = null; return null }
-    const body = await r.json()
+    const body = await r.json() as AuthResponse
     this.absorb(body)
     return this.access
   }
