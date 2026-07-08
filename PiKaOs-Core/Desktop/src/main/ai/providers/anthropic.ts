@@ -38,6 +38,26 @@ type AnthropicResponseBody = { content?: AnthropicContentBlock[] }
 
 export class AnthropicProvider implements LlmProvider {
   async complete(messages: ChatMessage[], tools: ToolSpec[], opts: CompleteOpts): Promise<CompleteResult> {
+    // Every exit out of this method funnels through this try/catch so the key can never escape
+    // unscrubbed — not just the two explicit `throw`s below, but also fetch() rejecting (network/
+    // DNS/invalid header) and res.json() throwing on a malformed 200 body. Structural, not a
+    // per-call-site patch, because later adapters (OpenAI/Ollama) copy this shape.
+    try {
+      return await this.#send(messages, tools, opts)
+    } catch (err) {
+      // ProviderAuthError already carries a redacted message (built below) and callers
+      // instanceof-check it to clear the stored key — flattening it here would break that.
+      if (err instanceof ProviderAuthError) throw err
+      // AbortSignal-triggered fetch rejections are DOMException/Error with name 'AbortError'.
+      // The agent loop's cancel path relies on catching that distinct identity; an abort never
+      // carries the key (it's a signal, not response data), so it's safe to re-throw as-is.
+      if (err instanceof Error && err.name === 'AbortError') throw err
+      const message = err instanceof Error ? err.message : String(err)
+      throw new Error(redacted(message, opts.apiKey))
+    }
+  }
+
+  async #send(messages: ChatMessage[], tools: ToolSpec[], opts: CompleteOpts): Promise<CompleteResult> {
     const { system, messages: msgs } = toAnthropic(messages)
     const res = await fetch(opts.baseUrl ?? API, {
       method: 'POST',
@@ -56,11 +76,18 @@ export class AnthropicProvider implements LlmProvider {
       throw new Error(detail)
     }
     const body = (await res.json()) as AnthropicResponseBody
-    const blocks = body.content ?? []
+    // The vendor response is untrusted input: a malformed truthy-but-non-array `content` (e.g. an
+    // object) must not crash the caller with a raw TypeError — degrade to no content instead.
+    const blocks = Array.isArray(body.content) ? body.content : []
     const text = blocks.filter((b) => b.type === 'text').map((b) => b.text).join('')
     const toolCalls = blocks
-      .filter((b) => b.type === 'tool_use')
-      .map((b) => ({ id: b.id!, name: b.name!, arguments: b.input ?? {} }))
+      // A `tool_use` block missing `id`/`name` is malformed vendor data; skip it rather than
+      // (a) yielding a ToolCall with `undefined` fields via a non-null assertion, which the loop
+      // would then dispatch as a broken tool call, or (b) throwing and discarding every other
+      // valid block/text in the same response for one bad entry.
+      .filter((b): b is AnthropicContentBlock & { id: string; name: string } =>
+        b.type === 'tool_use' && typeof b.id === 'string' && typeof b.name === 'string')
+      .map((b) => ({ id: b.id, name: b.name, arguments: b.input ?? {} }))
     return { text, toolCalls }
   }
 }
