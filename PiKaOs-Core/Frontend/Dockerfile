@@ -3,7 +3,7 @@
 #   target: prod  → static bundle served by nginx (deploy; tiny, separable to its own server/CDN)
 
 # --- shared deps layer ---
-FROM node:22-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 # Fix-DEP-01: reproducible install straight from the committed lockfile (was `npm install`, which can
