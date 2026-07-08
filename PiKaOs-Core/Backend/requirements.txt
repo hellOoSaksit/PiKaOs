@@ -9,6 +9,6 @@ pydantic==2.13.4
 pydantic-settings==2.14.1
 cryptography==43.0.3        # kernel keystore (app.core.crypto) — encrypts runtime secrets at rest
 PyYAML==6.0.3              # compose_render merges tool compose-fragments at install
-httpx==0.28.1             # starlette TestClient (Core's plugin-free test suite) rides on httpx
+httpx==0.28.1             # RUNTIME: /api/mcp/call re-enters the ASGI app (ASGITransport); also starlette TestClient
 pytest==8.4.2             # the backend-CI job runs Core's suite in-container, so the runners ship in the image
 pytest-asyncio==0.26.0
