@@ -1,31 +1,11 @@
 /* PiKaOs — ES module (migrated from PiKaOs-Core/components.jsx). */
 import React from 'react';
-import { byId, statusLabel } from '../data/data.jsx';
-import { CharacterSprite } from './CharacterSprite.jsx';
 
 /* ============================================================
    SHARED UI PRIMITIVES
    ============================================================ */
 
-function Avatar({ a, size = "", showRing = true }) {
-  if (!a) return null;
-  const h = size === "lg" ? 60 : size === "sm" ? 30 : 42;
-  const cls = ["avatar", "portrait", size, showRing ? a.status : ""].filter(Boolean).join(" ");
-  return (
-    <div className={cls} style={{ "--av": a.color }} title={a.name}>
-      <CharacterSprite charId={a.characterId} seed={a.id || a.name} walking={false} h={h}
-        style={{ position: "absolute", bottom: size === "sm" ? 1 : 2, left: "50%", transform: "translateX(-50%)" }} />
-      {showRing && <span className="a-ring" />}
-    </div>
-  );
-}
-
 function RankGem({ r }) { return <span className={`rank ${r}`}>{r}</span>; }
-
-function StatusBadge({ s }) {
-  const map = { on: "on", busy: "busy", idle: "idle", away: "idle" };
-  return <span className={`badge ${map[s] || "idle"}`}><span className="dot" />{statusLabel[s]}</span>;
-}
 
 function Meter({ kind = "mana", val }) {
   return <div className={`meter ${kind}`}><i style={{ width: `${val}%` }} /></div>;
@@ -71,125 +51,15 @@ function StatTile({ label, value, unit, delta, deltaTone, icon }) {
 
 function Divider() { return <div className="divider"><span className="gem" /></div>; }
 
-// Adventurer roster card
-function AgentCard({ a, onClick, compact }) {
-  return (
-    <button className={`agent-card ${compact ? "compact" : ""}`} onClick={onClick}>
-      <Avatar a={a} size={compact ? "sm" : ""} />
-      <div className="ac-body">
-        <div className="ac-top">
-          <span className="ac-name">{a.name}</span>
-          <RankGem r={a.rank} />
-        </div>
-        <div className="ac-role mono">{a.classEn} · {a.role}</div>
-        {!compact && (
-          <div className="ac-task">
-            <span className="ac-task-dot" data-s={a.status} />
-            <span className="muted" style={{ fontSize: 12.5 }}>{a.task}</span>
-          </div>
-        )}
-        <div className="ac-meta">
-          <StatusBadge s={a.status} />
-          <span className="mono faint" style={{ fontSize: 10.5 }}>Lv.{a.level}</span>
-          <span className="ac-mana mono"><i className="mana-orb" />{a.tokens}</span>
-        </div>
-      </div>
-    </button>
-  );
-}
-
-// Quest card
-function QuestCard({ q, onClick }) {
-  const lead = byId(q.lead);
-  const party = q.party.map(byId).filter(Boolean);
-  const statusMap = {
-    active: { c: "busy", t: "กำลังลุย" }, queued: { c: "idle", t: "ในคิว" },
-    review: { c: "info", t: "รอตรวจ" }, done: { c: "on", t: "สำเร็จ" }, failed: { c: "warn", t: "ล้มเหลว" },
-  };
-  const st = statusMap[q.status];
-  return (
-    <button className={`quest-card status-${q.status}`} onClick={onClick}>
-      <div className="qc-left">
-        <RankGem r={q.rank} />
-      </div>
-      <div className="qc-body">
-        <div className="qc-top">
-          <span className="qc-id mono">{q.id.toUpperCase()}</span>
-          <span className={`badge ${st.c}`}><span className="dot" />{st.t}</span>
-          <span className="qc-deadline mono faint">{q.deadline}</span>
-        </div>
-        <div className="qc-title">{q.title}</div>
-        <div className="qc-progress-row">
-          <Meter kind="xp" val={q.progress} />
-          <span className="mono" style={{ fontSize: 11, color: "var(--ink-3)", minWidth: 70, textAlign: "right" }}>
-            {q.stepDone}/{q.steps} ขั้น · {q.progress}%
-          </span>
-        </div>
-        <div className="qc-foot">
-          <div className="qc-party">
-            {party.length === 0 && <span className="muted mono" style={{ fontSize: 11 }}>ยังไม่ได้มอบหมาย</span>}
-            {party.map((p, i) => (
-              <span key={p.id} className="qc-party-av" style={{ marginLeft: i ? -8 : 0, zIndex: 9 - i, overflow: "hidden" }} title={p.name}>{window.CharacterSprite ? <CharacterSprite charId={p.characterId} walking={false} h={24} style={{ position: "static" }} /> : p.icon}</span>
-            ))}
-            {lead && <span className="muted mono" style={{ fontSize: 11, marginLeft: 8 }}>นำโดย {lead.name.split(" ")[0]}</span>}
-          </div>
-        </div>
-      </div>
-    </button>
-  );
-}
-
-// Activity feed row
-function ActivityRow({ ev }) {
-  const a = byId(ev.who);
-  if (!a) return null;
-  return (
-    <div className="act-row">
-      <span className="act-icon" data-tone={ev.tone}>{ev.icon}</span>
-      <div className="act-body">
-        <div style={{ fontSize: 13 }}><span className="gold-text" style={{ fontWeight: 600 }}>{a.name.split(" ")[0]}</span> <span className="muted">{ev.text}</span></div>
-        <div className="mono faint" style={{ fontSize: 10.5 }}>{ev.time}ที่ผ่านมา</div>
-      </div>
-    </div>
-  );
-}
-
-// Chat message
-function ChatMessage({ m }) {
-  if (m.kind === "system") {
-    return (
-      <div className="chat-sys">
-        <span className="chat-sys-crest">⚜</span>
-        <div className="chat-sys-body">
-          <span className="chat-sys-name">{m.who}</span>
-          <span className="muted" style={{ fontSize: 13 }}>{m.text}</span>
-        </div>
-        <span className="mono faint chat-time">{m.time}</span>
-      </div>
-    );
-  }
-  const a = byId(m.who);
-  if (!a) return null;
-  return (
-    <div className="chat-msg">
-      <Avatar a={a} size="sm" showRing={false} />
-      <div className="chat-msg-body">
-        <div className="chat-msg-head">
-          <span className="chat-msg-name" style={{ color: a.color }}>{a.name}</span>
-          <span className="badge" style={{ padding: "0 6px", fontSize: 9.5 }}>{a.classEn}</span>
-          <span className="mono faint chat-time">{m.time}</span>
-        </div>
-        <div className="chat-bubble">{m.text}</div>
-        {m.attach && <div className="chat-attach mono"><span>📎</span>{m.attach}</div>}
-      </div>
-    </div>
-  );
-}
-
+// NOTE: TypingDots used to render an <Avatar> (backed by CharacterSprite); the
+// game-component cluster (Avatar/AgentCard/QuestCard/ActivityRow/ChatMessage +
+// CharacterSprite) was deleted as dead code once RBAC left Core. TypingDots is
+// the one KEPT primitive that depended on it, so its avatar swatch is now a
+// plain colored dot using the still-shared .avatar/.portrait/.sm classes.
 function TypingDots({ a }) {
   return (
     <div className="chat-msg typing">
-      <Avatar a={a} size="sm" showRing={false} />
+      <span className="avatar portrait sm" style={{ "--av": a.color }} />
       <div className="chat-msg-body">
         <div className="chat-msg-head"><span className="chat-msg-name" style={{ color: a.color }}>{a.name}</span></div>
         <div className="chat-bubble typing-bubble"><span /><span /><span /></div>
@@ -252,17 +122,13 @@ function HelpNote({ children, tag }) {
 }
 
 Object.assign(window, {
-  Avatar, RankGem, StatusBadge, Meter, Panel, Btn, StatTile, Divider,
-  AgentCard, QuestCard, ActivityRow, ChatMessage, TypingDots, Empty, PageHead,
+  RankGem, Meter, Panel, Btn, StatTile, Divider,
+  TypingDots, Empty, PageHead,
   FeatureTag, HelpNote,
 });
 
 export {
-  ActivityRow,
-  AgentCard,
-  Avatar,
   Btn,
-  ChatMessage,
   Divider,
   Empty,
   FEATURE_TAGS,
@@ -271,9 +137,7 @@ export {
   Meter,
   PageHead,
   Panel,
-  QuestCard,
   RankGem,
   StatTile,
-  StatusBadge,
   TypingDots
 };
