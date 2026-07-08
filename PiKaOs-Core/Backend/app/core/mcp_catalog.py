@@ -21,10 +21,12 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
+
+from . import kernel_state
 
 try:  # FastAPI >= 0.137 — the tree walk that OpenAPI generation itself uses
     from fastapi.routing import _iter_routes_with_context
@@ -51,6 +53,14 @@ _TOOL_PREFIX = "pikaos"
 _CORE_OWNER = "core"
 _NON_METHODS = frozenset({"HEAD", "OPTIONS"})
 _UNSAFE = re.compile(r"[^a-z0-9]+")
+
+_EFFECTS = frozenset(EFFECT_BY_METHOD.values())
+
+# The operator's explicit opt-in list, in kernel local-JSON (the kernel keeps no tables of its own).
+# `{tool_name: {"effect": <override>}}` — presence is the grant; the value only tunes it.
+# RESERVED in git_installer.RESERVED_SETTINGS_KEYS: widening what an external AI may invoke is
+# `plugins.manage` authority, so the generic settings KV must never reach it (K4).
+ALLOWLIST_KEY = "mcp_allowlist"
 
 
 @dataclass(frozen=True)
@@ -191,3 +201,34 @@ def build_catalog(app: FastAPI) -> list[ToolDescriptor]:
                 effect=EFFECT_BY_METHOD.get(method, EFFECT_SIDE_EFFECT),
             ))
     return out
+
+
+def read_allowlist() -> dict[str, dict]:
+    """The operator's allowlist, or `{}` — which exposes nothing. A corrupt or hand-edited file that
+    is not an object fails closed rather than crashing open."""
+    value = kernel_state.read_json(ALLOWLIST_KEY, {})
+    if not isinstance(value, dict):
+        return {}
+    return {name: entry for name, entry in value.items() if isinstance(entry, dict)}
+
+
+def write_allowlist(entries: dict[str, dict]) -> dict[str, dict]:
+    """Replace the allowlist wholesale. Callers are guarded by `plugins.manage` (routers/mcp.py)."""
+    normalized = {name: (entry if isinstance(entry, dict) else {}) for name, entry in entries.items()}
+    kernel_state.write_json(ALLOWLIST_KEY, normalized)
+    return normalized
+
+
+def _with_override(tool: ToolDescriptor, entry: dict) -> ToolDescriptor:
+    """Apply the operator's effect override, if any. An unrecognized value is not a reason to relax:
+    it falls to the safe class rather than to the method default the operator was trying to change."""
+    override = entry.get("effect")
+    if override is None:
+        return tool
+    return replace(tool, effect=override if override in _EFFECTS else EFFECT_SIDE_EFFECT)
+
+
+def allowed_tools(app: FastAPI) -> list[ToolDescriptor]:
+    """Catalog ∩ allowlist, effect overrides applied. Deny by default: an empty allowlist yields []."""
+    allowlist = read_allowlist()
+    return [_with_override(t, allowlist[t.name]) for t in build_catalog(app) if t.name in allowlist]

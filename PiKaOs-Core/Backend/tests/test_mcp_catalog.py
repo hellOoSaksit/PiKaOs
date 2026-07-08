@@ -7,8 +7,11 @@ plugin, only about the shape every plugin already has (a namespaced path + requi
 """
 from __future__ import annotations
 
+import pytest
 from fastapi import APIRouter, Depends, FastAPI
 
+from app.core import kernel_state, mcp_catalog
+from app.core.git_installer import RESERVED_SETTINGS_KEYS
 from app.core.identity import require_perm
 from app.core.mcp_catalog import (
     EFFECT_IDEMPOTENT_WRITE,
@@ -16,6 +19,14 @@ from app.core.mcp_catalog import (
     EFFECT_SIDE_EFFECT,
     build_catalog,
 )
+
+
+@pytest.fixture
+def state_dir(tmp_path, monkeypatch):
+    """Point kernel local-JSON at a temp dir — the allowlist is the kernel's own state."""
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "kernel_state_dir", str(tmp_path))
+    return tmp_path
 
 
 def _app() -> FastAPI:
@@ -138,3 +149,47 @@ def test_a_directly_decorated_app_route_is_reflected_too():
         return {}
 
     assert [t.name for t in build_catalog(app)] == ["pikaos.direct.index"]
+
+
+# --- the operator allowlist: layer 1 of the two-layer filter ----------------------------------------
+
+
+def test_the_allowlist_is_a_reserved_settings_key():
+    """Widening what an external AI may invoke is plugins.manage authority. If the generic settings
+    KV could write it, options.manage would escalate to it (git_installer.py K4)."""
+    assert mcp_catalog.ALLOWLIST_KEY in RESERVED_SETTINGS_KEYS
+
+
+def test_missing_allowlist_exposes_nothing(state_dir):
+    """Absence must never mean 'allow all' — the catalog is the attack surface."""
+    assert mcp_catalog.read_allowlist() == {}
+    assert mcp_catalog.allowed_tools(_app()) == []
+
+
+def test_only_allowlisted_tools_are_exposed(state_dir):
+    mcp_catalog.write_allowlist({"pikaos.knowledge.search": {}})
+    assert [d.name for d in mcp_catalog.allowed_tools(_app())] == ["pikaos.knowledge.search"]
+
+
+def test_an_allowlist_entry_may_override_the_effect(state_dir):
+    """An operator who knows a POST is idempotent may say so; the default stays pessimistic."""
+    mcp_catalog.write_allowlist({"pikaos.knowledge.documents": {"effect": EFFECT_IDEMPOTENT_WRITE}})
+    assert mcp_catalog.allowed_tools(_app())[0].effect == EFFECT_IDEMPOTENT_WRITE
+
+
+def test_an_unknown_effect_override_falls_back_to_side_effect(state_dir):
+    """A typo must never quietly relax a tool below the class its method implies."""
+    mcp_catalog.write_allowlist({"pikaos.knowledge.search": {"effect": "harmless"}})
+    assert mcp_catalog.allowed_tools(_app())[0].effect == EFFECT_SIDE_EFFECT
+
+
+def test_allowlisting_a_tool_that_does_not_exist_is_inert(state_dir):
+    mcp_catalog.write_allowlist({"pikaos.ghost.vanished": {}})
+    assert mcp_catalog.allowed_tools(_app()) == []
+
+
+def test_a_corrupt_allowlist_file_exposes_nothing(state_dir):
+    """kernel_state.read_json never raises; a non-dict payload must fail closed, not crash open."""
+    kernel_state.write_json(mcp_catalog.ALLOWLIST_KEY, ["pikaos.knowledge.search"])
+    assert mcp_catalog.read_allowlist() == {}
+    assert mcp_catalog.allowed_tools(_app()) == []

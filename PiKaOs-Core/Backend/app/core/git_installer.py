@@ -27,8 +27,11 @@ _CREDENTIALS_KEY = "plugin_git_credentials"         # {value: {host: encrypted_t
 # Installer-owned keys that live in the shared `app_settings` blob. The generic `/api/settings/global/{key}`
 # routes MUST refuse these (K4): otherwise `options.manage` (weaker than `plugins.manage`) could widen the
 # RCE allowlist or overwrite credentials via PUT, and any authenticated user could read the (encrypted)
-# credential blob via GET. settings_config.py imports this to build its reserved-key denylist.
-RESERVED_SETTINGS_KEYS: frozenset[str] = frozenset({_ALLOWLIST_KEY, _CREDENTIALS_KEY})
+# credential blob via GET. `mcp_allowlist` joins them for the same reason — widening what an external AI may
+# invoke is `plugins.manage` authority too. (Spelled literally rather than imported from `mcp_catalog`, which
+# would cycle; test_mcp_catalog.py asserts the two agree.) settings_config.py imports this to build its
+# reserved-key denylist.
+RESERVED_SETTINGS_KEYS: frozenset[str] = frozenset({_ALLOWLIST_KEY, _CREDENTIALS_KEY, "mcp_allowlist"})
 _STDERR_LOG_LIMIT = 2000                            # cap so one runaway git error can't flood the log
 
 
