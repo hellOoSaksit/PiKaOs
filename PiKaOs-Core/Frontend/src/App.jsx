@@ -12,7 +12,6 @@ import { KernelOnlyShell } from './screens/KernelOnlyShell.jsx';
 import { KernelHome } from './screens/KernelHome.jsx';
 import { PluginsManager } from './screens/screens-plugins.jsx';
 import { ToolsManager } from './screens/screens-tools.jsx';
-import { ComponentLibrary } from './screens/screens-library.jsx';
 import { useAuth } from './lib/auth.jsx';
 import { BottomUtilityBar } from './components/ui/BottomUtilityBar.jsx';
 import { Icon, renderIcon } from './components/ui/icons.jsx';
@@ -37,7 +36,6 @@ const ROUTE_META = {
   mypackages: { icon: "package", title: "แพ็กเกจของฉัน", en: "My Packages & Share" },
   localmcp: { icon: "monitor", title: "Local MCP", en: "Local MCP" },
   settings:{ icon: "settings", title: "ตั้งค่าระบบ", en: "Settings" },
-  library: { icon: "components", title: "คลังคอมโพเนนต์", en: "Component Library" },
   ...PLUGIN_ROUTE_META,   // plugin routes contribute their own topbar metadata (Phase 6 seam)
 };
 
@@ -298,7 +296,6 @@ function App() {
       case "mypackages": return guard("plugins.manage", <PluginsManager Sys={Sys} view="mine" />);
       // Local MCP moved into the Marketplace hub's "Local MCP" tab (desktop-only) — no standalone route.
       case "settings": return <Settings theme={theme} setTheme={setTheme} lex={lex} setLex={setLex} pickLanguage={pickLanguage} language={language} formal={formal} t={t} />;
-      case "library": return <ComponentLibrary onBack={() => go("settings")} t={t} />;
       default: {
         // a route owned by an enabled plugin (Phase 6 seam) — else fall back to kernel Home.
         const pluginEl = renderPluginRoute(route, { t, can, language, go, me });

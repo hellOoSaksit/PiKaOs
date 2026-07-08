@@ -39,7 +39,7 @@
 .task-prog.complete .task-prog-fill { background: var(--emerald); }
 .task-prog-label { font-size: 11.5px; color: var(--ink-2); font-weight: 600; min-width: 42px; text-align: right; }
 
-/* settings · managed option lists (chips) — screens-tools.jsx, screens-library.jsx, screens-nav.jsx */
+/* settings · managed option lists (chips) — screens-tools.jsx, screens-nav.jsx */
 .opt-select, .opt-multi { display: flex; flex-direction: column; gap: 8px; }
 .opt-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .opt-chip { font-family: var(--font-body); font-size: 12.5px; color: var(--ink-2); background: var(--bg-3); border: 1px solid var(--line);

@@ -636,7 +636,7 @@ select.bf-input { cursor: pointer; }
    ============================================================ */
 /* The typed tool form (.tool-form, .bf-secret*, .tool-type-desc, .tool-add-row) and the catalog's
    search/collapse chrome (.tool-search, .tool-collapse) went with the Tools catalog screen. What
-   remains below is the row list — LocalMcp and the component library both still render it. */
+   remains below is the row list, which LocalMcp still renders. */
 .tool-list { display: flex; flex-direction: column; }
 
 /* Profile modal (avatar account — full-screen centered, never clipped).

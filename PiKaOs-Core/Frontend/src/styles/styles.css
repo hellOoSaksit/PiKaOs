@@ -497,6 +497,10 @@ body {
   box-shadow: var(--shadow-panel);
 }
 .panel.inset { background: var(--bg-1); }
+/* Panels dropped straight into a page have no shared flex/grid parent to space them, so two in a row
+   render as one seamless slab. Scoped to direct children of `.content-pad` on purpose: a panel list
+   inside a `.col`/grid already gets its rhythm from that container's `gap`. */
+.content-pad > .panel + .panel { margin-top: 14px; }
 .panel-head {
   display: flex; align-items: center; gap: 10px;
   padding: 14px 16px;
