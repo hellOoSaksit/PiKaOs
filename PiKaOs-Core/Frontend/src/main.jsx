@@ -3,13 +3,10 @@ import './styles/index.css';
 
 // ---- app modules, imported in dependency order for side effects + window bus ----
 import './data/data.jsx';
-import './data/data-users.jsx';
 import './lib/i18n.jsx';
 import './lib/characters.jsx';
 import './components/components.jsx';
 import './screens/screens-extra.jsx';
-import './screens/screens-admin.jsx';
-import './screens/screens-rbac.jsx';
 import './lib/ui-modal.jsx';
 import './lib/notify.jsx';
 import App from './App.jsx';
