@@ -59,14 +59,6 @@ _UNSAFE = re.compile(r"[^a-z0-9]+")
 # without limit. Excluded structurally rather than by trusting the operator to avoid the footgun.
 _SELF_PREFIX = "/api/mcp"
 
-# The catalog never exposes the authority to change the program. `plugins.manage` guards install /
-# enable / disable / uninstall / purge — an AI holding any of them could rewrite the system it runs
-# in. The allowlist cannot carry this rule: it is deny-by-default but *grantable*, and in open mode
-# every caller is owner-admin, so one entry away from install_from_git is RCE. Excluded here, at the
-# source, for the same reason `_SELF_PREFIX` is — and keyed on the PERMISSION, not the tool name, so
-# a future plugin route that requests this authority is excluded without anyone remembering to add it.
-FORBIDDEN_PERMISSIONS: frozenset[str] = frozenset({"plugins.manage"})
-
 _EFFECTS = frozenset(EFFECT_BY_METHOD.values())
 
 # The operator's explicit opt-in list, in kernel local-JSON (the kernel keeps no tables of its own).
@@ -102,21 +94,33 @@ def _iter_routes(app: FastAPI) -> Iterator[object]:
             yield context if context is not None else route
 
 
-def _permission_of(operation) -> str | None:
-    """The permission this operation enforces, or None if it enforces none. Walks the dependency tree:
-    a plugin may guard at router level rather than per-route."""
+def _permission_and_safety_of(operation) -> tuple[str | None, bool]:
+    """The permission this operation enforces, and whether the operation may be handed to an AI — or
+    (None, False) if it enforces none. Walks the dependency tree: a plugin may guard at router level
+    rather than per-route.
 
-    def walk(dependant) -> str | None:
+    A route may carry SEVERAL `require_perm` guards, so safety is the conjunction over all of them: one
+    unmarked guard anywhere disqualifies the route. Stopping at the first guard found would make the
+    answer depend on dependency declaration order — a route behind both `plugins.manage` (unmarked) and
+    `options.manage` (marked) would enter the catalog whenever the marked one happened to be discovered
+    first, published under a weaker permission than it actually runs on. A marker is never borrowed from
+    a dependency other than its own.
+    """
+    guards: list[tuple[str, bool]] = []
+
+    def walk(dependant) -> None:
         perm = getattr(dependant.call, "required_perm", None)
         if perm:
-            return perm
+            guards.append((perm, bool(getattr(dependant.call, "ai_safe", False))))
         for sub in dependant.dependencies:
-            found = walk(sub)
-            if found:
-                return found
-        return None
+            walk(sub)
 
-    return walk(operation.dependant)
+    walk(operation.dependant)
+    if not guards:
+        return None, False
+    # Report the first guard's permission — that is what `GET /mcp/tools` filters the caller against. A
+    # caller lacking any of the others is still refused by the mirrored route itself on `POST /mcp/call`.
+    return guards[0][0], all(ai_safe for _, ai_safe in guards)
 
 
 def _owner_and_rest(path: str) -> tuple[str, list[str]]:
@@ -187,8 +191,14 @@ def _input_schema(spec: dict, path: str, method: str) -> tuple[dict, str]:
 
 
 def build_catalog(app: FastAPI) -> list[ToolDescriptor]:
-    """Every exposable route as a tool descriptor. A route enforcing no permission is omitted: a
-    surface an LLM can reach without authorization is a bug, not a feature.
+    """Every exposable route as a tool descriptor.
+
+    Two independent conditions gate a route in, both required: it must enforce SOME permission (a
+    surface an LLM can reach without authorization is a bug, not a feature), AND that permission's
+    dependency must be declared `ai_safe=True` (require_perm's opt-in flag). The second condition is
+    the allow-list on authority: a permission alone only proves the route is *guarded*, not that it is
+    safe to hand to an AI — the fail-safe is that a newly added mutating route, permissioned but
+    unmarked, is excluded automatically rather than requiring someone to remember to blacklist it.
 
     WebSocket routes and static mounts are not `APIRoute`s and are skipped by construction."""
     operations = list(_iter_routes(app))
@@ -201,8 +211,8 @@ def build_catalog(app: FastAPI) -> list[ToolDescriptor]:
     for op in operations:
         if op.path.startswith(_SELF_PREFIX):
             continue
-        permission = _permission_of(op)
-        if not permission or permission in FORBIDDEN_PERMISSIONS:
+        permission, ai_safe = _permission_and_safety_of(op)
+        if not permission or not ai_safe:
             continue
         for method in sorted(op.methods - _NON_METHODS):
             schema, description = _input_schema(spec, op.path, method)

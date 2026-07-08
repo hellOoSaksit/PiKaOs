@@ -87,3 +87,11 @@ def test_require_perm_dependency_declares_its_permission():
     # Reflection (core/mcp_catalog) reads the permission off the dependency rather than prying it out
     # of the closure cell, so a route can declare what it enforces.
     assert require_perm("plugins.manage").required_perm == "plugins.manage"
+
+
+def test_a_route_is_not_ai_safe_unless_it_says_so():
+    """The default that makes the MCP catalog an allow-list rather than a deny-list: guarding a route
+    never implies it may be handed to an AI. Flip this default and every permissioned route in Core and
+    every plugin becomes an AI-callable tool at once."""
+    assert require_perm("plugins.manage").ai_safe is False
+    assert require_perm("options.manage", ai_safe=True).ai_safe is True

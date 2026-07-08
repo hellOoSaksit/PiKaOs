@@ -47,3 +47,34 @@ def test_a_normal_global_key_still_round_trips(client):
     assert put.status_code == 200
     got = client.get("/api/settings/global/theme", headers=_AUTH)
     assert got.status_code == 200 and got.json()["value"] == {"mode": "dark"}
+
+
+def test_an_oversized_value_is_refused_and_never_persisted(client):
+    """`put_global` is `ai_safe`, so an AI holding options.manage may write here. Unbounded, that
+    authority is a DoS: `app_settings` is one JSON file that every settings read/write reparses and
+    rewrites in full, so a single huge value taxes the reserved installer keys sharing it too."""
+    resp = client.put("/api/settings/global/bloat", json={"value": "x" * 70_000}, headers=_AUTH)
+    assert resp.status_code == 413
+    assert kernel_state.read_json("app_settings", {}).get("bloat") is None
+
+
+def test_the_nav_writer_is_capped_too(client):
+    """`put_nav` carries the same `ai_safe` authority over the same blob — capping only `put_global`
+    would leave the identical DoS one route away."""
+    resp = client.put("/api/settings/nav", json={"value": ["x" * 70_000]}, headers=_AUTH)
+    assert resp.status_code == 413
+    assert kernel_state.read_json("app_settings", {}).get("nav") is None
+
+
+def test_a_value_just_under_the_cap_is_accepted(client):
+    """The cap must not be so eager that a legitimate config blob trips it."""
+    resp = client.put("/api/settings/global/big", json={"value": "x" * 60_000}, headers=_AUTH)
+    assert resp.status_code == 200
+
+
+def test_the_cap_counts_the_bytes_that_will_be_persisted_not_ascii_escapes(client):
+    """Values are stored with `ensure_ascii=False`, so a Thai label costs 3 UTF-8 bytes, not the 6 of
+    a `\\uXXXX` escape. Measuring the escaped form would reject a value that fits on disk."""
+    thai = "ก" * 20_000                                    # 60 KB as UTF-8; 120 KB escaped
+    resp = client.put("/api/settings/global/thai", json={"value": thai}, headers=_AUTH)
+    assert resp.status_code == 200
