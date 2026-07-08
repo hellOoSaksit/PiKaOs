@@ -634,33 +634,10 @@ select.bf-input { cursor: pointer; }
 /* ============================================================
    Tools Manager (admin)
    ============================================================ */
-.tool-form { display: flex; flex-direction: column; gap: 12px; padding: 14px; margin-bottom: 14px; background: var(--bg-3); border: 1px solid var(--line); border-radius: var(--radius); }
-/* tool form inside the kit modal (popup) */
-.pk-modal.tool-modal { width: min(600px, 100%); max-height: min(84vh, 760px); overflow: auto; }
-.pk-modal.tool-modal .tool-form { padding: 0; margin: 14px 0 0; background: none; border: none; }
-/* typed form fields */
-.bf-input.area { min-height: 76px; resize: vertical; line-height: 1.55; padding-top: 9px; font-family: var(--font-body); }
-.bf-secret { position: relative; }
-.bf-secret .bf-input { width: 100%; }
-.bf-secret-eye { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); border: none; background: none; cursor: pointer; font-size: 9.5px; font-weight: 700; letter-spacing: .08em; color: var(--ink-4); padding: 4px 6px; border-radius: var(--radius-sm); }
-.bf-secret-eye:hover { color: var(--gold-bright); background: color-mix(in srgb, var(--gold) 8%, transparent); }
-.bf.bf-toggle { display: flex; align-items: center; padding-top: 20px; }
-.tool-type-desc { font-size: 12px; color: var(--ink-3); line-height: 1.6; background: color-mix(in srgb, var(--gold) 7%, transparent); border: 1px dashed color-mix(in srgb, var(--gold) 30%, transparent); border-radius: var(--radius-sm); padding: 8px 12px; }
-.tool-add-row { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 10px; padding: 11px; font-family: var(--font-body); font-size: 13px; font-weight: 600; color: var(--ink-3); background: none; border: 1.5px dashed var(--line); border-radius: var(--radius); cursor: pointer; transition: color .15s ease, border-color .15s ease, background .15s ease; }
-.tool-add-row:hover { color: var(--gold-bright); border-color: color-mix(in srgb, var(--gold) 45%, transparent); background: color-mix(in srgb, var(--gold) 6%, transparent); }
+/* The typed tool form (.tool-form, .bf-secret*, .tool-type-desc, .tool-add-row) and the catalog's
+   search/collapse chrome (.tool-search, .tool-collapse) went with the Tools catalog screen. What
+   remains below is the row list — LocalMcp and the component library both still render it. */
 .tool-list { display: flex; flex-direction: column; }
-/* tool catalog search + collapse */
-.tool-search { display: flex; align-items: center; gap: 8px; background: var(--bg-1); border: 1px solid var(--line);
-  border-radius: 10px; padding: 0 10px; height: 38px; margin-bottom: 10px; transition: border-color .14s, box-shadow .14s; }
-.tool-search:focus-within { border-color: var(--gold-deep); box-shadow: 0 0 0 3px var(--gold-glow); }
-.tool-search .ts-ic { font-size: 13px; opacity: .7; }
-.tool-search input { flex: 1; border: none; background: transparent; outline: none; color: var(--ink); font-size: 13px; font-family: inherit; }
-.tool-search .ts-clear { border: none; background: var(--bg-3); color: var(--ink-3); width: 20px; height: 20px; border-radius: 6px;
-  cursor: pointer; font-size: 10px; flex: none; transition: background .14s, color .14s; }
-.tool-search .ts-clear:hover { background: color-mix(in srgb, var(--crimson) 18%, var(--bg-3)); color: var(--crimson); }
-.tool-collapse { border: 1px solid var(--line); background: var(--bg-3); color: var(--ink-2); width: 28px; height: 28px;
-  border-radius: 8px; cursor: pointer; font-size: 13px; display: grid; place-items: center; transition: background .14s, color .14s, border-color .14s; }
-.tool-collapse:hover { background: color-mix(in srgb, var(--gold) 12%, var(--bg-3)); color: var(--gold-bright); border-color: var(--gold-deep); }
 
 /* Profile modal (avatar account — full-screen centered, never clipped).
    Owned by the auth plugin's profile.jsx; Core keeps the rules because Core plugins ship no CSS. */
