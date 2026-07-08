@@ -1,4 +1,4 @@
-import { ChatMessage, CompleteOpts, CompleteResult, LlmProvider, ProviderAuthError, ToolSpec, redacted } from './types'
+import { ChatMessage, CompleteOpts, CompleteResult, LlmProvider, ProviderAuthError, ToolSpec, redacted, withRedaction } from './types'
 
 const API = 'https://api.anthropic.com/v1/messages'
 const VERSION = '2023-06-01'
@@ -38,23 +38,9 @@ type AnthropicResponseBody = { content?: AnthropicContentBlock[] }
 
 export class AnthropicProvider implements LlmProvider {
   async complete(messages: ChatMessage[], tools: ToolSpec[], opts: CompleteOpts): Promise<CompleteResult> {
-    // Every exit out of this method funnels through this try/catch so the key can never escape
-    // unscrubbed — not just the two explicit `throw`s below, but also fetch() rejecting (network/
-    // DNS/invalid header) and res.json() throwing on a malformed 200 body. Structural, not a
-    // per-call-site patch, because later adapters (OpenAI/Ollama) copy this shape.
-    try {
-      return await this.#send(messages, tools, opts)
-    } catch (err) {
-      // ProviderAuthError already carries a redacted message (built below) and callers
-      // instanceof-check it to clear the stored key — flattening it here would break that.
-      if (err instanceof ProviderAuthError) throw err
-      // AbortSignal-triggered fetch rejections are DOMException/Error with name 'AbortError'.
-      // The agent loop's cancel path relies on catching that distinct identity; an abort never
-      // carries the key (it's a signal, not response data), so it's safe to re-throw as-is.
-      if (err instanceof Error && err.name === 'AbortError') throw err
-      const message = err instanceof Error ? err.message : String(err)
-      throw new Error(redacted(message, opts.apiKey))
-    }
+    // The scrubbing funnel (never let the key escape unscrubbed) lives in withRedaction (types.ts)
+    // so every adapter shares it instead of re-hand-rolling this try/catch.
+    return withRedaction(opts.apiKey, () => this.#send(messages, tools, opts))
   }
 
   async #send(messages: ChatMessage[], tools: ToolSpec[], opts: CompleteOpts): Promise<CompleteResult> {

@@ -21,3 +21,24 @@ export class ProviderAuthError extends Error {}
 export function redacted(message: string, apiKey: string | null): string {
   return apiKey ? message.split(apiKey).join('****') : message
 }
+
+// Every adapter's complete() funnels its whole request/parse path through this so the key can
+// never escape unscrubbed — not just an explicit `throw` inside `fn`, but also fetch() rejecting
+// (network/DNS/invalid header) and res.json() throwing on a malformed 200 body. Shared here
+// (originally hand-rolled per-adapter in anthropic.ts) so adding a vendor never means re-copying
+// the scrubbing funnel.
+export async function withRedaction<T>(apiKey: string | null, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch (err) {
+    // ProviderAuthError already carries a redacted message (built by the caller before throwing)
+    // and callers instanceof-check it to clear the stored key — flattening it here would break that.
+    if (err instanceof ProviderAuthError) throw err
+    // AbortSignal-triggered fetch rejections are DOMException/Error with name 'AbortError'. The
+    // agent loop's cancel path relies on catching that distinct identity; an abort never carries
+    // the key (it's a signal, not response data), so it's safe to re-throw as-is.
+    if (err instanceof Error && err.name === 'AbortError') throw err
+    const message = err instanceof Error ? err.message : String(err)
+    throw new Error(redacted(message, apiKey))
+  }
+}
