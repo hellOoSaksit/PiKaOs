@@ -30,17 +30,12 @@ const I18N_DEFAULT_PACK = (LEX_PACKS.find(p => p.lang === DEFAULT_LANG && p.styl
 
 const ROUTE_META = {
   home:    { icon: "🏠", title: "หน้าหลัก", en: "Home" },
-  admin:   { icon: "👥", title: "จัดการผู้ใช้", en: "User Management" },
   toolsmgr:{ icon: "🧰", title: "จัดการเครื่องมือ", en: "Tools" },
-  roles:   { icon: "🔑", title: "บทบาทและสิทธิ์", en: "Roles & Access" },
-  permissions: { icon: "🗝️", title: "แคตตาล็อกสิทธิ์", en: "Permissions" },
   install: { icon: "📥", title: "ติดตั้ง", en: "Install" },
-  audit:   { icon: "📋", title: "บันทึกการตรวจสอบ", en: "Audit Log" },
   modules: { icon: "🧩", title: "โมดูล / ปลั๊กอิน", en: "Modules / Plugins" },
   marketplace: { icon: "🛍️", title: "มาร์เก็ตเพลส", en: "Marketplace" },
   mypackages: { icon: "📦", title: "แพ็กเกจของฉัน", en: "My Packages & Share" },
   localmcp: { icon: "🖥️", title: "Local MCP", en: "Local MCP" },
-  userDetail: { icon: "👤", title: "ข้อมูลสมาชิก", en: "User" },
   settings:{ icon: "⚙️", title: "ตั้งค่าระบบ", en: "Settings" },
   library: { icon: "🧩", title: "คลังคอมโพเนนต์", en: "Component Library" },
   ...PLUGIN_ROUTE_META,   // plugin routes contribute their own topbar metadata (Phase 6 seam)

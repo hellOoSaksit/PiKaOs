@@ -5,7 +5,6 @@ const NAV = [
     { id: "home", icon: "🏠", label: "หน้าหลัก", en: "Home" },
   ]},
   { group: "ผู้ดูแลระบบ", items: [
-    { id: "admin", icon: "👥", label: "จัดการผู้ใช้", en: "User Management", perm: "user.view.any" },
     { id: "toolsmgr", icon: "🧰", label: "จัดการเครื่องมือ", en: "Tools", perm: "options.manage" },
     // "Install" groups everything that adds/manages plugins. Clicking it lands on the Modules list
     // (its route renders view="modules"); the children jump to each view. Local MCP is NOT a sidebar
@@ -15,10 +14,6 @@ const NAV = [
       { id: "marketplace", icon: "🛍️", label: "มาร์เก็ตเพลส", en: "Marketplace", perm: "plugins.manage" },
       { id: "mypackages", icon: "📦", label: "แพ็กเกจของฉัน", en: "My Packages & Share", perm: "plugins.manage" },
     ]},
-    { id: "permissions", icon: "🗝️", label: "แคตตาล็อกสิทธิ์", en: "Permissions", perm: "user.view.any", children: [
-      { id: "roles", icon: "🔑", label: "บทบาทและสิทธิ์", en: "Roles & Access", perm: "role.manage" },
-    ]},
-    { id: "audit", icon: "📋", label: "บันทึกการตรวจสอบ", en: "Audit Log", perm: "audit.view" },
     { id: "settings", icon: "⚙️", label: "ตั้งค่าระบบ", en: "Settings" },
   ]},
 ];
