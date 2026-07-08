@@ -193,3 +193,16 @@ def test_a_corrupt_allowlist_file_exposes_nothing(state_dir):
     kernel_state.write_json(mcp_catalog.ALLOWLIST_KEY, ["pikaos.knowledge.search"])
     assert mcp_catalog.read_allowlist() == {}
     assert mcp_catalog.allowed_tools(_app()) == []
+
+
+def test_the_mcp_routes_never_reflect_themselves(state_dir):
+    """`PUT /api/mcp/allowlist` is the tool that grants every other tool. If it could be allowlisted,
+    one entry would let an external AI widen its own reach without limit — so the catalog excludes its
+    own surface structurally, not by asking the operator to avoid a footgun."""
+    from app.main import app as real_app
+
+    assert not [t for t in mcp_catalog.build_catalog(real_app) if t.path.startswith("/api/mcp")]
+
+    # …and allowlisting one by name changes nothing, because it was never in the catalog.
+    mcp_catalog.write_allowlist({"pikaos.mcp.put_allowlist": {}})
+    assert mcp_catalog.allowed_tools(real_app) == []

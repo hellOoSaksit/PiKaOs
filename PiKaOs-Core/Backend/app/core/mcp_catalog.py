@@ -54,6 +54,11 @@ _CORE_OWNER = "core"
 _NON_METHODS = frozenset({"HEAD", "OPTIONS"})
 _UNSAFE = re.compile(r"[^a-z0-9]+")
 
+# The catalog never reflects its own surface. `PUT /api/mcp/allowlist` is the tool that grants every
+# other tool: were it reachable, one allowlist entry would let an external AI widen its own reach
+# without limit. Excluded structurally rather than by trusting the operator to avoid the footgun.
+_SELF_PREFIX = "/api/mcp"
+
 _EFFECTS = frozenset(EFFECT_BY_METHOD.values())
 
 # The operator's explicit opt-in list, in kernel local-JSON (the kernel keeps no tables of its own).
@@ -186,6 +191,8 @@ def build_catalog(app: FastAPI) -> list[ToolDescriptor]:
     spec = app.openapi()   # generated once; FastAPI caches it on the app anyway
     out: list[ToolDescriptor] = []
     for op in operations:
+        if op.path.startswith(_SELF_PREFIX):
+            continue
         permission = _permission_of(op)
         if not permission:
             continue
