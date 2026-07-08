@@ -81,3 +81,9 @@ def test_no_provider_falls_back_to_deny():
     # container present but nothing bound under IDENTITY → BootstrapProvider → every data route denied.
     c = TestClient(_app(bind_provider=False))
     assert c.get("/me", headers={"Authorization": "Bearer t"}).status_code == 401
+
+
+def test_require_perm_dependency_declares_its_permission():
+    # Reflection (core/mcp_catalog) reads the permission off the dependency rather than prying it out
+    # of the closure cell, so a route can declare what it enforces.
+    assert require_perm("plugins.manage").required_perm == "plugins.manage"

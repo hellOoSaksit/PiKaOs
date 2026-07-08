@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class NavConfigIn(BaseModel):
@@ -155,3 +155,33 @@ class StorageStatusOut(BaseModel):
     secure: bool
     region: str | None = None
     reachable: bool                        # can the configured store be reached right now
+
+
+# MCP tool catalog (/api/mcp) — Core's capabilities as tools an external AI client may call.
+# `effect` drives the desktop gateway's consent gate: side_effect always prompts.
+class McpToolOut(BaseModel):
+    name: str
+    description: str
+    input_schema: dict
+    effect: str            # read | idempotent_write | side_effect
+
+
+class McpToolsOut(BaseModel):
+    tools: list[McpToolOut]
+
+
+class McpCallIn(BaseModel):
+    name: str
+    arguments: dict = Field(default_factory=dict)
+
+
+class McpCallOut(BaseModel):
+    result: Any
+
+
+class McpAllowlistIn(BaseModel):
+    entries: dict[str, dict]
+
+
+class McpAllowlistOut(BaseModel):
+    entries: dict[str, dict]

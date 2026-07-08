@@ -145,6 +145,9 @@ def require_perm(perm: str):
             raise _FORBIDDEN
         return user
 
+    # Reflection (core/mcp_catalog) reads this to learn what a route enforces. `perm` also sits in
+    # `_dep`'s closure cell, but introspecting `__closure__` is brittle — let the dependency declare it.
+    _dep.required_perm = perm
     return _dep
 
 
