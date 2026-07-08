@@ -9,6 +9,11 @@ export function createWindow(): BrowserWindow {
     width: 1280,
     height: 800,
     show: false,
+    // The renderer paints into `.app`, which is exactly 100vh — so any window area the compositor has
+    // not yet covered (a resize, a restore) shows the WINDOW's background, and Electron defaults that
+    // to white. It read as a white band under the app. Match the default theme's --bg-1 instead; a
+    // dark-theme user sees this only for the frames before the renderer paints.
+    backgroundColor: '#f5f7fb',
     webPreferences: {
       sandbox: true,
       contextIsolation: true,
