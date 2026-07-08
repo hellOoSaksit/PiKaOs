@@ -39,7 +39,7 @@
 .task-prog.complete .task-prog-fill { background: var(--emerald); }
 .task-prog-label { font-size: 11.5px; color: var(--ink-2); font-weight: 600; min-width: 42px; text-align: right; }
 
-/* settings · managed option lists (chips) — screens-tools.jsx, screens-library.jsx, screens-nav.jsx */
+/* settings · managed option lists (chips) — screens-tools.jsx, screens-nav.jsx */
 .opt-select, .opt-multi { display: flex; flex-direction: column; gap: 8px; }
 .opt-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .opt-chip { font-family: var(--font-body); font-size: 12.5px; color: var(--ink-2); background: var(--bg-3); border: 1px solid var(--line);
@@ -59,11 +59,8 @@
 .opt-chip.manage:not(.on) .chip-act:hover { background: var(--bg-4); color: var(--ink); }
 .opt-chip.manage:not(.on) .chip-act.danger:hover { background: color-mix(in srgb, var(--crimson) 14%, transparent); color: var(--crimson); }
 .chip-act:active { transform: scale(.78); transition-duration: .05s; }
-.opt-add-row { display: flex; align-items: center; gap: 7px; }
-.opt-add-row input { flex: 1; min-width: 0; }
-.opt-cancel { background: var(--bg-3); border: 1px solid var(--line); color: var(--ink-2); border-radius: var(--radius-sm); cursor: pointer; padding: 6px 9px; font-size: 12px; }
 
-/* generic settings hint note (reused class name, not sitemap-specific) — screens-tools.jsx, screens-nav.jsx */
+/* generic settings hint note (reused class name, not sitemap-specific) — screens-nav.jsx */
 .sm-set-note { font-size: 11.5px; color: var(--ink-3); }
 
 /* status/priority badge — components/ui/Badge.jsx, Filter.jsx, Search.jsx, Todo.jsx */

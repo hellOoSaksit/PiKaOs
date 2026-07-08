@@ -21,7 +21,4 @@ const NAV = [
   ]},
 ];
 
-const byId = (id) => (window.__charById || {})[id];
-const statusLabel = { on: "ปฏิบัติงาน", busy: "กำลังคิด", idle: "ว่าง", away: "ไม่อยู่" };
-
-export { NAV, byId, statusLabel };
+export { NAV };

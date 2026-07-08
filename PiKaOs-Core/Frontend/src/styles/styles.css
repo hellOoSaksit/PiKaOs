@@ -410,6 +410,18 @@ body {
 /* Menu Manager panel toolbar (help note + reset) */
 .navmgr-bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
 
+/* Save row: the nav arrangement is shared by every user, so edits stage locally and only this row
+   writes them. It sits below the list, sticks to the bottom of the section, and reads its own state. */
+.navmgr-save {
+  position: sticky; bottom: 0;
+  justify-content: flex-end;
+  margin: 4px 0 0; padding: 12px 2px 2px;
+  border-top: 1px solid var(--line);
+  background: var(--bg-2);
+}
+.navmgr-dirty { margin-right: auto; font-size: 12.5px; color: var(--ink-3); }
+.navmgr-dirty.on { color: var(--gold-bright); font-weight: 600; }   /* the system's attention colour */
+
 .sidebar-foot {
   padding: 12px 16px;
   border-top: 1px solid var(--line-soft);
@@ -460,7 +472,17 @@ body {
    shrink below its content, so without this .content grows to full content height,
    overflows .main (which clips), and overflow-y:auto never engages → page can't scroll. */
 .content { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
-.content-pad { padding: 34px 40px 48px; max-width: 1500px; }
+
+/* The utility bar is `position: fixed` and lives OUTSIDE .content, so the scroll container knows
+   nothing about it: scrolled all the way down, the last rows of every page sat behind it. Reserve
+   its footprint (60px tall + 22px off the viewport edge) at the bottom of the scrollable content.
+   The extra breathing room is not decoration — a page that ends flush against the bar still reads
+   as cropped, so the last card must be able to scroll clear of it. */
+:root {
+  --utility-bar-footprint: 82px;
+  --content-bottom-space: calc(var(--utility-bar-footprint) + 64px);
+}
+.content-pad { padding: 34px 40px var(--content-bottom-space); max-width: 1500px; }
 
 /* ============================================================
    PRIMITIVES
@@ -475,6 +497,10 @@ body {
   box-shadow: var(--shadow-panel);
 }
 .panel.inset { background: var(--bg-1); }
+/* Panels dropped straight into a page have no shared flex/grid parent to space them, so two in a row
+   render as one seamless slab. Scoped to direct children of `.content-pad` on purpose: a panel list
+   inside a `.col`/grid already gets its rhythm from that container's `gap`. */
+.content-pad > .panel + .panel { margin-top: 14px; }
 .panel-head {
   display: flex; align-items: center; gap: 10px;
   padding: 14px 16px;

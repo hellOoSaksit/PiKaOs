@@ -52,13 +52,16 @@ button, a, .nav-item, .room-card, [role="button"] { -webkit-tap-highlight-color:
    The breakpoint below is mirrored there as NAV_DRAWER_BP — keep them in step. */
 .nav-scrim { display: none; }
 
+/* Responsive padding tightens the top/sides ONLY — never `padding` shorthand. The utility bar is
+   fixed at a constant 82px footprint at every width, so a shorthand here silently resets
+   `--content-bottom-space` and re-buries the last card behind the bar (styles.css owns the bottom). */
 @media (max-width: 1180px) {
-  .content-pad { padding: 28px 28px 40px; }
+  .content-pad { padding-top: 28px; padding-inline: 28px; }
 }
 
 /* ---------- iPad / tablet (portrait & landscape) ---------- */
 @media (min-width: 641px) and (max-width: 1024px) {
-  .content-pad { padding: 24px 24px 38px; }
+  .content-pad { padding-top: 24px; padding-inline: 24px; }
   .page-title { font-size: 26px; }
   /* dense grids relax to 2-up on tablet */
   .room-picker { grid-template-columns: repeat(2, 1fr); }
@@ -85,7 +88,7 @@ button, a, .nav-item, .room-card, [role="button"] { -webkit-tap-highlight-color:
     transition: opacity .26s ease;
   }
   .app[data-drawer="open"] .nav-scrim { opacity: 1; pointer-events: auto; }
-  .content-pad { padding: 22px 20px 36px; }
+  .content-pad { padding-top: 22px; padding-inline: 20px; }
   /* let horizontal control rows scroll rather than overflow */
   .world-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
   .world-tabs::-webkit-scrollbar { display: none; }
@@ -98,7 +101,7 @@ button, a, .nav-item, .room-card, [role="button"] { -webkit-tap-highlight-color:
   .page-title { font-size: 22px; }
   .page-head { flex-wrap: wrap; align-items: flex-start; }
   .page-head .row, .page-head > div:last-child { width: 100%; }
-  .content-pad { padding: 18px 14px 32px; }
+  .content-pad { padding-top: 18px; padding-inline: 14px; }
   .me-hero { padding: 18px 16px; }
   .me-hero-actions { width: 100%; }
   .room-picker { grid-template-columns: 1fr 1fr; gap: 12px; }

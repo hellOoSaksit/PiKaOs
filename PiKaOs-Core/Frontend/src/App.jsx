@@ -3,17 +3,15 @@ import React from 'react';
 const { useState, useEffect } = React;
 import { NAV } from './data/data.jsx';
 import { loadNav, saveNav, mergeWithDefault } from './data/data-nav.jsx';
-import { getNavConfig, setNavConfig, getMySettings, setMySetting, getGlobalConfig, setGlobalConfig, setupStatus, setToken, getCapabilities } from './lib/api.js';
+import { getNavConfig, setNavConfig, getMySettings, setMySetting, setupStatus, setToken, getCapabilities } from './lib/api.js';
 import { resolveShellMode } from './lib/shell-mode.js';
 import { useShellNav } from './lib/shell-nav.js';
-import { applyGlobalConfig } from './lib/characters.jsx';
 import { Settings } from './screens/screens-extra.jsx';
 import { FirstRun } from './screens/FirstRun.jsx';
 import { KernelOnlyShell } from './screens/KernelOnlyShell.jsx';
 import { KernelHome } from './screens/KernelHome.jsx';
 import { PluginsManager } from './screens/screens-plugins.jsx';
 import { ToolsManager } from './screens/screens-tools.jsx';
-import { ComponentLibrary } from './screens/screens-library.jsx';
 import { useAuth } from './lib/auth.jsx';
 import { BottomUtilityBar } from './components/ui/BottomUtilityBar.jsx';
 import { Icon, renderIcon } from './components/ui/icons.jsx';
@@ -38,7 +36,6 @@ const ROUTE_META = {
   mypackages: { icon: "package", title: "แพ็กเกจของฉัน", en: "My Packages & Share" },
   localmcp: { icon: "monitor", title: "Local MCP", en: "Local MCP" },
   settings:{ icon: "settings", title: "ตั้งค่าระบบ", en: "Settings" },
-  library: { icon: "components", title: "คลังคอมโพเนนต์", en: "Component Library" },
   ...PLUGIN_ROUTE_META,   // plugin routes contribute their own topbar metadata (Phase 6 seam)
 };
 
@@ -233,16 +230,9 @@ function App() {
   }, [signedIn]);
   useEffect(() => { if (settingsLoaded.current) setMySetting("theme", theme).catch(() => {}); }, [theme]);
   useEffect(() => { if (settingsLoaded.current) setMySetting("lex", lex).catch(() => {}); }, [lex]);
-  // global Tools/roster config (positions/skills, tool catalog, skill docs) — shared by everyone.
-  // Pull into the local cache on sign-in; admin edits push back (save* fire window.__syncGlobal).
-  useEffect(() => {
-    if (!signedIn) return;
-    window.__syncGlobal = (key, value) => { if (can("options.manage")) setGlobalConfig(key, value).catch(() => {}); };
-    let alive = true;
-    ["options", "skill_docs", "tool_cfgs"].forEach(k =>
-      getGlobalConfig(k).then(r => { if (alive && r && r.value != null) applyGlobalConfig(k, r.value); }).catch(() => {}));
-    return () => { alive = false; };
-  }, [signedIn]);
+  // The `options`/`skill_docs`/`tool_cfgs` global blobs were pulled here on sign-in for the Tools
+  // catalog + agent-builder screens. Both are gone, and nothing else ever read them — the sidebar
+  // arrangement has its own `/api/settings/nav` route (getNavConfig/setNavConfig below).
   // ทุกอย่างมาจากชุดที่กำลังใช้ — ภาษา/โหมดองค์กร derive จากข้อมูลในไฟล์ ไม่มี hardcode
   const activePack = packById(lex) || defaultPack() || {};
   const language = activePack.lang || "th";
@@ -305,8 +295,7 @@ function App() {
       case "marketplace": return guard("plugins.manage", <PluginsManager Sys={Sys} view="market" />);
       case "mypackages": return guard("plugins.manage", <PluginsManager Sys={Sys} view="mine" />);
       // Local MCP moved into the Marketplace hub's "Local MCP" tab (desktop-only) — no standalone route.
-      case "settings": return <Settings theme={theme} setTheme={setTheme} lex={lex} setLex={setLex} pickLanguage={pickLanguage} language={language} formal={formal} go={go} t={t} />;
-      case "library": return <ComponentLibrary onBack={() => go("settings")} t={t} />;
+      case "settings": return <Settings theme={theme} setTheme={setTheme} lex={lex} setLex={setLex} pickLanguage={pickLanguage} language={language} formal={formal} t={t} />;
       default: {
         // a route owned by an enabled plugin (Phase 6 seam) — else fall back to kernel Home.
         const pluginEl = renderPluginRoute(route, { t, can, language, go, me });

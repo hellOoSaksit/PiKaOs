@@ -2,9 +2,7 @@ import { createRoot } from 'react-dom/client';
 import './styles/index.css';
 
 // ---- app modules, imported in dependency order for side effects + window bus ----
-import './data/data.jsx';
 import './lib/i18n.jsx';
-import './lib/characters.jsx';
 import './components/components.jsx';
 import './screens/screens-extra.jsx';
 import './lib/ui-modal.jsx';

@@ -60,7 +60,7 @@ function PluginRow({ p, T, may, busy, onInstall, onEnable, onDisable, onUninstal
   );
 }
 
-function GitCredentialsPanel({ T, busy, onSave }) {
+function GitCredentialsPanel({ T, t, busy, onSave }) {
   const [host, setHost] = useState('');
   const [token, setToken] = useState('');
   const submit = async () => {
@@ -69,10 +69,10 @@ function GitCredentialsPanel({ T, busy, onSave }) {
     setHost(''); setToken('');
   };
   return (
-    <Panel>
+    <Panel title={t('pkg.cred.title')} en="CREDENTIALS">
       <div className="faint" style={{ fontSize: 12, marginBottom: 6 }}>
-        {T('Private repo credentials — a token per host, stored encrypted, never shown again.',
-           'ข้อมูลรับรองสำหรับ repo ส่วนตัว — โทเคนต่อโฮสต์ เก็บแบบเข้ารหัส ไม่แสดงซ้ำ')}
+        {T('One token per host, stored encrypted, never shown again.',
+           'หนึ่งโทเคนต่อโฮสต์ เก็บแบบเข้ารหัส ไม่แสดงซ้ำ')}
       </div>
       <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <input className="bf-input" style={{ flex: 1, minWidth: 160 }} placeholder={T('Host (e.g. github.com)', 'โฮสต์ (เช่น github.com)')}
@@ -298,7 +298,7 @@ export function PluginsManager({ Sys, view = 'modules' }) {
                     'ติดตั้งแพ็กเกจจากลิงก์ git โดยตรง · การแชร์แพ็กเกจของคุณขึ้นมาร์เก็ตเพลสจะมาเร็วๆ นี้')} />
           {may ? (
             <>
-              <Panel>
+              <Panel title={t('pkg.git.title')} en="GIT INSTALL">
                 <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <input className="bf-input" style={{ flex: 2, minWidth: 240 }} placeholder={T('Git URL to install…', 'ลิงก์ Git ที่จะติดตั้ง…')}
                     value={gitUrl} onChange={e => setGitUrl(e.target.value)} disabled={!may} />
@@ -317,7 +317,7 @@ export function PluginsManager({ Sys, view = 'modules' }) {
                   'เว้นแท็กว่างไว้เพื่อตรึงเวอร์ชัน release ล่าสุดโดยอัตโนมัติ')}</HelpNote>
               </Panel>
 
-              <GitCredentialsPanel T={T} busy={busy} onSave={saveGitCredential} />
+              <GitCredentialsPanel T={T} t={t} busy={busy} onSave={saveGitCredential} />
             </>
           ) : (
             <HelpNote tag="local">{T('You can view modules, but installing / enabling needs the “plugins.manage” permission.',

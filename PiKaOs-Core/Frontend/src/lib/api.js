@@ -168,19 +168,9 @@ export async function getCapabilities() { return raw("/capabilities"); }
 // The active API base — per-server client-data namespacing keys off it (spec §5).
 export function getApiBase() { return base; }
 
-// --- LLM provider config API (admin: which provider/model/key the engine uses — no-hardcode) ---
-// The API key is write-only: send it in the body to set/replace it; the server never returns it
-// (responses carry `api_key_set` only). Omit it on update to keep the stored key unchanged.
-export async function llmConnections() { return raw("/llm/connections"); }
-export async function createLlmConnection(body) { return raw("/llm/connections", { method: "POST", body }); }
-export async function updateLlmConnection(id, body) { return raw(`/llm/connections/${id}`, { method: "PATCH", body }); }
-export async function activateLlmConnection(id) { return raw(`/llm/connections/${id}/activate`, { method: "POST" }); }
-export async function deleteLlmConnection(id) { return raw(`/llm/connections/${id}`, { method: "DELETE" }); }
-
-// Per-system LLM assignment: which connection a role (engine/search/summarize) uses.
-// connectionId=null clears the binding → that system falls back to the active connection.
-export async function llmRoles() { return raw("/llm/roles"); }
-export async function setLlmRole(role, connectionId) { return raw(`/llm/roles/${role}`, { method: "PUT", body: { connection_id: connectionId } }); }
+// The `/llm/*` client (provider connections + per-role assignment) lived here for the Tools screen's
+// AI-model panel. Both the panel and those routes left Core — the engine and its providers are the
+// `ai` plugin now — so a plugin that ships that panel brings its own client with it.
 
 // --- knowledge / codex documents API (markdown-as-truth store + RAG search) ---
 // Files live in MinIO; the backend chunks + embeds them in the background (ingest_status).
@@ -221,11 +211,6 @@ export async function reindexKnowledge(onlyStale = true) {
   return raw(`/knowledge/reindex?only_stale=${onlyStale ? "true" : "false"}`, { method: "POST" });
 }
 
-// --- object storage status (admin: see/test the configured store — read-only, no secrets) ---
-// Storage creds are bootstrap config (env only); these endpoints never mutate them. Need infra.manage.
-export async function storageStatus() { return raw("/storage/status"); }
-export async function storageTest() { return raw("/storage/test", { method: "POST" }); }
-
 // --- shared sidebar nav arrangement (server-scoped; admin edits, every user/device sees the same) ---
 export async function getNavConfig() { return raw("/settings/nav"); }                                          // any authenticated user
 export async function setNavConfig(value) { return raw("/settings/nav", { method: "PUT", body: { value } }); }  // requires options.manage
@@ -234,9 +219,9 @@ export async function setNavConfig(value) { return raw("/settings/nav", { method
 export async function getMySettings() { return raw("/settings/me"); }                                           // { values: {...} }
 export async function setMySetting(key, value) { return raw(`/settings/me/${key}`, { method: "PUT", body: { value } }); }
 
-// --- global config blobs (Tools/system settings; same for everyone) ---
-export async function getGlobalConfig(key) { return raw(`/settings/global/${key}`); }                           // { value }
-export async function setGlobalConfig(key, value) { return raw(`/settings/global/${key}`, { method: "PUT", body: { value } }); }  // options.manage
+// The `/settings/global/{key}` client fed the Tools catalog's `options`/`skill_docs`/`tool_cfgs`
+// blobs. Those screens are gone and nothing else read them; the route still exists server-side for
+// whatever needs a shared blob next.
 
 // --- plugins (the install / Modules screen — reads are any authenticated user; mutations need
 // plugins.manage). Mutations return { plugins:[...], restart_required } (restart-to-apply). ---

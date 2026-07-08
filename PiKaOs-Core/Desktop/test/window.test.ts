@@ -60,6 +60,15 @@ it('sets sandbox, contextIsolation, nodeIntegration:false, webSecurity, a preloa
   expect(win.opts.webPreferences.preload).toMatch(/preload[/\\]index\.js$/)
 })
 
+// Without this the window's own background is white, and every area the compositor has not covered
+// yet (resize, restore) flashes as a white band under the 100vh app shell.
+it('paints the window background with the app background, not the default white', async () => {
+  const { createWindow } = await import('../src/main/window')
+  const win = createWindow() as unknown as FakeBrowserWindow
+
+  expect(win.opts.backgroundColor).toBe('#f5f7fb')
+})
+
 it('shows the window only after ready-to-show fires', async () => {
   const { createWindow } = await import('../src/main/window')
   const win = createWindow() as unknown as FakeBrowserWindow
