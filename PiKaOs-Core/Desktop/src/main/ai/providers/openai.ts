@@ -24,9 +24,24 @@ function toOpenAi(messages: ChatMessage[]) {
 }
 
 // No "DOM" lib in this tsconfig means res.json() returns unknown — type the response body
-// locally, same pattern as anthropic.ts's AnthropicResponseBody.
-type OpenAiToolCall = { id: string; function: { name: string; arguments: string } }
+// locally, same pattern as anthropic.ts's AnthropicResponseBody. Fields are optional (not the
+// required shape a well-formed response would have) because the vendor body is untrusted input —
+// parseOpenAiToolCall below is what actually validates each entry before it becomes a ToolCall.
+type OpenAiToolCall = { id?: string; function?: { name?: string; arguments?: string } }
 type OpenAiResponseBody = { choices?: Array<{ message?: { content?: string | null; tool_calls?: OpenAiToolCall[] } }> }
+
+// A malformed tool_calls entry (missing `function`/`name`, or `arguments` that isn't valid JSON)
+// is untrusted vendor data, not a program bug — one bad entry must not abort the whole turn and
+// discard every other valid tool call / the response text, same reasoning as anthropic.ts's
+// tool_use block filter. Returns null for anything that doesn't parse; callers filter nulls out.
+function parseOpenAiToolCall(c: OpenAiToolCall): { id: string; name: string; arguments: Record<string, unknown> } | null {
+  if (typeof c.id !== 'string' || typeof c.function?.name !== 'string') return null
+  try {
+    return { id: c.id, name: c.function.name, arguments: JSON.parse(c.function.arguments || '{}') as Record<string, unknown> }
+  } catch {
+    return null
+  }
+}
 
 export class OpenAiProvider implements LlmProvider {
   async complete(messages: ChatMessage[], tools: ToolSpec[], opts: CompleteOpts): Promise<CompleteResult> {
@@ -55,7 +70,9 @@ export class OpenAiProvider implements LlmProvider {
       text: msg.content ?? '',
       // function.arguments is a JSON-encoded string on this vendor (confirmed against current
       // OpenAI docs — see task-2-report.md), unlike Ollama's already-parsed object.
-      toolCalls: (msg.tool_calls ?? []).map((c) => ({ id: c.id, name: c.function.name, arguments: JSON.parse(c.function.arguments || '{}') as Record<string, unknown> })),
+      toolCalls: (msg.tool_calls ?? [])
+        .map(parseOpenAiToolCall)
+        .filter((c): c is { id: string; name: string; arguments: Record<string, unknown> } => c !== null),
     }
   }
 }

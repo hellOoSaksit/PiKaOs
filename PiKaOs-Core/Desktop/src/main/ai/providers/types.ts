@@ -14,6 +14,14 @@ export interface LlmProvider {
 
 // 401/403 from the vendor. Upstream (ai/ipc.ts) clears the stored key on this — retrying a bad
 // key is a dev loop (rule 9).
+//
+// CONTRACT (enforce this yourself — the type system can't): the `message` you pass to this
+// constructor MUST already be redacted, e.g. `new ProviderAuthError(redacted(rawBody, apiKey))`.
+// withRedaction()'s catch block special-cases `instanceof ProviderAuthError` and re-throws it
+// UNSCRUBBED — that's what lets a caller build a deliberately-formatted message without
+// withRedaction mangling it, but it also means withRedaction does NOT scrub for you here.
+// `throw new ProviderAuthError(rawVendorBody)` leaks the key straight through. Follow the
+// established pattern in anthropic.ts / openai.ts: redact first, construct second.
 export class ProviderAuthError extends Error {}
 
 // A thrown error's message may embed the response body, and the body may echo the key back.
@@ -31,8 +39,10 @@ export async function withRedaction<T>(apiKey: string | null, fn: () => Promise<
   try {
     return await fn()
   } catch (err) {
-    // ProviderAuthError already carries a redacted message (built by the caller before throwing)
-    // and callers instanceof-check it to clear the stored key — flattening it here would break that.
+    // ProviderAuthError already carries a redacted message (built by the caller before throwing —
+    // see the CONTRACT comment on the class above) and callers instanceof-check it to clear the
+    // stored key — flattening it here would break that. This helper trusts, not enforces, the
+    // contract: it does NOT re-redact ProviderAuthError's message.
     if (err instanceof ProviderAuthError) throw err
     // AbortSignal-triggered fetch rejections are DOMException/Error with name 'AbortError'. The
     // agent loop's cancel path relies on catching that distinct identity; an abort never carries
