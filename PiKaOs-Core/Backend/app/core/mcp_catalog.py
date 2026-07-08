@@ -59,6 +59,14 @@ _UNSAFE = re.compile(r"[^a-z0-9]+")
 # without limit. Excluded structurally rather than by trusting the operator to avoid the footgun.
 _SELF_PREFIX = "/api/mcp"
 
+# The catalog never exposes the authority to change the program. `plugins.manage` guards install /
+# enable / disable / uninstall / purge — an AI holding any of them could rewrite the system it runs
+# in. The allowlist cannot carry this rule: it is deny-by-default but *grantable*, and in open mode
+# every caller is owner-admin, so one entry away from install_from_git is RCE. Excluded here, at the
+# source, for the same reason `_SELF_PREFIX` is — and keyed on the PERMISSION, not the tool name, so
+# a future plugin route that requests this authority is excluded without anyone remembering to add it.
+FORBIDDEN_PERMISSIONS: frozenset[str] = frozenset({"plugins.manage"})
+
 _EFFECTS = frozenset(EFFECT_BY_METHOD.values())
 
 # The operator's explicit opt-in list, in kernel local-JSON (the kernel keeps no tables of its own).
@@ -194,7 +202,7 @@ def build_catalog(app: FastAPI) -> list[ToolDescriptor]:
         if op.path.startswith(_SELF_PREFIX):
             continue
         permission = _permission_of(op)
-        if not permission:
+        if not permission or permission in FORBIDDEN_PERMISSIONS:
             continue
         for method in sorted(op.methods - _NON_METHODS):
             schema, description = _input_schema(spec, op.path, method)

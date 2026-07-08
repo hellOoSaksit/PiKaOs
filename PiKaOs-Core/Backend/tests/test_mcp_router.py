@@ -204,3 +204,14 @@ def test_the_real_core_app_reflects_a_non_empty_catalog_and_exposes_nothing_by_d
     assert all(t.permission for t in catalog)               # never an unguarded tool
     assert all(t.name.startswith("pikaos.") for t in catalog)
     assert mcp_catalog.allowed_tools(real_app) == []        # deny by default, on the real app
+
+
+def test_real_app_catalog_exposes_no_program_mutating_tool():
+    """The _SELF_PREFIX lesson: only reflecting the REAL app catches this class of regression. A
+    throwaway app cannot know which of Core's routes are guarded by plugins.manage."""
+    from app.main import app as real_app
+
+    tools = mcp_catalog.build_catalog(real_app)
+    assert tools, "catalog came back empty — reflection is broken, not merely filtered"
+    offenders = [t.name for t in tools if t.permission in mcp_catalog.FORBIDDEN_PERMISSIONS]
+    assert offenders == [], f"program-mutating tools reachable by an AI: {offenders}"

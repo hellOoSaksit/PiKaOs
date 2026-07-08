@@ -195,6 +195,37 @@ def test_a_corrupt_allowlist_file_exposes_nothing(state_dir):
     assert mcp_catalog.allowed_tools(_app()) == []
 
 
+def test_forbidden_permissions_never_enter_the_catalog():
+    """A route guarded by plugins.manage is the authority to change the program itself. It must not
+    exist as a tool — not merely be absent from the allowlist, which an operator can widen."""
+    app = FastAPI()
+
+    @app.post("/api/plugins/install", dependencies=[Depends(require_perm("plugins.manage"))])
+    async def install() -> dict:
+        return {}
+
+    @app.put("/api/settings/nav", dependencies=[Depends(require_perm("settings.manage"))])
+    async def set_nav() -> dict:
+        return {}
+
+    tools = build_catalog(app)
+    assert not any(t.permission == "plugins.manage" for t in tools)
+    assert any(t.permission == "settings.manage" for t in tools)   # settings still exposed
+
+
+def test_allowlisting_a_forbidden_tool_cannot_resurrect_it(state_dir):
+    """Even a hand-written allowlist entry naming the tool yields nothing: allowed_tools() intersects
+    with build_catalog(), which never emitted it."""
+    app = FastAPI()
+
+    @app.post("/api/plugins/install", dependencies=[Depends(require_perm("plugins.manage"))])
+    async def install() -> dict:
+        return {}
+
+    mcp_catalog.write_allowlist({"pikaos.plugins.install": {}})
+    assert mcp_catalog.allowed_tools(app) == []
+
+
 def test_the_mcp_routes_never_reflect_themselves(state_dir):
     """`PUT /api/mcp/allowlist` is the tool that grants every other tool. If it could be allowlisted,
     one entry would let an external AI widen its own reach without limit — so the catalog excludes its
