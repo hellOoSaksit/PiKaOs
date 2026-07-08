@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { UtilityBarButton } from './UtilityBarButton.jsx';
 import { PopoverPanel } from './PopoverPanel.jsx';
+import { Icon } from './icons.jsx';
 
 const isAvImg = (a) => typeof a === 'string' && (a.startsWith('data:') || a.startsWith('http'));
 
+// The bar's buttons size their own glyph (no CSS slot owns it), so `size` is explicit here.
 const ICONS = {
-  home: <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11.5 12 4.5l8 7"/><path d="M6 9.8V19.5h12V9.8"/><path d="M10 19.5V14h4v5.5"/></svg>,
-  search: <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="6.2"/><path d="m20 20-3.8-3.8"/></svg>,
-  notifications: <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M18 9.5a6 6 0 1 0-12 0c0 4.8-2 6.3-2 6.3h16s-2-1.5-2-6.3z"/><path d="M10.2 19.2a2 2 0 0 0 3.6 0"/></svg>,
-  add: <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>,
-  chat: <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6.5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2.5V20l4-3.5H18a2 2 0 0 0 2-2v-8z"/></svg>,
+  home: <Icon name="home" size={23} />,
+  search: <Icon name="search" size={23} />,
+  notifications: <Icon name="notifications" size={23} />,
+  add: <Icon name="add" size={23} />,
+  chat: <Icon name="chat" size={23} />,
 };
 
 /**

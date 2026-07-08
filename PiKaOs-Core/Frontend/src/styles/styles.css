@@ -228,6 +228,17 @@ body {
 .num { font-family: var(--font-num); font-weight: 700; }
 .thai-serif { font-family: var(--font-head); }
 
+/* ---------- Icons ---------- */
+/* Design-system icons (components/ui/icons.jsx) are monochrome: they stroke with the inherited
+   `currentColor`, so light/dark needs no second sheet. Semantic colour is opt-in per call site
+   via `tone` — the icon itself never hardcodes one. Size is owned by the slot, not the glyph. */
+.ico { display: block; flex: none; }
+.ico[data-tone="danger"] { color: var(--crimson); }
+.ico[data-tone="warn"]   { color: var(--amber); }
+.ico[data-tone="ok"]     { color: var(--emerald); }
+.ico[data-tone="info"]   { color: var(--sapphire); }
+.ico[data-tone="accent"] { color: var(--gold-bright); }
+
 /* ============================================================
    APP SHELL
    ============================================================ */
@@ -319,7 +330,9 @@ body {
   transition: background .14s, color .14s, border-color .14s;
   user-select: none;
 }
-.nav-item .ni-icon { width: 18px; text-align: center; opacity: .85; font-size: 15px; flex: 0 0 18px; }
+/* font-size still applies: the slot also renders a raw glyph when a plugin hasn't migrated to icon names */
+.nav-item .ni-icon { width: 18px; flex: 0 0 18px; display: inline-flex; align-items: center; justify-content: center; opacity: .85; font-size: 15px; }
+.nav-item .ni-icon > svg { width: 18px; height: 18px; }
 .nav-item:hover { background: var(--bg-3); color: var(--ink); }
 .nav-item.active {
   background: var(--raised-grad);
@@ -344,6 +357,7 @@ body {
 .nav-sub { overflow: hidden; max-height: 0; opacity: 0; transition: max-height .28s ease, opacity .2s ease; }
 .nav-sub.open { max-height: 600px; opacity: 1; }
 .nav-subitem .ni-icon { opacity: .65; font-size: 13px; }
+.nav-subitem .ni-icon > svg { width: 16px; height: 16px; }
 .nav-caret {
   display: inline-flex; align-items: center; justify-content: center;
   width: 22px; height: 22px; margin-left: 6px; flex: 0 0 22px;
@@ -361,7 +375,8 @@ body {
 .navmgr-row.is-hidden { opacity: .5; }
 .navmgr-row.dragging { opacity: .4; border-style: dashed; }
 .navmgr-grip { cursor: grab; color: var(--ink-4); font-size: 14px; user-select: none; }
-.navmgr-ic { width: 20px; text-align: center; font-size: 15px; }
+.navmgr-ic { width: 20px; flex: 0 0 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 15px; }
+.navmgr-ic > svg { width: 18px; height: 18px; }
 .navmgr-bd { flex: 1; min-width: 0; }
 .navmgr-name { font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 8px; }
 .navmgr-tag { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: .1em; color: var(--ink); background: var(--bg-4); border: 1px solid var(--line); border-radius: 20px; padding: 1px 7px; }
@@ -401,7 +416,8 @@ body {
   backdrop-filter: blur(4px);
 }
 .topbar-title { display: flex; align-items: center; gap: 11px; min-width: 0; }
-.topbar-title .tt-icon { font-size: 18px; color: var(--ink-3); }
+.topbar-title .tt-icon { font-size: 18px; color: var(--ink-3); display: inline-flex; align-items: center; }
+.topbar-title .tt-icon > svg { width: 20px; height: 20px; }
 .topbar-title h1 { font-family: var(--font-head); font-weight: 700; font-size: 18px; margin: 0; color: var(--ink); white-space: nowrap; }
 .topbar-title .tt-en { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); }
 .live-badge {

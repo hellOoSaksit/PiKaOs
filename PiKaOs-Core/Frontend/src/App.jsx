@@ -16,6 +16,7 @@ import { ToolsManager } from './screens/screens-tools.jsx';
 import { ComponentLibrary } from './screens/screens-library.jsx';
 import { useAuth } from './lib/auth.jsx';
 import { BottomUtilityBar } from './components/ui/BottomUtilityBar.jsx';
+import { renderIcon } from './components/ui/icons.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
 import { UILoadingHost, UIModalHost } from './lib/ui-modal.jsx';
 import { makeT, DEFAULT_LANG, DEFAULT_STYLE, packById, defaultPack, defaultPackForLang, LEX_PACKS } from './lib/i18n.jsx';
@@ -29,15 +30,15 @@ const I18N_DEFAULT_PACK = (LEX_PACKS.find(p => p.lang === DEFAULT_LANG && p.styl
    ============================================================ */
 
 const ROUTE_META = {
-  home:    { icon: "🏠", title: "หน้าหลัก", en: "Home" },
-  toolsmgr:{ icon: "🧰", title: "จัดการเครื่องมือ", en: "Tools" },
-  install: { icon: "📥", title: "ติดตั้ง", en: "Install" },
-  modules: { icon: "🧩", title: "โมดูล / ปลั๊กอิน", en: "Modules / Plugins" },
-  marketplace: { icon: "🛍️", title: "มาร์เก็ตเพลส", en: "Marketplace" },
-  mypackages: { icon: "📦", title: "แพ็กเกจของฉัน", en: "My Packages & Share" },
-  localmcp: { icon: "🖥️", title: "Local MCP", en: "Local MCP" },
-  settings:{ icon: "⚙️", title: "ตั้งค่าระบบ", en: "Settings" },
-  library: { icon: "🧩", title: "คลังคอมโพเนนต์", en: "Component Library" },
+  home:    { icon: "home", title: "หน้าหลัก", en: "Home" },
+  toolsmgr:{ icon: "tools", title: "จัดการเครื่องมือ", en: "Tools" },
+  install: { icon: "download", title: "ติดตั้ง", en: "Install" },
+  modules: { icon: "puzzle", title: "โมดูล / ปลั๊กอิน", en: "Modules / Plugins" },
+  marketplace: { icon: "cart", title: "มาร์เก็ตเพลส", en: "Marketplace" },
+  mypackages: { icon: "package", title: "แพ็กเกจของฉัน", en: "My Packages & Share" },
+  localmcp: { icon: "monitor", title: "Local MCP", en: "Local MCP" },
+  settings:{ icon: "settings", title: "ตั้งค่าระบบ", en: "Settings" },
+  library: { icon: "components", title: "คลังคอมโพเนนต์", en: "Component Library" },
   ...PLUGIN_ROUTE_META,   // plugin routes contribute their own topbar metadata (Phase 6 seam)
 };
 
@@ -62,7 +63,7 @@ function NavNode({ node, depth, route, go, t, can, navOpen, setNavOpen }) {
     <React.Fragment>
       <div className={`nav-item ${depth > 0 ? "nav-subitem" : ""} ${route === node.id ? "active" : ""}`}
         style={depth > 0 ? { marginLeft: depth * 16 } : undefined} onClick={() => go(node.id)}>
-        <span className="ni-icon">{node.icon}</span>
+        <span className="ni-icon">{renderIcon(node.icon)}</span>
         <span style={{ flex: 1 }}>{node.customLabel || t("nav." + node.id)}</span>
         {node.tag && <span className={`ni-tag ${node.tag === "live" ? "alert" : ""}`}>{node.tag === "live" ? "● LIVE" : node.tag}</span>}
         {hasKids && (
@@ -265,7 +266,7 @@ function Topbar({ route, theme, setTheme, user, language, t, me, onSignOut, onSa
   return (
     <header className="topbar" data-no-lex>
       <div className="topbar-title">
-        <span className="tt-icon">{m.icon}</span>
+        <span className="tt-icon">{renderIcon(m.icon)}</span>
         <h1>{title}</h1>
         {language !== "en" && <span className="tt-en">{tEn("route." + route + ".title")}</span>}
         {live && <span className="live-badge" style={{ marginLeft: 6 }}><span className="pulse-dot" />LIVE</span>}

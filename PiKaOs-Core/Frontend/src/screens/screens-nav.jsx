@@ -7,6 +7,7 @@
 import React from 'react';
 const { useState } = React;
 import { Btn } from '../components/components.jsx';
+import { renderIcon } from '../components/ui/icons.jsx';
 import {
   MAX_DEPTH, moveUp, moveDown, indent, outdent, canIndent, canOutdent,
   toggleHidden, rename, reorderBefore, resetNav,
@@ -50,7 +51,7 @@ function NavManagerPanel({ Sys, t }) {
           onDrop={(e) => { e.preventDefault(); if (drag && drag !== node.id) setNav(reorderBefore(nav, drag, node.id)); setDrag(null); }}
           onDragEnd={() => setDrag(null)}>
           <span className="navmgr-grip" title={T("Drag to reorder", "ลากเพื่อจัดลำดับ")}>⠿</span>
-          <span className="navmgr-ic">{node.icon}</span>
+          <span className="navmgr-ic">{renderIcon(node.icon)}</span>
           <div className="navmgr-bd">
             <div className="navmgr-name">{labelOf(node)}{node.customLabel && <span className="navmgr-tag">{T("custom", "ตั้งเอง")}</span>}{hidden && <span className="navmgr-tag">{T("hidden", "ซ่อน")}</span>}</div>
             <div className="navmgr-meta mono faint">{node.id} · {LEVEL_NAME[depth] || ("L" + (depth + 1))}{node.perm ? " · " + node.perm : ""}</div>
