@@ -59,6 +59,18 @@
   --radius-lg: 22px;
   --radius-sm: 10px;
 
+  /* spacing scale — every gap/margin/padding in a screen comes from here, never a literal px.
+     Screens had no scale to reach for, so each grew its own inline `style={{gap:16}}`. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* the dimming layer behind any overlay (modal, drawer, drawer-on-mobile) */
+  --scrim: rgba(17, 23, 38, 0.48);
+
   --sidebar-w: 256px;
   --sidebar-rail-w: 68px;   /* the collapsed sidebar; --rail-w below is the RIGHT-hand rail */
   --rail-w: 360px;
@@ -88,6 +100,7 @@
   --gold: #6076f6; --gold-bright: #8194f9; --gold-deep: #4d63ec; --gold-glow: rgba(96,118,246,0.34);
   --bronze: #8b93a1; --crimson: #f0524f; --crimson-deep: #d23f3c; --emerald: #2bbd6b; --amber: #eda22b; --sapphire: #5b94f7; --amethyst: #9a7cf5; --ruby: #f0588f;
   --letter-face: #eef1ff;
+  --scrim: rgba(0, 0, 0, 0.62);
   --panel-grad: linear-gradient(180deg, #191d25 0%, #171a21 100%);
   --raised-grad: linear-gradient(180deg, #20242d 0%, #1d2129 100%);
   --gold-grad: linear-gradient(180deg, #6076f6 0%, #4f64ec 100%);
@@ -507,7 +520,9 @@ body {
   border-bottom: 1px solid var(--line-soft);
 }
 .panel-head h3 { font-family: var(--font-head); font-weight: 700; font-size: 15px; margin: 0; color: var(--ink); }
-.panel-head .ph-icon { color: var(--gold); font-size: 15px; }
+/* the slot owns the size: `font-size` covers a legacy emoji, the `.ico` rule an `Icon` svg */
+.panel-head .ph-icon { color: var(--gold); font-size: 15px; display: inline-flex; align-items: center; }
+.panel-head .ph-icon .ico { width: 17px; height: 17px; }
 .panel-head .ph-spacer { flex: 1; }
 .panel-body { padding: 16px; }
 .panel-body.no-pad { padding: 0; }
@@ -520,12 +535,14 @@ body {
 .ornate::before { top: 7px; left: 7px; border-top: 2px solid; border-left: 2px solid; border-top-left-radius: 4px; }
 .ornate::after { bottom: 7px; right: 7px; border-bottom: 2px solid; border-right: 2px solid; border-bottom-right-radius: 4px; }
 
-/* Buttons — cartoon "physical button": 3D base shadow, sink on press, springy release */
+/* Buttons — cartoon "physical button": 3D base shadow, sink on press, springy release.
+   SOLE definition of `.btn*` (the component kit used to redeclare them; see index.css). */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   font-family: var(--font-display); font-weight: 700; font-size: 14px;
   padding: 10px 18px; border-radius: var(--radius);
   cursor: pointer; border: 1px solid transparent; white-space: nowrap;
+  color: var(--ink);
   transition: transform .25s var(--spring), box-shadow .25s var(--spring), background .14s, border-color .14s, filter .14s;
   user-select: none;
 }
@@ -535,19 +552,19 @@ body {
   box-shadow: 0 4px 0 var(--gold-deep);
   text-shadow: none;
 }
-.btn-gold:hover { background: var(--gold-grad-hover); transform: translateY(-1px); box-shadow: 0 5px 0 var(--gold-deep); }
+.btn-gold:hover { background: var(--gold-grad-hover); transform: translateY(-1px); box-shadow: 0 5px 0 var(--gold-deep), var(--shadow-raised); filter: brightness(1.06); }
 .btn-gold:active { transform: translateY(4px) scale(.985); box-shadow: 0 0 0 var(--gold-deep); }
 .btn-ghost {
   background: var(--bg-2); color: var(--ink); border: 1px solid var(--line);
   box-shadow: 0 3px 0 var(--line);
 }
-.btn-ghost:hover { background: var(--bg-3); transform: translateY(-1px); box-shadow: 0 4px 0 var(--line); }
+.btn-ghost:hover { background: var(--bg-3); transform: translateY(-1px); box-shadow: 0 4px 0 var(--line), var(--shadow-raised); }
 .btn-ghost:active { transform: translateY(3px) scale(.985); box-shadow: 0 0 0 var(--line); }
 .btn-danger {
   background: var(--crimson); color: #fff; border: none;
   box-shadow: 0 4px 0 var(--crimson-deep);
 }
-.btn-danger:hover { transform: translateY(-1px); box-shadow: 0 5px 0 var(--crimson-deep); filter: brightness(1.04); }
+.btn-danger:hover { transform: translateY(-1px); box-shadow: 0 5px 0 var(--crimson-deep), var(--shadow-raised); filter: brightness(1.06); }
 .btn-danger:active { transform: translateY(4px) scale(.985); box-shadow: 0 0 0 var(--crimson-deep); }
 .btn[disabled], .btn:disabled { opacity: .55; pointer-events: none; box-shadow: none; transform: none; }
 .btn-sm { padding: 7px 14px; font-size: 12.5px; font-weight: 600; border-radius: var(--radius-sm); }

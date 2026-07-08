@@ -100,7 +100,11 @@
 
 /* ---------- Empty ---------- */
 .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 20px; text-align: center; }
-.empty-icon { font-size: 38px; opacity: .55; margin-bottom: 12px; filter: grayscale(.3); }
+/* the slot owns the size: 38px reads as font-size for a legacy emoji, as a box for an `Icon` svg */
+.empty-icon { font-size: 38px; opacity: .55; margin-bottom: var(--space-3); filter: grayscale(.3); color: var(--ink-3); }
+.empty-icon .ico { width: 38px; height: 38px; }
+.empty-title { font-size: 16px; color: var(--ink-2); }
+.empty-sub { font-size: 13px; margin-top: var(--space-1); }
 
 /* ---------- Right rail (hall) ---------- */
 .hall-grid { display: grid; grid-template-columns: 1fr var(--rail-w); gap: 18px; align-items: start; }
@@ -146,6 +150,17 @@
 /* segmented list */
 .list-rows { display: flex; flex-direction: column; }
 .list-rows > * + * { margin-top: 10px; }
+
+/* KV row — one label→value pair per line, label left, value right. The canonical key/value
+   idiom (the `.kv-item` tile above is a different thing: a standalone metric card). */
+.kv-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4);
+  padding: var(--space-2) 0; border-bottom: 1px solid var(--line-soft); }
+.kv-row:last-child { border-bottom: none; }
+.kv-k { color: var(--ink-3); font-size: 13px; }
+.kv-v { color: var(--ink); font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+
+/* the row inside a `.list-rows` stack: leading label, trailing meta */
+.list-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
 
 /* ---------- World map (de-emphasized) ---------- */
 .worldmap { position: relative; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--line);
@@ -349,19 +364,21 @@
 .builder-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 22px; border-top: 1px solid var(--line); background: var(--bg-2); }
 @media (max-width: 760px) { .builder-body { grid-template-columns: 1fr; } .builder-preview { border-left: none; border-top: 1px solid var(--line); } }
 
+/* Form field — SOLE definition of `.bf*` (the component kit used to redeclare them).
+   The kit's `Field` and every raw `.bf-input` in a screen render from these rules. */
 .bf { display: flex; flex-direction: column; gap: 7px; }
 .bf-label { font-family: var(--font-head); font-size: 13px; font-weight: 700; color: var(--ink); display: flex; align-items: baseline; gap: 8px; }
 .bf-hint { font-family: var(--font-body); font-weight: 400; font-size: 11px; color: var(--ink-3); }
 .bf-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .bf-input { width: 100%; background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px;
-  color: var(--ink); font-family: var(--font-body); font-size: 13.5px; resize: vertical; }
+  color: var(--ink); font-family: var(--font-body); font-size: 13.5px; resize: vertical; outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; }
+.bf-input::placeholder { color: var(--ink-4); }
 .bf-input:focus { outline: none; border-color: var(--gold-deep); box-shadow: 0 0 0 3px var(--gold-glow); }
+.bf-input:disabled { opacity: .55; }
+.bf.has-error .bf-input { border-color: var(--crimson); box-shadow: 0 0 0 3px color-mix(in srgb, var(--crimson) 18%, transparent); }
+.bf-error { font-size: 12px; font-weight: 500; color: var(--crimson); }
 select.bf-input { cursor: pointer; }
-
-.seg { display: inline-flex; background: var(--bg-3); border: 1px solid var(--line); border-radius: var(--radius); padding: 3px; gap: 2px; width: 100%; }
-.seg-btn { flex: 1; border: none; background: transparent; color: var(--ink-3); font-family: var(--font-body); font-size: 12.5px; padding: 7px 6px; border-radius: var(--radius-sm); cursor: pointer; white-space: nowrap; }
-.seg-btn.on { background: var(--raised-grad); color: var(--gold-bright); box-shadow: var(--shadow-raised); font-weight: 600; }
-.seg-btn:hover:not(.on) { color: var(--ink); }
 
 .taginput { background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px; }
 .tag-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }

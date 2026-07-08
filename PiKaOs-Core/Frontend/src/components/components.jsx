@@ -1,5 +1,6 @@
 /* PiKaOs — ES module (migrated from PiKaOs-Core/components.jsx). */
 import React from 'react';
+import { renderIcon } from './ui/icons.jsx';
 
 /* ============================================================
    SHARED UI PRIMITIVES
@@ -16,7 +17,7 @@ function Panel({ title, en, icon, right, children, className = "", ornate = fals
     <section className={`panel ${ornate ? "ornate" : ""} ${className}`}>
       {title && (
         <div className="panel-head">
-          {icon && <span className="ph-icon">{icon}</span>}
+          {icon && <span className="ph-icon">{renderIcon(icon)}</span>}
           <h3>{title}</h3>
           {en && <span className="mono" style={{ fontSize: 10.5, color: "var(--ink-4)" }}>{en}</span>}
           <span className="ph-spacer" />
@@ -72,13 +73,14 @@ function TypingDots({ a }) {
   );
 }
 
-// Empty state
-function Empty({ icon = "🗺️", title, sub }) {
+// Empty state. `icon` is an icons.jsx name; an emoji or element still passes straight through
+// (renderIcon's contract) so un-migrated callers keep rendering.
+function Empty({ icon = "folder", title, sub }) {
   return (
     <div className="empty-state">
-      <div className="empty-icon">{icon}</div>
-      <div className="thai-serif" style={{ fontSize: 16, color: "var(--ink-2)" }}>{title}</div>
-      {sub && <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{sub}</div>}
+      <div className="empty-icon">{renderIcon(icon)}</div>
+      <div className="empty-title">{title}</div>
+      {sub && <div className="empty-sub muted">{sub}</div>}
     </div>
   );
 }
