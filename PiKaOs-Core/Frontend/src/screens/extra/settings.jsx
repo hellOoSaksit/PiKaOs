@@ -2,7 +2,7 @@
    ไม่ hardcode ภาษา/รูปแบบคำศัพท์ — สแกนจาก src/data/i18n/*.json (เมตาในแต่ละไฟล์):
    LEX_LANGS = รายการภาษา (ตัดซ้ำแล้ว) · stylesForLang(code) = ทุกรูปแบบคำศัพท์ของภาษานั้น
    (LLM API keys live in the tools screen via the backend /llm/connections flow — F4.) */
-import { Btn, PageHead, Panel } from '../../components/components.jsx';
+import { PageHead, Panel } from '../../components/components.jsx';
 import { LEX_LANGS, langByCode, stylesForLang, packById } from '../../lib/i18n.jsx';
 
 const THEME_CARDS = [
@@ -10,7 +10,7 @@ const THEME_CARDS = [
   { key: "pro-dark", name: "กลางคืน", en: "Night", bg: "#111419", chips: ["#6076f6", "#171a21", "#e8eaef"] },
 ];
 
-function Settings({ theme, setTheme, lex, setLex, pickLanguage, language, formal, go, t }) {
+function Settings({ theme, setTheme, lex, setLex, pickLanguage, language, formal, t }) {
   const curTheme = THEME_CARDS.find(c => c.key === theme) || THEME_CARDS[0];
   const langs = LEX_LANGS;                       // ภาษาที่แสดง — ตัดซ้ำแล้ว
   const curLang = langByCode(language) || langs[0];
@@ -78,16 +78,6 @@ function Settings({ theme, setTheme, lex, setLex, pickLanguage, language, formal
           <div className="muted" style={{ fontSize: 12.5, marginTop: 12, lineHeight: 1.6 }}>
             {curStyle.desc || t("set.styleFallback")}
             <span className="mono" style={{ display: "block", fontSize: 10.5, color: "var(--ink-4)", marginTop: 4 }} data-no-lex>{t("set.scanNote")}</span>
-          </div>
-        </Panel>
-
-        <Panel title={t("set.design")} en="DESIGN SYSTEM" icon="🧩">
-          <div className="row" style={{ justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
-            <div style={{ flex: 1, minWidth: 220 }}>
-              <div style={{ fontWeight: 600, fontSize: 14, color: "var(--ink)" }}>{t("set.design.item")}</div>
-              <div className="muted" style={{ fontSize: 12.5, marginTop: 3, lineHeight: 1.6 }}>{t("set.design.itemDesc")}</div>
-            </div>
-            <Btn kind="gold" icon="🧩" onClick={() => go && go("library")}>{t("set.design.open")}</Btn>
           </div>
         </Panel>
       </div>

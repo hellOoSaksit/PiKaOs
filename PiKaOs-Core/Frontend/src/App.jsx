@@ -297,7 +297,7 @@ function App() {
       case "marketplace": return guard("plugins.manage", <PluginsManager Sys={Sys} view="market" />);
       case "mypackages": return guard("plugins.manage", <PluginsManager Sys={Sys} view="mine" />);
       // Local MCP moved into the Marketplace hub's "Local MCP" tab (desktop-only) — no standalone route.
-      case "settings": return <Settings theme={theme} setTheme={setTheme} lex={lex} setLex={setLex} pickLanguage={pickLanguage} language={language} formal={formal} go={go} t={t} />;
+      case "settings": return <Settings theme={theme} setTheme={setTheme} lex={lex} setLex={setLex} pickLanguage={pickLanguage} language={language} formal={formal} t={t} />;
       case "library": return <ComponentLibrary onBack={() => go("settings")} t={t} />;
       default: {
         // a route owned by an enabled plugin (Phase 6 seam) — else fall back to kernel Home.
