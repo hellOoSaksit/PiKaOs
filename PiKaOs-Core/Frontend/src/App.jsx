@@ -14,7 +14,7 @@ import { PluginsManager } from './screens/screens-plugins.jsx';
 import { ToolsManager } from './screens/screens-tools.jsx';
 import { useAuth } from './lib/auth.jsx';
 import { BottomUtilityBar } from './components/ui/BottomUtilityBar.jsx';
-import { TitleBar } from './components/ui';
+import { TitleBar, Tooltip } from './components/ui';
 import { Icon, renderIcon } from './components/ui/icons.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
 import { UILoadingHost, UIModalHost } from './lib/ui-modal.jsx';
@@ -67,7 +67,9 @@ function NavNode({ node, depth, route, go, t, can, navOpen, setNavOpen, rail, on
         style={depth > 0 && !rail ? { marginLeft: depth * 16 } : undefined}
         title={rail ? label : undefined}
         onClick={() => { if (rail && hasKids) onExpandShell(); go(node.id); }}>
-        <span className="ni-icon">{renderIcon(node.icon)}</span>
+        {rail
+          ? <Tooltip label={label}><span className="ni-icon">{renderIcon(node.icon)}</span></Tooltip>
+          : <span className="ni-icon">{renderIcon(node.icon)}</span>}
         <span className="ni-label">{label}</span>
         {node.tag && <span className={`ni-tag ${node.tag === "live" ? "alert" : ""}`}>{node.tag === "live" ? "● LIVE" : node.tag}</span>}
         {hasKids && !rail && (
@@ -94,19 +96,27 @@ function Sidebar({ route, go, t, can, nav, openMode, rail, onToggle }) {
     <aside className="sidebar" data-no-lex>
       <div className="brand">
         {/* in the rail the logo IS the toggle — there's no width for a second control */}
-        <button type="button" className="brand-logo" onClick={rail ? onToggle : undefined}
-          title={rail ? toggleLabel : undefined} aria-label={rail ? toggleLabel : undefined}>
-          <span className="ltr">P</span>
-        </button>
+        {rail
+          ? <Tooltip label={toggleLabel}>
+              <button type="button" className="brand-logo" onClick={onToggle}
+                title={toggleLabel} aria-label={toggleLabel}>
+                <span className="ltr">P</span>
+              </button>
+            </Tooltip>
+          : <button type="button" className="brand-logo">
+              <span className="ltr">P</span>
+            </button>}
         <div className="brand-id">
           <div className="brand-name">{t("brand.name")}</div>
           <div className="brand-sub">{t("brand.sub")}</div>
         </div>
         {!rail && (
-          <button type="button" className="brand-toggle" onClick={onToggle}
-            title={toggleLabel} aria-label={toggleLabel}>
-            <Icon name="sidebar" />
-          </button>
+          <Tooltip label={toggleLabel}>
+            <button type="button" className="brand-toggle" onClick={onToggle}
+              title={toggleLabel} aria-label={toggleLabel}>
+              <Icon name="sidebar" />
+            </button>
+          </Tooltip>
         )}
       </div>
       <nav className="nav">

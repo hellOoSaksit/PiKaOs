@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { UtilityBarButton } from './UtilityBarButton.jsx';
 import { PopoverPanel } from './PopoverPanel.jsx';
 import { Icon } from './icons.jsx';
+import Tooltip from './Tooltip.jsx';
 
 // The bar's buttons size their own glyph (no CSS slot owns it), so `size` is explicit here.
 const ICONS = {
@@ -52,24 +53,30 @@ export function BottomUtilityBar({
       {openPop && <div className="utility-bar-overlay" onClick={closePop} />}
       <div className="utility-bar">
         {/* the sidebar's other control: narrows/widens it on desktop, opens the drawer on mobile */}
-        <UtilityBarButton
-          icon={ICONS.nav} title={t('utilitybar.nav')} label={t('utilitybar.nav')}
-          showLabel={showLabels}
-          onClick={() => { setOpenPop(null); onToggleNav && onToggleNav(); }}
-        />
+        <Tooltip label={t('utilitybar.nav')}>
+          <UtilityBarButton
+            icon={ICONS.nav} title={t('utilitybar.nav')} label={t('utilitybar.nav')}
+            showLabel={showLabels}
+            onClick={() => { setOpenPop(null); onToggleNav && onToggleNav(); }}
+          />
+        </Tooltip>
 
-        <UtilityBarButton
-          icon={ICONS.home} title={t('utilitybar.home')} label={t('utilitybar.home')}
-          showLabel={showLabels} active={active === 'home'}
-          onClick={() => go('home', onHome)}
-        />
+        <Tooltip label={t('utilitybar.home')}>
+          <UtilityBarButton
+            icon={ICONS.home} title={t('utilitybar.home')} label={t('utilitybar.home')}
+            showLabel={showLabels} active={active === 'home'}
+            onClick={() => go('home', onHome)}
+          />
+        </Tooltip>
 
         <div style={{ position: 'relative' }}>
-          <UtilityBarButton
-            icon={ICONS.search} title={t('utilitybar.search')} label={t('utilitybar.search')}
-            showLabel={showLabels} active={active === 'search'}
-            onClick={() => togglePop('search')}
-          />
+          <Tooltip label={t('utilitybar.search')}>
+            <UtilityBarButton
+              icon={ICONS.search} title={t('utilitybar.search')} label={t('utilitybar.search')}
+              showLabel={showLabels} active={active === 'search'}
+              onClick={() => togglePop('search')}
+            />
+          </Tooltip>
           <PopoverPanel open={openPop === 'search'} onClose={closePop} anchor="left" width={300}>
             <div className="pop-search-field">
               <input
@@ -83,11 +90,13 @@ export function BottomUtilityBar({
         </div>
 
         <div style={{ position: 'relative' }}>
-          <UtilityBarButton
-            icon={ICONS.notifications} title={t('utilitybar.notifications')} label={t('utilitybar.notifications')}
-            showLabel={showLabels} active={active === 'notifications'} badge={notifCount}
-            onClick={() => togglePop('notifications')}
-          />
+          <Tooltip label={t('utilitybar.notifications')}>
+            <UtilityBarButton
+              icon={ICONS.notifications} title={t('utilitybar.notifications')} label={t('utilitybar.notifications')}
+              showLabel={showLabels} active={active === 'notifications'} badge={notifCount}
+              onClick={() => togglePop('notifications')}
+            />
+          </Tooltip>
           <PopoverPanel open={openPop === 'notifications'} onClose={closePop} anchor="center" width={320}>
             <div className="pop-head">
               <span className="pop-title">{t('utilitybar.notifications.title')}</span>
@@ -107,18 +116,22 @@ export function BottomUtilityBar({
           </PopoverPanel>
         </div>
 
-        <UtilityBarButton
-          icon={ICONS.add} title={t('utilitybar.add.title')} label={t('utilitybar.add')}
-          showLabel={showLabels} active={active === 'add'}
-          onClick={() => go('add', onAdd)}
-        />
+        <Tooltip label={t('utilitybar.add.title')}>
+          <UtilityBarButton
+            icon={ICONS.add} title={t('utilitybar.add.title')} label={t('utilitybar.add')}
+            showLabel={showLabels} active={active === 'add'}
+            onClick={() => go('add', onAdd)}
+          />
+        </Tooltip>
 
         <div style={{ position: 'relative' }}>
-          <UtilityBarButton
-            icon={ICONS.chat} title={t('utilitybar.chat')} label={t('utilitybar.chat')}
-            showLabel={showLabels} active={active === 'chat'} badge={chatCount}
-            onClick={() => togglePop('chat')}
-          />
+          <Tooltip label={t('utilitybar.chat')}>
+            <UtilityBarButton
+              icon={ICONS.chat} title={t('utilitybar.chat')} label={t('utilitybar.chat')}
+              showLabel={showLabels} active={active === 'chat'} badge={chatCount}
+              onClick={() => togglePop('chat')}
+            />
+          </Tooltip>
           <PopoverPanel open={openPop === 'chat'} onClose={closePop} anchor="right" width={320}>
             <div className="pop-head">
               <span className="pop-title">{t('utilitybar.chat.title')}</span>
