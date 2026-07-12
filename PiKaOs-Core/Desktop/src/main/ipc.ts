@@ -1,4 +1,4 @@
-import { ipcMain, IpcMainInvokeEvent } from 'electron'
+import { ipcMain, IpcMainInvokeEvent, BrowserWindow } from 'electron'
 import type { SecretVault } from './vault'
 import type { SessionBroker } from './session-broker'
 import type { McpRegistry } from './mcp/registry'
@@ -39,4 +39,14 @@ export function registerIpc(deps: { vault: SecretVault; broker: SessionBroker; r
   // Namespaced under `mcp.<sid>.<key>` — never a bare key — so a server def can never name and
   // receive a foreign vault secret (e.g. auth.refresh). (F1)
   ipcMain.handle('secrets:setForServer', guard((_e, sid, key, value) => vault.set(`mcp.${sid}.${key}`, value)))
+
+  // Custom title-bar controls (frame:false). Resolve the sender's own window each call — never a
+  // captured reference — so a control always acts on the window that asked. (spec §3.2)
+  ipcMain.handle('window:minimize', guard((e) => BrowserWindow.fromWebContents(e.sender)?.minimize()))
+  ipcMain.handle('window:toggleMaximize', guard((e) => {
+    const w = BrowserWindow.fromWebContents(e.sender)
+    if (w) w.isMaximized() ? w.unmaximize() : w.maximize()
+  }))
+  ipcMain.handle('window:close', guard((e) => BrowserWindow.fromWebContents(e.sender)?.close()))
+  ipcMain.handle('window:isMaximized', guard((e) => BrowserWindow.fromWebContents(e.sender)?.isMaximized() ?? false))
 }
