@@ -966,6 +966,10 @@
     "utilitybar.chat.open": "Open inbox",
     "utilitybar.profile": "Profile",
     "utilitybar.profile.viewProfile": "View profile",
-    "utilitybar.profile.settings": "Settings"
+    "utilitybar.profile.settings": "Settings",
+    "window.minimize": "Minimize",
+    "window.maximize": "Maximize",
+    "window.restore": "Restore",
+    "window.close": "Close"
   }
 }

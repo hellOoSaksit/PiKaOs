@@ -183,6 +183,10 @@
     "login.val.userShort": "ユーザー名は3文字以上で入力してください",
     "login.val.userChars": "使用できるのは英数字と . _ - のみです",
     "login.val.pwReq": "パスワードを入力してください",
-    "login.val.pwShort": "パスワードは6文字以上で入力してください"
+    "login.val.pwShort": "パスワードは6文字以上で入力してください",
+    "window.minimize": "最小化",
+    "window.maximize": "最大化",
+    "window.restore": "元のサイズに戻す",
+    "window.close": "閉じる"
   }
 }

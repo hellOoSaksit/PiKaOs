@@ -903,6 +903,10 @@
     "utilitybar.chat.open": "เปิดกล่องข้อความ",
     "utilitybar.profile": "โปรไฟล์",
     "utilitybar.profile.viewProfile": "ดูโปรไฟล์",
-    "utilitybar.profile.settings": "ตั้งค่า"
+    "utilitybar.profile.settings": "ตั้งค่า",
+    "window.minimize": "ย่อหน้าต่าง",
+    "window.maximize": "ขยายเต็มจอ",
+    "window.restore": "คืนขนาด",
+    "window.close": "ปิด"
   }
 }
