@@ -301,7 +301,7 @@ function App() {
     if (!isDesktop) return body;
     return (
       <div className="desktop-frame" data-maximized={winMax ? "" : undefined}>
-        <TitleBar t={t} />
+        <TitleBar />
         <div className="desktop-body">{body}</div>
       </div>
     );

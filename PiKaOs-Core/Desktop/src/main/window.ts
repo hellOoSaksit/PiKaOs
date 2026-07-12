@@ -9,12 +9,13 @@ export function createWindow(): BrowserWindow {
     width: 1280,
     height: 800,
     show: false,
-    frame: false,          // custom title bar — the renderer draws minimize/maximize/close
-    // Opaque window (frame drawn by the renderer). The transparent variant could not truly maximize
-    // on Windows — the OS never entered the maximized state, so isMaximized()/'maximize' stayed false.
-    // Opaque: native maximize + resize work, and Windows 11 (DWM) rounds the frameless corners itself.
-    // The "2026" accent is a 1px inset hairline drawn by the renderer (.desktop-frame). backgroundColor
-    // is the default theme surface so the pre-paint frame matches the app, not white.
+    titleBarStyle: 'hidden',
+    // Window Controls Overlay: the OS draws min/max/close (correct size + hit-testing). frame:false
+    // (fully frameless) caused a Chromium click-coordinate offset on scaled Windows displays; a hidden
+    // title bar keeps native non-client handling and avoids it. color matches the renderer's .titlebar
+    // strip; symbolColor is the button glyph. Theme-sync via win.setTitleBarOverlay() is a follow-up.
+    titleBarOverlay: { color: '#ffffff', symbolColor: '#69707d', height: 36 },
+    // backgroundColor is the default theme surface so the pre-paint frame matches the app, not white.
     backgroundColor: '#f5f7fb',
     webPreferences: {
       sandbox: true,

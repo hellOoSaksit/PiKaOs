@@ -308,15 +308,6 @@ body {
 }
 .titlebar-word { font-family: var(--font-head); font-weight: 700; font-size: 12.5px; color: var(--ink-3); letter-spacing: .02em; }
 .titlebar-drag { flex: 1; align-self: stretch; }
-.titlebar-controls { display: flex; align-self: stretch; -webkit-app-region: no-drag; }
-.win-btn {
-  width: 46px; align-self: stretch; display: grid; place-items: center;
-  border: 0; background: transparent; color: var(--ink-3); cursor: pointer;
-  transition: background .12s, color .12s;
-}
-.win-btn > svg { width: 15px; height: 15px; }
-.win-btn:hover { background: var(--bg-4); color: var(--ink); }
-.win-btn-close:hover { background: var(--crimson); color: #fff; }
 
 /* Rail is a desktop affordance only — below the drawer breakpoint shell-nav.js never sets it
    (fx.css turns the sidebar into an off-canvas drawer there, where a 68px rail means nothing). */
