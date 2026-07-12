@@ -272,11 +272,13 @@ body {
 /* window chrome (desktop only) — 2026-07-12 window-chrome spec */
 :root { --titlebar-h: 36px; --radius-window: 14px; --titlebar-gutter: 16px; }
 
-/* Desktop shell: a title-bar row spanning both columns sits above sidebar+main. */
-.app.desktop-chrome {
-  grid-template-rows: var(--titlebar-h) minmax(0, 1fr);
+/* Desktop shell: the frame + title bar wrap EVERY screen (App.jsx withChrome), above the auth gate —
+   so the window controls exist on the pre-login screens too, not just the signed-in `.app`. A flex
+   column: the title bar sits atop `.desktop-body`, which holds whatever screen is mounted. */
+.desktop-frame {
+  display: flex; flex-direction: column;
   /* floating card: a transparent gutter (the window is transparent) holds the ambient shadow;
-     `.app` is the opaque, rounded, bordered surface. Stripped when maximized. */
+     the frame is the opaque, rounded, bordered surface. Stripped when maximized. */
   height: calc(100vh - var(--titlebar-gutter) * 2);
   margin: var(--titlebar-gutter);
   border: 1px solid var(--line);
@@ -284,11 +286,16 @@ body {
   box-shadow: var(--shadow-pop);
   overflow: hidden;
 }
-.app.desktop-chrome[data-maximized] {
-  height: 100vh; margin: 0; border-radius: 0; box-shadow: none;
-}
+.desktop-frame[data-maximized] { height: 100vh; margin: 0; border-radius: 0; box-shadow: none; }
+/* the mounted screen fills the body regardless of its own intrinsic height */
+.desktop-body { position: relative; flex: 1; min-height: 0; }
+.desktop-body > * { position: absolute; inset: 0; }
+/* `.app` is `height: 100vh` for the web build (no `.desktop-body`); inside the frame it fills the body */
+.desktop-body > .app { height: 100%; }
+/* FirstRun's `.auth-screen` is `position: fixed; inset: 0` — that would escape the frame and cover the
+   title bar; pin it to the body instead (higher specificity than login.css `.auth-screen`). */
+.desktop-body > .auth-screen { position: absolute; z-index: auto; }
 .titlebar {
-  grid-column: 1 / -1;
   display: flex; align-items: center; gap: 10px;
   height: var(--titlebar-h);
   padding-left: 12px;

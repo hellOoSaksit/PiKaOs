@@ -294,17 +294,30 @@ function App() {
 
   const Sys = { t, T, can, me, go, language, nav: navCfg, setNav: saveNavCfg };
 
+  // Native window chrome wraps EVERY screen on desktop (frameless window has no OS titlebar), so the
+  // close/minimize/maximize controls are present on the pre-login screens too — not just the signed-in
+  // shell. On web (isDesktop false) this is a passthrough and the markup is byte-identical to before.
+  const withChrome = (body) => {
+    if (!isDesktop) return body;
+    return (
+      <div className="desktop-frame" data-maximized={winMax ? "" : undefined}>
+        <TitleBar t={t} />
+        <div className="desktop-body">{body}</div>
+      </div>
+    );
+  };
+
   const shell = resolveShellMode({ ready: auth.ready, caps, bootstrap, loggedIn: auth.loggedIn });
-  if (shell === 'loading') return null;   // avoid flashing the setup screen while restoring
-  if (shell === 'kernel-shell') return <KernelOnlyShell language={language} />;
+  if (shell === 'loading') return withChrome(null);   // avoid flashing the setup screen while restoring
+  if (shell === 'kernel-shell') return withChrome(<KernelOnlyShell language={language} />);
   if (shell === 'firstrun') {
-    return <FirstRun t={t} language={language} onLang={pickLanguage}
+    return withChrome(<FirstRun t={t} language={language} onLang={pickLanguage}
       onVerified={(token) => {
         setToken(token);
         refreshBootstrap();
         // verify-code flips the server open (spec §4) — refetch so this render pass sees it
         getCapabilities().then(setCaps).catch(() => {});
-      }} />;
+      }} />);
   }
 
   const screen = (() => {
@@ -327,12 +340,10 @@ function App() {
     }
   })();
 
-  return (
+  return withChrome(
     <ToastProvider>
-    <div className={'app' + (isDesktop ? ' desktop-chrome' : '')} key={lex}
-      data-nav={navRail ? "rail" : "full"} data-drawer={drawerOpen ? "open" : undefined}
-      data-maximized={isDesktop && winMax ? "" : undefined}>
-      <TitleBar t={t} />
+    <div className="app" key={lex}
+      data-nav={navRail ? "rail" : "full"} data-drawer={drawerOpen ? "open" : undefined}>
       <Sidebar route={route} go={go} t={t} can={can} nav={navCfg} openMode={openMode}
         rail={navRail} onToggle={toggleNav} />
       <div className="nav-scrim" onClick={closeDrawer} />
