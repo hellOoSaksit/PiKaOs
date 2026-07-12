@@ -31,3 +31,4 @@ export { default as LoadingPopup } from './LoadingPopup.jsx';
 export { default as Notifications } from './Notifications.jsx';
 export { default as Letters3D } from './Letters3D.jsx';
 export { default as SaveBar } from './SaveBar.jsx';
+export { default as TitleBar, maximizeIconName } from './TitleBar.jsx';
