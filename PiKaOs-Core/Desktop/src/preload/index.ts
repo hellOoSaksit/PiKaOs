@@ -31,8 +31,11 @@ const api = {
     toggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),
     close: () => ipcRenderer.invoke('window:close'),
     isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
-    onMaximizedChanged: (cb: (v: boolean) => void) =>
-      ipcRenderer.on('window:maximizedChanged', (_e, v) => cb(v)),
+    onMaximizedChanged: (cb: (v: boolean) => void) => {
+      const listener = (_e: unknown, v: boolean) => cb(v)
+      ipcRenderer.on('window:maximizedChanged', listener)
+      return () => ipcRenderer.removeListener('window:maximizedChanged', listener)
+    },
   },
 }
 

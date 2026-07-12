@@ -171,8 +171,10 @@ function App() {
   useEffect(() => {
     const w = window.pikaosDesktop?.window;
     if (!w) return;
-    w.isMaximized().then(setWinMax).catch(() => {});
-    w.onMaximizedChanged(setWinMax);
+    let alive = true;
+    w.isMaximized().then((v) => { if (alive) setWinMax(v); }).catch(() => {});
+    const off = w.onMaximizedChanged(setWinMax);
+    return () => { alive = false; if (typeof off === 'function') off(); };
   }, []);
 
   // Kernel-only bootstrap gate (no auth plugin installed yet — 2026-07-02-bootstrap-install-shell-

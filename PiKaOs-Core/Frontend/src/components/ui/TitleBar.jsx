@@ -16,8 +16,10 @@ export default function TitleBar({ t }) {
 
   useEffect(() => {
     if (!api?.window) return;
-    api.window.isMaximized().then(setMaximized).catch(() => {});
-    api.window.onMaximizedChanged(setMaximized);
+    let alive = true;
+    api.window.isMaximized().then((v) => { if (alive) setMaximized(v); }).catch(() => {});
+    const off = api.window.onMaximizedChanged(setMaximized);
+    return () => { alive = false; if (typeof off === 'function') off(); };
   }, [api]);
 
   if (!api?.isDesktop) return null;
