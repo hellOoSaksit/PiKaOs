@@ -1,6 +1,6 @@
 /* PiKaOs — ES module (migrated from PiKaOs-Core/app.jsx). */
 import React from 'react';
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 import { NAV } from './data/data.jsx';
 import { loadNav, saveNav, mergeWithDefault } from './data/data-nav.jsx';
 import { getNavConfig, setNavConfig, getMySettings, setMySetting, setupStatus, setToken, getCapabilities } from './lib/api.js';
@@ -197,6 +197,8 @@ function App() {
   const signedIn = auth.loggedIn || openMode;
 
   const [route, setRoute] = useState("home");
+  const histRef = useRef({ stack: ["home"], idx: 0 });
+  const [, bumpHist] = useState(0);
   const [theme, setThemeState] = useState(() => { const t = localStorage.getItem("guild-theme"); return (t === "pro" || t === "pro-dark") ? t : "pro"; });
   // active lexicon = ภาษาที่แสดง + รูปแบบคำศัพท์ รวมเป็นชุดเดียว (รหัสชุดจาก data/lexicons/*.json)
   const [lex, setLexState] = useState(() => {
@@ -269,10 +271,24 @@ function App() {
     try { window.dispatchEvent(new Event("guildos-route-change")); } catch (e) { }
     closeDrawer();   // choosing a destination dismisses the small-screen drawer
     setRoute(r);
+    // a user navigation truncates any forward entries (browser-style history)
+    const h = histRef.current;
+    if (h.stack[h.idx] !== r) { h.stack = h.stack.slice(0, h.idx + 1); h.stack.push(r); h.idx = h.stack.length - 1; bumpHist(x => x + 1); }
     document.querySelector(".content")?.scrollTo(0, 0);
     if (r === "search") { const h = window.uiLoading && window.uiLoading({ title: "กำลังเชื่อมต่อคลังความรู้…", message: "ผู้ควบคุมกลาง Recall" }); setTimeout(() => h && h.close(), 820); }
   };
   window.__guildGo = go;
+
+  // Back/forward navigate the history WITHOUT re-pushing — setRoute directly, never go().
+  const navGo = (delta) => {
+    const h = histRef.current;
+    const ni = h.idx + delta;
+    if (ni < 0 || ni >= h.stack.length) return;
+    h.idx = ni; bumpHist(x => x + 1);
+    try { window.dispatchEvent(new Event("guildos-route-change")); } catch (e) {}
+    closeDrawer(); setRoute(h.stack[ni]);
+    document.querySelector(".content")?.scrollTo(0, 0);
+  };
 
   // ---- current user + permissions come from the SERVER (F1) ----
   const T = (en, th) => language === "en" ? en : th;
@@ -301,7 +317,11 @@ function App() {
     if (!isDesktop) return body;
     return (
       <div className="desktop-frame" data-maximized={winMax ? "" : undefined}>
-        <TitleBar />
+        <TitleBar t={t}
+          onMenu={toggleNav} onSidebar={toggleNav} onSearch={() => go('search')}
+          onBack={() => navGo(-1)} onForward={() => navGo(1)}
+          canBack={histRef.current.idx > 0}
+          canForward={histRef.current.idx < histRef.current.stack.length - 1} />
         <div className="desktop-body">{body}</div>
       </div>
     );

@@ -907,6 +907,11 @@
     "window.minimize": "ย่อหน้าต่าง",
     "window.maximize": "ขยายเต็มจอ",
     "window.restore": "คืนขนาด",
-    "window.close": "ปิด"
+    "window.close": "ปิด",
+    "titlebar.menu": "เมนู",
+    "titlebar.sidebar": "สลับแถบข้าง",
+    "titlebar.search": "ค้นหา",
+    "titlebar.back": "ย้อนกลับ",
+    "titlebar.forward": "ถัดไป"
   }
 }

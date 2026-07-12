@@ -49,4 +49,7 @@ export function registerIpc(deps: { vault: SecretVault; broker: SessionBroker; r
   }))
   ipcMain.handle('window:close', guard((e) => BrowserWindow.fromWebContents(e.sender)?.close()))
   ipcMain.handle('window:isMaximized', guard((e) => BrowserWindow.fromWebContents(e.sender)?.isMaximized() ?? false))
+  ipcMain.handle('window:getBounds', guard((e) => BrowserWindow.fromWebContents(e.sender)?.getBounds()))
+  // fire-and-forget for smooth JS window drag (avoids invoke round-trip per mousemove)
+  ipcMain.on('window:move', (e, x, y) => { if (okOrigin(e)) BrowserWindow.fromWebContents(e.sender)?.setPosition(Math.round(x), Math.round(y)) })
 }

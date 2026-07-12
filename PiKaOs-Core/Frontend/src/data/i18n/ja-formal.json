@@ -187,6 +187,11 @@
     "window.minimize": "最小化",
     "window.maximize": "最大化",
     "window.restore": "元のサイズに戻す",
-    "window.close": "閉じる"
+    "window.close": "閉じる",
+    "titlebar.menu": "メニュー",
+    "titlebar.sidebar": "サイドバー切替",
+    "titlebar.search": "検索",
+    "titlebar.back": "戻る",
+    "titlebar.forward": "進む"
   }
 }

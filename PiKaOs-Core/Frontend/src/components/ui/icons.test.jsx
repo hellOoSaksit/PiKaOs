@@ -15,6 +15,10 @@ it('ships the four window-control glyphs', () => {
     expect(ICON_NAMES).toContain(name);
 });
 
+it('ships the toolbar chevrons', () => {
+  for (const n of ['chevron-left', 'chevron-right']) expect(ICON_NAMES).toContain(n);
+});
+
 it('resolves a known name to an element', () => {
   expect(renderIcon('home')).toMatchObject({ props: { name: 'home' } });
 });

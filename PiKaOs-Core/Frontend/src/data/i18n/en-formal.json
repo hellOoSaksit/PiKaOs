@@ -970,6 +970,11 @@
     "window.minimize": "Minimize",
     "window.maximize": "Maximize",
     "window.restore": "Restore",
-    "window.close": "Close"
+    "window.close": "Close",
+    "titlebar.menu": "Menu",
+    "titlebar.sidebar": "Toggle sidebar",
+    "titlebar.search": "Search",
+    "titlebar.back": "Back",
+    "titlebar.forward": "Forward"
   }
 }

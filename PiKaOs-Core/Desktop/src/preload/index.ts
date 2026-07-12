@@ -31,6 +31,8 @@ const api = {
     toggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),
     close: () => ipcRenderer.invoke('window:close'),
     isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
+    getBounds: () => ipcRenderer.invoke('window:getBounds'),
+    move: (x: number, y: number) => ipcRenderer.send('window:move', x, y),
     onMaximizedChanged: (cb: (v: boolean) => void) => {
       const listener = (_e: unknown, v: boolean) => cb(v)
       ipcRenderer.on('window:maximizedChanged', listener)
