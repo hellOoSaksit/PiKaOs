@@ -10,6 +10,11 @@ it('every kernel nav item names an icon the set actually ships', () => {
   expect(navIcons.filter(name => !ICON_NAMES.includes(name))).toEqual([]);
 });
 
+it('ships the four window-control glyphs', () => {
+  for (const name of ['win-minimize', 'win-maximize', 'win-restore', 'win-close'])
+    expect(ICON_NAMES).toContain(name);
+});
+
 it('resolves a known name to an element', () => {
   expect(renderIcon('home')).toMatchObject({ props: { name: 'home' } });
 });

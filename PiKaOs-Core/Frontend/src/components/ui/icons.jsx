@@ -1,5 +1,5 @@
-/* PiKaOs icon set — 56 line icons on a 24x24 grid, 1.8 stroke, round caps/joins.
-   Source of truth: PiKaOs-Docs/design-system/"Icon System.dc.html" (46 icons) plus 10 drawn
+/* PiKaOs icon set — 60 line icons on a 24x24 grid, 1.8 stroke, round caps/joins.
+   Source of truth: PiKaOs-Docs/design-system/"Icon System.dc.html" (50 icons) plus 10 drawn
    for shell surfaces the sheet didn't cover (key, tools, puzzle, components, package, monitor,
    clipboard-list, book, globe, sidebar).
 
@@ -78,6 +78,11 @@ const PATHS = {
   "tools": <path d="m14.6 6.4 3.1-3.1a5.3 5.3 0 0 0-7 7L4.6 16.4a2 2 0 1 0 2.9 2.9l6.1-6.1a5.3 5.3 0 0 0 7-7l-3.1 3.1-2.4-.5-.5-2.4z"/>,
   "puzzle": <path d="M7.5 5H9a3 3 0 1 1 6 0h1.5a2.5 2.5 0 0 1 2.5 2.5V9a3 3 0 1 0 0 6v1.5a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 16.5v-9A2.5 2.5 0 0 1 7.5 5z"/>,
   "components": <><path d="m12 3.5 8 4.2-8 4.2-8-4.2 8-4.2z"/><path d="m4 12 8 4.2 8-4.2"/><path d="m4 16.2 8 4.2 8-4.2"/></>,
+  /* window chrome — control-strip glyphs (2026-07-12 window-chrome spec) */
+  "win-minimize": <path d="M5 12h14"/>,
+  "win-maximize": <rect x="5.5" y="5.5" width="13" height="13" rx="1.5"/>,
+  "win-restore": <><rect x="8" y="8" width="10.5" height="10.5" rx="1.5"/><path d="M5.5 15.5V6.5A1 1 0 0 1 6.5 5.5H15.5"/></>,
+  "win-close": <path d="M6 6 18 18M18 6 6 18"/>,
 };
 
 export const ICON_NAMES = Object.keys(PATHS);
