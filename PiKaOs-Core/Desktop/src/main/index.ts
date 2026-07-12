@@ -1,6 +1,7 @@
-import { app, BrowserWindow, dialog } from 'electron'
+import { app, BrowserWindow, dialog, Menu } from 'electron'
 import { join } from 'node:path'
 import { registerAppProtocol } from './protocol'
+import { removeAppMenu, registerDevtoolsShortcut, forwardMaximizeState } from './chrome'
 import { createWindow } from './window'
 import { registerIpc } from './ipc'
 import { SecretVault } from './vault'
@@ -60,7 +61,10 @@ app.whenReady().then(() => {
     }
   })
 
-  createWindow()
+  removeAppMenu(Menu)
+  const win = createWindow()
+  registerDevtoolsShortcut(win, app.isPackaged)
+  forwardMaximizeState(win)
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
