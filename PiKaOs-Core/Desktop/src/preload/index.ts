@@ -26,6 +26,14 @@ const api = {
   secrets: {
     setForServer: (sid: string, key: string, value: string) => ipcRenderer.invoke('secrets:setForServer', sid, key, value),
   },
+  window: {
+    minimize: () => ipcRenderer.invoke('window:minimize'),
+    toggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),
+    close: () => ipcRenderer.invoke('window:close'),
+    isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
+    onMaximizedChanged: (cb: (v: boolean) => void) =>
+      ipcRenderer.on('window:maximizedChanged', (_e, v) => cb(v)),
+  },
 }
 
 export type PikaosDesktopApi = typeof api
