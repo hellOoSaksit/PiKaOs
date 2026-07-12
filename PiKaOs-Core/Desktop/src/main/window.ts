@@ -10,11 +10,12 @@ export function createWindow(): BrowserWindow {
     height: 800,
     show: false,
     frame: false,          // custom title bar — the renderer draws minimize/maximize/close
-    transparent: true,     // corners outside `.app`'s radius show through → real rounded frame
-    // Fully transparent: the opaque surface is `.app` (100vh) in the renderer, which also carries
-    // the rounded border + shadow. A transparent window that paints an opaque colour would fill
-    // the rounded corners back in. (2026-07-12 window-chrome spec §3.1 / §7)
-    backgroundColor: '#00000000',
+    // Opaque window (frame drawn by the renderer). The transparent variant could not truly maximize
+    // on Windows — the OS never entered the maximized state, so isMaximized()/'maximize' stayed false.
+    // Opaque: native maximize + resize work, and Windows 11 (DWM) rounds the frameless corners itself.
+    // The "2026" accent is a 1px inset hairline drawn by the renderer (.desktop-frame). backgroundColor
+    // is the default theme surface so the pre-paint frame matches the app, not white.
+    backgroundColor: '#f5f7fb',
     webPreferences: {
       sandbox: true,
       contextIsolation: true,

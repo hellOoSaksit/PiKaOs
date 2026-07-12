@@ -270,23 +270,19 @@ body {
 }
 
 /* window chrome (desktop only) — 2026-07-12 window-chrome spec */
-:root { --titlebar-h: 36px; --radius-window: 14px; --titlebar-gutter: 16px; }
+:root { --titlebar-h: 36px; }
 
 /* Desktop shell: the frame + title bar wrap EVERY screen (App.jsx withChrome), above the auth gate —
    so the window controls exist on the pre-login screens too, not just the signed-in `.app`. A flex
    column: the title bar sits atop `.desktop-body`, which holds whatever screen is mounted. */
 .desktop-frame {
   display: flex; flex-direction: column;
-  /* floating card: a transparent gutter (the window is transparent) holds the ambient shadow;
-     the frame is the opaque, rounded, bordered surface. Stripped when maximized. */
-  height: calc(100vh - var(--titlebar-gutter) * 2);
-  margin: var(--titlebar-gutter);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-window);
-  box-shadow: var(--shadow-pop);
-  overflow: hidden;
+  height: 100vh;
+  /* Opaque window — Windows 11 (DWM) rounds the frameless corners itself, so no CSS radius/gutter.
+     The 2026 accent is a 1px inset hairline ring, dropped when the window is maximized. */
+  box-shadow: inset 0 0 0 1px var(--line);
 }
-.desktop-frame[data-maximized] { height: 100vh; margin: 0; border-radius: 0; box-shadow: none; }
+.desktop-frame[data-maximized] { box-shadow: none; }
 /* the mounted screen fills the body regardless of its own intrinsic height */
 .desktop-body { position: relative; flex: 1; min-height: 0; }
 .desktop-body > * { position: absolute; inset: 0; }
