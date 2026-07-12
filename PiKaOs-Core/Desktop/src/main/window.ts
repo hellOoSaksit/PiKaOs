@@ -9,11 +9,12 @@ export function createWindow(): BrowserWindow {
     width: 1280,
     height: 800,
     show: false,
-    // The renderer paints into `.app`, which is exactly 100vh — so any window area the compositor has
-    // not yet covered (a resize, a restore) shows the WINDOW's background, and Electron defaults that
-    // to white. It read as a white band under the app. Match the default theme's --bg-1 instead; a
-    // dark-theme user sees this only for the frames before the renderer paints.
-    backgroundColor: '#f5f7fb',
+    frame: false,          // custom title bar — the renderer draws minimize/maximize/close
+    transparent: true,     // corners outside `.app`'s radius show through → real rounded frame
+    // Fully transparent: the opaque surface is `.app` (100vh) in the renderer, which also carries
+    // the rounded border + shadow. A transparent window that paints an opaque colour would fill
+    // the rounded corners back in. (2026-07-12 window-chrome spec §3.1 / §7)
+    backgroundColor: '#00000000',
     webPreferences: {
       sandbox: true,
       contextIsolation: true,

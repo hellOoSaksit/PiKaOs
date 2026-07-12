@@ -60,13 +60,17 @@ it('sets sandbox, contextIsolation, nodeIntegration:false, webSecurity, a preloa
   expect(win.opts.webPreferences.preload).toMatch(/preload[/\\]index\.js$/)
 })
 
-// Without this the window's own background is white, and every area the compositor has not covered
-// yet (resize, restore) flashes as a white band under the 100vh app shell.
-it('paints the window background with the app background, not the default white', async () => {
+// Frameless + transparent so the renderer can draw a custom title bar and a rounded floating
+// frame (2026-07-12 window-chrome spec). The opaque surface is now `.app` in the renderer, NOT
+// the window — a transparent window must not paint an opaque background or the rounded corners
+// fill in. (Supersedes the old white-band backgroundColor fix, which moves to `.app`.)
+it('is frameless and transparent, with no opaque window background', async () => {
   const { createWindow } = await import('../src/main/window')
   const win = createWindow() as unknown as FakeBrowserWindow
 
-  expect(win.opts.backgroundColor).toBe('#f5f7fb')
+  expect(win.opts.frame).toBe(false)
+  expect(win.opts.transparent).toBe(true)
+  expect(win.opts.backgroundColor).toBe('#00000000')
 })
 
 it('shows the window only after ready-to-show fires', async () => {
