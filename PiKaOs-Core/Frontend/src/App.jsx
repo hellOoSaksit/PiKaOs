@@ -14,6 +14,7 @@ import { PluginsManager } from './screens/screens-plugins.jsx';
 import { ToolsManager } from './screens/screens-tools.jsx';
 import { useAuth } from './lib/auth.jsx';
 import { BottomUtilityBar } from './components/ui/BottomUtilityBar.jsx';
+import { TitleBar } from './components/ui';
 import { Icon, renderIcon } from './components/ui/icons.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
 import { UILoadingHost, UIModalHost } from './lib/ui-modal.jsx';
@@ -153,6 +154,16 @@ function Topbar({ route, language, t }) {
 function App() {
   const auth = useAuth();                                  // { user, ready, loggedIn, login, logout }
   const currentUser = auth.user;                           // backend account or null
+
+  // Native window chrome (desktop only): the frame + custom TitleBar replace the OS titlebar.
+  const isDesktop = typeof window !== 'undefined' && !!window.pikaosDesktop?.isDesktop;
+  const [winMax, setWinMax] = useState(false);
+  useEffect(() => {
+    const w = window.pikaosDesktop?.window;
+    if (!w) return;
+    w.isMaximized().then(setWinMax).catch(() => {});
+    w.onMaximizedChanged(setWinMax);
+  }, []);
 
   // Kernel-only bootstrap gate (no auth plugin installed yet — 2026-07-02-bootstrap-install-shell-
   // design.md): a stored session token from a verified setup code unlocks a minimal install shell.
@@ -306,7 +317,10 @@ function App() {
 
   return (
     <ToastProvider>
-    <div className="app" key={lex} data-nav={navRail ? "rail" : "full"} data-drawer={drawerOpen ? "open" : undefined}>
+    <div className={'app' + (isDesktop ? ' desktop-chrome' : '')} key={lex}
+      data-nav={navRail ? "rail" : "full"} data-drawer={drawerOpen ? "open" : undefined}
+      data-maximized={isDesktop && winMax ? "" : undefined}>
+      <TitleBar t={t} />
       <Sidebar route={route} go={go} t={t} can={can} nav={navCfg} openMode={openMode}
         rail={navRail} onToggle={toggleNav} />
       <div className="nav-scrim" onClick={closeDrawer} />
