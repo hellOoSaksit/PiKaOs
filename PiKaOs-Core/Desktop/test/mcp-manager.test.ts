@@ -47,3 +47,21 @@ it('refuses to spawn when consent is denied', async () => {
   expect(spawn).not.toHaveBeenCalled()
   expect(mgr.status('fs')).toBe('stopped')
 })
+
+it('stopAll stops every running server and marks them stopped', async () => {
+  fake = child()
+  const { spawn } = await import('node:child_process'); (spawn as any).mockClear()
+  const { McpManager } = await import('../src/main/mcp/manager')
+  const { McpRegistry } = await import('../src/main/mcp/registry')
+  const dir = mkdtempSync(join(tmpdir(), 'm-'))
+  const reg = new McpRegistry(join(dir, 'mcp.json'))
+  reg.add({ id: 'a', label: 'A', command: 'npx', args: ['-y', '@x/a'], secretKeys: [] })
+  reg.add({ id: 'b', label: 'B', command: 'npx', args: ['-y', '@x/b'], secretKeys: [] })
+  const vault = { get: () => null, set: vi.fn(), delete: vi.fn(), isAvailable: () => true } as any
+  const mgr = new McpManager(reg, vault, vi.fn().mockResolvedValue(true), join(dir, 'approvals.json'))
+  await mgr.start('a')
+  await mgr.start('b')
+  await mgr.stopAll()
+  expect(mgr.status('a')).toBe('stopped')
+  expect(mgr.status('b')).toBe('stopped')
+})
