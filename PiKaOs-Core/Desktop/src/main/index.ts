@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, Menu } from 'electron'
+import { app, BrowserWindow, dialog, Menu, session } from 'electron'
 import { join } from 'node:path'
 import { registerAppProtocol } from './protocol'
 import { removeAppMenu, registerDevtoolsShortcut, registerZoomShortcuts, forwardMaximizeState } from './chrome'
@@ -8,6 +8,7 @@ import { SecretVault } from './vault'
 import { SessionBroker } from './session-broker'
 import { McpRegistry } from './mcp/registry'
 import { McpManager } from './mcp/manager'
+import { RecoveryService } from './recovery'
 import { getBackendConfig } from './config'
 import type { McpServerDef } from './mcp/registry'
 
@@ -52,8 +53,16 @@ app.whenReady().then(() => {
   const broker = new SessionBroker(vault, () => getBackendConfig().apiBaseUrl)
   const registry = new McpRegistry(join(userDataDir, 'mcp.json'))
   const manager = new McpManager(registry, vault, confirmMcpStart, join(userDataDir, 'mcp-approvals.json'))
+  const recovery = new RecoveryService({
+    userDataDir, registry, manager,
+    session: {
+      getCacheSize: () => session.defaultSession.getCacheSize(),
+      clearCache: () => session.defaultSession.clearCache(),
+      clearStorageData: () => session.defaultSession.clearStorageData({ origin: 'app://pikaos' }),
+    },
+  })
 
-  registerIpc({ vault, broker, registry, manager })
+  registerIpc({ vault, broker, registry, manager, recovery })
 
   manager.on('status', (id: string, status: string) => {
     for (const win of BrowserWindow.getAllWindows()) {
