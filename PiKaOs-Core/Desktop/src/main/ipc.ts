@@ -46,12 +46,12 @@ export function registerIpc(deps: { vault: SecretVault; broker: SessionBroker; r
   ipcMain.handle('recovery:diagnose', guard(() => recovery.diagnose()))
   ipcMain.handle('recovery:repair', guard(async (_e, id: string, subId?: string) => {
     const r = await recovery.repair(id, subId)
-    console.log('[recovery] repair', id, subId ?? '', r.ok ? 'ok' : r.error)
+    console.log('[recovery] repair', id, subId ?? '', r.ok ? 'ok' : 'failed')
     return r
   }))
   ipcMain.handle('recovery:clear', guard(async (_e, id: string) => {
     const r = await recovery.clear(id)
-    console.log('[recovery] clear', id, r.ok ? 'ok' : r.error)
+    console.log('[recovery] clear', id, r.ok ? 'ok' : 'failed')
     return r
   }))
   ipcMain.handle('recovery:clearCache', guard(() => recovery.clearHttpCache()))
