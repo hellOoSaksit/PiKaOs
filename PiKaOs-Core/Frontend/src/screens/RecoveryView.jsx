@@ -100,7 +100,7 @@ export function RecoveryView({ t, onBack }) {
       <Row key={id} name={t(`recovery.item.${id}`)} desc={t(`recovery.item.${id}.desc`)}
         {...statusBadge(it.status)} extra={`${t('recovery.count', { count: it.count })} · ${fmtBytes(it.bytes)}`}>
         {it.status === 'corrupt' && (
-          <ActionBtn t={t} label={t('recovery.repair')} disabled={busy}
+          <ActionBtn t={t} label={t('recovery.repair')} danger={danger} disabled={busy || (danger && !armed)}
             onRun={() => run(() => window.pikaosDesktop.recovery.repair(id))} />
         )}
         <ActionBtn t={t} label={t('recovery.clear')} danger={danger} disabled={busy || (danger && !armed)}
