@@ -84,7 +84,9 @@ export class RecoveryService {
         await this.deps.session.clearStorageData()
         return { ok: true }
       }
-      if (!(id in FILES)) return { ok: false, error: 'unknown item' }
+      // Object.hasOwn (not `in`): `in` walks the prototype chain, so ids like 'constructor' or
+      // 'toString' would resolve to Object.prototype members and slip past this gate.
+      if (!Object.hasOwn(FILES, id)) return { ok: false, error: 'unknown item' }
       if (id === 'mcp-registry') await this.deps.manager.stopAll()   // no orphan children (spec §6)
       this.clearFile(id as FileItemId)
       return { ok: true }

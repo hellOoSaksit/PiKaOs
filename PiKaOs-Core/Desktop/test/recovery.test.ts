@@ -108,6 +108,15 @@ it('clear rejects unknown and renderer-owned ids', async () => {
   expect((await svc.clear('boot-cache')).ok).toBe(false)
 })
 
+it('clear rejects inherited Object.prototype keys (in-operator prototype-chain gap)', async () => {
+  for (const id of ['constructor', 'toString', 'hasOwnProperty']) {
+    const r = await svc.clear(id)
+    expect(r.ok).toBe(false)
+  }
+  // proves no filesystem side effect slipped through (e.g. a delete under name 'Object')
+  expect(existsSync(join(dir, 'Object'))).toBe(false)
+})
+
 it('factory-reset clears every file item and both session stores', async () => {
   registry.add({ id: 's1', label: 'S1', command: 'node', args: [] })
   writeFileSync(join(dir, 'secrets.json'), '{}')
