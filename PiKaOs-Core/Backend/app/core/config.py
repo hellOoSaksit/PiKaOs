@@ -59,6 +59,15 @@ class Settings(BaseSettings):
     cookie_secure: bool = False  # True behind HTTPS in production
     perms_cache_ttl_seconds: int = 60  # effective-perms cache (perms:<user_id>) freshness
 
+    # --- login brute-force throttle (roadmap-v3 T1; auth plugin's login_throttle reads these) ---
+    # A failed login increments a per-account and a per-source-IP counter; once either reaches its cap
+    # the login is refused (429) until the counter expires — a soft, self-healing lockout (window ==
+    # lockout, no manual unlock) so a throttled account auto-recovers and can't be weaponised into a
+    # permanent DoS. IP cap is higher: it aggregates attempts across many accounts from one host.
+    login_throttle_account_max: int = 5
+    login_throttle_ip_max: int = 20
+    login_throttle_window_seconds: int = 60 * 15  # 15 minutes
+
     # --- network exposure (G2, roadmap-v3 T1) ---
     # Interface uvicorn binds (docker-entrypoint.sh reads BIND_HOST). Loopback by default so a
     # bare/direct run or the desktop-embedded backend is never reachable from the LAN out of the box.
