@@ -1,30 +1,46 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useLayoutEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 
-/** Tooltip — dark bubble that springs in on hover/focus. Stays on-screen near any viewport edge:
- *  it flips BELOW the control when there's no room above (title-bar buttons sit at the very top, so
- *  an above-bubble would render off the top edge), and shifts horizontally via --tip-dx so an edge
- *  control's bubble never overflows left/right (the arrow counter-shifts to keep pointing at it). */
+/** Tooltip — dark bubble on hover/focus. The bubble is PORTALED to <body> with position:fixed so it
+ *  can never be clipped by an ancestor's overflow (e.g. the sidebar) or the window edge. JS anchors it
+ *  to the control's rect: it flips BELOW when there's no room above (title-bar buttons at the top),
+ *  and --tip-dx nudges it back on-screen if it would overflow left/right. */
 export default function Tooltip({ label, children, className = '' }) {
-  const bubble = useRef(null);
-  const [below, setBelow] = useState(false);
-  const place = () => {
-    const el = bubble.current;
+  const ref = useRef(null);
+  const bubbleRef = useRef(null);
+  const [tip, setTip] = useState(null);   // { cx, y, below } while shown, else null
+
+  const show = useCallback(() => {
+    const el = ref.current;
     if (!el) return;
-    const trigger = el.parentElement;
-    const tr = trigger.getBoundingClientRect();
-    setBelow(tr.top - el.offsetHeight - 10 < 0);         // no room above → render below the control
-    el.style.setProperty('--tip-dx', '0px');             // reset before measuring the horizontal fit
     const r = el.getBoundingClientRect();
-    const pad = 8;
+    const GAP = 8, BUBBLE_H = 30;                       // approx bubble height for the above/below choice
+    const below = r.top - BUBBLE_H - GAP < 0;           // no room above → hang it below the control
+    setTip({ cx: r.left + r.width / 2, y: below ? r.bottom + GAP : r.top - GAP, below });
+  }, []);
+  const hide = useCallback(() => setTip(null), []);
+
+  // After the bubble lands (centred on the control), clamp it horizontally so it stays on-screen.
+  useLayoutEffect(() => {
+    const b = bubbleRef.current;
+    if (!b) return;
+    b.style.setProperty('--tip-dx', '0px');
+    const r = b.getBoundingClientRect();
+    const PAD = 8;
     let dx = 0;
-    if (r.left < pad) dx = pad - r.left;                 // overflowing the left edge → push right
-    else if (r.right > window.innerWidth - pad) dx = window.innerWidth - pad - r.right;  // right edge → push left
-    el.style.setProperty('--tip-dx', dx ? `${Math.round(dx)}px` : '0px');
-  };
+    if (r.left < PAD) dx = PAD - r.left;
+    else if (r.right > window.innerWidth - PAD) dx = window.innerWidth - PAD - r.right;
+    if (dx) b.style.setProperty('--tip-dx', `${Math.round(dx)}px`);
+  }, [tip]);
+
   return (
-    <span className={'tip' + (below ? ' tip-below' : '') + (className ? ' ' + className : '')} tabIndex={0} onMouseEnter={place} onFocus={place}>
+    <span className={'tip' + (className ? ' ' + className : '')} ref={ref} tabIndex={0}
+      onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}>
       {children}
-      <span className="tip-bubble" role="tooltip" ref={bubble}>{label}</span>
+      {tip && createPortal(
+        <span ref={bubbleRef} role="tooltip" className={'tip-portal' + (tip.below ? ' tip-below' : '')}
+          style={{ left: tip.cx, top: tip.y }}>{label}</span>,
+        document.body)}
     </span>
   );
 }

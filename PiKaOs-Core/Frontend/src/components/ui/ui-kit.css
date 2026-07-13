@@ -124,41 +124,21 @@
 .mono-chip { font-family: var(--font-mono); font-size: 11.5px; }
 
 /* ============ Tooltip ============ */
-.tip { position: relative; display: inline-block; }
-.tip .tip-bubble {
-  position: absolute; bottom: calc(100% + 8px); left: 50%;
-  /* --tip-dx is set by Tooltip.jsx to shift the bubble back on-screen near a viewport edge. */
-  transform: translateX(calc(-50% + var(--tip-dx, 0px))) translateY(4px) scale(.9);
-  transform-origin: bottom center;
+.tip { display: inline-block; }
+/* Bubble is portaled to <body> (Tooltip.jsx) with position:fixed, so it never clips against an
+   ancestor's overflow (e.g. the sidebar) or the window edge. JS sets left(=control centre)/top;
+   --tip-dx nudges it back on-screen horizontally; .tip-below hangs it under the control. */
+.tip-portal {
+  position: fixed; z-index: 100; pointer-events: none;
   background: var(--ink); color: var(--bg-1);
   font-size: 11.5px; font-weight: 500; white-space: nowrap;
   border-radius: var(--radius-sm); padding: 6px 10px;
-  opacity: 0; visibility: hidden; pointer-events: none; z-index: 20;
+  box-shadow: var(--shadow-pop);
+  transform: translate(calc(-50% + var(--tip-dx, 0px)), -100%);   /* above: bubble bottom sits at top */
+  animation: tipPop .14s ease both;
 }
-.tip .tip-bubble::after {
-  /* counter-shift the arrow by -dx so it keeps pointing at the control after the bubble is clamped */
-  content: ""; position: absolute; top: 100%; left: calc(50% - var(--tip-dx, 0px)); transform: translateX(-50%);
-  border: 5px solid transparent; border-top-color: var(--ink);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .tip .tip-bubble { transition: opacity .15s ease, transform .3s var(--spring), visibility 0s linear .15s; }
-}
-.tip:hover .tip-bubble, .tip:focus-within .tip-bubble {
-  opacity: 1; visibility: visible;
-  transform: translateX(calc(-50% + var(--tip-dx, 0px))) translateY(0) scale(1);
-  transition: opacity .12s ease, transform .3s var(--spring), visibility 0s;
-}
-/* flipped below the control (Tooltip.jsx sets .tip-below when there's no room above, e.g. title-bar
-   buttons at the top edge) — bubble drops under the control and the arrow points up instead. */
-.tip.tip-below .tip-bubble {
-  bottom: auto; top: calc(100% + 8px);
-  transform: translateX(calc(-50% + var(--tip-dx, 0px))) translateY(-4px) scale(.9);
-  transform-origin: top center;
-}
-.tip.tip-below .tip-bubble::after {
-  top: auto; bottom: 100%;
-  border-top-color: transparent; border-bottom-color: var(--ink);
-}
+.tip-portal.tip-below { transform: translate(calc(-50% + var(--tip-dx, 0px)), 0); }  /* below the control */
+@keyframes tipPop { from { opacity: 0; } to { opacity: 1; } }
 
 /* ============ Progress ============ */
 .task-prog { display: flex; align-items: center; gap: 12px; min-width: 260px; }
