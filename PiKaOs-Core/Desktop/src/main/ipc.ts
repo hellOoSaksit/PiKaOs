@@ -75,7 +75,8 @@ export function registerIpc(deps: { vault: SecretVault; broker: SessionBroker; r
     const w = BrowserWindow.fromWebContents(e.sender)
     if (w) w.setFullScreen(!w.isFullScreen())
   }))
-  ipcMain.handle('window:toggleDevTools', guard((e) => { BrowserWindow.fromWebContents(e.sender)?.webContents.toggleDevTools() }))
+  // DevTools stays dev-only, matching chrome.ts's F12 binding — never openable from a packaged build.
+  ipcMain.handle('window:toggleDevTools', guard((e) => { if (!app.isPackaged) BrowserWindow.fromWebContents(e.sender)?.webContents.toggleDevTools() }))
   // Page zoom from the menu — mirrors chrome.ts's Ctrl+=/-/0 binding: ±0.5 per step, clamped to ±4.
   ipcMain.handle('window:zoom', guard((e, dir: 'in' | 'out' | 'reset') => {
     const wc = BrowserWindow.fromWebContents(e.sender)?.webContents

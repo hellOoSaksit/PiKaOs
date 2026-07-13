@@ -148,6 +148,17 @@
   transform: translateX(calc(-50% + var(--tip-dx, 0px))) translateY(0) scale(1);
   transition: opacity .12s ease, transform .3s var(--spring), visibility 0s;
 }
+/* flipped below the control (Tooltip.jsx sets .tip-below when there's no room above, e.g. title-bar
+   buttons at the top edge) — bubble drops under the control and the arrow points up instead. */
+.tip.tip-below .tip-bubble {
+  bottom: auto; top: calc(100% + 8px);
+  transform: translateX(calc(-50% + var(--tip-dx, 0px))) translateY(-4px) scale(.9);
+  transform-origin: top center;
+}
+.tip.tip-below .tip-bubble::after {
+  top: auto; bottom: 100%;
+  border-top-color: transparent; border-bottom-color: var(--ink);
+}
 
 /* ============ Progress ============ */
 .task-prog { display: flex; align-items: center; gap: 12px; min-width: 260px; }
