@@ -233,16 +233,18 @@ function App() {
     if (target) setLex(target);
   };
   useEffect(() => { document.documentElement.setAttribute("data-theme", theme); }, [theme]);
-  // Keep the OS-drawn window buttons (Window Controls Overlay) on the theme's surface — without
-  // this the dark theme shows a white button strip. Reads the applied tokens so the CSS stays the
+  // Keep the OS-drawn window buttons (Window Controls Overlay) AND the window fill on the active
+  // theme surface. color = --bg-1 unifies the min/max/close strip with .titlebar + the app (one
+  // colour, no white bar); bg re-paints the window backgroundColor so a maximize/resize never flashes
+  // the creation-time light colour on the dark theme. Reads the applied tokens so the CSS stays the
   // single source of truth; must run AFTER the data-theme attribute effect above.
   useEffect(() => {
     const w = window.pikaosDesktop?.window;
     if (!w?.setTitleBarOverlay) return;
     const css = getComputedStyle(document.documentElement);
-    const color = css.getPropertyValue('--bg-2').trim();
+    const color = css.getPropertyValue('--bg-1').trim();
     const symbolColor = css.getPropertyValue('--ink-3').trim();
-    w.setTitleBarOverlay({ color, symbolColor }).catch(() => {});
+    w.setTitleBarOverlay({ color, symbolColor, bg: color }).catch(() => {});
   }, [theme]);
   useEffect(() => { saveNav(navCfg); }, [navCfg]);   // local cache for instant render next load
   // pull the shared arrangement from the server once signed in (authoritative; overrides the cache)

@@ -31,7 +31,7 @@ const api = {
     isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
     getBounds: () => ipcRenderer.invoke('window:getBounds'),
     move: (x: number, y: number) => ipcRenderer.send('window:move', x, y),
-    setTitleBarOverlay: (colors: { color: string; symbolColor: string }) =>
+    setTitleBarOverlay: (colors: { color: string; symbolColor: string; bg?: string }) =>
       ipcRenderer.invoke('window:setTitleBarOverlay', colors),
     onMaximizedChanged: (cb: (v: boolean) => void) => {
       const listener = (_e: unknown, v: boolean) => cb(v)

@@ -51,14 +51,20 @@ export function registerIpc(deps: { vault: SecretVault; broker: SessionBroker; r
   ipcMain.handle('window:getBounds', guard((e) => BrowserWindow.fromWebContents(e.sender)?.getBounds()))
   // fire-and-forget for smooth JS window drag (avoids invoke round-trip per mousemove)
   ipcMain.on('window:move', (e, x, y) => { if (okOrigin(e)) BrowserWindow.fromWebContents(e.sender)?.setPosition(Math.round(x), Math.round(y)) })
-  // Theme sync: the renderer sends its computed --bg-2/--ink-3 tokens when the theme changes so the
-  // OS-drawn overlay buttons match. Hex-only at the edge — anything else is dropped, not sanitized.
-  ipcMain.handle('window:setTitleBarOverlay', guard((e, colors: { color?: string; symbolColor?: string }) => {
+  // Theme sync: the renderer sends its computed --bg-1/--ink-3 tokens (and --bg-1 again as bg) when the
+  // theme changes so the OS-drawn overlay buttons AND the window fill match. Hex-only at the edge —
+  // anything else is dropped, not sanitized.
+  ipcMain.handle('window:setTitleBarOverlay', guard((e, colors: { color?: string; symbolColor?: string; bg?: string }) => {
     const hex = (v: unknown) => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v : undefined)
     const color = hex(colors?.color); const symbolColor = hex(colors?.symbolColor)
     if (!color || !symbolColor) throw new Error('invalid overlay colors')
     const w = BrowserWindow.fromWebContents(e.sender)
+    if (!w) return
     // setTitleBarOverlay only exists where WCO is active (Windows/Linux) — a no-op elsewhere.
-    if (w && typeof w.setTitleBarOverlay === 'function') w.setTitleBarOverlay({ color, symbolColor, height: 36 })
+    if (typeof w.setTitleBarOverlay === 'function') w.setTitleBarOverlay({ color, symbolColor, height: 36 })
+    // Repaint the window fill on the active theme surface so a maximize/resize never flashes the
+    // creation-time light colour (the dark-theme blink on maximize).
+    const bg = hex(colors?.bg)
+    if (bg) w.setBackgroundColor(bg)
   }))
 }

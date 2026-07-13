@@ -17,12 +17,15 @@ export function createWindow(): BrowserWindow {
     show: false,
     ...(nativeFrame ? {} : {
       titleBarStyle: 'hidden' as const,
-      // Window Controls Overlay: the OS draws min/max/close (correct size + hit-testing). color
-      // matches the renderer's .titlebar strip; symbolColor is the button glyph; the renderer
-      // re-syncs both to the active theme via window:setTitleBarOverlay.
-      titleBarOverlay: { color: '#ffffff', symbolColor: '#69707d', height: 36 },
+      // Window Controls Overlay: the OS draws min/max/close (correct size + hit-testing). color is
+      // the button-strip background — kept equal to --bg-1 (the app surface + .titlebar) so the whole
+      // top strip reads as ONE colour with the program, not a distinct white bar; symbolColor is the
+      // glyph. The renderer re-syncs both (and the window fill) to the active theme via
+      // window:setTitleBarOverlay.
+      titleBarOverlay: { color: '#f5f7fb', symbolColor: '#69707d', height: 36 },
     }),
-    // backgroundColor is the default theme surface so the pre-paint frame matches the app, not white.
+    // backgroundColor is the app surface (--bg-1) so the pre-paint frame + any resize/maximize repaint
+    // matches the program, not white. The renderer keeps it on the active theme (setBackgroundColor).
     backgroundColor: '#f5f7fb',
     webPreferences: {
       sandbox: true,

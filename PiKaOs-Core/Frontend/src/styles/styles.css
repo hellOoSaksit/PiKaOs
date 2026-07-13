@@ -297,7 +297,9 @@ body {
 .titlebar {
   display: flex; align-items: center;
   height: var(--titlebar-h);
-  background: var(--bg-2);
+  /* --bg-1 = the app surface + the window backgroundColor + the OS min/max/close strip (WCO overlay),
+     so the whole top row is one colour with the program instead of a distinct white bar. */
+  background: var(--bg-1);
   border-bottom: 1px solid var(--line);
   user-select: none;
 }
