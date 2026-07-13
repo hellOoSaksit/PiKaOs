@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { readFileSync, writeFileSync, rmSync, existsSync, statSync } from 'node:fs'
 import type { McpRegistry, McpServerDef } from './mcp/registry'
 import type { McpManager } from './mcp/manager'
+import { isAllowedBackendUrl } from './config'
 
 // Recovery spec 2026-07-13: main owns every file touch; the renderer only ever names one of
 // these enum ids — never a path. `boot-cache`/`ui-state` are renderer-owned web storage and
@@ -51,10 +52,15 @@ export class RecoveryService {
         return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
           ? { id, status: 'ok', count: Object.keys(parsed).length, bytes }
           : { id, status: 'corrupt', count: 0, bytes }
-      // backend-config
-      return parsed && typeof parsed === 'object' && Array.isArray(parsed.servers)
-        ? { id, status: 'ok', count: parsed.servers.length, bytes }
-        : { id, status: 'corrupt', count: 0, bytes }
+      // backend-config: mirror config.ts getBackendConfig's validity notion exactly, incl. its
+      // legacy back-compat branch (a pre-list one-field file with a policy-allowed apiBaseUrl,
+      // which getBackendConfig silently upgrades to a one-entry server list) — else a healthy
+      // legacy config false-alarms here as corrupt and could prompt a destructive repair.
+      if (!parsed || typeof parsed !== 'object') return { id, status: 'corrupt', count: 0, bytes }
+      if (Array.isArray(parsed.servers)) return { id, status: 'ok', count: parsed.servers.length, bytes }
+      if (typeof parsed.apiBaseUrl === 'string' && isAllowedBackendUrl(parsed.apiBaseUrl))
+        return { id, status: 'ok', count: 1, bytes }
+      return { id, status: 'corrupt', count: 0, bytes }
     })
     let cacheBytes = 0
     try { cacheBytes = await this.deps.session.getCacheSize() } catch { /* size is cosmetic */ }

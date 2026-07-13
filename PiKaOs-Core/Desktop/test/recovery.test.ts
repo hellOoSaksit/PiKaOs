@@ -60,6 +60,18 @@ it('diagnose: registry with an invalid def reports warn', async () => {
   expect(item.count).toBe(1) // only valid defs counted
 })
 
+it('diagnose: legacy backend.json (apiBaseUrl, no servers) reports ok, count 1 — config.ts back-compat parity', async () => {
+  writeFileSync(join(dir, 'backend.json'), JSON.stringify({ apiBaseUrl: 'https://x/api' }))
+  const item = byId(await svc.diagnose(), 'backend-config')
+  expect(item).toMatchObject({ status: 'ok', count: 1 })
+})
+
+it('diagnose: legacy backend.json with a disallowed URL (no servers) reports corrupt', async () => {
+  writeFileSync(join(dir, 'backend.json'), JSON.stringify({ apiBaseUrl: 'not-a-url' }))
+  const item = byId(await svc.diagnose(), 'backend-config')
+  expect(item).toMatchObject({ status: 'corrupt', count: 0 })
+})
+
 it('diagnose: secret values never appear anywhere in the result', async () => {
   writeFileSync(join(dir, 'secrets.json'), JSON.stringify({ 'mcp.s1.TOKEN': 'SUPERSECRETB64' }))
   const json = JSON.stringify(await svc.diagnose())
