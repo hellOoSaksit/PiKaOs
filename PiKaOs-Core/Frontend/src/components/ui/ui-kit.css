@@ -159,7 +159,12 @@
 .task-prog-label { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--ink-3); min-width: 38px; text-align: right; }
 
 /* ============ Toast ============ */
-.toast-stack { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 90; }
+/* top/left:auto — as a direct child of .desktop-body the fill rule (`.desktop-body > *
+   { inset: 0 }`, styles.css) leaked top:0/left:0 in here, silently turning this empty box into a
+   full-window shield that swallowed EVERY click in the desktop app (2026-07-13). pointer-events
+   none/auto is the belt-and-braces: the container can never eat clicks again, only the toasts. */
+.toast-stack { position: fixed; top: auto; left: auto; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 90; pointer-events: none; }
+.toast-stack > * { pointer-events: auto; }
 .toast {
   display: flex; align-items: center; gap: 10px;
   background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius);

@@ -283,9 +283,12 @@ body {
   box-shadow: inset 0 0 0 1px var(--line);
 }
 .desktop-frame[data-maximized] { box-shadow: none; }
-/* the mounted screen fills the body regardless of its own intrinsic height */
+/* The mounted screen fills the body regardless of its own intrinsic height. Fixed-position
+   overlays that are siblings of the screen (ToastProvider's stack) must NOT be stretched —
+   inset:0 leaking into an invisible overlay turns it into a full-window click shield (the
+   every-button-dead desktop bug, 2026-07-13). */
 .desktop-body { position: relative; flex: 1; min-height: 0; }
-.desktop-body > * { position: absolute; inset: 0; }
+.desktop-body > :not(.toast-stack) { position: absolute; inset: 0; }
 /* `.app` is `height: 100vh` for the web build (no `.desktop-body`); inside the frame it fills the body */
 .desktop-body > .app { height: 100%; }
 /* FirstRun's `.auth-screen` is `position: fixed; inset: 0` — that would escape the frame and cover the
