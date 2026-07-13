@@ -68,5 +68,33 @@ export class RecoveryService {
     return items
   }
 
-  // Tasks 3-4 add clear/repair/clearHttpCache below.
+  private clearFile(id: FileItemId) {
+    if (id === 'mcp-registry' || id === 'mcp-approvals') writeFileSync(this.path(id), '[]')
+    else rmSync(this.path(id), { force: true })   // idempotent: missing file is success
+  }
+
+  // `id` is untyped `string` (not RecoveryItemId) because it crosses the IPC bridge from the
+  // renderer — main re-validates it here rather than trusting the caller's type.
+  async clear(id: string): Promise<ActionResult> {
+    try {
+      if (id === 'factory-reset') {
+        await this.deps.manager.stopAll()
+        for (const f of Object.keys(FILES) as FileItemId[]) this.clearFile(f)
+        await this.deps.session.clearCache()
+        await this.deps.session.clearStorageData()
+        return { ok: true }
+      }
+      if (!(id in FILES)) return { ok: false, error: 'unknown item' }
+      if (id === 'mcp-registry') await this.deps.manager.stopAll()   // no orphan children (spec §6)
+      this.clearFile(id as FileItemId)
+      return { ok: true }
+    } catch (e: any) { return { ok: false, error: String(e?.message ?? e) } }
+  }
+
+  async clearHttpCache(): Promise<ActionResult> {
+    try { await this.deps.session.clearCache(); return { ok: true } }
+    catch (e: any) { return { ok: false, error: String(e?.message ?? e) } }
+  }
+
+  // Task 4 adds repair below.
 }

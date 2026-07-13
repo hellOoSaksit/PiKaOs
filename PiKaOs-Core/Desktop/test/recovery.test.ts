@@ -1,5 +1,5 @@
-import { it, expect, beforeEach } from 'vitest'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { it, expect, beforeEach, vi } from 'vitest'
+import { mkdtempSync, writeFileSync, existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { McpRegistry } from '../src/main/mcp/registry'
@@ -77,4 +77,45 @@ it('diagnose: secret values never appear anywhere in the result', async () => {
   const json = JSON.stringify(await svc.diagnose())
   expect(json).not.toContain('SUPERSECRET')
   expect(json).not.toContain('TOKEN')
+})
+
+it('clear mcp-registry stops all processes first, then writes an empty list', async () => {
+  registry.add({ id: 's1', label: 'S1', command: 'node', args: [] })
+  const spy = vi.spyOn(manager, 'stopAll')
+  const r = await svc.clear('mcp-registry')
+  expect(r.ok).toBe(true)
+  expect(spy).toHaveBeenCalled()
+  expect(registry.list()).toEqual([])
+})
+
+it('clear secrets / backend-config removes the files', async () => {
+  writeFileSync(join(dir, 'secrets.json'), '{}')
+  writeFileSync(join(dir, 'backend.json'), '{}')
+  expect((await svc.clear('secrets')).ok).toBe(true)
+  expect((await svc.clear('backend-config')).ok).toBe(true)
+  expect(existsSync(join(dir, 'secrets.json'))).toBe(false)
+  expect(existsSync(join(dir, 'backend.json'))).toBe(false)
+})
+
+it('clear is idempotent — clearing a missing file succeeds', async () => {
+  expect((await svc.clear('secrets')).ok).toBe(true)
+  expect((await svc.clear('mcp-approvals')).ok).toBe(true)
+})
+
+it('clear rejects unknown and renderer-owned ids', async () => {
+  expect((await svc.clear('../../etc/passwd')).ok).toBe(false)
+  expect((await svc.clear('ui-state')).ok).toBe(false)   // renderer-owned, main must refuse
+  expect((await svc.clear('boot-cache')).ok).toBe(false)
+})
+
+it('factory-reset clears every file item and both session stores', async () => {
+  registry.add({ id: 's1', label: 'S1', command: 'node', args: [] })
+  writeFileSync(join(dir, 'secrets.json'), '{}')
+  const cache = vi.spyOn(fakeSession, 'clearCache')
+  const storage = vi.spyOn(fakeSession, 'clearStorageData')
+  expect((await svc.clear('factory-reset')).ok).toBe(true)
+  expect(registry.list()).toEqual([])
+  expect(existsSync(join(dir, 'secrets.json'))).toBe(false)
+  expect(cache).toHaveBeenCalled()
+  expect(storage).toHaveBeenCalled()
 })
