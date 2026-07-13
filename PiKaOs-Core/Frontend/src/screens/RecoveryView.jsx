@@ -142,7 +142,7 @@ export function RecoveryView({ t, onBack }) {
           <p style={{ margin: '0 0 8px', fontSize: 12.5, color: 'var(--ink-4)' }}>{t('recovery.mcp.empty')}</p>
         ) : mcp.map((s) => (
           <Row key={s.id} name={s.label || s.id} desc={`${s.command} ${(s.args || []).join(' ')}`}
-            {...statusBadge(s.status === 'error' ? 'corrupt' : 'ok')} extra={s.status}>
+            {...statusBadge(s.status === 'error' ? 'corrupt' : 'ok')} extra={t('recovery.mcp.state.' + s.status)}>
             <ActionBtn t={t} label={t('recovery.repair')} disabled={busy}
               onRun={() => run(() => window.pikaosDesktop.recovery.repair('mcp-registry', s.id))} />
             <ActionBtn t={t} label={t('recovery.uninstall')} danger disabled={busy}

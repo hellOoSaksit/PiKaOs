@@ -144,10 +144,12 @@ export function ConnectServer({ language, onConnected }) {
         </div>
       )}
 
-      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setView('recovery')}
-        style={{ marginTop: 26 }}>
-        {t('recovery.entry')}
-      </button>
+      {window.pikaosDesktop?.isDesktop && (
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setView('recovery')}
+          style={{ marginTop: 26 }}>
+          {t('recovery.entry')}
+        </button>
+      )}
     </div>
   );
 }
