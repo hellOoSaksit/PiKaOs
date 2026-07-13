@@ -128,3 +128,43 @@ it('factory-reset clears every file item and both session stores', async () => {
   expect(cache).toHaveBeenCalled()
   expect(storage).toHaveBeenCalled()
 })
+
+it('repair(mcp-registry, subId) stops the server and drops only its approval hash — def stays', async () => {
+  const def = { id: 's1', label: 'S1', command: 'node', args: [] as string[] }
+  const other = { id: 's2', label: 'S2', command: 'node', args: ['x'] }
+  registry.add(def); registry.add(other)
+  writeFileSync(join(dir, 'mcp-approvals.json'), JSON.stringify([registry.hash(def), registry.hash(other)]))
+  const stop = vi.spyOn(manager, 'stop')
+  const r = await svc.repair('mcp-registry', 's1')
+  expect(r.ok).toBe(true)
+  expect(stop).toHaveBeenCalledWith('s1')
+  expect(registry.get('s1')).toBeTruthy()   // repair keeps the module installed
+  const approvals = JSON.parse(readFileSync(join(dir, 'mcp-approvals.json'), 'utf8'))
+  expect(approvals).toEqual([registry.hash(other)])   // other server's consent untouched
+})
+
+it('repair(mcp-registry, unknown-subId) fails without touching files', async () => {
+  expect((await svc.repair('mcp-registry', 'ghost')).ok).toBe(false)
+})
+
+it('repair on a corrupt file rewrites a valid empty default', async () => {
+  writeFileSync(join(dir, 'mcp.json'), '{nope')
+  expect((await svc.repair('mcp-registry')).ok).toBe(true)
+  expect(registry.list()).toEqual([])
+})
+
+it('repair on a healthy or missing file is a no-op success', async () => {
+  registry.add({ id: 's1', label: 'S1', command: 'node', args: [] })
+  expect((await svc.repair('mcp-registry')).ok).toBe(true)
+  expect(registry.list()).toHaveLength(1)   // healthy content untouched
+  expect((await svc.repair('secrets')).ok).toBe(true)   // missing file: nothing to do
+})
+
+it('repair rejects unknown ids and factory-reset', async () => {
+  expect((await svc.repair('nope')).ok).toBe(false)
+  expect((await svc.repair('factory-reset')).ok).toBe(false)
+})
+
+it('repair rejects inherited Object.prototype keys (in-operator prototype-chain gap)', async () => {
+  expect((await svc.repair('constructor')).ok).toBe(false)
+})

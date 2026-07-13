@@ -98,5 +98,35 @@ export class RecoveryService {
     catch (e: any) { return { ok: false, error: String(e?.message ?? e) } }
   }
 
-  // Task 4 adds repair below.
+  private isCorrupt(id: FileItemId): boolean {
+    if (!existsSync(this.path(id))) return false
+    try { JSON.parse(readFileSync(this.path(id), 'utf8')); return false } catch { return true }
+  }
+
+  // Repair = clear CRASH STATE, keep the module (spec §5 — the load-bearing distinction from
+  // uninstall). Per-row: stop + revoke that def's consent hash so the next start re-asks. The
+  // whole-file variant only acts when the file is unreadable: rewrite a valid default (the old
+  // content cannot be recovered — the UI says so).
+  async repair(id: string, subId?: string): Promise<ActionResult> {
+    try {
+      // Object.hasOwn (not `in`): `in` walks the prototype chain, so ids like 'constructor' or
+      // 'toString' would resolve to Object.prototype members and slip past this gate (same fix
+      // as clear() in Task 3).
+      if (!Object.hasOwn(FILES, id)) return { ok: false, error: 'unknown item' }
+      if (id === 'mcp-registry' && subId && !this.isCorrupt('mcp-registry')) {
+        const def = this.deps.registry.get(subId)
+        if (!def) return { ok: false, error: 'unknown server' }
+        await this.deps.manager.stop(subId)
+        const aPath = this.path('mcp-approvals')
+        let approvals: string[] = []
+        try { approvals = existsSync(aPath) ? JSON.parse(readFileSync(aPath, 'utf8')) : [] } catch { approvals = [] }
+        const hash = this.deps.registry.hash(def)
+        writeFileSync(aPath, JSON.stringify(approvals.filter((h) => h !== hash)))
+        return { ok: true }
+      }
+      const fid = id as FileItemId
+      if (this.isCorrupt(fid)) this.clearFile(fid)   // rewrite valid default / remove per FILES policy
+      return { ok: true }
+    } catch (e: any) { return { ok: false, error: String(e?.message ?? e) } }
+  }
 }
