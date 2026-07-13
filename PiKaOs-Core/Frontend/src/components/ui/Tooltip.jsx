@@ -4,8 +4,11 @@ import { createPortal } from 'react-dom';
 /** Tooltip — dark bubble on hover/focus. The bubble is PORTALED to <body> with position:fixed so it
  *  can never be clipped by an ancestor's overflow (e.g. the sidebar) or the window edge. JS anchors it
  *  to the control's rect: it flips BELOW when there's no room above (title-bar buttons at the top),
- *  and --tip-dx nudges it back on-screen if it would overflow left/right. */
-export default function Tooltip({ label, children, className = '' }) {
+ *  and --tip-dx nudges it back on-screen if it would overflow left/right.
+ *  The wrapper takes NO tab stop by default: onFocus/onBlur see focusin/focusout bubbling up from a
+ *  focusable child (button/link), so keyboard focus still shows the tip without a second stop. Pass
+ *  `focusable` only when the wrapped content is itself non-focusable (e.g. a plain rail icon span). */
+export default function Tooltip({ label, children, className = '', focusable = false }) {
   const ref = useRef(null);
   const bubbleRef = useRef(null);
   const [tip, setTip] = useState(null);   // { cx, y, below } while shown, else null
@@ -34,7 +37,7 @@ export default function Tooltip({ label, children, className = '' }) {
   }, [tip]);
 
   return (
-    <span className={'tip' + (className ? ' ' + className : '')} ref={ref} tabIndex={0}
+    <span className={'tip' + (className ? ' ' + className : '')} ref={ref} tabIndex={focusable ? 0 : undefined}
       onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}>
       {children}
       {tip && createPortal(

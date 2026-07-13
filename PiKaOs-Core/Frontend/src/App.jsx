@@ -68,7 +68,7 @@ function NavNode({ node, depth, route, go, t, can, navOpen, setNavOpen, rail, on
         title={rail ? label : undefined}
         onClick={() => { if (rail && hasKids) onExpandShell(); go(node.id); }}>
         {rail
-          ? <Tooltip label={label}><span className="ni-icon">{renderIcon(node.icon)}</span></Tooltip>
+          ? <Tooltip label={label} focusable><span className="ni-icon">{renderIcon(node.icon)}</span></Tooltip>
           : <span className="ni-icon">{renderIcon(node.icon)}</span>}
         <span className="ni-label">{label}</span>
         {node.tag && <span className={`ni-tag ${node.tag === "live" ? "alert" : ""}`}>{node.tag === "live" ? "● LIVE" : node.tag}</span>}
