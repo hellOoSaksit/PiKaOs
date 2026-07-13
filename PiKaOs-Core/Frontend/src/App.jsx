@@ -99,7 +99,7 @@ function Sidebar({ route, go, t, can, nav, openMode, rail, onToggle }) {
         {rail
           ? <Tooltip label={toggleLabel}>
               <button type="button" className="brand-logo" onClick={onToggle}
-                title={toggleLabel} aria-label={toggleLabel}>
+                aria-label={toggleLabel}>
                 <span className="ltr">P</span>
               </button>
             </Tooltip>
@@ -113,7 +113,7 @@ function Sidebar({ route, go, t, can, nav, openMode, rail, onToggle }) {
         {!rail && (
           <Tooltip label={toggleLabel}>
             <button type="button" className="brand-toggle" onClick={onToggle}
-              title={toggleLabel} aria-label={toggleLabel}>
+              aria-label={toggleLabel}>
               <Icon name="sidebar" />
             </button>
           </Tooltip>
