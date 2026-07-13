@@ -91,6 +91,7 @@
     "connect.errUnreachable": "このアドレスのサーバーに接続できません。",
     "connect.errSave": "接続しましたが、サーバーの保存に失敗しました — デスクトップのログを確認してください。",
     "connect.errDelete": "サーバーを削除できませんでした — もう一度お試しください。",
+    "connect.disconnect": "切断",
     "nav.modules": "モジュール / プラグイン",
     "nav.marketplace": "マーケットプレイス",
     "nav.mypackages": "マイパッケージと共有",

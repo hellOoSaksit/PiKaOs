@@ -399,6 +399,7 @@
     "connect.errUnreachable": "Cannot reach a server at this address.",
     "connect.errSave": "Connected, but saving the server failed — check the desktop logs.",
     "connect.errDelete": "Could not remove that server — try again.",
+    "connect.disconnect": "Disconnect",
     "nav.modules": "Modules / Plugins",
     "nav.marketplace": "Marketplace",
     "nav.mypackages": "My Packages & Share",

@@ -336,6 +336,7 @@
     "connect.errUnreachable": "ติดต่อเซิร์ฟเวอร์ตามที่อยู่นี้ไม่ได้",
     "connect.errSave": "เชื่อมต่อได้ แต่บันทึกเซิร์ฟเวอร์ไม่สำเร็จ — ตรวจ log ของแอป",
     "connect.errDelete": "ลบเซิร์ฟเวอร์ไม่สำเร็จ — ลองใหม่",
+    "connect.disconnect": "ตัดการเชื่อมต่อ",
     "nav.modules": "โมดูล / ปลั๊กอิน",
     "nav.marketplace": "มาร์เก็ตเพลส",
     "nav.mypackages": "แพ็กเกจของฉัน",
