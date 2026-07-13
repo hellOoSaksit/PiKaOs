@@ -1,4 +1,5 @@
 import Tooltip from './Tooltip.jsx';
+import TitleMenu from './TitleMenu.jsx';
 import { renderIcon } from './icons.jsx';
 
 const desk = () => (typeof window !== 'undefined' ? window.pikaosDesktop : undefined);
@@ -6,7 +7,7 @@ const desk = () => (typeof window !== 'undefined' ? window.pikaosDesktop : undef
 /** Functional title-bar toolbar (Window Controls Overlay draws min/max/close on the right).
  *  No CSS webkit drag region anywhere — it breaks click hit-testing on scaled Windows displays
  *  (Electron #7347). The window is dragged in JS via the empty handle instead. Desktop-only. */
-export default function TitleBar({ t, onSidebar, onSearch, onBack, onForward, canBack, canForward }) {
+export default function TitleBar({ t, onSidebar, onSearch, onBack, onForward, canBack, canForward, onMenuSettings, version }) {
   const api = desk();
   if (!api?.isDesktop) return null;
 
@@ -42,6 +43,7 @@ export default function TitleBar({ t, onSidebar, onSearch, onBack, onForward, ca
   return (
     <header className="titlebar" data-no-lex>
       <div className="titlebar-tools">
+        <TitleMenu t={t} onSettings={onMenuSettings} onToggleSidebar={onSidebar} version={version} />
         <Btn icon="sidebar" label={t('titlebar.sidebar')} onClick={onSidebar} />
         <Btn icon="search" label={t('titlebar.search')} onClick={onSearch} />
         <Btn icon="chevron-left" label={t('titlebar.back')} onClick={onBack} disabled={!canBack} />

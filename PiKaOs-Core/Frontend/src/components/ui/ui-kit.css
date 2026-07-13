@@ -127,7 +127,8 @@
 .tip { position: relative; display: inline-block; }
 .tip .tip-bubble {
   position: absolute; bottom: calc(100% + 8px); left: 50%;
-  transform: translateX(-50%) translateY(4px) scale(.9);
+  /* --tip-dx is set by Tooltip.jsx to shift the bubble back on-screen near a viewport edge. */
+  transform: translateX(calc(-50% + var(--tip-dx, 0px))) translateY(4px) scale(.9);
   transform-origin: bottom center;
   background: var(--ink); color: var(--bg-1);
   font-size: 11.5px; font-weight: 500; white-space: nowrap;
@@ -135,7 +136,8 @@
   opacity: 0; visibility: hidden; pointer-events: none; z-index: 20;
 }
 .tip .tip-bubble::after {
-  content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+  /* counter-shift the arrow by -dx so it keeps pointing at the control after the bubble is clamped */
+  content: ""; position: absolute; top: 100%; left: calc(50% - var(--tip-dx, 0px)); transform: translateX(-50%);
   border: 5px solid transparent; border-top-color: var(--ink);
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -143,7 +145,7 @@
 }
 .tip:hover .tip-bubble, .tip:focus-within .tip-bubble {
   opacity: 1; visibility: visible;
-  transform: translateX(-50%) translateY(0) scale(1);
+  transform: translateX(calc(-50% + var(--tip-dx, 0px))) translateY(0) scale(1);
   transition: opacity .12s ease, transform .3s var(--spring), visibility 0s;
 }
 

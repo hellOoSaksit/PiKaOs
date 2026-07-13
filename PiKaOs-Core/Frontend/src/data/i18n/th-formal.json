@@ -908,6 +908,22 @@
     "titlebar.sidebar": "สลับแถบข้าง",
     "titlebar.search": "ค้นหา",
     "titlebar.back": "ย้อนกลับ",
-    "titlebar.forward": "ถัดไป"
+    "titlebar.forward": "ถัดไป",
+    "menu.app": "เมนู",
+    "menu.file": "ไฟล์",
+    "menu.view": "มุมมอง",
+    "menu.help": "ช่วยเหลือ",
+    "menu.settings": "ตั้งค่า",
+    "menu.disconnect": "ตัดการเชื่อมต่อ",
+    "menu.exit": "ออกจากโปรแกรม",
+    "menu.reload": "โหลดใหม่",
+    "menu.zoomIn": "ขยาย",
+    "menu.zoomOut": "ย่อ",
+    "menu.zoomReset": "ขนาดปกติ",
+    "menu.fullscreen": "เต็มหน้าจอ",
+    "menu.toggleSidebar": "สลับแถบด้านข้าง",
+    "menu.devtools": "เครื่องมือนักพัฒนา",
+    "menu.about": "เกี่ยวกับ",
+    "menu.close": "ปิด"
   }
 }

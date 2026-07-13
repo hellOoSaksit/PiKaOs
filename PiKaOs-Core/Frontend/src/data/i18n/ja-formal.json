@@ -188,6 +188,22 @@
     "titlebar.sidebar": "サイドバー切替",
     "titlebar.search": "検索",
     "titlebar.back": "戻る",
-    "titlebar.forward": "進む"
+    "titlebar.forward": "進む",
+    "menu.app": "メニュー",
+    "menu.file": "ファイル",
+    "menu.view": "表示",
+    "menu.help": "ヘルプ",
+    "menu.settings": "設定",
+    "menu.disconnect": "切断",
+    "menu.exit": "終了",
+    "menu.reload": "再読み込み",
+    "menu.zoomIn": "拡大",
+    "menu.zoomOut": "縮小",
+    "menu.zoomReset": "ズームをリセット",
+    "menu.fullscreen": "全画面表示",
+    "menu.toggleSidebar": "サイドバーの切り替え",
+    "menu.devtools": "開発者ツール",
+    "menu.about": "情報",
+    "menu.close": "閉じる"
   }
 }

@@ -971,6 +971,22 @@
     "titlebar.sidebar": "Toggle sidebar",
     "titlebar.search": "Search",
     "titlebar.back": "Back",
-    "titlebar.forward": "Forward"
+    "titlebar.forward": "Forward",
+    "menu.app": "Menu",
+    "menu.file": "File",
+    "menu.view": "View",
+    "menu.help": "Help",
+    "menu.settings": "Settings",
+    "menu.disconnect": "Disconnect",
+    "menu.exit": "Exit",
+    "menu.reload": "Reload",
+    "menu.zoomIn": "Zoom In",
+    "menu.zoomOut": "Zoom Out",
+    "menu.zoomReset": "Reset Zoom",
+    "menu.fullscreen": "Full Screen",
+    "menu.toggleSidebar": "Toggle Sidebar",
+    "menu.devtools": "Developer Tools",
+    "menu.about": "About",
+    "menu.close": "Close"
   }
 }

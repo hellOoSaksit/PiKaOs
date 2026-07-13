@@ -314,6 +314,38 @@ body {
 .tb-btn:disabled { opacity: .4; cursor: default; }
 .titlebar-draghandle { flex: 1; align-self: stretch; }
 
+/* ☰ app menu (File / View / Help) collapsed into the title bar. The ☰ is the leftmost control, so
+   submenus fly out to the RIGHT with room to spare — no viewport-edge clamping needed here. */
+.tb-menu { position: relative; display: inline-flex; }
+.tb-menu-scrim { position: fixed; inset: 0; z-index: 40; }         /* outside-click catcher */
+.tb-menu-pop {
+  position: absolute; top: calc(100% + 4px); left: 4px; z-index: 41;
+  min-width: 172px; padding: 5px;
+  background: var(--panel-grad); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-pop);
+}
+.tb-menu-group { position: relative; }
+.tb-menu-top {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%;
+  padding: 7px 10px; border: 0; background: transparent; color: var(--ink);
+  font-size: 13px; border-radius: 8px; cursor: pointer; text-align: left;
+}
+.tb-menu-top:hover, .tb-menu-top.is-active { background: var(--bg-4); }
+.tb-menu-caret { display: inline-flex; opacity: .45; }
+.tb-menu-caret > svg { width: 14px; height: 14px; }
+.tb-submenu {
+  position: absolute; top: -5px; left: calc(100% + 5px); z-index: 42;
+  min-width: 184px; padding: 5px;
+  background: var(--panel-grad); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-pop);
+}
+.tb-menu-item {
+  display: block; width: 100%; padding: 7px 10px; border: 0; background: transparent;
+  color: var(--ink); font-size: 13px; border-radius: 8px; cursor: pointer; text-align: left; white-space: nowrap;
+}
+.tb-menu-item:hover { background: var(--bg-4); }
+.tb-menu-sep { height: 1px; background: var(--line); margin: 5px 6px; }
+
 /* Rail is a desktop affordance only — below the drawer breakpoint shell-nav.js never sets it
    (fx.css turns the sidebar into an off-canvas drawer there, where a 68px rail means nothing). */
 @media (min-width: 981px) {

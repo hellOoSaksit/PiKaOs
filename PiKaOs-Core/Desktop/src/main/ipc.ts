@@ -1,4 +1,4 @@
-import { ipcMain, IpcMainInvokeEvent, BrowserWindow } from 'electron'
+import { ipcMain, IpcMainInvokeEvent, BrowserWindow, app } from 'electron'
 import type { SecretVault } from './vault'
 import type { SessionBroker } from './session-broker'
 import type { McpRegistry } from './mcp/registry'
@@ -66,5 +66,22 @@ export function registerIpc(deps: { vault: SecretVault; broker: SessionBroker; r
     // creation-time light colour (the dark-theme blink on maximize).
     const bg = hex(colors?.bg)
     if (bg) w.setBackgroundColor(bg)
+  }))
+
+  // App-menu actions (the ☰ File/View/Help menu). Each resolves the sender's own window; quit ends
+  // the app. DevTools/fullscreen/zoom act on the sender's webContents only.
+  ipcMain.handle('window:quit', guard(() => app.quit()))
+  ipcMain.handle('window:toggleFullscreen', guard((e) => {
+    const w = BrowserWindow.fromWebContents(e.sender)
+    if (w) w.setFullScreen(!w.isFullScreen())
+  }))
+  ipcMain.handle('window:toggleDevTools', guard((e) => { BrowserWindow.fromWebContents(e.sender)?.webContents.toggleDevTools() }))
+  // Page zoom from the menu — mirrors chrome.ts's Ctrl+=/-/0 binding: ±0.5 per step, clamped to ±4.
+  ipcMain.handle('window:zoom', guard((e, dir: 'in' | 'out' | 'reset') => {
+    const wc = BrowserWindow.fromWebContents(e.sender)?.webContents
+    if (!wc) return
+    if (dir === 'reset') return wc.setZoomLevel(0)
+    const next = wc.getZoomLevel() + (dir === 'in' ? 0.5 : -0.5)
+    wc.setZoomLevel(Math.min(4, Math.max(-4, next)))
   }))
 }

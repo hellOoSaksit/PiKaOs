@@ -334,7 +334,8 @@ function App() {
           onSidebar={toggleNav} onSearch={() => go('search')}
           onBack={() => navGo(-1)} onForward={() => navGo(1)}
           canBack={histRef.current.idx > 0}
-          canForward={histRef.current.idx < histRef.current.stack.length - 1} />
+          canForward={histRef.current.idx < histRef.current.stack.length - 1}
+          onMenuSettings={() => go('toolsmgr')} version={caps?.version} />
         <div className="desktop-body">{body}</div>
       </div>
     );
