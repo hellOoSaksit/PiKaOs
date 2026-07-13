@@ -29,10 +29,13 @@ python -m scripts.migrate_plugins
 # --log-config silences the /api/version access-log line Docker's HEALTHCHECK triggers every
 # 15s (app/core/log_config.py) — without it that single probe drowns out real request/error
 # lines in `docker compose logs`. uvicorn.error (startup/shutdown/exceptions) is untouched.
+# Bind loopback by default (G2 safe default); compose sets BIND_HOST=0.0.0.0 for Docker, where the
+# container must listen on all interfaces and host exposure is controlled by the `ports:` binding.
+BIND_HOST="${BIND_HOST:-127.0.0.1}"
 if [ -n "${UVICORN_RELOAD}" ]; then
-  echo "[entrypoint] starting uvicorn (reload, 1 worker)..."
-  exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --log-config uvicorn_log_config.json
+  echo "[entrypoint] starting uvicorn (reload, 1 worker) on ${BIND_HOST}:8000..."
+  exec uvicorn app.main:app --host "${BIND_HOST}" --port 8000 --reload --log-config uvicorn_log_config.json
 else
-  echo "[entrypoint] starting uvicorn (${WEB_CONCURRENCY:-4} workers)..."
-  exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers "${WEB_CONCURRENCY:-4}" --log-config uvicorn_log_config.json
+  echo "[entrypoint] starting uvicorn (${WEB_CONCURRENCY:-4} workers) on ${BIND_HOST}:8000..."
+  exec uvicorn app.main:app --host "${BIND_HOST}" --port 8000 --workers "${WEB_CONCURRENCY:-4}" --log-config uvicorn_log_config.json
 fi

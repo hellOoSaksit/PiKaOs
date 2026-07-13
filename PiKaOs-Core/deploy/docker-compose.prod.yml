@@ -24,6 +24,11 @@ services:
       - ../Backend/.env
       - ../.env.ai
     # UVICORN_RELOAD deliberately absent → multi-worker uvicorn (docker-entrypoint.sh).
+    environment:
+      # The container binds all interfaces; host exposure is the loopback ports: map below (TLS edge in
+      # front). ALLOW_OPEN_LAN is deliberately NOT set — a prod running OPEN auth mode on this bind must
+      # trip the G2 guard and fail fast unless the operator consciously acknowledges it. (roadmap-v3 T1)
+      BIND_HOST: "0.0.0.0"
     ports:
       - "127.0.0.1:8000:8000"   # behind the TLS edge; not host-public
     volumes:

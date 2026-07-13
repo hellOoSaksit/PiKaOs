@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import modules
+from .core import setup_state
 from .core.composition import build_container, teardown_container
 from .core.config import settings
 from .core.contracts import STORAGE
@@ -28,6 +29,12 @@ async def lifespan(app: FastAPI):
                 "Refusing to start in production with insecure config:\n  - "
                 + "\n  - ".join(violations)
             )
+
+    # G2: open auth mode reachable from the LAN is an anonymous-owner-admin RCE surface. Fail fast
+    # (any environment) unless the operator acknowledged LAN exposure. Loopback + login mode are safe.
+    lan_violation = settings.open_mode_lan_violation(setup_state.read_auth_mode())
+    if lan_violation:
+        raise RuntimeError("Refusing to start: " + lan_violation)
 
     # Composition root: build the DI container + register enabled plugins (symmetric with worker.py:startup),
     # so routers can resolve tool/plugin contracts (e.g. postgres.Connection) per request. Fault-isolated.

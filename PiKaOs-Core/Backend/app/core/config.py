@@ -59,6 +59,16 @@ class Settings(BaseSettings):
     cookie_secure: bool = False  # True behind HTTPS in production
     perms_cache_ttl_seconds: int = 60  # effective-perms cache (perms:<user_id>) freshness
 
+    # --- network exposure (G2, roadmap-v3 T1) ---
+    # Interface uvicorn binds (docker-entrypoint.sh reads BIND_HOST). Loopback by default so a
+    # bare/direct run or the desktop-embedded backend is never reachable from the LAN out of the box.
+    # Docker deployments set it to 0.0.0.0 explicitly (the container must bind all interfaces; host
+    # exposure is then controlled by the compose `ports:` binding — prod publishes 127.0.0.1:8000).
+    bind_host: str = "127.0.0.1"
+    # Explicit acknowledgement that open auth mode on a NON-loopback bind is intended (a dev box, a
+    # deliberate LAN kiosk). Without it, open-mode-on-public refuses to start — see open_mode_lan_violation.
+    allow_open_lan: bool = False
+
     # --- Object storage (MinIO / S3-compatible — pluggable via env, not the UI) ---
     # The `minio` client speaks the S3 API, so the SAME code works against MinIO, AWS S3, or any
     # S3-compatible store just by changing these env vars (no code change). `storage_provider` is a
@@ -183,6 +193,29 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment.strip().lower() in ("production", "prod")
+
+    @staticmethod
+    def _is_loopback(host: str) -> bool:
+        """A host that is only reachable from the same machine (never the LAN)."""
+        h = (host or "").strip().lower()
+        return h in ("", "localhost", "::1", "[::1]") or h == "127.0.0.1" or h.startswith("127.")
+
+    def open_mode_lan_violation(self, auth_mode: str) -> str | None:
+        """The G2 gate: open auth mode reachable from the LAN, unacknowledged.
+
+        In open mode `/api/capabilities` reports authMode=open and the bootstrap provider treats an
+        anonymous caller as owner-admin, so a non-loopback bind lets any LAN host `POST
+        /api/plugins/install` directly (the MCP allow-list is NOT this gate). Refuse that combo at
+        startup unless the operator opts in via ALLOW_OPEN_LAN. Returns the problem string, or None
+        when safe. Login mode (auth required) and a loopback bind are always safe.
+        """
+        if auth_mode != "open" or self._is_loopback(self.bind_host) or self.allow_open_lan:
+            return None
+        return (
+            f"open auth mode is bound to a non-loopback interface (BIND_HOST={self.bind_host!r}) — an "
+            "anonymous LAN caller is owner-admin and can install plugins directly. Bind "
+            "BIND_HOST=127.0.0.1, switch off open mode, or set ALLOW_OPEN_LAN=1 to acknowledge LAN exposure."
+        )
 
     def production_violations(self) -> list[str]:
         """Insecure settings that must be fixed before running in production.

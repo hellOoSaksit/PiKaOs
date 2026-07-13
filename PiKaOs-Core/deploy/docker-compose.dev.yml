@@ -27,6 +27,11 @@ services:
       - "8000:8000"
     environment:
       UVICORN_RELOAD: "1"        # dev hot-reload (entrypoint runs uvicorn --reload, 1 worker)
+      # Docker needs the container to bind all interfaces (host reaches it via the ports: map above).
+      # The dev backend answers open mode, so ALLOW_OPEN_LAN explicitly acknowledges that this dev box
+      # is open + LAN-reachable (G2 guard) — never set this on a real server. (roadmap-v3 T1)
+      BIND_HOST: "0.0.0.0"
+      ALLOW_OPEN_LAN: "1"
     volumes:
       - ../Backend:/app          # hot-reload: code edits on the host reflect in the container
       - kernelstate:/app/state   # kernel local-JSON state (plugin registry + nav + user prefs)
