@@ -81,11 +81,6 @@ const PATHS = {
   /* toolbar */
   "chevron-left": <path d="M15 5l-7 7 7 7"/>,
   "chevron-right": <path d="M9 5l7 7-7 7"/>,
-  /* window chrome — control-strip glyphs (2026-07-12 window-chrome spec) */
-  "win-minimize": <path d="M5 12h14"/>,
-  "win-maximize": <rect x="5.5" y="5.5" width="13" height="13" rx="1.5"/>,
-  "win-restore": <><rect x="8" y="8" width="10.5" height="10.5" rx="1.5"/><path d="M5.5 15.5V6.5A1 1 0 0 1 6.5 5.5H15.5"/></>,
-  "win-close": <path d="M6 6 18 18M18 6 6 18"/>,
 };
 
 export const ICON_NAMES = Object.keys(PATHS);

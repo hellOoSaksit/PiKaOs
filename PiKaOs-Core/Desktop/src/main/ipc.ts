@@ -40,16 +40,25 @@ export function registerIpc(deps: { vault: SecretVault; broker: SessionBroker; r
   // receive a foreign vault secret (e.g. auth.refresh). (F1)
   ipcMain.handle('secrets:setForServer', guard((_e, sid, key, value) => vault.set(`mcp.${sid}.${key}`, value)))
 
-  // Custom title-bar controls (frame:false). Resolve the sender's own window each call — never a
+  // Title-bar controls (Window Controls Overlay draws min/max/close natively — only the verbs the
+  // renderer toolbar still needs exist here). Resolve the sender's own window each call — never a
   // captured reference — so a control always acts on the window that asked. (spec §3.2)
-  ipcMain.handle('window:minimize', guard((e) => BrowserWindow.fromWebContents(e.sender)?.minimize()))
   ipcMain.handle('window:toggleMaximize', guard((e) => {
     const w = BrowserWindow.fromWebContents(e.sender)
     if (w) w.isMaximized() ? w.unmaximize() : w.maximize()
   }))
-  ipcMain.handle('window:close', guard((e) => BrowserWindow.fromWebContents(e.sender)?.close()))
   ipcMain.handle('window:isMaximized', guard((e) => BrowserWindow.fromWebContents(e.sender)?.isMaximized() ?? false))
   ipcMain.handle('window:getBounds', guard((e) => BrowserWindow.fromWebContents(e.sender)?.getBounds()))
   // fire-and-forget for smooth JS window drag (avoids invoke round-trip per mousemove)
   ipcMain.on('window:move', (e, x, y) => { if (okOrigin(e)) BrowserWindow.fromWebContents(e.sender)?.setPosition(Math.round(x), Math.round(y)) })
+  // Theme sync: the renderer sends its computed --bg-2/--ink-3 tokens when the theme changes so the
+  // OS-drawn overlay buttons match. Hex-only at the edge — anything else is dropped, not sanitized.
+  ipcMain.handle('window:setTitleBarOverlay', guard((e, colors: { color?: string; symbolColor?: string }) => {
+    const hex = (v: unknown) => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v : undefined)
+    const color = hex(colors?.color); const symbolColor = hex(colors?.symbolColor)
+    if (!color || !symbolColor) throw new Error('invalid overlay colors')
+    const w = BrowserWindow.fromWebContents(e.sender)
+    // setTitleBarOverlay only exists where WCO is active (Windows/Linux) — a no-op elsewhere.
+    if (w && typeof w.setTitleBarOverlay === 'function') w.setTitleBarOverlay({ color, symbolColor, height: 36 })
+  }))
 }

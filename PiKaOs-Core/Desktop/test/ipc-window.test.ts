@@ -3,9 +3,9 @@ import { it, expect, vi, beforeEach } from 'vitest'
 const handlers: Record<string, (...a: any[]) => any> = {}
 const listeners: Record<string, (...a: any[]) => any> = {}
 const fakeWin = {
-  minimize: vi.fn(), maximize: vi.fn(), unmaximize: vi.fn(), close: vi.fn(),
+  maximize: vi.fn(), unmaximize: vi.fn(),
   isMaximized: vi.fn(() => false), getBounds: vi.fn(() => ({ x: 100, y: 50, width: 800, height: 600 })),
-  setPosition: vi.fn(),
+  setPosition: vi.fn(), setTitleBarOverlay: vi.fn(),
 }
 
 vi.mock('electron', () => ({
@@ -27,14 +27,12 @@ beforeEach(async () => {
   registerIpc({ vault: {}, broker: {}, registry: {}, manager: {} } as any)
 })
 
-it('registers the four window channels', () => {
-  for (const ch of ['window:minimize', 'window:toggleMaximize', 'window:close', 'window:isMaximized'])
+it('registers the window channels (and no dead minimize/close verbs)', () => {
+  for (const ch of ['window:toggleMaximize', 'window:isMaximized', 'window:getBounds', 'window:setTitleBarOverlay'])
     expect(typeof handlers[ch]).toBe('function')
-})
-
-it('window:minimize minimizes the sender window', () => {
-  handlers['window:minimize'](appEvent)
-  expect(fakeWin.minimize).toHaveBeenCalled()
+  // WCO draws min/close natively — the old renderer verbs must stay deleted
+  expect(handlers['window:minimize']).toBeUndefined()
+  expect(handlers['window:close']).toBeUndefined()
 })
 
 it('window:toggleMaximize maximizes when not maximized, unmaximizes when maximized', () => {
@@ -48,8 +46,15 @@ it('window:toggleMaximize maximizes when not maximized, unmaximizes when maximiz
 
 it('rejects a foreign-origin sender (guard holds)', () => {
   const evil = { senderFrame: { url: 'https://evil.com/' }, sender: {} } as any
-  expect(() => handlers['window:close'](evil)).toThrow('forbidden sender')
-  expect(fakeWin.close).not.toHaveBeenCalled()
+  expect(() => handlers['window:toggleMaximize'](evil)).toThrow('forbidden sender')
+  expect(fakeWin.maximize).not.toHaveBeenCalled()
+})
+
+it('window:setTitleBarOverlay forwards valid hex colors and rejects anything else', () => {
+  handlers['window:setTitleBarOverlay'](appEvent, { color: '#171a21', symbolColor: '#828a97' })
+  expect(fakeWin.setTitleBarOverlay).toHaveBeenCalledWith({ color: '#171a21', symbolColor: '#828a97', height: 36 })
+  for (const bad of [{ color: 'red', symbolColor: '#ffffff' }, { color: '#fff', symbolColor: '#ffffff' }, {}, null])
+    expect(() => handlers['window:setTitleBarOverlay'](appEvent, bad)).toThrow('invalid overlay colors')
 })
 
 it('window:getBounds returns the sender window bounds', () => {

@@ -5,16 +5,23 @@ import { join } from 'node:path'
 // sandbox + contextIsolation + no nodeIntegration, external links forced to the OS browser,
 // navigation locked to app://pikaos (+ the dev server URL), permission prompts deny-by-default.
 export function createWindow(): BrowserWindow {
+  // Escape hatch while diagnosing the scaled-display input bug: PIKAOS_NATIVE_FRAME=1 launches a
+  // stock OS-framed window (no WCO) so input handling can be compared on the same build.
+  const nativeFrame = process.env.PIKAOS_NATIVE_FRAME === '1'
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
+    // Below this the drawer/rail breakpoints stop making sense — clamp instead of rendering broken.
+    minWidth: 480,
+    minHeight: 360,
     show: false,
-    titleBarStyle: 'hidden',
-    // Window Controls Overlay: the OS draws min/max/close (correct size + hit-testing). frame:false
-    // (fully frameless) caused a Chromium click-coordinate offset on scaled Windows displays; a hidden
-    // title bar keeps native non-client handling and avoids it. color matches the renderer's .titlebar
-    // strip; symbolColor is the button glyph. Theme-sync via win.setTitleBarOverlay() is a follow-up.
-    titleBarOverlay: { color: '#ffffff', symbolColor: '#69707d', height: 36 },
+    ...(nativeFrame ? {} : {
+      titleBarStyle: 'hidden' as const,
+      // Window Controls Overlay: the OS draws min/max/close (correct size + hit-testing). color
+      // matches the renderer's .titlebar strip; symbolColor is the button glyph; the renderer
+      // re-syncs both to the active theme via window:setTitleBarOverlay.
+      titleBarOverlay: { color: '#ffffff', symbolColor: '#69707d', height: 36 },
+    }),
     // backgroundColor is the default theme surface so the pre-paint frame matches the app, not white.
     backgroundColor: '#f5f7fb',
     webPreferences: {

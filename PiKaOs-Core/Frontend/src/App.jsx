@@ -233,6 +233,17 @@ function App() {
     if (target) setLex(target);
   };
   useEffect(() => { document.documentElement.setAttribute("data-theme", theme); }, [theme]);
+  // Keep the OS-drawn window buttons (Window Controls Overlay) on the theme's surface — without
+  // this the dark theme shows a white button strip. Reads the applied tokens so the CSS stays the
+  // single source of truth; must run AFTER the data-theme attribute effect above.
+  useEffect(() => {
+    const w = window.pikaosDesktop?.window;
+    if (!w?.setTitleBarOverlay) return;
+    const css = getComputedStyle(document.documentElement);
+    const color = css.getPropertyValue('--bg-2').trim();
+    const symbolColor = css.getPropertyValue('--ink-3').trim();
+    w.setTitleBarOverlay({ color, symbolColor }).catch(() => {});
+  }, [theme]);
   useEffect(() => { saveNav(navCfg); }, [navCfg]);   // local cache for instant render next load
   // pull the shared arrangement from the server once signed in (authoritative; overrides the cache)
   useEffect(() => {
@@ -318,7 +329,7 @@ function App() {
     return (
       <div className="desktop-frame" data-maximized={winMax ? "" : undefined}>
         <TitleBar t={t}
-          onMenu={toggleNav} onSidebar={toggleNav} onSearch={() => go('search')}
+          onSidebar={toggleNav} onSearch={() => go('search')}
           onBack={() => navGo(-1)} onForward={() => navGo(1)}
           canBack={histRef.current.idx > 0}
           canForward={histRef.current.idx < histRef.current.stack.length - 1} />

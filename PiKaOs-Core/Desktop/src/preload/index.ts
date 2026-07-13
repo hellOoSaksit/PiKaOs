@@ -27,12 +27,12 @@ const api = {
     setForServer: (sid: string, key: string, value: string) => ipcRenderer.invoke('secrets:setForServer', sid, key, value),
   },
   window: {
-    minimize: () => ipcRenderer.invoke('window:minimize'),
     toggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),
-    close: () => ipcRenderer.invoke('window:close'),
     isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
     getBounds: () => ipcRenderer.invoke('window:getBounds'),
     move: (x: number, y: number) => ipcRenderer.send('window:move', x, y),
+    setTitleBarOverlay: (colors: { color: string; symbolColor: string }) =>
+      ipcRenderer.invoke('window:setTitleBarOverlay', colors),
     onMaximizedChanged: (cb: (v: boolean) => void) => {
       const listener = (_e: unknown, v: boolean) => cb(v)
       ipcRenderer.on('window:maximizedChanged', listener)

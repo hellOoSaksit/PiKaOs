@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, Menu } from 'electron'
 import { join } from 'node:path'
 import { registerAppProtocol } from './protocol'
-import { removeAppMenu, registerDevtoolsShortcut, forwardMaximizeState } from './chrome'
+import { removeAppMenu, registerDevtoolsShortcut, registerZoomShortcuts, forwardMaximizeState } from './chrome'
 import { createWindow } from './window'
 import { registerIpc } from './ipc'
 import { SecretVault } from './vault'
@@ -64,6 +64,7 @@ app.whenReady().then(() => {
   removeAppMenu(Menu)
   const win = createWindow()
   registerDevtoolsShortcut(win, app.isPackaged)
+  registerZoomShortcuts(win)
   forwardMaximizeState(win)
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })
