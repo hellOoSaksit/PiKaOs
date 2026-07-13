@@ -60,12 +60,15 @@ it('sets sandbox, contextIsolation, nodeIntegration:false, webSecurity, a preloa
   expect(win.opts.webPreferences.preload).toMatch(/preload[/\\]index\.js$/)
 })
 
-// Without this the window's own background is white, and every area the compositor has not covered
-// yet (resize, restore) flashes as a white band under the 100vh app shell.
-it('paints the window background with the app background, not the default white', async () => {
+it('uses a hidden title bar + Window Controls Overlay (avoids the frameless click-offset on scaled displays)', async () => {
   const { createWindow } = await import('../src/main/window')
   const win = createWindow() as unknown as FakeBrowserWindow
 
+  expect(win.opts.titleBarStyle).toBe('hidden')
+  expect(win.opts.titleBarOverlay).toMatchObject({ height: 36 })
+  expect(win.opts.titleBarOverlay.color).toBeTruthy()
+  expect(win.opts.titleBarOverlay.symbolColor).toBeTruthy()
+  expect(win.opts.frame).toBeUndefined()
   expect(win.opts.backgroundColor).toBe('#f5f7fb')
 })
 

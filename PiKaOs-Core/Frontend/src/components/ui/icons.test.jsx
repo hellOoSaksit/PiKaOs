@@ -10,6 +10,10 @@ it('every kernel nav item names an icon the set actually ships', () => {
   expect(navIcons.filter(name => !ICON_NAMES.includes(name))).toEqual([]);
 });
 
+it('ships the toolbar chevrons', () => {
+  for (const n of ['chevron-left', 'chevron-right']) expect(ICON_NAMES).toContain(n);
+});
+
 it('resolves a known name to an element', () => {
   expect(renderIcon('home')).toMatchObject({ props: { name: 'home' } });
 });

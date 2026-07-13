@@ -2,8 +2,9 @@
 rem ===========================================================
 rem  PiKaOs — stop the stack (counterpart of start.bat).
 rem  Containers + networks are removed; named volumes (pgdata/redisdata/
-rem  miniodata/kernelstate/frontend_node_modules) are KEPT so data survives
+rem  miniodata/kernelstate) are KEPT so data survives
 rem  a restart. To wipe volumes too:  stop.bat --volumes   (or -v)
+rem  (Vite now runs on the host, so nothing here stops it - close its window.)
 rem ===========================================================
 setlocal EnableExtensions
 set "ROOT=%~dp0"

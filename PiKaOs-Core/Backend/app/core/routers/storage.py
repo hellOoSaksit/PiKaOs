@@ -37,7 +37,9 @@ async def _status(request: Request) -> StorageStatusOut:
 
 @router.get("/status", response_model=StorageStatusOut)
 async def storage_status(request: Request,
-                         _: object = Depends(require_perm("infra.manage"))) -> StorageStatusOut:
+                         # ai_safe: a pure read of non-secret config + a reachability flag — nothing an
+                         # AI could use to change what storage is configured or reach into it.
+                         _: object = Depends(require_perm("infra.manage", ai_safe=True))) -> StorageStatusOut:
     """Current object-storage config (no secrets) + whether it is reachable right now."""
     return await _status(request)
 

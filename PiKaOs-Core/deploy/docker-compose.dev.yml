@@ -1,4 +1,10 @@
-# PiKaOs — local dev BASE compose (kernel-only: backend + frontend).
+# PiKaOs — local dev BASE compose (kernel-only: backend).
+#
+# There is no `frontend` service. PiKaOs is a desktop app: the renderer is served to Electron either
+# from `Frontend/dist` over `app://pikaos` (packaged path) or by a Vite dev server run ON THE HOST for
+# hot reload (start-desktop-dev.bat). A container could serve neither to Electron without pretending to
+# be a browser, and UI is verified in Electron only. The prod compose still builds the nginx static
+# bundle — that is the web deployment, a separate artifact.
 #
 # Tool-plugin sidecars (postgres/redis/minio/...) are NOT defined here — they are merged in from each
 # enabled plugin's `compose.fragment.yml` by `Backend/scripts/render_compose.py`, matching the
@@ -31,22 +37,5 @@ services:
       # way when a dev stack should run them for real.
       - ../../PiKaOs-Plugin-Mock:/PiKaOs-Plugin-Mock:ro
 
-  frontend:
-    build:
-      context: ../Frontend
-      target: dev                # Vite hot-reload (the prod target is the nginx static build)
-    restart: unless-stopped
-    env_file: ../Frontend/.env   # VITE_API_BASE (PUBLIC app config — baked into the bundle)
-    environment:
-      VITE_PROXY_TARGET: http://backend:8000   # same compose network — no host.docker.internal needed
-      VITE_OPEN: "false"
-      VITE_POLL: "true"          # watcher fires reliably on a Docker bind mount
-    ports:
-      - "5173:5173"
-    volumes:
-      - ../Frontend:/app
-      - frontend_node_modules:/app/node_modules
-
 volumes:
   kernelstate:
-  frontend_node_modules:

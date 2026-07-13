@@ -59,6 +59,18 @@
   --radius-lg: 22px;
   --radius-sm: 10px;
 
+  /* spacing scale — every gap/margin/padding in a screen comes from here, never a literal px.
+     Screens had no scale to reach for, so each grew its own inline `style={{gap:16}}`. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* the dimming layer behind any overlay (modal, drawer, drawer-on-mobile) */
+  --scrim: rgba(17, 23, 38, 0.48);
+
   --sidebar-w: 256px;
   --sidebar-rail-w: 68px;   /* the collapsed sidebar; --rail-w below is the RIGHT-hand rail */
   --rail-w: 360px;
@@ -88,6 +100,7 @@
   --gold: #6076f6; --gold-bright: #8194f9; --gold-deep: #4d63ec; --gold-glow: rgba(96,118,246,0.34);
   --bronze: #8b93a1; --crimson: #f0524f; --crimson-deep: #d23f3c; --emerald: #2bbd6b; --amber: #eda22b; --sapphire: #5b94f7; --amethyst: #9a7cf5; --ruby: #f0588f;
   --letter-face: #eef1ff;
+  --scrim: rgba(0, 0, 0, 0.62);
   --panel-grad: linear-gradient(180deg, #191d25 0%, #171a21 100%);
   --raised-grad: linear-gradient(180deg, #20242d 0%, #1d2129 100%);
   --gold-grad: linear-gradient(180deg, #6076f6 0%, #4f64ec 100%);
@@ -255,6 +268,83 @@ body {
     var(--paper-texture),
     var(--bg-1);
 }
+
+/* window chrome (desktop only) — 2026-07-12 window-chrome spec */
+:root { --titlebar-h: 36px; }
+
+/* Desktop shell: the frame + title bar wrap EVERY screen (App.jsx withChrome), above the auth gate —
+   so the window controls exist on the pre-login screens too, not just the signed-in `.app`. A flex
+   column: the title bar sits atop `.desktop-body`, which holds whatever screen is mounted. */
+.desktop-frame {
+  display: flex; flex-direction: column;
+  height: 100vh;
+  /* Opaque window — Windows 11 (DWM) rounds the frameless corners itself, so no CSS radius/gutter.
+     The 2026 accent is a 1px inset hairline ring, dropped when the window is maximized. */
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.desktop-frame[data-maximized] { box-shadow: none; }
+/* The mounted screen fills the body regardless of its own intrinsic height. Fixed-position
+   overlays that are siblings of the screen (ToastProvider's stack) must NOT be stretched —
+   inset:0 leaking into an invisible overlay turns it into a full-window click shield (the
+   every-button-dead desktop bug, 2026-07-13). */
+.desktop-body { position: relative; flex: 1; min-height: 0; }
+.desktop-body > :not(.toast-stack) { position: absolute; inset: 0; }
+/* `.app` is `height: 100vh` for the web build (no `.desktop-body`); inside the frame it fills the body */
+.desktop-body > .app { height: 100%; }
+/* FirstRun's `.auth-screen` is `position: fixed; inset: 0` — that would escape the frame and cover the
+   title bar; pin it to the body instead (higher specificity than login.css `.auth-screen`). */
+.desktop-body > .auth-screen { position: absolute; z-index: auto; }
+.titlebar {
+  display: flex; align-items: center;
+  height: var(--titlebar-h);
+  /* --bg-1 = the app surface + the window backgroundColor + the OS min/max/close strip (WCO overlay),
+     so the whole top row is one colour with the program instead of a distinct white bar. */
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--line);
+  user-select: none;
+}
+.titlebar-tools { display: flex; align-items: center; gap: 2px; padding-left: 8px; }
+.tb-btn {
+  width: 34px; height: 28px; display: grid; place-items: center;
+  border: 0; background: transparent; color: var(--ink-3); border-radius: 8px; cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.tb-btn > svg { width: 17px; height: 17px; }
+.tb-btn:hover:not(:disabled) { background: var(--bg-4); color: var(--ink); }
+.tb-btn:disabled { opacity: .4; cursor: default; }
+.titlebar-draghandle { flex: 1; align-self: stretch; }
+
+/* ☰ app menu (File / View / Help) collapsed into the title bar. The ☰ is the leftmost control, so
+   submenus fly out to the RIGHT with room to spare — no viewport-edge clamping needed here. */
+.tb-menu { position: relative; display: inline-flex; }
+.tb-menu-scrim { position: fixed; inset: 0; z-index: 40; }         /* outside-click catcher */
+.tb-menu-pop {
+  position: absolute; top: calc(100% + 4px); left: 4px; z-index: 41;
+  min-width: 172px; padding: 5px;
+  background: var(--panel-grad); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-pop);
+}
+.tb-menu-group { position: relative; }
+.tb-menu-top {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%;
+  padding: 7px 10px; border: 0; background: transparent; color: var(--ink);
+  font-size: 13px; border-radius: 8px; cursor: pointer; text-align: left;
+}
+.tb-menu-top:hover, .tb-menu-top.is-active { background: var(--bg-4); }
+.tb-menu-caret { display: inline-flex; opacity: .45; }
+.tb-menu-caret > svg { width: 14px; height: 14px; }
+.tb-submenu {
+  position: absolute; top: -5px; left: calc(100% + 5px); z-index: 42;
+  min-width: 184px; padding: 5px;
+  background: var(--panel-grad); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-pop);
+}
+.tb-menu-item {
+  display: block; width: 100%; padding: 7px 10px; border: 0; background: transparent;
+  color: var(--ink); font-size: 13px; border-radius: 8px; cursor: pointer; text-align: left; white-space: nowrap;
+}
+.tb-menu-item:hover { background: var(--bg-4); }
+.tb-menu-sep { height: 1px; background: var(--line); margin: 5px 6px; }
 
 /* Rail is a desktop affordance only — below the drawer breakpoint shell-nav.js never sets it
    (fx.css turns the sidebar into an off-canvas drawer there, where a 68px rail means nothing). */
@@ -507,7 +597,9 @@ body {
   border-bottom: 1px solid var(--line-soft);
 }
 .panel-head h3 { font-family: var(--font-head); font-weight: 700; font-size: 15px; margin: 0; color: var(--ink); }
-.panel-head .ph-icon { color: var(--gold); font-size: 15px; }
+/* the slot owns the size: `font-size` covers a legacy emoji, the `.ico` rule an `Icon` svg */
+.panel-head .ph-icon { color: var(--gold); font-size: 15px; display: inline-flex; align-items: center; }
+.panel-head .ph-icon .ico { width: 17px; height: 17px; }
 .panel-head .ph-spacer { flex: 1; }
 .panel-body { padding: 16px; }
 .panel-body.no-pad { padding: 0; }
@@ -520,12 +612,14 @@ body {
 .ornate::before { top: 7px; left: 7px; border-top: 2px solid; border-left: 2px solid; border-top-left-radius: 4px; }
 .ornate::after { bottom: 7px; right: 7px; border-bottom: 2px solid; border-right: 2px solid; border-bottom-right-radius: 4px; }
 
-/* Buttons — cartoon "physical button": 3D base shadow, sink on press, springy release */
+/* Buttons — cartoon "physical button": 3D base shadow, sink on press, springy release.
+   SOLE definition of `.btn*` (the component kit used to redeclare them; see index.css). */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   font-family: var(--font-display); font-weight: 700; font-size: 14px;
   padding: 10px 18px; border-radius: var(--radius);
   cursor: pointer; border: 1px solid transparent; white-space: nowrap;
+  color: var(--ink);
   transition: transform .25s var(--spring), box-shadow .25s var(--spring), background .14s, border-color .14s, filter .14s;
   user-select: none;
 }
@@ -535,19 +629,19 @@ body {
   box-shadow: 0 4px 0 var(--gold-deep);
   text-shadow: none;
 }
-.btn-gold:hover { background: var(--gold-grad-hover); transform: translateY(-1px); box-shadow: 0 5px 0 var(--gold-deep); }
+.btn-gold:hover { background: var(--gold-grad-hover); transform: translateY(-1px); box-shadow: 0 5px 0 var(--gold-deep), var(--shadow-raised); filter: brightness(1.06); }
 .btn-gold:active { transform: translateY(4px) scale(.985); box-shadow: 0 0 0 var(--gold-deep); }
 .btn-ghost {
   background: var(--bg-2); color: var(--ink); border: 1px solid var(--line);
   box-shadow: 0 3px 0 var(--line);
 }
-.btn-ghost:hover { background: var(--bg-3); transform: translateY(-1px); box-shadow: 0 4px 0 var(--line); }
+.btn-ghost:hover { background: var(--bg-3); transform: translateY(-1px); box-shadow: 0 4px 0 var(--line), var(--shadow-raised); }
 .btn-ghost:active { transform: translateY(3px) scale(.985); box-shadow: 0 0 0 var(--line); }
 .btn-danger {
   background: var(--crimson); color: #fff; border: none;
   box-shadow: 0 4px 0 var(--crimson-deep);
 }
-.btn-danger:hover { transform: translateY(-1px); box-shadow: 0 5px 0 var(--crimson-deep); filter: brightness(1.04); }
+.btn-danger:hover { transform: translateY(-1px); box-shadow: 0 5px 0 var(--crimson-deep), var(--shadow-raised); filter: brightness(1.06); }
 .btn-danger:active { transform: translateY(4px) scale(.985); box-shadow: 0 0 0 var(--crimson-deep); }
 .btn[disabled], .btn:disabled { opacity: .55; pointer-events: none; box-shadow: none; transform: none; }
 .btn-sm { padding: 7px 14px; font-size: 12.5px; font-weight: 600; border-radius: var(--radius-sm); }

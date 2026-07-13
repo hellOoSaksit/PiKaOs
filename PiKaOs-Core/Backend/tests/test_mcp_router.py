@@ -33,7 +33,7 @@ def app() -> FastAPI:
     kb = APIRouter(prefix="/api/knowledge")
 
     @kb.get("/search", summary="Search documents")
-    async def search(q: str = "", user=Depends(require_perm("knowledge.read"))):
+    async def search(q: str = "", user=Depends(require_perm("knowledge.read", ai_safe=True))):
         return {"hits": [q]}
 
     application.include_router(kb)
@@ -204,3 +204,50 @@ def test_the_real_core_app_reflects_a_non_empty_catalog_and_exposes_nothing_by_d
     assert all(t.permission for t in catalog)               # never an unguarded tool
     assert all(t.name.startswith("pikaos.") for t in catalog)
     assert mcp_catalog.allowed_tools(real_app) == []        # deny by default, on the real app
+
+
+def test_the_real_kernel_catalog_is_exactly_the_three_routes_that_opted_in():
+    """The whole prohibition in one assertion. A kernel-only Core reflects 12 guarded routes; only
+    these three ever reach an AI, and each is a settings write or a non-secret read. This list grows
+    ONLY by a deliberate `ai_safe=True`, so a new mutating route cannot join it by accident — which is
+    the property a deny-list of forbidden permissions could not give (it missed `llm.manage`).
+
+    The _SELF_PREFIX lesson: only reflecting the REAL app catches this class of regression."""
+    from app.main import app as real_app
+
+    tools = mcp_catalog.build_catalog(real_app)
+    assert tools, "catalog came back empty — reflection is broken, not merely filtered"
+
+    assert {(t.method, t.path) for t in tools} == {
+        ("GET", "/api/storage/status"),          # read: non-secret config + reachability
+        ("PUT", "/api/settings/nav"),            # settings write: the shared sidebar arrangement
+        ("PUT", "/api/settings/global/{key}"),   # settings write: a shared config blob (size-capped)
+    }
+    # `POST /api/storage/test` shares `infra.manage` with the status read and is NOT marked — proof
+    # the gate is the marker on the route, never the permission it happens to enforce.
+    assert not any(t.path == "/api/storage/test" for t in tools)
+
+
+def test_no_ai_safe_route_can_reach_code_execution_or_the_filesystem():
+    """The canary. `ai_safe=True` is a human judgement, and humans drift: someone will one day mark a
+    route whose module has meanwhile grown a `subprocess` call. Rather than trust the review, fail the
+    build when a module hosting a tool-eligible route imports the machinery of program mutation."""
+    import inspect
+    import re
+
+    from app.main import app as real_app
+
+    forbidden = re.compile(r"^\s*(?:import|from)\s+(subprocess|shutil|pty|ctypes)\b", re.M)
+    offenders, checked = [], 0
+    for op in mcp_catalog._iter_routes(real_app):
+        permission, ai_safe = mcp_catalog._permission_and_safety_of(op)
+        if not (permission and ai_safe):
+            continue
+        checked += 1
+        module = inspect.getmodule(op.endpoint)
+        if hit := forbidden.search(inspect.getsource(module)):
+            offenders.append(f"{module.__name__} imports {hit.group(1)} (route {op.path})")
+
+    # A canary that inspects nothing always passes. Pin the count to the routes that opted in.
+    assert checked == 3, f"expected 3 ai_safe routes to inspect, found {checked}"
+    assert offenders == [], "ai_safe routes must not live beside code-execution machinery: " + "; ".join(offenders)

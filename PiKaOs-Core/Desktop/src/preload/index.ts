@@ -26,6 +26,23 @@ const api = {
   secrets: {
     setForServer: (sid: string, key: string, value: string) => ipcRenderer.invoke('secrets:setForServer', sid, key, value),
   },
+  window: {
+    toggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),
+    isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
+    getBounds: () => ipcRenderer.invoke('window:getBounds'),
+    move: (x: number, y: number) => ipcRenderer.send('window:move', x, y),
+    setTitleBarOverlay: (colors: { color: string; symbolColor: string; bg?: string }) =>
+      ipcRenderer.invoke('window:setTitleBarOverlay', colors),
+    quit: () => ipcRenderer.invoke('window:quit'),
+    toggleFullscreen: () => ipcRenderer.invoke('window:toggleFullscreen'),
+    toggleDevTools: () => ipcRenderer.invoke('window:toggleDevTools'),
+    zoom: (dir: 'in' | 'out' | 'reset') => ipcRenderer.invoke('window:zoom', dir),
+    onMaximizedChanged: (cb: (v: boolean) => void) => {
+      const listener = (_e: unknown, v: boolean) => cb(v)
+      ipcRenderer.on('window:maximizedChanged', listener)
+      return () => ipcRenderer.removeListener('window:maximizedChanged', listener)
+    },
+  },
 }
 
 export type PikaosDesktopApi = typeof api

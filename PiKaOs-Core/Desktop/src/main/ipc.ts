@@ -1,4 +1,4 @@
-import { ipcMain, IpcMainInvokeEvent } from 'electron'
+import { ipcMain, IpcMainInvokeEvent, BrowserWindow, app } from 'electron'
 import type { SecretVault } from './vault'
 import type { SessionBroker } from './session-broker'
 import type { McpRegistry } from './mcp/registry'
@@ -39,4 +39,50 @@ export function registerIpc(deps: { vault: SecretVault; broker: SessionBroker; r
   // Namespaced under `mcp.<sid>.<key>` — never a bare key — so a server def can never name and
   // receive a foreign vault secret (e.g. auth.refresh). (F1)
   ipcMain.handle('secrets:setForServer', guard((_e, sid, key, value) => vault.set(`mcp.${sid}.${key}`, value)))
+
+  // Title-bar controls (Window Controls Overlay draws min/max/close natively — only the verbs the
+  // renderer toolbar still needs exist here). Resolve the sender's own window each call — never a
+  // captured reference — so a control always acts on the window that asked. (spec §3.2)
+  ipcMain.handle('window:toggleMaximize', guard((e) => {
+    const w = BrowserWindow.fromWebContents(e.sender)
+    if (w) w.isMaximized() ? w.unmaximize() : w.maximize()
+  }))
+  ipcMain.handle('window:isMaximized', guard((e) => BrowserWindow.fromWebContents(e.sender)?.isMaximized() ?? false))
+  ipcMain.handle('window:getBounds', guard((e) => BrowserWindow.fromWebContents(e.sender)?.getBounds()))
+  // fire-and-forget for smooth JS window drag (avoids invoke round-trip per mousemove)
+  ipcMain.on('window:move', (e, x, y) => { if (okOrigin(e)) BrowserWindow.fromWebContents(e.sender)?.setPosition(Math.round(x), Math.round(y)) })
+  // Theme sync: the renderer sends its computed --bg-1/--ink-3 tokens (and --bg-1 again as bg) when the
+  // theme changes so the OS-drawn overlay buttons AND the window fill match. Hex-only at the edge —
+  // anything else is dropped, not sanitized.
+  ipcMain.handle('window:setTitleBarOverlay', guard((e, colors: { color?: string; symbolColor?: string; bg?: string }) => {
+    const hex = (v: unknown) => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v : undefined)
+    const color = hex(colors?.color); const symbolColor = hex(colors?.symbolColor)
+    if (!color || !symbolColor) throw new Error('invalid overlay colors')
+    const w = BrowserWindow.fromWebContents(e.sender)
+    if (!w) return
+    // setTitleBarOverlay only exists where WCO is active (Windows/Linux) — a no-op elsewhere.
+    if (typeof w.setTitleBarOverlay === 'function') w.setTitleBarOverlay({ color, symbolColor, height: 36 })
+    // Repaint the window fill on the active theme surface so a maximize/resize never flashes the
+    // creation-time light colour (the dark-theme blink on maximize).
+    const bg = hex(colors?.bg)
+    if (bg) w.setBackgroundColor(bg)
+  }))
+
+  // App-menu actions (the ☰ File/View/Help menu). Each resolves the sender's own window; quit ends
+  // the app. DevTools/fullscreen/zoom act on the sender's webContents only.
+  ipcMain.handle('window:quit', guard(() => app.quit()))
+  ipcMain.handle('window:toggleFullscreen', guard((e) => {
+    const w = BrowserWindow.fromWebContents(e.sender)
+    if (w) w.setFullScreen(!w.isFullScreen())
+  }))
+  // DevTools stays dev-only, matching chrome.ts's F12 binding — never openable from a packaged build.
+  ipcMain.handle('window:toggleDevTools', guard((e) => { if (!app.isPackaged) BrowserWindow.fromWebContents(e.sender)?.webContents.toggleDevTools() }))
+  // Page zoom from the menu — mirrors chrome.ts's Ctrl+=/-/0 binding: ±0.5 per step, clamped to ±4.
+  ipcMain.handle('window:zoom', guard((e, dir: 'in' | 'out' | 'reset') => {
+    const wc = BrowserWindow.fromWebContents(e.sender)?.webContents
+    if (!wc) return
+    if (dir === 'reset') return wc.setZoomLevel(0)
+    const next = wc.getZoomLevel() + (dir === 'in' ? 0.5 : -0.5)
+    wc.setZoomLevel(Math.min(4, Math.max(-4, next)))
+  }))
 }

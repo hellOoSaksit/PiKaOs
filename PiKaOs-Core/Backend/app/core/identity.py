@@ -132,9 +132,18 @@ async def get_current_user(request: Request) -> "UserLike":
     return user
 
 
-def require_perm(perm: str):
+def require_perm(perm: str, *, ai_safe: bool = False):
     """Dependency factory: require a single permission (server-side RBAC). 401 if unauthenticated, 403 if
-    the permission is missing. Returns the user so a route may also accept `user = Depends(require_perm(...))`."""
+    the permission is missing. Returns the user so a route may also accept `user = Depends(require_perm(...))`.
+
+    `ai_safe` opts this route into the MCP catalog (core/mcp_catalog.build_catalog). It defaults to False,
+    so enforcing a permission is NOT by itself enough to become a tool — a route stays invisible to every
+    AI until a developer deliberately marks it. That is an allow-list on authority rather than a deny-list
+    of forbidden permissions: a deny-list is safe only until someone forgets to blacklist the next mutating
+    route; an allow-list keeps a new route hidden by construction until someone opts it in. Mark ONLY
+    genuine read/settings routes `ai_safe=True` — NEVER a route that installs, spawns, writes files, or
+    redirects the system's own model backend (e.g. `llm.manage`/`llm.assign`). See architecture/security.md.
+    """
 
     async def _dep(request: Request) -> "UserLike":
         provider = _provider(request)
@@ -145,9 +154,11 @@ def require_perm(perm: str):
             raise _FORBIDDEN
         return user
 
-    # Reflection (core/mcp_catalog) reads this to learn what a route enforces. `perm` also sits in
-    # `_dep`'s closure cell, but introspecting `__closure__` is brittle — let the dependency declare it.
+    # Reflection (core/mcp_catalog) reads these to learn what a route enforces and whether it may ever
+    # become a tool. `perm`/`ai_safe` also sit in `_dep`'s closure cell, but introspecting `__closure__`
+    # is brittle — let the dependency declare them.
     _dep.required_perm = perm
+    _dep.ai_safe = ai_safe
     return _dep
 
 

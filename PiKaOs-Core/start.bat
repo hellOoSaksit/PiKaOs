@@ -7,13 +7,17 @@ rem    1) make sure the Docker engine is running
 rem         - if not, start Docker Desktop and wait
 rem         - if it still won't come up, run fix-docker.bat and wait
 rem    2) render deploy\docker-compose.generated.yml: the kernel base
-rem       (backend + frontend) merged with every ENABLED tool plugin's
+rem       (backend) merged with every ENABLED tool plugin's
 rem       compose.fragment.yml (Backend\scripts\render_compose.py —
 rem       kernel-redesign.md §3, install-time compose generation)
 rem    3) bring up the ONE generated stack, -p pikaos
-rem    4) open the app in the browser and exit
+rem    4) report the API is up and exit
 rem
-rem  All services share one compose network now (backend/frontend/worker/
+rem  This starts the SERVER only. The UI is the Electron desktop shell — run
+rem  start-desktop-dev.bat for it. There is no `frontend` service in the dev
+rem  compose; PiKaOs is a desktop app, not a page a container can serve.
+rem
+rem  All services share one compose network now (backend/worker/
 rem  db/redis/minio reach each other by service name — no host.docker.internal).
 rem  Stop everything with stop.bat. Watch logs:
 rem    docker compose -p pikaos -f deploy\docker-compose.generated.yml logs -f
@@ -110,14 +114,16 @@ if %errorlevel% neq 0 (
 )
 
 popd
-echo       Waiting for the backend API (so the UI doesn't load before it's ready)...
+echo       Waiting for the backend API...
 call :waitbackend 90
-if %errorlevel%==0 (echo       Backend API is ready.) else (echo       Backend not ready yet - opening anyway; reload the page in a moment.)
+if %errorlevel%==0 (echo       Backend API is ready.) else (echo       Backend not ready yet - it may still be starting.)
 echo.
 
-rem ---- 4. open the app + exit (logs are in Docker Desktop) ----
-echo [4/4] Opening http://localhost:5173 ...
-start "" "http://localhost:5173"
+rem ---- 4. done. The UI is the Electron desktop shell, not a browser tab ----
+echo [4/4] Backend + enabled tool plugins are up on http://localhost:8000
+echo.
+echo       There is no web UI in the dev stack - PiKaOs is a desktop app.
+echo       Open it with:  start-desktop-dev.bat   (Vite HMR + Electron)
 echo.
 echo       The stack runs in Docker. Stop it with stop.bat. Watch logs:
 echo         docker compose -p pikaos -f deploy\docker-compose.generated.yml logs -f

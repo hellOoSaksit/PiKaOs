@@ -3,6 +3,10 @@
 Two fake plugin routers stand in for real plugins: reflection must not know about any specific
 plugin, only about the shape every plugin already has (a namespaced path + require_perm).
 
+A route reaches the catalog only when it enforces a permission **and** that same `require_perm`
+declared `ai_safe=True`. So the fake routes below say `ai_safe=True` wherever a test asserts the tool
+exists — being *guarded* is necessary but never sufficient.
+
     docker compose exec backend pytest tests/test_mcp_catalog.py
 """
 from __future__ import annotations
@@ -34,15 +38,15 @@ def _app() -> FastAPI:
     kb = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
 
     @kb.get("/search", summary="Search documents")
-    async def search(q: str, user=Depends(require_perm("knowledge.read"))):
+    async def search(q: str, user=Depends(require_perm("knowledge.read", ai_safe=True))):
         return {"hits": []}
 
     @kb.post("/documents", summary="Create a document")
-    async def create_doc(user=Depends(require_perm("knowledge.write"))):
+    async def create_doc(user=Depends(require_perm("knowledge.write", ai_safe=True))):
         return {"id": 1}
 
     @kb.put("/documents/{doc_id}", summary="Replace a document")
-    async def replace_doc(doc_id: int, user=Depends(require_perm("knowledge.write"))):
+    async def replace_doc(doc_id: int, user=Depends(require_perm("knowledge.write", ai_safe=True))):
         return {"id": doc_id}
 
     unguarded = APIRouter(prefix="/api/open")
@@ -98,11 +102,11 @@ def test_a_path_serving_several_methods_disambiguates_by_method():
     r = APIRouter(prefix="/api/thing")
 
     @r.get("/item", summary="Read it")
-    async def read_item(user=Depends(require_perm("thing.read"))):
+    async def read_item(user=Depends(require_perm("thing.read", ai_safe=True))):
         return {}
 
     @r.delete("/item", summary="Destroy it")
-    async def delete_item(user=Depends(require_perm("thing.write"))):
+    async def delete_item(user=Depends(require_perm("thing.write", ai_safe=True))):
         return {}
 
     app.include_router(r)
@@ -118,7 +122,7 @@ def test_a_prefix_supplied_at_include_time_still_yields_the_mounted_path():
     inner = APIRouter()
 
     @inner.get("/search", summary="Search documents")
-    async def search(user=Depends(require_perm("knowledge.read"))):
+    async def search(user=Depends(require_perm("knowledge.read", ai_safe=True))):
         return {}
 
     app.include_router(inner, prefix="/api/knowledge")
@@ -130,7 +134,7 @@ def test_a_prefix_supplied_at_include_time_still_yields_the_mounted_path():
 def test_a_router_level_guard_is_discovered_for_every_route_it_covers():
     """A plugin may guard once at router level rather than repeating require_perm per route."""
     app = FastAPI()
-    guarded = APIRouter(prefix="/api/g", dependencies=[Depends(require_perm("g.admin"))])
+    guarded = APIRouter(prefix="/api/g", dependencies=[Depends(require_perm("g.admin", ai_safe=True))])
 
     @guarded.post("/act", summary="Act")
     async def act():
@@ -145,7 +149,7 @@ def test_a_directly_decorated_app_route_is_reflected_too():
     app = FastAPI()
 
     @app.get("/api/direct", summary="Direct")
-    async def direct(user=Depends(require_perm("core.read"))):
+    async def direct(user=Depends(require_perm("core.read", ai_safe=True))):
         return {}
 
     assert [t.name for t in build_catalog(app)] == ["pikaos.direct.index"]
@@ -193,6 +197,77 @@ def test_a_corrupt_allowlist_file_exposes_nothing(state_dir):
     kernel_state.write_json(mcp_catalog.ALLOWLIST_KEY, ["pikaos.knowledge.search"])
     assert mcp_catalog.read_allowlist() == {}
     assert mcp_catalog.allowed_tools(_app()) == []
+
+
+# --- the allow-list on authority: `ai_safe`, layer 0 of the filter -----------------------------------
+
+
+def test_a_guarded_route_stays_invisible_until_it_opts_in():
+    """Enforcing a permission proves a route is *guarded*, never that it is safe to hand an AI. The
+    fail-safe: a newly added mutating route is excluded because nobody marked it, rather than exposed
+    because nobody remembered to blacklist it. `plugins.manage` is the authority to rewrite the
+    program, and it is invisible here for exactly the same reason `llm.manage` would be."""
+    app = FastAPI()
+
+    @app.post("/api/plugins/install", dependencies=[Depends(require_perm("plugins.manage"))])
+    async def install() -> dict:
+        return {}
+
+    @app.put("/api/settings/nav", dependencies=[Depends(require_perm("options.manage", ai_safe=True))])
+    async def set_nav() -> dict:
+        return {}
+
+    tools = build_catalog(app)
+    assert [t.permission for t in tools] == ["options.manage"]   # only the route that opted in
+
+
+@pytest.mark.parametrize("marked_first", [False, True], ids=["unmarked_first", "marked_first"])
+def test_one_unmarked_guard_disqualifies_a_route_whatever_the_declaration_order(marked_first):
+    """A route may carry several `require_perm` guards; safety is the conjunction over all of them.
+    Were it the first guard discovered that decided, this route would enter the catalog whenever the
+    marked dependency happened to be declared first — published as the harmless `options.manage` while
+    actually sitting behind `plugins.manage`. A marker must never launder a permission that merely
+    shares a route with it, and dependency order must not be load-bearing for a security gate."""
+    marked = Depends(require_perm("options.manage", ai_safe=True))
+    unmarked = Depends(require_perm("plugins.manage"))
+    app = FastAPI()
+
+    @app.post("/api/danger/act", dependencies=[marked, unmarked] if marked_first else [unmarked, marked])
+    async def act() -> dict:
+        return {}
+
+    assert build_catalog(app) == []
+
+
+def test_a_route_whose_every_guard_opted_in_is_still_reflected():
+    """The conjunction must not be so eager that it excludes a legitimately marked multi-guard route."""
+    app = FastAPI()
+
+    @app.put(
+        "/api/thing/item",
+        dependencies=[
+            Depends(require_perm("thing.read", ai_safe=True)),
+            Depends(require_perm("options.manage", ai_safe=True)),
+        ],
+    )
+    async def edit() -> dict:
+        return {}
+
+    tools = build_catalog(app)
+    assert [t.permission for t in tools] == ["thing.read"]   # the first guard names the tool
+
+
+def test_allowlisting_an_unmarked_tool_cannot_resurrect_it(state_dir):
+    """Even a hand-written allowlist entry naming the tool yields nothing: allowed_tools() intersects
+    with build_catalog(), which never emitted it. The allowlist is grantable; this exclusion is not."""
+    app = FastAPI()
+
+    @app.post("/api/plugins/install", dependencies=[Depends(require_perm("plugins.manage"))])
+    async def install() -> dict:
+        return {}
+
+    mcp_catalog.write_allowlist({"pikaos.plugins.install": {}})
+    assert mcp_catalog.allowed_tools(app) == []
 
 
 def test_the_mcp_routes_never_reflect_themselves(state_dir):

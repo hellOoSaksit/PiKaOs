@@ -5,14 +5,27 @@ import { join } from 'node:path'
 // sandbox + contextIsolation + no nodeIntegration, external links forced to the OS browser,
 // navigation locked to app://pikaos (+ the dev server URL), permission prompts deny-by-default.
 export function createWindow(): BrowserWindow {
+  // Escape hatch while diagnosing the scaled-display input bug: PIKAOS_NATIVE_FRAME=1 launches a
+  // stock OS-framed window (no WCO) so input handling can be compared on the same build.
+  const nativeFrame = process.env.PIKAOS_NATIVE_FRAME === '1'
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
+    // Below this the drawer/rail breakpoints stop making sense — clamp instead of rendering broken.
+    minWidth: 480,
+    minHeight: 360,
     show: false,
-    // The renderer paints into `.app`, which is exactly 100vh — so any window area the compositor has
-    // not yet covered (a resize, a restore) shows the WINDOW's background, and Electron defaults that
-    // to white. It read as a white band under the app. Match the default theme's --bg-1 instead; a
-    // dark-theme user sees this only for the frames before the renderer paints.
+    ...(nativeFrame ? {} : {
+      titleBarStyle: 'hidden' as const,
+      // Window Controls Overlay: the OS draws min/max/close (correct size + hit-testing). color is
+      // the button-strip background — kept equal to --bg-1 (the app surface + .titlebar) so the whole
+      // top strip reads as ONE colour with the program, not a distinct white bar; symbolColor is the
+      // glyph. The renderer re-syncs both (and the window fill) to the active theme via
+      // window:setTitleBarOverlay.
+      titleBarOverlay: { color: '#f5f7fb', symbolColor: '#69707d', height: 36 },
+    }),
+    // backgroundColor is the app surface (--bg-1) so the pre-paint frame + any resize/maximize repaint
+    // matches the program, not white. The renderer keeps it on the active theme (setBackgroundColor).
     backgroundColor: '#f5f7fb',
     webPreferences: {
       sandbox: true,

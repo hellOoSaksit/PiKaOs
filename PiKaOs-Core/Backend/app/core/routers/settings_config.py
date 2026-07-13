@@ -9,6 +9,7 @@ untouched.
 """
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any
 
@@ -24,6 +25,21 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 _NAV_KEY = "nav"
 _APP = "app_settings"       # {key: {"value": <json>, "updated_at": <iso>}}
 _USERS = "user_settings"    # {user_id: {key: <json>}}
+
+# Both writers below are ai_safe (an options.manage AI may write settings) — without a size cap that
+# authority becomes a DoS. `app_settings` is ONE JSON file: every write re-reads, mutates and rewrites
+# the whole blob, so one oversized value taxes every later settings read/write, including the reserved
+# installer keys that share the file. 64 KiB is generous for a config value and cheap to check before it
+# ever reaches kernel_state.
+_MAX_VALUE_BYTES = 65536
+
+
+def _guard_value_size(value: object) -> None:
+    """Reject a value too large to belong in the shared settings blob. Measured the way it will be
+    persisted (`kernel_state.write_json` → `ensure_ascii=False`), so a Thai label costs its real UTF-8
+    bytes rather than six ASCII escapes."""
+    if len(json.dumps(value, ensure_ascii=False).encode("utf-8")) > _MAX_VALUE_BYTES:
+        raise HTTPException(status_code=413, detail="value too large")
 
 
 def _guard_reserved(key: str) -> None:
@@ -64,9 +80,11 @@ async def get_nav(_: UserLike = Depends(get_current_user)) -> NavConfigOut:
 @router.put("/nav", response_model=NavConfigOut)
 async def put_nav(
     body: NavConfigIn,
-    user: UserLike = Depends(require_perm("options.manage")),
+    # ai_safe: replaces the shared sidebar arrangement — a settings write, never program/server mutation.
+    user: UserLike = Depends(require_perm("options.manage", ai_safe=True)),
 ) -> NavConfigOut:
     """Replace the shared sidebar arrangement (admin only). The frontend owns the value's shape."""
+    _guard_value_size(body.value)
     entry = _app_upsert(_NAV_KEY, body.value)
     return NavConfigOut(value=entry["value"], updated_at=entry["updated_at"])
 
@@ -117,10 +135,13 @@ async def get_global(key: str, _: UserLike = Depends(get_current_user)) -> Globa
 async def put_global(
     key: str,
     body: SettingValueIn,
-    user: UserLike = Depends(require_perm("options.manage")),
+    # ai_safe: a settings write, never program/server mutation — but see the size cap, folded in because
+    # this authority is exactly what an ai_safe-marked route must not turn into a DoS vector.
+    user: UserLike = Depends(require_perm("options.manage", ai_safe=True)),
 ) -> GlobalConfigOut:
     """Set a shared config blob (requires options.manage). Seen by every user/device. Installer-owned
     reserved keys (K4) 404 — they are managed only through the `plugins.manage`-gated installer routes."""
     _guard_reserved(key)
+    _guard_value_size(body.value)
     entry = _app_upsert(key, body.value)
     return GlobalConfigOut(value=entry["value"])

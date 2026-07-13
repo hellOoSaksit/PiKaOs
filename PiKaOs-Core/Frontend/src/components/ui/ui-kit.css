@@ -3,44 +3,12 @@
    PiKaOs design-system reference). Uses the shared pro / pro-dark
    tokens defined in src/styles/styles.css.
 
-   NOTE: kept SEPARATE from the app's global CSS. Some class names
-   (.btn, .qbadge, .seg, .bf-input…) intentionally mirror the kit
-   reference and may overlap with app classes — import this file
-   only where the kit components are actually used.
+   NOTE: kept SEPARATE from the app's global CSS, and it must NOT redeclare a class the app
+   already owns — it used to mirror `.btn*`, `.bf*` and `.seg` from the kit reference, and the
+   import order in styles/index.css silently decided which values rendered. One class, one home:
+     `.btn*`  → styles/styles.css        `.bf*` → styles/components.css
+     `.seg`, `.qbadge`, `.spinner`, `.pk-*`, `.dd*` … → here (nothing else defines them).
    ============================================================ */
-
-/* ============ Buttons ============ */
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  font-family: var(--font-display); font-size: 14.5px; font-weight: 700;
-  border-radius: var(--radius); padding: 11px 20px; border: none; cursor: pointer;
-  color: var(--ink);
-  transition: transform .25s var(--spring), filter .15s ease, box-shadow .12s ease, background .15s ease;
-}
-.btn-gold {
-  background: linear-gradient(180deg, var(--gold-bright), var(--gold) 60%, var(--gold));
-  color: #fff;
-  box-shadow: 0 4px 0 var(--gold-deep), var(--shadow-raised);
-}
-.btn-gold:hover:not(:disabled) { filter: brightness(1.06); transform: translateY(-1px); box-shadow: 0 5px 0 var(--gold-deep), var(--shadow-raised); }
-.btn-gold:active:not(:disabled) { transform: translateY(4px) scale(.985); box-shadow: 0 0 0 var(--gold-deep); transition-duration: .05s; }
-.btn-ghost {
-  background: var(--bg-2); border: 1px solid var(--line); color: var(--ink-2);
-  box-shadow: 0 3px 0 var(--line), var(--shadow-raised);
-}
-.btn-ghost:hover:not(:disabled) { background: var(--bg-3); transform: translateY(-1px); box-shadow: 0 4px 0 var(--line), var(--shadow-raised); }
-.btn-ghost:active:not(:disabled) { transform: translateY(3px) scale(.985); box-shadow: 0 0 0 var(--line); transition-duration: .05s; }
-.btn-danger {
-  background: linear-gradient(180deg, var(--crimson), var(--crimson) 60%, var(--crimson));
-  color: #fff;
-  box-shadow: 0 4px 0 var(--crimson-deep), var(--shadow-raised);
-}
-.btn-danger:hover:not(:disabled) { filter: brightness(1.06); transform: translateY(-1px); box-shadow: 0 5px 0 var(--crimson-deep), var(--shadow-raised); }
-.btn-danger:active:not(:disabled) { transform: translateY(4px) scale(.985); box-shadow: 0 0 0 var(--crimson-deep); transition-duration: .05s; }
-.btn-sm { font-size: 12.5px; font-weight: 600; padding: 7px 14px; border-radius: var(--radius-sm); }
-.btn:disabled { opacity: .55; cursor: default; }
-.btn-icon { padding: 11px; width: 42px; }
-.btn-icon.btn-sm { padding: 7px; width: 32px; }
 
 .spinner { width: 15px; height: 15px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; animation: spin .7s linear infinite; }
 .spinner.dark { border-color: color-mix(in srgb, var(--ink-3) 35%, transparent); border-top-color: var(--ink-3); }
@@ -137,20 +105,7 @@
 .seg button:active { transform: scale(.94); transition-duration: .05s; }
 .seg button.on { background: var(--bg-2); color: var(--gold-bright); box-shadow: var(--shadow-raised); }
 
-/* ============ Inputs ============ */
-.bf { display: flex; flex-direction: column; gap: 6px; min-width: 220px; }
-.bf-label { font-size: 13px; font-weight: 600; color: var(--ink-2); }
-.bf-input {
-  font-family: var(--font-body); font-size: 14px; color: var(--ink);
-  background: var(--bg-3); border: 1px solid var(--line); border-radius: var(--radius-sm);
-  padding: 11px 12px; outline: none; width: 100%;
-  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
-}
-.bf-input::placeholder { color: var(--ink-4); }
-.bf-input:focus { border-color: var(--gold); background: var(--bg-2); box-shadow: 0 0 0 3px var(--gold-glow); }
-.bf-input:disabled { opacity: .55; }
-.bf.has-error .bf-input { border-color: var(--crimson); box-shadow: 0 0 0 3px color-mix(in srgb, var(--crimson) 18%, transparent); }
-.bf-error { font-size: 12px; font-weight: 500; color: var(--crimson); }
+/* Inputs (`.bf*`) live in styles/components.css — see the header note. */
 
 /* ============ Badges & tags ============ */
 .qbadge {
@@ -169,28 +124,21 @@
 .mono-chip { font-family: var(--font-mono); font-size: 11.5px; }
 
 /* ============ Tooltip ============ */
-.tip { position: relative; display: inline-block; }
-.tip .tip-bubble {
-  position: absolute; bottom: calc(100% + 8px); left: 50%;
-  transform: translateX(-50%) translateY(4px) scale(.9);
-  transform-origin: bottom center;
+.tip { display: inline-block; }
+/* Bubble is portaled to <body> (Tooltip.jsx) with position:fixed, so it never clips against an
+   ancestor's overflow (e.g. the sidebar) or the window edge. JS sets left(=control centre)/top;
+   --tip-dx nudges it back on-screen horizontally; .tip-below hangs it under the control. */
+.tip-portal {
+  position: fixed; z-index: 100; pointer-events: none;
   background: var(--ink); color: var(--bg-1);
   font-size: 11.5px; font-weight: 500; white-space: nowrap;
   border-radius: var(--radius-sm); padding: 6px 10px;
-  opacity: 0; visibility: hidden; pointer-events: none; z-index: 20;
+  box-shadow: var(--shadow-pop);
+  transform: translate(calc(-50% + var(--tip-dx, 0px)), -100%);   /* above: bubble bottom sits at top */
+  animation: tipPop .14s ease both;
 }
-.tip .tip-bubble::after {
-  content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
-  border: 5px solid transparent; border-top-color: var(--ink);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .tip .tip-bubble { transition: opacity .15s ease, transform .3s var(--spring), visibility 0s linear .15s; }
-}
-.tip:hover .tip-bubble, .tip:focus-within .tip-bubble {
-  opacity: 1; visibility: visible;
-  transform: translateX(-50%) translateY(0) scale(1);
-  transition: opacity .12s ease, transform .3s var(--spring), visibility 0s;
-}
+.tip-portal.tip-below { transform: translate(calc(-50% + var(--tip-dx, 0px)), 0); }  /* below the control */
+@keyframes tipPop { from { opacity: 0; } to { opacity: 1; } }
 
 /* ============ Progress ============ */
 .task-prog { display: flex; align-items: center; gap: 12px; min-width: 260px; }
@@ -204,7 +152,12 @@
 .task-prog-label { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--ink-3); min-width: 38px; text-align: right; }
 
 /* ============ Toast ============ */
-.toast-stack { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 90; }
+/* top/left:auto — as a direct child of .desktop-body the fill rule (`.desktop-body > *
+   { inset: 0 }`, styles.css) leaked top:0/left:0 in here, silently turning this empty box into a
+   full-window shield that swallowed EVERY click in the desktop app (2026-07-13). pointer-events
+   none/auto is the belt-and-braces: the container can never eat clicks again, only the toasts. */
+.toast-stack { position: fixed; top: auto; left: auto; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 90; pointer-events: none; }
+.toast-stack > * { pointer-events: auto; }
 .toast {
   display: flex; align-items: center; gap: 10px;
   background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius);

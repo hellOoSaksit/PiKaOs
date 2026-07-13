@@ -1,6 +1,6 @@
 /* PiKaOs — ES module (migrated from PiKaOs-Core/app.jsx). */
 import React from 'react';
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 import { NAV } from './data/data.jsx';
 import { loadNav, saveNav, mergeWithDefault } from './data/data-nav.jsx';
 import { getNavConfig, setNavConfig, getMySettings, setMySetting, setupStatus, setToken, getCapabilities } from './lib/api.js';
@@ -14,6 +14,7 @@ import { PluginsManager } from './screens/screens-plugins.jsx';
 import { ToolsManager } from './screens/screens-tools.jsx';
 import { useAuth } from './lib/auth.jsx';
 import { BottomUtilityBar } from './components/ui/BottomUtilityBar.jsx';
+import { TitleBar, Tooltip } from './components/ui';
 import { Icon, renderIcon } from './components/ui/icons.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
 import { UILoadingHost, UIModalHost } from './lib/ui-modal.jsx';
@@ -66,7 +67,9 @@ function NavNode({ node, depth, route, go, t, can, navOpen, setNavOpen, rail, on
         style={depth > 0 && !rail ? { marginLeft: depth * 16 } : undefined}
         title={rail ? label : undefined}
         onClick={() => { if (rail && hasKids) onExpandShell(); go(node.id); }}>
-        <span className="ni-icon">{renderIcon(node.icon)}</span>
+        {rail
+          ? <Tooltip label={label} focusable><span className="ni-icon">{renderIcon(node.icon)}</span></Tooltip>
+          : <span className="ni-icon">{renderIcon(node.icon)}</span>}
         <span className="ni-label">{label}</span>
         {node.tag && <span className={`ni-tag ${node.tag === "live" ? "alert" : ""}`}>{node.tag === "live" ? "● LIVE" : node.tag}</span>}
         {hasKids && !rail && (
@@ -93,19 +96,27 @@ function Sidebar({ route, go, t, can, nav, openMode, rail, onToggle }) {
     <aside className="sidebar" data-no-lex>
       <div className="brand">
         {/* in the rail the logo IS the toggle — there's no width for a second control */}
-        <button type="button" className="brand-logo" onClick={rail ? onToggle : undefined}
-          title={rail ? toggleLabel : undefined} aria-label={rail ? toggleLabel : undefined}>
-          <span className="ltr">P</span>
-        </button>
+        {rail
+          ? <Tooltip label={toggleLabel}>
+              <button type="button" className="brand-logo" onClick={onToggle}
+                aria-label={toggleLabel}>
+                <span className="ltr">P</span>
+              </button>
+            </Tooltip>
+          : <button type="button" className="brand-logo">
+              <span className="ltr">P</span>
+            </button>}
         <div className="brand-id">
           <div className="brand-name">{t("brand.name")}</div>
           <div className="brand-sub">{t("brand.sub")}</div>
         </div>
         {!rail && (
-          <button type="button" className="brand-toggle" onClick={onToggle}
-            title={toggleLabel} aria-label={toggleLabel}>
-            <Icon name="sidebar" />
-          </button>
+          <Tooltip label={toggleLabel}>
+            <button type="button" className="brand-toggle" onClick={onToggle}
+              aria-label={toggleLabel}>
+              <Icon name="sidebar" />
+            </button>
+          </Tooltip>
         )}
       </div>
       <nav className="nav">
@@ -154,6 +165,18 @@ function App() {
   const auth = useAuth();                                  // { user, ready, loggedIn, login, logout }
   const currentUser = auth.user;                           // backend account or null
 
+  // Native window chrome (desktop only): the frame + custom TitleBar replace the OS titlebar.
+  const isDesktop = typeof window !== 'undefined' && !!window.pikaosDesktop?.isDesktop;
+  const [winMax, setWinMax] = useState(false);
+  useEffect(() => {
+    const w = window.pikaosDesktop?.window;
+    if (!w) return;
+    let alive = true;
+    w.isMaximized().then((v) => { if (alive) setWinMax(v); }).catch(() => {});
+    const off = w.onMaximizedChanged(setWinMax);
+    return () => { alive = false; if (typeof off === 'function') off(); };
+  }, []);
+
   // Kernel-only bootstrap gate (no auth plugin installed yet — 2026-07-02-bootstrap-install-shell-
   // design.md): a stored session token from a verified setup code unlocks a minimal install shell.
   // `null` = not checked yet (avoid flashing FirstRun before we know); re-checked after FirstRun's
@@ -174,6 +197,8 @@ function App() {
   const signedIn = auth.loggedIn || openMode;
 
   const [route, setRoute] = useState("home");
+  const histRef = useRef({ stack: ["home"], idx: 0 });
+  const [, bumpHist] = useState(0);
   const [theme, setThemeState] = useState(() => { const t = localStorage.getItem("guild-theme"); return (t === "pro" || t === "pro-dark") ? t : "pro"; });
   // active lexicon = ภาษาที่แสดง + รูปแบบคำศัพท์ รวมเป็นชุดเดียว (รหัสชุดจาก data/lexicons/*.json)
   const [lex, setLexState] = useState(() => {
@@ -208,6 +233,19 @@ function App() {
     if (target) setLex(target);
   };
   useEffect(() => { document.documentElement.setAttribute("data-theme", theme); }, [theme]);
+  // Keep the OS-drawn window buttons (Window Controls Overlay) AND the window fill on the active
+  // theme surface. color = --bg-1 unifies the min/max/close strip with .titlebar + the app (one
+  // colour, no white bar); bg re-paints the window backgroundColor so a maximize/resize never flashes
+  // the creation-time light colour on the dark theme. Reads the applied tokens so the CSS stays the
+  // single source of truth; must run AFTER the data-theme attribute effect above.
+  useEffect(() => {
+    const w = window.pikaosDesktop?.window;
+    if (!w?.setTitleBarOverlay) return;
+    const css = getComputedStyle(document.documentElement);
+    const color = css.getPropertyValue('--bg-1').trim();
+    const symbolColor = css.getPropertyValue('--ink-3').trim();
+    w.setTitleBarOverlay({ color, symbolColor, bg: color }).catch(() => {});
+  }, [theme]);
   useEffect(() => { saveNav(navCfg); }, [navCfg]);   // local cache for instant render next load
   // pull the shared arrangement from the server once signed in (authoritative; overrides the cache)
   useEffect(() => {
@@ -246,10 +284,24 @@ function App() {
     try { window.dispatchEvent(new Event("guildos-route-change")); } catch (e) { }
     closeDrawer();   // choosing a destination dismisses the small-screen drawer
     setRoute(r);
+    // a user navigation truncates any forward entries (browser-style history)
+    const h = histRef.current;
+    if (h.stack[h.idx] !== r) { h.stack = h.stack.slice(0, h.idx + 1); h.stack.push(r); h.idx = h.stack.length - 1; bumpHist(x => x + 1); }
     document.querySelector(".content")?.scrollTo(0, 0);
     if (r === "search") { const h = window.uiLoading && window.uiLoading({ title: "กำลังเชื่อมต่อคลังความรู้…", message: "ผู้ควบคุมกลาง Recall" }); setTimeout(() => h && h.close(), 820); }
   };
   window.__guildGo = go;
+
+  // Back/forward navigate the history WITHOUT re-pushing — setRoute directly, never go().
+  const navGo = (delta) => {
+    const h = histRef.current;
+    const ni = h.idx + delta;
+    if (ni < 0 || ni >= h.stack.length) return;
+    h.idx = ni; bumpHist(x => x + 1);
+    try { window.dispatchEvent(new Event("guildos-route-change")); } catch (e) {}
+    closeDrawer(); setRoute(h.stack[ni]);
+    document.querySelector(".content")?.scrollTo(0, 0);
+  };
 
   // ---- current user + permissions come from the SERVER (F1) ----
   const T = (en, th) => language === "en" ? en : th;
@@ -271,17 +323,35 @@ function App() {
 
   const Sys = { t, T, can, me, go, language, nav: navCfg, setNav: saveNavCfg };
 
+  // Native window chrome wraps EVERY screen on desktop (frameless window has no OS titlebar), so the
+  // close/minimize/maximize controls are present on the pre-login screens too — not just the signed-in
+  // shell. On web (isDesktop false) this is a passthrough and the markup is byte-identical to before.
+  const withChrome = (body) => {
+    if (!isDesktop) return body;
+    return (
+      <div className="desktop-frame" data-maximized={winMax ? "" : undefined}>
+        <TitleBar t={t}
+          onSidebar={toggleNav} onSearch={() => go('search')}
+          onBack={() => navGo(-1)} onForward={() => navGo(1)}
+          canBack={histRef.current.idx > 0}
+          canForward={histRef.current.idx < histRef.current.stack.length - 1}
+          onMenuSettings={() => go('toolsmgr')} version={caps?.version} />
+        <div className="desktop-body">{body}</div>
+      </div>
+    );
+  };
+
   const shell = resolveShellMode({ ready: auth.ready, caps, bootstrap, loggedIn: auth.loggedIn });
-  if (shell === 'loading') return null;   // avoid flashing the setup screen while restoring
-  if (shell === 'kernel-shell') return <KernelOnlyShell language={language} />;
+  if (shell === 'loading') return withChrome(null);   // avoid flashing the setup screen while restoring
+  if (shell === 'kernel-shell') return withChrome(<KernelOnlyShell language={language} />);
   if (shell === 'firstrun') {
-    return <FirstRun t={t} language={language} onLang={pickLanguage}
+    return withChrome(<FirstRun t={t} language={language} onLang={pickLanguage}
       onVerified={(token) => {
         setToken(token);
         refreshBootstrap();
         // verify-code flips the server open (spec §4) — refetch so this render pass sees it
         getCapabilities().then(setCaps).catch(() => {});
-      }} />;
+      }} />);
   }
 
   const screen = (() => {
@@ -304,9 +374,10 @@ function App() {
     }
   })();
 
-  return (
+  return withChrome(
     <ToastProvider>
-    <div className="app" key={lex} data-nav={navRail ? "rail" : "full"} data-drawer={drawerOpen ? "open" : undefined}>
+    <div className="app" key={lex}
+      data-nav={navRail ? "rail" : "full"} data-drawer={drawerOpen ? "open" : undefined}>
       <Sidebar route={route} go={go} t={t} can={can} nav={navCfg} openMode={openMode}
         rail={navRail} onToggle={toggleNav} />
       <div className="nav-scrim" onClick={closeDrawer} />
