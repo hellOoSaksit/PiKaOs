@@ -7,12 +7,13 @@ const child = () => Object.assign(new EventEmitter(), { pid: 123, stdin: {}, std
 let fake: any
 vi.mock('node:child_process', () => ({ spawn: vi.fn(() => fake) }))
 
-const mkManager = async (confirm: any, secretKeys = ['FS_TOKEN']) => {
+const mkManager = async (confirm: any, secretKeys = ['FS_TOKEN'], defs?: Array<{ id: string; label: string; command: string; args: string[]; secretKeys: string[] }>) => {
   const { McpManager } = await import('../src/main/mcp/manager')
   const { McpRegistry } = await import('../src/main/mcp/registry')
   const dir = mkdtempSync(join(tmpdir(), 'm-'))
   const reg = new McpRegistry(join(dir, 'mcp.json'))
-  reg.add({ id: 'fs', label: 'FS', command: 'npx', args: ['-y', '@x/fs'], secretKeys })
+  if (defs) { for (const def of defs) reg.add(def) }
+  else reg.add({ id: 'fs', label: 'FS', command: 'npx', args: ['-y', '@x/fs'], secretKeys })
   const vault = { get: (k: string) => (k === 'mcp.fs.FS_TOKEN' ? 'SECRET' : k === 'auth.refresh' ? 'RT_LEAK' : null), set: vi.fn(), delete: vi.fn(), isAvailable: () => true } as any
   return new McpManager(reg, vault, confirm, join(dir, 'approvals.json'))
 }
@@ -46,4 +47,24 @@ it('refuses to spawn when consent is denied', async () => {
   await expect(mgr.start('fs')).rejects.toThrow()
   expect(spawn).not.toHaveBeenCalled()
   expect(mgr.status('fs')).toBe('stopped')
+})
+
+it('stopAll stops every running server and marks them stopped', async () => {
+  const { spawn } = await import('node:child_process'); (spawn as any).mockClear()
+  // each server gets its OWN fake child, so we can prove stopAll actually kills every
+  // process (not just flips status) — a shared fake would hide an orphan-child regression
+  const childA = child()
+  const childB = child()
+  ;(spawn as any).mockImplementationOnce(() => childA).mockImplementationOnce(() => childB)
+  const mgr = await mkManager(vi.fn().mockResolvedValue(true), [], [
+    { id: 'a', label: 'A', command: 'npx', args: ['-y', '@x/a'], secretKeys: [] },
+    { id: 'b', label: 'B', command: 'npx', args: ['-y', '@x/b'], secretKeys: [] },
+  ])
+  await mgr.start('a')
+  await mgr.start('b')
+  await mgr.stopAll()
+  expect(mgr.status('a')).toBe('stopped')
+  expect(mgr.status('b')).toBe('stopped')
+  expect(childA.kill).toHaveBeenCalled()
+  expect(childB.kill).toHaveBeenCalled()
 })

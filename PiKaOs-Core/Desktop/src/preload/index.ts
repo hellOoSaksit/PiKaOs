@@ -26,6 +26,12 @@ const api = {
   secrets: {
     setForServer: (sid: string, key: string, value: string) => ipcRenderer.invoke('secrets:setForServer', sid, key, value),
   },
+  recovery: {
+    diagnose: () => ipcRenderer.invoke('recovery:diagnose'),
+    repair: (id: string, subId?: string) => ipcRenderer.invoke('recovery:repair', id, subId),
+    clear: (id: string) => ipcRenderer.invoke('recovery:clear', id),
+    clearCache: () => ipcRenderer.invoke('recovery:clearCache'),
+  },
   window: {
     toggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),
     isMaximized: () => ipcRenderer.invoke('window:isMaximized'),

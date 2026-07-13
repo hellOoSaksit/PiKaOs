@@ -33,7 +33,10 @@ beforeEach(async () => {
   mockApp.isPackaged = false
   mockApp.quit.mockClear()
   const { registerIpc } = await import('../src/main/ipc')
-  registerIpc({ vault: {}, broker: {}, registry: {}, manager: {} } as any)
+  registerIpc({
+    vault: {}, broker: {}, registry: {}, manager: {},
+    recovery: { diagnose: async () => [], repair: async () => ({ ok: true }), clear: async () => ({ ok: true }), clearHttpCache: async () => ({ ok: true }) },
+  } as any)
 })
 
 it('registers the window channels (and no dead minimize/close verbs)', () => {

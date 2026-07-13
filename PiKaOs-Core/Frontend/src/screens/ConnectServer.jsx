@@ -9,6 +9,7 @@ const { useState, useEffect } = React;
 import { getBrand } from '../lib/brand.js';
 import { makeT } from '../lib/i18n.jsx';
 import { normalizeServerInput, probeServer } from '../lib/server-url.js';
+import { RecoveryView } from './RecoveryView.jsx';
 
 // normalizeServerInput throws Error('empty'|'invalid'|'http_not_allowed') → the matching i18n key
 const ERR_KEY = { empty: 'connect.errEmpty', invalid: 'connect.errInvalid', http_not_allowed: 'connect.errHttp' };
@@ -24,6 +25,7 @@ export function ConnectServer({ language, onConnected }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [warn, setWarn] = useState(false);
+  const [view, setView] = useState('connect');   // 'connect' | 'recovery' (recovery spec 2026-07-13)
 
   useEffect(() => {
     window.pikaosDesktop.config.get()
@@ -78,6 +80,8 @@ export function ConnectServer({ language, onConnected }) {
   };
 
   const submit = (e) => { e.preventDefault(); connect(input); };
+
+  if (view === 'recovery') return <RecoveryView t={t} onBack={() => setView('connect')} />;
 
   return (
     <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -138,6 +142,13 @@ export function ConnectServer({ language, onConnected }) {
             </div>
           ))}
         </div>
+      )}
+
+      {window.pikaosDesktop?.isDesktop && (
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setView('recovery')}
+          style={{ marginTop: 26 }}>
+          {t('recovery.entry')}
+        </button>
       )}
     </div>
   );

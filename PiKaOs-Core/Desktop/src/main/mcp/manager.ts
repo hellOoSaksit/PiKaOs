@@ -42,4 +42,6 @@ export class McpManager extends EventEmitter {
     if (child.pid) this.set(id, 'running')
   }
   async stop(id: string) { this.procs.get(id)?.kill(); this.procs.delete(id); this.set(id, 'stopped') }
+  // Recovery uses this before clearing the registry file so no orphan child outlives its definition.
+  async stopAll() { for (const id of [...this.procs.keys()]) await this.stop(id) }
 }

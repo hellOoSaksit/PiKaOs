@@ -3,6 +3,7 @@ import type { SecretVault } from './vault'
 import type { SessionBroker } from './session-broker'
 import type { McpRegistry } from './mcp/registry'
 import type { McpManager } from './mcp/manager'
+import type { RecoveryService } from './recovery'
 import { getBackendConfig, setBackendConfig } from './config'
 
 // Parse the sender URL and compare protocol+host exactly — a startsWith('app://pikaos') check
@@ -19,8 +20,8 @@ export const okOrigin = (e: IpcMainInvokeEvent) => {
 const guard = (fn: (e: IpcMainInvokeEvent, ...a: any[]) => any) =>
   (e: IpcMainInvokeEvent, ...a: any[]) => { if (!okOrigin(e)) throw new Error('forbidden sender'); return fn(e, ...a) }
 
-export function registerIpc(deps: { vault: SecretVault; broker: SessionBroker; registry: McpRegistry; manager: McpManager }) {
-  const { vault, broker, registry, manager } = deps
+export function registerIpc(deps: { vault: SecretVault; broker: SessionBroker; registry: McpRegistry; manager: McpManager; recovery: RecoveryService }) {
+  const { vault, broker, registry, manager, recovery } = deps
 
   ipcMain.handle('config:get', guard(() => getBackendConfig()))
   ipcMain.handle('config:set', guard((_e, cfg) => setBackendConfig(cfg)))
@@ -39,6 +40,21 @@ export function registerIpc(deps: { vault: SecretVault; broker: SessionBroker; r
   // Namespaced under `mcp.<sid>.<key>` — never a bare key — so a server def can never name and
   // receive a foreign vault secret (e.g. auth.refresh). (F1)
   ipcMain.handle('secrets:setForServer', guard((_e, sid, key, value) => vault.set(`mcp.${sid}.${key}`, value)))
+
+  // Recovery (spec 2026-07-13 §6): enum item ids only — RecoveryService rejects anything else,
+  // so a renderer can never name a path. Outcome-only logging; never contents, never secrets.
+  ipcMain.handle('recovery:diagnose', guard(() => recovery.diagnose()))
+  ipcMain.handle('recovery:repair', guard(async (_e, id: string, subId?: string) => {
+    const r = await recovery.repair(id, subId)
+    console.log('[recovery] repair', id, subId ?? '', r.ok ? 'ok' : 'failed')
+    return r
+  }))
+  ipcMain.handle('recovery:clear', guard(async (_e, id: string) => {
+    const r = await recovery.clear(id)
+    console.log('[recovery] clear', id, r.ok ? 'ok' : 'failed')
+    return r
+  }))
+  ipcMain.handle('recovery:clearCache', guard(() => recovery.clearHttpCache()))
 
   // Title-bar controls (Window Controls Overlay draws min/max/close natively — only the verbs the
   // renderer toolbar still needs exist here). Resolve the sender's own window each call — never a
