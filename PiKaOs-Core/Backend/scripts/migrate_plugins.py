@@ -35,6 +35,8 @@ async def _run() -> None:
         return
 
     # Composition root: register just the postgres Tool so it creates the engine, then resolve it.
+    # DSN precedence (kernel-state db_config first, env fallback) lives in postgres.register() itself —
+    # this script never builds its own engine, so the operator's Step-1 choice flows through unchanged.
     container = Container()
     ctx = plugin_loader.PluginContext(container=container, events=EventBus(), settings=plugin_loader.settings)
     plugin_loader.register_plugins({"postgres"} & enabled, manifests, ctx)
