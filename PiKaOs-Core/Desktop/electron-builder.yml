@@ -10,7 +10,7 @@ asar: true
 # Bundled renderer: Frontend/dist is copied in and served via the app://pikaos protocol
 # (src/main/protocol.ts), never file://.
 extraResources:
-  - from: ../Frontend/dist
+  - from: Frontend/dist
     to: frontend
 # Mandatory hardening (spec §9) — electron-builder's native `electronFuses` key flips these via
 # @electron/fuses (already a transitive electron-builder dependency, pinned as our own devDependency

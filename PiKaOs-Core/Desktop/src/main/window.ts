@@ -70,7 +70,7 @@ export function isAllowedNavigation(url: string): boolean {
   }
 }
 
-// Dev → the Frontend Vite dev server; prod → the bundled Frontend/dist via app://pikaos.
+// Dev → the Frontend Vite dev server; prod → the bundled Desktop/Frontend/dist via app://pikaos.
 export function loadRenderer(win: BrowserWindow) {
   const devUrl = process.env.VITE_DEV_SERVER_URL
   if (devUrl) win.loadURL(devUrl)

@@ -1,7 +1,7 @@
 # PiKaOs — local dev BASE compose (kernel-only: backend).
 #
 # There is no `frontend` service. PiKaOs is a desktop app: the renderer is served to Electron either
-# from `Frontend/dist` over `app://pikaos` (packaged path) or by a Vite dev server run ON THE HOST for
+# from `Desktop/Frontend/dist` over `app://pikaos` (packaged path) or by a Vite dev server run ON THE HOST for
 # hot reload (start-desktop-dev.bat). A container could serve neither to Electron without pretending to
 # be a browser, and UI is verified in Electron only. The prod compose still builds the nginx static
 # bundle — that is the web deployment, a separate artifact.

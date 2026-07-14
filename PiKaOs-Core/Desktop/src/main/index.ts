@@ -15,13 +15,13 @@ import type { McpServerDef } from './mcp/registry'
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) app.quit()
 
-// Prod: Frontend/dist is copied into app resources via electron-builder's extraResources
-// (electron-builder.yml: `../Frontend/dist` -> `frontend`). Dev: the renderer comes from the
+// Prod: Desktop/Frontend/dist is copied into app resources via electron-builder's extraResources
+// (electron-builder.yml: `Frontend/dist` -> `frontend`). Dev: the renderer comes from the
 // Vite dev server (VITE_DEV_SERVER_URL) instead, but a sane on-disk path is still passed in
 // so the app:// handler never resolves to an undefined directory.
 const distDir = app.isPackaged
   ? join(process.resourcesPath, 'frontend')
-  : join(__dirname, '../../../Frontend/dist')
+  : join(__dirname, '../../Frontend/dist')
 
 // TODO(i18n): route these through the app's i18n th/en pair (F8) — no main-process i18n
 // helper exists in this project yet, so plain English is used for now.

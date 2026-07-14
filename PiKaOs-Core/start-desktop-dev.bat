@@ -69,11 +69,11 @@ if errorlevel 1 ( echo       compose up failed. & pause & exit /b 1 )
 
 rem ---- 3. Vite dev server on the host ------------------------
 echo [3/4] Starting Vite on the host (http://localhost:5173)...
-if not exist "%ROOT%Frontend\node_modules" (
+if not exist "%ROOT%Desktop\Frontend\node_modules" (
   echo       Installing Frontend deps first run...
-  pushd "%ROOT%Frontend" & call npm ci & popd
+  pushd "%ROOT%Desktop\Frontend" & call npm ci & popd
 )
-start "%VITE_TITLE%" /min cmd /c "cd /d ""%ROOT%Frontend"" && npm run dev"
+start "%VITE_TITLE%" /min cmd /c "cd /d ""%ROOT%Desktop\Frontend"" && npm run dev"
 for /l %%i in (1,1,40) do (
   curl -s -o nul http://localhost:5173 && goto viteup
   timeout /t 2 >nul

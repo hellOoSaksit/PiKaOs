@@ -31,8 +31,8 @@
 /PiKaOs-UAT-Run/
 # Core keeps ONLY the plugin SEAM files; the per-plugin folders beside them are gitignored symlinks
 # into PiKaOs-App/plugins/ (created by link-plugins.sh).
-/PiKaOs-Core/Frontend/src/plugins/*
-!/PiKaOs-Core/Frontend/src/plugins/index.jsx
+/PiKaOs-Core/Desktop/Frontend/src/plugins/*
+!/PiKaOs-Core/Desktop/Frontend/src/plugins/index.jsx
 /PiKaOs-Core/Backend/app/plugins/*
 !/PiKaOs-Core/Backend/app/plugins/__init__.py
 !/PiKaOs-Core/Backend/app/plugins/manifest.schema.json
