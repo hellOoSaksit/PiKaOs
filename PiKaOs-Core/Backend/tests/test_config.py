@@ -59,3 +59,35 @@ def test_development_is_not_production():
 def test_prod_alias_recognized():
     assert Settings(environment="prod").is_production
     assert Settings(environment="PRODUCTION").is_production
+
+
+# --- G2: open auth mode must not be reachable on a non-loopback interface (roadmap-v3 T1) ---
+# In open mode an anonymous caller is owner-admin and can POST /api/plugins/install directly, so a
+# public bind is the real RCE surface. The guard refuses that combo unless the operator acknowledges it.
+
+def test_open_mode_on_public_bind_is_flagged():
+    s = Settings(bind_host="0.0.0.0", allow_open_lan=False)
+    assert s.open_mode_lan_violation("open") is not None
+
+
+def test_open_mode_on_loopback_is_safe():
+    # the desktop / a direct local run binds loopback — open mode there exposes nothing to the LAN
+    assert Settings(bind_host="127.0.0.1").open_mode_lan_violation("open") is None
+    assert Settings(bind_host="localhost").open_mode_lan_violation("open") is None
+    assert Settings(bind_host="::1").open_mode_lan_violation("open") is None
+
+
+def test_login_mode_on_public_bind_is_safe():
+    # a normal (auth-required) deployment binding all interfaces is fine — credentials still gate it
+    assert Settings(bind_host="0.0.0.0").open_mode_lan_violation("login") is None
+
+
+def test_public_bind_acknowledged_is_allowed():
+    # explicit opt-in (e.g. a dev box or an intentional LAN kiosk) suppresses the guard
+    assert Settings(bind_host="0.0.0.0", allow_open_lan=True).open_mode_lan_violation("open") is None
+
+
+def test_bind_host_defaults_to_loopback():
+    # safe-by-default: a bare run / naive deploy binds loopback until the operator opts into LAN
+    assert Settings().bind_host == "127.0.0.1"
+    assert Settings().allow_open_lan is False
