@@ -157,6 +157,11 @@ export async function verifySetupCode(code) {
   // session token (setToken() it on success) that unlocks the kernel-only install shell.
   return raw("/setup/verify-code", { method: "POST", auth: false, body: { code } });
 }
+export async function bootstrapAdmin({ setupCode, username, password, confirmPassword }) {
+  // one-shot create-first-admin (auth enabled, zero users) — the setup code IS the auth
+  return raw("/auth/bootstrap-admin", { method: "POST", auth: false,
+    body: { setupCode, username, password, confirmPassword } });
+}
 
 // --- app version / build hash (AppBoot's mascot-cache check; also the seam release-and-
 // rollback.md §4's SPA version-skew policy is meant to use) ---

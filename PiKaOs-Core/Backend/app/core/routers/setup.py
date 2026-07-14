@@ -18,6 +18,7 @@ router = APIRouter(prefix="/api/setup", tags=["setup"])
 class StatusOut(BaseModel):
     needsSetup: bool
     bootstrapAuthorized: bool
+    needsFirstAdmin: bool
 
 
 class VerifyIn(BaseModel):
@@ -42,9 +43,14 @@ async def status(request: Request) -> StatusOut:
     generate_setup_code.py). `bootstrapAuthorized` reports whether the caller's bearer token (if any)
     is the current boot's valid session token — the frontend uses this to skip back to FirstRun after
     a restart invalidates a previously-stored token."""
+    mode = setup_state.read_auth_mode()
+    code_live = setup_state.read_code() is not None
     return StatusOut(
-        needsSetup=setup_state.read_code() is not None,
+        needsSetup=code_live and mode == "setup",
         bootstrapAuthorized=setup_state.verify_session_token(_bearer(request)),
+        # auth is enabled but ownerless (migrate revived the code): the client shows the
+        # create-first-admin form, and THIS router's verify-code refuses (see below).
+        needsFirstAdmin=code_live and mode == "login",
     )
 
 
@@ -54,6 +60,11 @@ async def verify_code(body: VerifyIn) -> VerifyOut:
     the frontend then sends as a Bearer token — `identity.BootstrapProvider` accepts it as a synthetic
     admin. Success ALSO completes first-run setup (open-mode spec §4): the flag is durable, and this
     boot's mode flips to "open" immediately so the operator lands in the full app without a restart."""
+    if setup_state.read_auth_mode() == "login":
+        # First-admin window (auth enabled, zero users): the live code authorises
+        # POST /api/auth/bootstrap-admin, not this route — accepting here would flip the server
+        # "open" underneath an auth-plugin identity provider.
+        raise HTTPException(status_code=409, detail="auth is installed — create the first admin instead")
     if not setup_state.verify_code(body.code):
         raise HTTPException(status_code=401, detail="invalid setup code")
     setup_state.mark_setup_completed()

@@ -32,6 +32,9 @@ services:
       # is open + LAN-reachable (G2 guard) — never set this on a real server. (roadmap-v3 T1)
       BIND_HOST: "0.0.0.0"
       ALLOW_OPEN_LAN: "1"
+      # dev/test stacks keep the seeded demo users (the live auth tests log in as them); a real
+      # install never sets this — its first account comes from the first-admin bootstrap window.
+      SEED_DEV_USERS: "1"
     volumes:
       - ../Backend:/app          # hot-reload: code edits on the host reflect in the container
       - kernelstate:/app/state   # kernel local-JSON state (plugin registry + nav + user prefs)

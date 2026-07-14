@@ -153,13 +153,16 @@ def client(tmp_state):
 
 def test_status_reports_needs_setup_true_when_code_present(tmp_state, client):
     setup_state.write(CODE, TOKEN)
+    setup_state.write_auth_mode("setup")
     body = client.get("/api/setup/status").json()
     assert body["needsSetup"] is True
     assert body["bootstrapAuthorized"] is False       # no Authorization header sent
 
 
 def test_status_reports_needs_setup_false_when_no_code(tmp_state, client):
-    assert client.get("/api/setup/status").json() == {"needsSetup": False, "bootstrapAuthorized": False}
+    assert client.get("/api/setup/status").json() == {
+        "needsSetup": False, "bootstrapAuthorized": False, "needsFirstAdmin": False,
+    }
 
 
 def test_status_reports_bootstrap_authorized_with_a_valid_token(tmp_state, client):
@@ -170,6 +173,7 @@ def test_status_reports_bootstrap_authorized_with_a_valid_token(tmp_state, clien
 
 def test_verify_code_endpoint_accepts_the_right_code_and_returns_a_token(tmp_state, client):
     setup_state.write(CODE, TOKEN)
+    setup_state.write_auth_mode("setup")
     resp = client.post("/api/setup/verify-code", json={"code": "pika-abcd-2345"})
     assert resp.status_code == 200
     assert resp.json() == {"ok": True, "token": TOKEN}
@@ -177,11 +181,13 @@ def test_verify_code_endpoint_accepts_the_right_code_and_returns_a_token(tmp_sta
 
 def test_verify_code_endpoint_rejects_a_wrong_code(tmp_state, client):
     setup_state.write(CODE, TOKEN)
+    setup_state.write_auth_mode("setup")
     resp = client.post("/api/setup/verify-code", json={"code": "PIKA-0000-0000"})
     assert resp.status_code == 401
 
 
 def test_verify_code_endpoint_rejects_when_no_code_set(tmp_state, client):
+    setup_state.write_auth_mode("setup")
     resp = client.post("/api/setup/verify-code", json={"code": "anything"})
     assert resp.status_code == 401
 
@@ -190,6 +196,7 @@ def test_verify_code_endpoint_rejects_when_no_code_set(tmp_state, client):
 
 def test_bootstrap_token_unlocks_the_plugins_list_route(tmp_state, client):
     setup_state.write(CODE, TOKEN)
+    setup_state.write_auth_mode("setup")
     verify = client.post("/api/setup/verify-code", json={"code": CODE})
     token = verify.json()["token"]
     resp = client.get("/api/plugins", headers={"Authorization": f"Bearer {token}"})
@@ -255,6 +262,7 @@ def test_verify_code_flips_server_open(tmp_state):
     from app.core.routers import setup as setup_router
 
     setup_state.write(CODE, TOKEN)
+    setup_state.write_auth_mode("setup")
     app = FastAPI()
     app.include_router(setup_router.router)
     client = TestClient(app)
@@ -269,6 +277,7 @@ def test_wrong_code_flips_nothing(tmp_state):
     from app.core.routers import setup as setup_router
 
     setup_state.write(CODE, TOKEN)
+    setup_state.write_auth_mode("setup")
     app = FastAPI()
     app.include_router(setup_router.router)
     client = TestClient(app)
@@ -276,4 +285,41 @@ def test_wrong_code_flips_nothing(tmp_state):
     r = client.post("/api/setup/verify-code", json={"code": "PIKA-WRNG-WRNG"})
     assert r.status_code == 401
     assert setup_state.is_setup_completed() is False
-    assert setup_state.read_auth_mode() == "login"
+    assert setup_state.read_auth_mode() == "setup"
+
+
+# --- first-admin bootstrap window (auth enabled, zero users — 2026-07-14 spec) ---------------------
+
+def _client() -> TestClient:
+    from app.core.routers import setup as setup_router
+    app = FastAPI()
+    app.include_router(setup_router.router)
+    return TestClient(app)
+
+
+def test_status_reports_first_admin_window(tmp_state):
+    """Code live + mode 'login' = the ownerless-auth window: needsFirstAdmin, NOT needsSetup."""
+    setup_state.write(CODE, TOKEN)
+    setup_state.write_auth_mode("login")
+    body = _client().get("/api/setup/status").json()
+    assert body["needsFirstAdmin"] is True
+    assert body["needsSetup"] is False
+
+
+def test_status_first_run_unchanged(tmp_state):
+    setup_state.write(CODE, TOKEN)
+    setup_state.write_auth_mode("setup")
+    body = _client().get("/api/setup/status").json()
+    assert body["needsSetup"] is True
+    assert body["needsFirstAdmin"] is False
+
+
+def test_verify_code_refuses_in_login_mode(tmp_state):
+    """In the first-admin window the code belongs to /api/auth/bootstrap-admin. verify-code must NOT
+    accept it — accepting would mark setup completed and declare authMode 'open' on a server whose
+    identity provider is the auth plugin (a mixed, half-open state)."""
+    setup_state.write(CODE, TOKEN)
+    setup_state.write_auth_mode("login")
+    resp = _client().post("/api/setup/verify-code", json={"code": CODE})
+    assert resp.status_code == 409
+    assert setup_state.is_setup_completed() is False

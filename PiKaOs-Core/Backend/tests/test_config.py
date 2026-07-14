@@ -91,3 +91,9 @@ def test_bind_host_defaults_to_loopback():
     # safe-by-default: a bare run / naive deploy binds loopback until the operator opts into LAN
     assert Settings().bind_host == "127.0.0.1"
     assert Settings().allow_open_lan is False
+
+
+def test_seed_dev_users_defaults_off():
+    """Fresh installs must never ship the shared dev credential; dev stacks opt in via SEED_DEV_USERS."""
+    from app.core.config import Settings
+    assert Settings(_env_file=None).seed_dev_users is False

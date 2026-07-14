@@ -74,6 +74,11 @@ class Settings(BaseSettings):
     # factor; 12 is the shipped floor (raise it here once a real create/change UI + MFA land).
     password_min_length: int = 12
 
+    # Seed the shared-password demo users (somchai/nicha/…)? OFF by default — a fresh install's first
+    # account comes from the first-admin bootstrap window, not a known credential. Dev/test stacks
+    # (whose live tests log in as the seeded users) set SEED_DEV_USERS=1 explicitly.
+    seed_dev_users: bool = False
+
     # --- network exposure (G2, roadmap-v3 T1) ---
     # Interface uvicorn binds (docker-entrypoint.sh reads BIND_HOST). Loopback by default so a
     # bare/direct run or the desktop-embedded backend is never reachable from the LAN out of the box.

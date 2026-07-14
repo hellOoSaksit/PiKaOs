@@ -8,6 +8,7 @@ import { resolveShellMode } from './lib/shell-mode.js';
 import { useShellNav } from './lib/shell-nav.js';
 import { Settings } from './screens/screens-extra.jsx';
 import { FirstRun } from './screens/FirstRun.jsx';
+import { FirstAdmin } from './screens/FirstAdmin.jsx';
 import { KernelOnlyShell } from './screens/KernelOnlyShell.jsx';
 import { KernelHome } from './screens/KernelHome.jsx';
 import { PluginsManager } from './screens/screens-plugins.jsx';
@@ -344,6 +345,13 @@ function App() {
   const shell = resolveShellMode({ ready: auth.ready, caps, bootstrap, loggedIn: auth.loggedIn });
   if (shell === 'loading') return withChrome(null);   // avoid flashing the setup screen while restoring
   if (shell === 'kernel-shell') return withChrome(<KernelOnlyShell language={language} />);
+  if (shell === 'first-admin') {
+    return withChrome(<FirstAdmin t={t} language={language} onLang={pickLanguage}
+      onDone={async (username, password) => {
+        await auth.login(username, password);   // normal session; shell flips to 'full' on loggedIn
+        refreshBootstrap();                     // needsFirstAdmin is now false server-side
+      }} />);
+  }
   if (shell === 'firstrun') {
     return withChrome(<FirstRun t={t} language={language} onLang={pickLanguage}
       onVerified={(token) => {
