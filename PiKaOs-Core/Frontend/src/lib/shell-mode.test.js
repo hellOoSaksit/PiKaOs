@@ -24,3 +24,14 @@ it('login mode + bootstrap token falls back to the kernel-only install shell', (
 it('login mode with nothing else lands on FirstRun', () => {
   expect(resolveShellMode(base)).toBe('firstrun');
 });
+
+it('auth enabled + zero users → first-admin', () => {
+  expect(resolveShellMode({ ready: true, caps: { authMode: 'login' },
+    bootstrap: { needsSetup: false, bootstrapAuthorized: false, needsFirstAdmin: true },
+    loggedIn: false })).toBe('first-admin');
+});
+
+it('first-admin window never overrides a live session', () => {
+  expect(resolveShellMode({ ready: true, caps: { authMode: 'login' },
+    bootstrap: { needsFirstAdmin: true }, loggedIn: true })).toBe('full');
+});

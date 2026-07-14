@@ -4,6 +4,7 @@
 export function resolveShellMode({ ready, caps, bootstrap, loggedIn }) {
   if (!ready || !caps || !bootstrap) return 'loading';          // don't flash FirstRun mid-restore
   if (loggedIn || caps.authMode === 'open') return 'full';      // open = server-declared (F1-safe)
+  if (bootstrap.needsFirstAdmin) return 'first-admin';          // auth enabled, zero users — create the owner
   if (bootstrap.bootstrapAuthorized) return 'kernel-shell';     // verified setup code, legacy shell
   return 'firstrun';
 }
