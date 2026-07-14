@@ -9,6 +9,7 @@ import { useShellNav } from './lib/shell-nav.js';
 import { Settings } from './screens/screens-extra.jsx';
 import { FirstRun } from './screens/FirstRun.jsx';
 import { FirstAdmin } from './screens/FirstAdmin.jsx';
+import { DbChoice } from './screens/DbChoice.jsx';
 import { KernelOnlyShell } from './screens/KernelOnlyShell.jsx';
 import { KernelHome } from './screens/KernelHome.jsx';
 import { PluginsManager } from './screens/screens-plugins.jsx';
@@ -344,6 +345,7 @@ function App() {
 
   const shell = resolveShellMode({ ready: auth.ready, caps, bootstrap, loggedIn: auth.loggedIn });
   if (shell === 'loading') return withChrome(null);   // avoid flashing the setup screen while restoring
+  if (shell === 'db-choice') return withChrome(<DbChoice t={t} language={language} onLang={pickLanguage} />);
   if (shell === 'kernel-shell') return withChrome(<KernelOnlyShell language={language} />);
   if (shell === 'first-admin') {
     return withChrome(<FirstAdmin t={t} language={language} onLang={pickLanguage}

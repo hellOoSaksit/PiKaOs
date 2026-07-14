@@ -163,6 +163,11 @@ export async function bootstrapAdmin({ setupCode, username, password, confirmPas
     body: { setupCode, username, password, confirmPassword } });
 }
 
+// --- DB-choice (Step 1 of install, gated on the bootstrap Bearer verify-code already handed back —
+// setToken() stored it, so `auth: true` (default) picks it up the same way setupStatus() does). ---
+export async function dbTest(payload) { return raw("/setup/db-test", { method: "POST", body: payload }); }
+export async function dbConfig(payload) { return raw("/setup/db-config", { method: "POST", body: payload }); }  // { ok, restart_required }
+
 // --- app version / build hash (AppBoot's mascot-cache check; also the seam release-and-
 // rollback.md §4's SPA version-skew policy is meant to use) ---
 export async function getVersion() { return raw("/version", { auth: false }); }   // { version, build, name }
