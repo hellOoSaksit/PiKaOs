@@ -23,8 +23,8 @@ it('every pack defines the first-admin screen labels', () => {
   const FA = ['firstadmin.kicker', 'firstadmin.title', 'firstadmin.subtitle', 'firstadmin.code',
     'firstadmin.codePh', 'firstadmin.username', 'firstadmin.password', 'firstadmin.confirm',
     'firstadmin.submit', 'firstadmin.submitting', 'firstadmin.errEmpty', 'firstadmin.errMismatch',
-    'firstadmin.errCode', 'firstadmin.errWeak', 'firstadmin.errClosed', 'firstadmin.errNetwork',
-    'firstadmin.ok'];
+    'firstadmin.errUsername', 'firstadmin.errCode', 'firstadmin.errWeak', 'firstadmin.errClosed',
+    'firstadmin.errNetwork', 'firstadmin.ok'];
   for (const [name, pack] of PACKS)
     for (const k of FA) expect(pack.translations[k], `${name} missing ${k}`).toBeTruthy();
 });

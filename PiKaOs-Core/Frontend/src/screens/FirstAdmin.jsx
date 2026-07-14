@@ -22,6 +22,7 @@ export function FirstAdmin({ t, language, onLang, onDone }) {
     const { setupCode, username, password, confirmPassword } = form;
     if (!setupCode.trim() || !username.trim() || !password || !confirmPassword) { setError(t('firstadmin.errEmpty')); return; }
     if (password !== confirmPassword) { setError(t('firstadmin.errMismatch')); return; }
+    if (!/^[a-zA-Z0-9_.-]{3,64}$/.test(username.trim())) { setError(t('firstadmin.errUsername')); return; }
     setBusy(true);
     try {
       await api.bootstrapAdmin({ setupCode: setupCode.trim(), username: username.trim(), password, confirmPassword });

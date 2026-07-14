@@ -412,6 +412,7 @@
     "firstadmin.submitting": "Creating…",
     "firstadmin.errEmpty": "Fill in every field.",
     "firstadmin.errMismatch": "Passwords do not match.",
+    "firstadmin.errUsername": "Username must be 3-64 characters — letters, numbers, and . _ - only.",
     "firstadmin.errCode": "That setup code is not valid. Check the latest code in the server console.",
     "firstadmin.errWeak": "Password is too short or too common.",
     "firstadmin.errClosed": "An administrator already exists — sign in instead.",

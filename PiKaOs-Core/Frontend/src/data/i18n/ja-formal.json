@@ -104,6 +104,7 @@
     "firstadmin.submitting": "作成中…",
     "firstadmin.errEmpty": "すべての項目を入力してください。",
     "firstadmin.errMismatch": "パスワードが一致しません。",
+    "firstadmin.errUsername": "ユーザー名は3〜64文字で、英数字と . _ - のみ使用できます。",
     "firstadmin.errCode": "このセットアップコードは無効です。サーバーコンソールで最新のコードを確認してください。",
     "firstadmin.errWeak": "パスワードが短すぎるか、よく使われるものです。",
     "firstadmin.errClosed": "管理者はすでに存在します — サインインしてください。",
