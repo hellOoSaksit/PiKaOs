@@ -1,10 +1,9 @@
 # PiKaOs — local dev BASE compose (kernel-only: backend).
 #
 # There is no `frontend` service. PiKaOs is a desktop app: the renderer is served to Electron either
-# from `Frontend/dist` over `app://pikaos` (packaged path) or by a Vite dev server run ON THE HOST for
+# from `Desktop/Frontend/dist` over `app://pikaos` (packaged path) or by a Vite dev server run ON THE HOST for
 # hot reload (start-desktop-dev.bat). A container could serve neither to Electron without pretending to
-# be a browser, and UI is verified in Electron only. The prod compose still builds the nginx static
-# bundle — that is the web deployment, a separate artifact.
+# be a browser, and UI is verified in Electron only.
 #
 # Tool-plugin sidecars (postgres/redis/minio/...) are NOT defined here — they are merged in from each
 # enabled plugin's `compose.fragment.yml` by `Backend/scripts/render_compose.py`, matching the
@@ -15,14 +14,13 @@
 #
 # Never edit docker-compose.generated.yml by hand — it's a build artifact. Edit this file (kernel
 # services) or a plugin's compose.fragment.yml (tool sidecars) instead, then re-run render_compose.py
-# (start.sh / start.bat do this automatically).
+# (start.bat does this automatically).
 services:
   backend:
     build: ../Backend
     restart: unless-stopped
     env_file:
       - ../Backend/.env
-      - ../.env.ai
     ports:
       - "8000:8000"
     environment:

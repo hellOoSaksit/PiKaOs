@@ -5,7 +5,6 @@ rem
 rem  Flow:
 rem    1) make sure the Docker engine is running
 rem         - if not, start Docker Desktop and wait
-rem         - if it still won't come up, run fix-docker.bat and wait
 rem    2) render deploy\docker-compose.generated.yml: the kernel base
 rem       (backend) merged with every ENABLED tool plugin's
 rem       compose.fragment.yml (Backend\scripts\render_compose.py —
@@ -51,27 +50,16 @@ echo       Docker is not running - starting Docker Desktop...
 if exist "%DD%" (
   start "" "%DD%"
 ) else (
-  echo       Docker Desktop.exe not found - will try fix-docker.bat.
+  echo       Docker Desktop.exe not found - see README.md Troubleshooting.
 )
 echo       Waiting for the engine...
 call :waitdocker 45
 if %errorlevel%==0 goto :dockerready
 
 echo.
-echo       Still not up - running fix-docker.bat (approve the UAC prompt)...
-if exist "%ROOT%fix-docker.bat" (
-  start "" "%ROOT%fix-docker.bat"
-) else (
-  echo       ERROR: fix-docker.bat not found next to start.bat.
-)
-echo       Waiting for Docker to recover...
-call :waitdocker 150
-if %errorlevel%==0 goto :dockerready
-
-echo.
 echo  *** Docker could not be started automatically. ***
-echo  Check the Docker Desktop / fix-docker window - a reboot may be
-echo  required if Windows features were just enabled. Then run start.bat again.
+echo  See README.md "Troubleshooting" for manual recovery steps
+echo  (WSL2 / virtualization / service restart). Then run start.bat again.
 echo.
 pause
 exit /b 1
@@ -83,13 +71,8 @@ echo.
 pushd "%ROOT%"
 
 rem ---- env preflight (point at setup instructions instead of failing cryptically) ----
-set "MISSING="
-if not exist "Backend\.env" set "MISSING=1"
-if not exist ".env.ai" set "MISSING=1"
-if not exist "Frontend\.env" set "MISSING=1"
-if defined MISSING (
-  echo       Missing an env file - copy Backend\.env.example / .env.ai.example / Frontend\.env.example
-  echo       to their real names first.
+if not exist "Backend\.env" (
+  echo       Backend\.env missing - copy Backend\.env.example to Backend\.env first ^(see README^).
   popd
   pause
   exit /b 1

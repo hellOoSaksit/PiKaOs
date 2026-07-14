@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 // Task 12 Step 3 — the packaged renderer only gets its CSP by rewriting the extraResources
-// copy of index.html (Frontend/dist has no CSP tag at build time). This exercises the
-// afterPack hook against a throwaway "appOutDir" so it never touches the real Frontend/dist.
+// copy of index.html (Desktop/Frontend/dist has no CSP tag at build time). This exercises the
+// afterPack hook against a throwaway "appOutDir" so it never touches the real Desktop/Frontend/dist.
 async function loadInjectCsp() {
   const mod: any = await import('../scripts/inject-csp.cjs')
   return (mod.default ?? mod) as (context: unknown) => Promise<void>

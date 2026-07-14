@@ -22,14 +22,14 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: PiKaOs-Core/Frontend
+        working-directory: PiKaOs-Core/Desktop/Frontend
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: PiKaOs-Core/Frontend/package-lock.json
+          cache-dependency-path: PiKaOs-Core/Desktop/Frontend/package-lock.json
       - run: npm ci
       - name: Lint (react-hooks/rules-of-hooks = error)
         run: npm run lint
@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     # No plugin repos are checked out in CI, so Core's suite runs plugin-free (testpaths = tests) and
     # needs no datastore sidecar — render_compose.py sees an empty app/plugins/ and emits just the
-    # kernel base compose (backend + frontend, no tool fragments). Gitignored .env files aren't in the
+    # kernel base compose (backend, no tool fragments). Gitignored .env files aren't in the
     # checkout; seed CI with the tracked *.example (dev creds) first.
     env:
       BE: docker compose -p pikaos -f PiKaOs-Core/deploy/docker-compose.generated.yml
@@ -76,10 +76,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Seed env files (dev defaults)
-        run: |
-          cp PiKaOs-Core/Backend/.env.example PiKaOs-Core/Backend/.env
-          cp PiKaOs-Core/Frontend/.env.example PiKaOs-Core/Frontend/.env
-          cp PiKaOs-Core/.env.ai.example PiKaOs-Core/.env.ai
+        run: cp PiKaOs-Core/Backend/.env.example PiKaOs-Core/Backend/.env
       - name: Render compose (kernel base — no plugins linked in CI)
         run: python PiKaOs-Core/Backend/scripts/render_compose.py
       - name: Start backend

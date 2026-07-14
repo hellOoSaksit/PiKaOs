@@ -11,7 +11,7 @@
 #
 # Repo-per-plugin (see CLAUDE.md): each plugin lives in its OWN repo, gitignored + nested as a sibling
 # of PiKaOs-Core/. A plugin's Python runs IN the Core process, so its code must sit under
-# Backend/app/plugins/<id>/ (and its UI under Frontend/src/plugins/<id>/). Those paths are gitignored
+# Backend/app/plugins/<id>/ (and its UI under Desktop/Frontend/src/plugins/<id>/). Those paths are gitignored
 # — this script (re)creates them from the sibling repos, so they are build state, never committed.
 #
 # id -> repo is discovered, not hardcoded: every sibling PiKaOs-Plugin-*/backend/manifest.json declares
@@ -34,7 +34,7 @@ if [ "${1:-}" = "--link" ]; then USE_SYMLINK=1; shift; fi
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"     # PiKaOs-Core/
 PROJECTS="$(cd "$ROOT/.." && pwd)"                       # PiKaOs-Projects/ (holds the plugin repos)
 BACKEND_PLUGINS="$ROOT/Backend/app/plugins"
-FRONTEND_PLUGINS="$ROOT/Frontend/src/plugins"
+FRONTEND_PLUGINS="$ROOT/Desktop/Frontend/src/plugins"
 
 # --- discover id -> repo backend dir from every sibling plugin repo's manifest ------------------------
 declare -A REPO_FOR_ID

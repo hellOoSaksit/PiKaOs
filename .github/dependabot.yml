@@ -22,7 +22,7 @@ updates:
 
   # Frontend (Vite / React) — npm against package-lock.json.
   - package-ecosystem: npm
-    directory: /PiKaOs-Core/Frontend
+    directory: /PiKaOs-Core/Desktop/Frontend
     schedule:
       interval: weekly
     groups:
@@ -33,6 +33,6 @@ updates:
   - package-ecosystem: docker
     directories:
       - /PiKaOs-Core/Backend
-      - /PiKaOs-Core/Frontend
+      - /PiKaOs-Core/Desktop/Frontend
     schedule:
       interval: weekly

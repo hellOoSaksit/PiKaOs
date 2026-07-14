@@ -7,7 +7,7 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } },
 ])
 
-// Serves the bundled Frontend/dist (prod) as app://pikaos/<path>. Call after app 'ready',
+// Serves the bundled Desktop/Frontend/dist (prod) as app://pikaos/<path>. Call after app 'ready',
 // before createWindow() so the renderer never race-loads an unhandled scheme.
 export function registerAppProtocol(distDir: string) {
   protocol.handle('app', (req) => {
