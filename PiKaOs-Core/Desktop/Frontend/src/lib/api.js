@@ -236,10 +236,6 @@ export async function setNavConfig(value) { return raw("/settings/nav", { method
 export async function getMySettings() { return raw("/settings/me"); }                                           // { values: {...} }
 export async function setMySetting(key, value) { return raw(`/settings/me/${key}`, { method: "PUT", body: { value } }); }
 
-// The `/settings/global/{key}` client fed the Tools catalog's `options`/`skill_docs`/`tool_cfgs`
-// blobs. Those screens are gone and nothing else read them; the route still exists server-side for
-// whatever needs a shared blob next.
-
 // --- plugins (the install / Modules screen — reads are any authenticated user; mutations need
 // plugins.manage). Mutations return { plugins:[...], restart_required } (restart-to-apply). ---
 export async function listPlugins() { return raw("/plugins"); }

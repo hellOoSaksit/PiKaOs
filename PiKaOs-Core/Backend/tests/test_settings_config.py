@@ -1,24 +1,25 @@
-"""routers/settings_config.py — the generic global-KV must NOT be a side-channel to installer-owned
-keys (K4). `plugin_install_allowed_hosts` / `plugin_git_credentials` live in the same `app_settings`
-blob, so `/api/settings/global/{key}` GET/PUT must refuse them (404) — otherwise `options.manage`
-(weaker than `plugins.manage`) could widen the RCE allowlist or overwrite credentials, and any
-authenticated user could read the credential blob.
+"""routers/settings_config.py — the settings tier is now the shared `nav` blob + per-user `/me`. The
+generic `/settings/global/{key}` KV was removed (G1): it had no consumers and was an authz side-channel.
+`GET /nav` is intentionally open to every authenticated user (the sidebar needs it on load); `PUT /nav`
+requires `options.manage` and is NOT an AI tool.
 
     docker compose exec backend pytest tests/test_settings_config.py
 """
 from __future__ import annotations
 
+from uuid import UUID
+
 import pytest
 from starlette.testclient import TestClient
 
 from app.core import kernel_state, setup_state
-from app.core.git_installer import RESERVED_SETTINGS_KEYS
+from app.core.contracts import IDENTITY
 
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    # Bootstrap session token → BootstrapProvider grants every perm (incl. options.manage), so a 404 here
-    # is the reserved-key guard, not an authz failure.
+    # Bootstrap session token → BootstrapProvider grants the synthetic admin (has_perm True), so the
+    # nav-cap tests below can PUT /nav. The identity-stub tests rebind IDENTITY for their own scope.
     monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
     setup_state.write("PIKA-ABCD-2345", "a-session-token")
     import app.main as main
@@ -29,52 +30,75 @@ def client(tmp_path, monkeypatch):
 _AUTH = {"Authorization": "Bearer a-session-token"}
 
 
-@pytest.mark.parametrize("key", sorted(RESERVED_SETTINGS_KEYS))
-def test_reserved_keys_cannot_be_read_via_generic_settings(client, key):
-    assert client.get(f"/api/settings/global/{key}", headers=_AUTH).status_code == 404
+# --- a permission-less / permissioned stub identity, bound through the DI seam -----------------------
+
+class _StubUser:
+    id = UUID(int=1)
+    role = "member"      # deliberately NOT admin, so no role==admin shortcut can mask a missing perm
+    status = "active"
 
 
-@pytest.mark.parametrize("key", sorted(RESERVED_SETTINGS_KEYS))
-def test_reserved_keys_cannot_be_written_via_generic_settings(client, key):
-    resp = client.put(f"/api/settings/global/{key}", json={"value": ["evil.example.com"]}, headers=_AUTH)
-    assert resp.status_code == 404
-    # and nothing was persisted under that key
-    assert kernel_state.read_json("app_settings", {}).get(key) is None
+class _StubProvider:
+    """Authenticates any bearer to a fixed non-admin user; `has_perm` answers from a fixed perm set."""
+    def __init__(self, perms):
+        self._perms = set(perms)
+
+    async def authenticate(self, token):
+        return _StubUser() if token else None
+
+    async def has_perm(self, user, perm):
+        return perm in self._perms
+
+    def has_role(self, user, *roles):
+        return _StubUser.role in roles
 
 
-def test_a_normal_global_key_still_round_trips(client):
-    put = client.put("/api/settings/global/theme", json={"value": {"mode": "dark"}}, headers=_AUTH)
-    assert put.status_code == 200
-    got = client.get("/api/settings/global/theme", headers=_AUTH)
-    assert got.status_code == 200 and got.json()["value"] == {"mode": "dark"}
+def _bind_identity(client, perms):
+    client.app.state.container.bind(IDENTITY, _StubProvider(perms))
 
 
-def test_an_oversized_value_is_refused_and_never_persisted(client):
-    """`put_global` is `ai_safe`, so an AI holding options.manage may write here. Unbounded, that
-    authority is a DoS: `app_settings` is one JSON file that every settings read/write reparses and
-    rewrites in full, so a single huge value taxes the reserved installer keys sharing it too."""
-    resp = client.put("/api/settings/global/bloat", json={"value": "x" * 70_000}, headers=_AUTH)
-    assert resp.status_code == 413
-    assert kernel_state.read_json("app_settings", {}).get("bloat") is None
+# --- the removed global tier is gone ----------------------------------------------------------------
+
+def test_the_generic_global_kv_route_is_removed(client):
+    assert client.get("/api/settings/global/anything", headers=_AUTH).status_code == 404
+    assert client.put("/api/settings/global/anything", json={"value": 1}, headers=_AUTH).status_code == 404
 
 
-def test_the_nav_writer_is_capped_too(client):
-    """`put_nav` carries the same `ai_safe` authority over the same blob — capping only `put_global`
-    would leave the identical DoS one route away."""
+# --- GET /nav is intentionally open; PUT /nav is gated on options.manage ----------------------------
+
+def test_nav_read_is_open_to_a_permissionless_user(client):
+    _bind_identity(client, perms=set())                       # authenticated, but holds NO permissions
+    assert client.get("/api/settings/nav", headers=_AUTH).status_code == 200
+
+
+def test_nav_write_is_forbidden_without_options_manage(client):
+    _bind_identity(client, perms=set())
+    assert client.put("/api/settings/nav", json={"value": ["a"]}, headers=_AUTH).status_code == 403
+
+
+def test_nav_write_is_allowed_with_options_manage(client):
+    _bind_identity(client, perms={"options.manage"})
+    assert client.put("/api/settings/nav", json={"value": ["a"]}, headers=_AUTH).status_code == 200
+
+
+# --- the size cap now lives only on the nav writer --------------------------------------------------
+
+def test_the_nav_writer_is_capped(client):
     resp = client.put("/api/settings/nav", json={"value": ["x" * 70_000]}, headers=_AUTH)
     assert resp.status_code == 413
     assert kernel_state.read_json("app_settings", {}).get("nav") is None
 
 
-def test_a_value_just_under_the_cap_is_accepted(client):
-    """The cap must not be so eager that a legitimate config blob trips it."""
-    resp = client.put("/api/settings/global/big", json={"value": "x" * 60_000}, headers=_AUTH)
+def test_a_nav_value_just_under_the_cap_is_accepted(client):
+    # NavConfigIn.value is typed `list` (the nav arrangement is a list of groups) — wrap the payload
+    # accordingly; a bare string body would 422 on schema validation before the size guard even runs.
+    resp = client.put("/api/settings/nav", json={"value": ["x" * 60_000]}, headers=_AUTH)
     assert resp.status_code == 200
 
 
-def test_the_cap_counts_the_bytes_that_will_be_persisted_not_ascii_escapes(client):
-    """Values are stored with `ensure_ascii=False`, so a Thai label costs 3 UTF-8 bytes, not the 6 of
-    a `\\uXXXX` escape. Measuring the escaped form would reject a value that fits on disk."""
-    thai = "ก" * 20_000                                    # 60 KB as UTF-8; 120 KB escaped
-    resp = client.put("/api/settings/global/thai", json={"value": thai}, headers=_AUTH)
+def test_the_cap_counts_utf8_bytes_not_ascii_escapes(client):
+    """Stored with `ensure_ascii=False`, so a Thai char costs 3 UTF-8 bytes, not the 6 of a \\uXXXX
+    escape. Measuring the escaped form would reject a value that fits on disk."""
+    thai = "ก" * 20_000                                        # 60 KB UTF-8; 120 KB escaped
+    resp = client.put("/api/settings/nav", json={"value": [thai]}, headers=_AUTH)
     assert resp.status_code == 200

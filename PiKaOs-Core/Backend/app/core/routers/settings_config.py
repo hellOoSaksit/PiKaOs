@@ -1,11 +1,12 @@
 """App settings HTTP routes — server-scoped, cross-device config (`/api/settings`).
 
-The sidebar nav arrangement lives here so an admin's layout is the same on every user and device (it used
-to be per-browser localStorage). Read = any authenticated user (the sidebar needs it on load); write =
-`options.manage`. Backed by **kernel local-JSON** now (zero-datastore kernel): the shared nav + global
-blobs live in the `app_settings` state file (`{key: {value, updated_at}}`), per-user prefs in
-`user_settings` (`{user_id: {key: value}}`). The API + response schemas are unchanged, so the frontend is
-untouched.
+Two tiers: the shared sidebar `nav` arrangement (read = any authenticated user, so every role can
+render the sidebar on load; write = `options.manage`, a human-admin action, NOT an AI tool), and
+per-user `/me` settings (theme/lexicon, own scope only). Backed by kernel local-JSON (zero-datastore
+kernel): the shared nav blob lives in the `app_settings` state file, per-user prefs in `user_settings`.
+
+The generic `/settings/global/{key}` KV was removed (G1, 2026-07-14): it had no remaining consumer and
+was an authz side-channel over a shared blob. `GET /nav` is intentionally open — non-sensitive layout.
 """
 from __future__ import annotations
 
@@ -16,9 +17,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 
 from .. import kernel_state
-from ..git_installer import RESERVED_SETTINGS_KEYS
 from ..identity import UserLike, get_current_user, require_perm
-from ..schemas import GlobalConfigOut, NavConfigIn, NavConfigOut, SettingValueIn, UserSettingsOut
+from ..schemas import NavConfigIn, NavConfigOut, SettingValueIn, UserSettingsOut
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -26,11 +26,10 @@ _NAV_KEY = "nav"
 _APP = "app_settings"       # {key: {"value": <json>, "updated_at": <iso>}}
 _USERS = "user_settings"    # {user_id: {key: <json>}}
 
-# Both writers below are ai_safe (an options.manage AI may write settings) — without a size cap that
-# authority becomes a DoS. `app_settings` is ONE JSON file: every write re-reads, mutates and rewrites
-# the whole blob, so one oversized value taxes every later settings read/write, including the reserved
-# installer keys that share the file. 64 KiB is generous for a config value and cheap to check before it
-# ever reaches kernel_state.
+# The nav writer re-reads, mutates and rewrites the whole `app_settings` JSON blob, so one oversized
+# value taxes every later settings read/write. 64 KiB is generous for a layout value; cap it before it
+# reaches kernel_state. (Defensive hygiene on the shared file — not an ai_safe-authority DoS guard: the
+# writer is options.manage-gated and no longer an AI tool.)
 _MAX_VALUE_BYTES = 65536
 
 
@@ -40,15 +39,6 @@ def _guard_value_size(value: object) -> None:
     bytes rather than six ASCII escapes."""
     if len(json.dumps(value, ensure_ascii=False).encode("utf-8")) > _MAX_VALUE_BYTES:
         raise HTTPException(status_code=413, detail="value too large")
-
-
-def _guard_reserved(key: str) -> None:
-    """Installer-owned keys (git allowlist / credentials) share the `app_settings` blob but MUST NOT be
-    readable or writable through this generic KV — that is a privilege side-channel around `plugins.manage`
-    (K4). Treat them as absent (404, generic) so this route never becomes a way to read credentials or
-    widen the install allowlist."""
-    if key in RESERVED_SETTINGS_KEYS:
-        raise HTTPException(status_code=404, detail="Not found")
 
 
 # --- shared (app-scoped) config over the app_settings state file ------------------------------------
@@ -80,8 +70,9 @@ async def get_nav(_: UserLike = Depends(get_current_user)) -> NavConfigOut:
 @router.put("/nav", response_model=NavConfigOut)
 async def put_nav(
     body: NavConfigIn,
-    # ai_safe: replaces the shared sidebar arrangement — a settings write, never program/server mutation.
-    user: UserLike = Depends(require_perm("options.manage", ai_safe=True)),
+    # Human-admin write of the shared sidebar arrangement. NOT ai_safe (G1): an AI must never
+    # blind-overwrite the shared nav — see docs/architecture/security.md.
+    user: UserLike = Depends(require_perm("options.manage")),
 ) -> NavConfigOut:
     """Replace the shared sidebar arrangement (admin only). The frontend owns the value's shape."""
     _guard_value_size(body.value)
@@ -117,31 +108,3 @@ async def set_my_setting(
     store[uid] = values
     kernel_state.write_json(_USERS, store)
     return UserSettingsOut(values=values)
-
-
-# --- generic global config blobs (Tools/system settings — same for everyone, the global tier) ---
-
-
-@router.get("/global/{key}", response_model=GlobalConfigOut)
-async def get_global(key: str, _: UserLike = Depends(get_current_user)) -> GlobalConfigOut:
-    """A shared config blob by key (or null). Any authenticated user can read it — except installer-owned
-    reserved keys (K4), which 404."""
-    _guard_reserved(key)
-    entry = _app_get(key)
-    return GlobalConfigOut(value=entry.get("value") if entry else None)
-
-
-@router.put("/global/{key}", response_model=GlobalConfigOut)
-async def put_global(
-    key: str,
-    body: SettingValueIn,
-    # ai_safe: a settings write, never program/server mutation — but see the size cap, folded in because
-    # this authority is exactly what an ai_safe-marked route must not turn into a DoS vector.
-    user: UserLike = Depends(require_perm("options.manage", ai_safe=True)),
-) -> GlobalConfigOut:
-    """Set a shared config blob (requires options.manage). Seen by every user/device. Installer-owned
-    reserved keys (K4) 404 — they are managed only through the `plugins.manage`-gated installer routes."""
-    _guard_reserved(key)
-    _guard_value_size(body.value)
-    entry = _app_upsert(key, body.value)
-    return GlobalConfigOut(value=entry["value"])
