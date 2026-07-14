@@ -3,7 +3,7 @@ rem ===========================================================
 rem  PiKaOs Desktop — DEV launcher (HOT RELOAD)
 rem
 rem  Runs the desktop shell against a LIVE Frontend Vite dev server, so
-rem  editing Frontend\src\** updates the running window instantly — no rebuild.
+rem  editing Desktop\Frontend\src\** updates the running window instantly — no rebuild.
 rem
 rem  Vite runs ON THE HOST, not in Docker. There is no `frontend` service any more:
 rem  PiKaOs is a desktop app, its renderer is loaded by Electron (over
@@ -26,7 +26,7 @@ rem    docker compose -f deploy\docker-compose.dev.yml logs backend
 rem  paste it into the FirstRun screen, then open mode holds across restarts.
 rem
 rem  Closing Electron also closes the Vite window. Stop the backend with stop.bat.
-rem  For a packaged/prod-path run (app://pikaos, no HMR) build Frontend\dist first
+rem  For a packaged/prod-path run (app://pikaos, no HMR) build Desktop\Frontend\dist first
 rem  and launch Electron with VITE_DEV_SERVER_URL unset.
 rem ===========================================================
 setlocal EnableExtensions

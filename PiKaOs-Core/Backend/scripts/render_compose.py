@@ -17,9 +17,10 @@ hard requirement for this whole project).
     python scripts/render_compose.py            # → writes ../deploy/docker-compose.generated.yml
     python scripts/render_compose.py --prod     # → writes ../deploy/docker-compose.generated.prod.yml
 
---prod swaps the kernel base for docker-compose.prod.yml (immutable image, multi-worker uvicorn, nginx
-frontend, loopback ports) and writes a separate generated file. Tool-fragment discovery + the
-`docker compose config` merge are identical to dev — only the base and output path change.
+--prod swaps the kernel base for docker-compose.prod.yml (immutable image, multi-worker uvicorn,
+loopback ports; backend + tool plugins only — PiKaOs is desktop-first, no web/nginx frontend service)
+and writes a separate generated file. Tool-fragment discovery + the `docker compose config` merge are
+identical to dev — only the base and output path change.
 """
 from __future__ import annotations
 
