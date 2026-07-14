@@ -68,6 +68,12 @@ class Settings(BaseSettings):
     login_throttle_ip_max: int = 20
     login_throttle_window_seconds: int = 60 * 15  # 15 minutes
 
+    # Password policy applied on create/change (auth plugin's validate_password_strength), NEVER on login
+    # or system seeding. NIST SP 800-63B Rev 4: a real minimum length + a common/compromised blocklist,
+    # and SHALL NOT impose composition rules. Rev 4 asks 15 for single-factor passwords / 8 as an MFA
+    # factor; 12 is the shipped floor (raise it here once a real create/change UI + MFA land).
+    password_min_length: int = 12
+
     # --- network exposure (G2, roadmap-v3 T1) ---
     # Interface uvicorn binds (docker-entrypoint.sh reads BIND_HOST). Loopback by default so a
     # bare/direct run or the desktop-embedded backend is never reachable from the LAN out of the box.
