@@ -5,9 +5,11 @@
 
    A plugin module default-exports a descriptor:
      { id, routes: [ { id, meta:{icon,title,en}, render(ctx) } ], nav: [ { group, items:[{id,icon,perm?}] } ],
-       profile?: (ctx) => JSX }
+       profile?: (ctx) => JSX, bootstrapScreens?: { [stage]: (ctx) => JSX } }
    `render(ctx)` receives the Core seams it asked for (t · can · language · …); the plugin owns the wiring
-   so Core never needs to know each screen's prop shape.
+   so Core never needs to know each screen's prop shape. `bootstrapScreens` is the same idea one step
+   earlier — a screen for the pre-login/pre-app install window (App.jsx's shell-mode stages), keyed by
+   stage id (e.g. 'db-choice', R2's first user).
 
    DISCOVERY (P1): plugins are found by globbing `./<id>/index.jsx` — Core does not name them. Drop a
    folder in (or symlink one from PiKaOs-App/plugins/, P2) and it ships; delete it and a Base-only build
@@ -45,6 +47,24 @@ for (const p of PLUGINS) for (const r of p.routes || []) _routes[r.id] = r;
 export function renderPluginRoute(routeId, ctx) {
   const r = _routes[routeId];
   return r ? r.render(ctx) : null;
+}
+
+/* `bootstrapScreens` is the same seam as `routes`, one step earlier: it lets a plugin own a screen
+   shown DURING the pre-login/pre-app install window (App.jsx's `resolveShellMode()` stages — e.g.
+   'db-choice'), not just the signed-in app's routes. Generic on purpose: any plugin may claim any
+   stage id; Core never hardcodes which plugin or which stage (postgres/db-choice is just the first
+   user, R2). First plugin (discovery order) whose map has the stage wins, same "first claim wins"
+   rule renderPluginProfile below already uses. */
+const _bootstrap = {};
+for (const p of PLUGINS) for (const [stage, render] of Object.entries(p.bootstrapScreens || {})) {
+  if (!(stage in _bootstrap)) _bootstrap[stage] = render;
+}
+
+/** Render an enabled plugin's bootstrap-window screen, or null when no plugin owns that stage
+ *  (Core falls back to its own default shell for that stage). */
+export function renderPluginBootstrap(stage, ctx) {
+  const render = _bootstrap[stage];
+  return render ? render(ctx) : null;
 }
 
 /** Topbar metadata ({icon,title,en}) for every plugin route — merged into Core's ROUTE_META. */
