@@ -18,11 +18,18 @@
 # its own "id". Standalone plugin-APPS (Compare/RedirectMap — capitalized Backend/, own compose) and
 # frontend-only plugins with no backend manifest (World) simply have no backend id and are skipped.
 #
-# Windows: symlinks need admin/developer-mode, so we try `ln -s` and fall back to a plain copy (the
-# Windows ln->copy fallback noted in the RBAC-frontend migration). A copy means edits in the plugin
-# repo do NOT reflect live — re-run this script after changing linked plugin code (or mount the repo
-# as a volume for hot-reload, the way the dev compose mounts the mock plugin).
+# Why COPY, not symlink: the Docker dev flow mounts `../Backend:/app` into the backend container, so
+# `app/plugins/<id>` must be REAL files that resolve inside the container. An absolute host symlink
+# (`/c/Users/.../backend`) is meaningless in the container, and a relative symlink only works if the
+# plugin repo is ALSO mounted at the resolvable path (the special-case dance the dev compose does for
+# the mock plugin). A plain copy resolves everywhere — host tooling (render_requirements/render_compose,
+# host pytest) AND the container — at the cost of no hot-reload: re-run this script after editing linked
+# plugin code (or, for one plugin you're actively editing, mount its repo as a volume like the mock).
+# `--link` opts into symlinks for a pure host-tooling run where no container mount is involved.
 set -euo pipefail
+
+USE_SYMLINK=0
+if [ "${1:-}" = "--link" ]; then USE_SYMLINK=1; shift; fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"     # PiKaOs-Core/
 PROJECTS="$(cd "$ROOT/.." && pwd)"                       # PiKaOs-Projects/ (holds the plugin repos)
@@ -46,15 +53,15 @@ else
   WANT=("${!REPO_FOR_ID[@]}")
 fi
 
-# --- link one path: prefer a symlink, fall back to a copy (Windows) ----------------------------------
+# --- link one path: COPY by default (resolves in-container); symlink only with --link ----------------
 link_one() {
   local src="$1" dst="$2"
   rm -rf "$dst"                                          # idempotent: drop any stale link/copy first
-  if ln -s "$src" "$dst" 2>/dev/null; then
+  if [ "$USE_SYMLINK" = "1" ] && ln -s "$src" "$dst" 2>/dev/null; then
     echo "    linked  $dst -> $src"
   else
     cp -r "$src" "$dst"
-    echo "    copied  $dst  (symlink unavailable — re-run after editing plugin code)"
+    echo "    copied  $dst  (re-run after editing plugin code — copies don't hot-reload)"
   fi
 }
 
