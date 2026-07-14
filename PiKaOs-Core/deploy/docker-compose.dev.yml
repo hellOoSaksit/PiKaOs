@@ -33,6 +33,11 @@ services:
       # dev/test stacks keep the seeded demo users (the live auth tests log in as them); a real
       # install never sets this — its first account comes from the first-admin bootstrap window.
       SEED_DEV_USERS: "1"
+      # dev's Postgres comes from DATABASE_URL (the `db` sidecar), not the install-time db-choice
+      # wizard — this tells the postgres plugin to mark itself configured-via-env at boot so
+      # `needsDbConfig` is false and the dev/CI stack boots straight through. A real install never
+      # sets this — the wizard runs and persists an encrypted DSN instead.
+      DB_CONFIG_SOURCE: "env"
     volumes:
       - ../Backend:/app          # hot-reload: code edits on the host reflect in the container
       - kernelstate:/app/state   # kernel local-JSON state (plugin registry + nav + user prefs)
