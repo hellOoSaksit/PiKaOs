@@ -22,7 +22,6 @@ services:
     restart: unless-stopped
     env_file:
       - ../Backend/.env
-      - ../.env.ai
     ports:
       - "8000:8000"
     environment:

@@ -75,12 +75,9 @@ echo "      Docker engine OK."
 echo
 
 # ---- env preflight (point at setup.sh instead of failing cryptically) ----
-missing=0
-for f in Backend/.env .env.ai Frontend/.env; do
-  [[ -f "$f" ]] || { yellow "      Missing env file: $f"; missing=1; }
-done
-if [[ "$missing" == "1" ]]; then
-  yellow "      Run ./setup.sh first to create the env files from the templates."
+if [[ ! -f "Backend/.env" ]]; then
+  yellow "      Missing env file: Backend/.env"
+  yellow "      Run ./setup.sh first to create it from the template."
   exit 1
 fi
 

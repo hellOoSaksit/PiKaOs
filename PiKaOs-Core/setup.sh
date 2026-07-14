@@ -8,11 +8,9 @@
 #         - enable + start docker.service (systemd)
 #         - add the current user to the `docker` group
 #           (⚠ needs a re-login / `newgrp docker` to take effect)
-#    2) copy the env templates into the real (gitignored) env files
-#       IF they don't exist yet — never overwrites your edits:
+#    2) copy the env template into the real (gitignored) env file
+#       IF it doesn't exist yet — never overwrites your edits:
 #         Backend/.env.example   -> Backend/.env
-#         .env.ai.example        -> .env.ai
-#         Frontend/.env.example  -> Frontend/.env
 #    3) print what to do next (./start.sh)
 #
 #  Safe to re-run. After it finishes the first time, log out/in
@@ -73,8 +71,6 @@ copy_env() {
   fi
 }
 copy_env "Backend/.env.example"  "Backend/.env"
-copy_env ".env.ai.example"       ".env.ai"
-copy_env "Frontend/.env.example" "Frontend/.env"
 
 # ---- 3. next steps ---------------------------------------------
 echo "[3/3] Done."

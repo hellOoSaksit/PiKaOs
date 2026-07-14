@@ -83,13 +83,8 @@ echo.
 pushd "%ROOT%"
 
 rem ---- env preflight (point at setup instructions instead of failing cryptically) ----
-set "MISSING="
-if not exist "Backend\.env" set "MISSING=1"
-if not exist ".env.ai" set "MISSING=1"
-if not exist "Frontend\.env" set "MISSING=1"
-if defined MISSING (
-  echo       Missing an env file - copy Backend\.env.example / .env.ai.example / Frontend\.env.example
-  echo       to their real names first.
+if not exist "Backend\.env" (
+  echo       Backend\.env missing - copy Backend\.env.example to Backend\.env first ^(see README^).
   popd
   pause
   exit /b 1

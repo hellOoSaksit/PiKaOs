@@ -9,7 +9,7 @@
 #   - ports bound to 127.0.0.1 — a TLS edge (nginx/ALB) terminates HTTPS in front; never 0.0.0.0
 #   - no dev mock-plugin mount
 #
-# ENV MODEL (single-network): every service reads ../Backend/.env (+ ../.env.ai), same paths as dev —
+# ENV MODEL (single-network): every service reads ../Backend/.env, same path as dev —
 # but on a PROD host those files hold PRODUCTION values (ENVIRONMENT=production, strong JWT_SECRET /
 # SECRET_KEY, COOKIE_SECURE=true, non-default SEED_PASSWORD / MINIO / REDIS creds, WEB_CONCURRENCY).
 # The backend refuses to boot (config.production_violations) unless they are strong. Populate them on
@@ -21,7 +21,6 @@ services:
     restart: unless-stopped
     env_file:
       - ../Backend/.env
-      - ../.env.ai
     # UVICORN_RELOAD deliberately absent → multi-worker uvicorn (docker-entrypoint.sh).
     environment:
       # The container binds all interfaces; host exposure is the loopback ports: map below (TLS edge in
