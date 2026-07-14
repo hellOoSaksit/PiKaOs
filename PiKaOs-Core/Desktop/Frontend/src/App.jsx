@@ -3,7 +3,7 @@ import React from 'react';
 const { useState, useEffect, useRef } = React;
 import { NAV } from './data/data.jsx';
 import { loadNav, saveNav, mergeWithDefault } from './data/data-nav.jsx';
-import { getNavConfig, setNavConfig, getMySettings, setMySetting, setupStatus, setToken, getCapabilities } from './lib/api.js';
+import { getNavConfig, setNavConfig, getMySettings, setMySetting, setupStatus, dbStatus, setToken, getCapabilities } from './lib/api.js';
 import { resolveShellMode } from './lib/shell-mode.js';
 import { useShellNav } from './lib/shell-nav.js';
 import { Settings } from './screens/screens-extra.jsx';
@@ -20,7 +20,7 @@ import { Icon, renderIcon } from './components/ui/icons.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
 import { UILoadingHost, UIModalHost } from './lib/ui-modal.jsx';
 import { makeT, DEFAULT_LANG, DEFAULT_STYLE, packById, defaultPack, defaultPackForLang, LEX_PACKS } from './lib/i18n.jsx';
-import { renderPluginRoute, renderPluginProfile, PLUGIN_ROUTE_META } from './plugins/index.jsx';
+import { renderPluginRoute, renderPluginProfile, renderPluginBootstrap, PLUGIN_ROUTE_META } from './plugins/index.jsx';
 
 // ชุดเริ่มต้นตอนเปิดแอป = master ของ i18n (English + Formal — มาจาก flag isDefault* ในไฟล์ ไม่ hardcode)
 const I18N_DEFAULT_PACK = (LEX_PACKS.find(p => p.lang === DEFAULT_LANG && p.styleKey === DEFAULT_STYLE) || defaultPack() || {}).id || "english_pro";
@@ -184,7 +184,13 @@ function App() {
   // onVerified stores a fresh token, so a page load with a still-valid token skips straight past it.
   const [bootstrap, setBootstrap] = useState(null);
   const refreshBootstrap = React.useCallback(() => {
-    setupStatus().then(setBootstrap).catch(() => setBootstrap({ needsSetup: false, bootstrapAuthorized: false }));
+    // needsDbConfig is no longer part of the kernel's own /setup/status (R1 moved DB-choice — and its
+    // sqlalchemy — into the postgres plugin's zero-core split); it comes from that plugin's own
+    // /api/postgres/db-status now, fetched alongside and merged in. A 404 (plugin not installed) or a
+    // network failure tolerates to `needsDbConfig: false` — Step 1 simply doesn't block in that case.
+    const status = setupStatus().catch(() => ({ needsSetup: false, bootstrapAuthorized: false }));
+    const db = dbStatus().catch(() => ({ needsDbConfig: false }));
+    Promise.all([status, db]).then(([s, d]) => setBootstrap({ ...s, needsDbConfig: d.needsDbConfig }));
   }, []);
   useEffect(() => { refreshBootstrap(); }, [refreshBootstrap]);
 
@@ -344,6 +350,10 @@ function App() {
 
   const shell = resolveShellMode({ ready: auth.ready, caps, bootstrap, loggedIn: auth.loggedIn });
   if (shell === 'loading') return withChrome(null);   // avoid flashing the setup screen while restoring
+  // 'db-choice' is owned by whichever installed plugin claims that bootstrap stage (postgres, R2) —
+  // Core has no DB-choice screen of its own anymore; a kernel with no such plugin enabled falls back
+  // to the kernel-only shell rather than getting stuck on a screen nothing renders.
+  if (shell === 'db-choice') return withChrome(renderPluginBootstrap('db-choice', { t, language, onLang: pickLanguage }) || <KernelOnlyShell language={language} />);
   if (shell === 'kernel-shell') return withChrome(<KernelOnlyShell language={language} />);
   if (shell === 'first-admin') {
     return withChrome(<FirstAdmin t={t} language={language} onLang={pickLanguage}

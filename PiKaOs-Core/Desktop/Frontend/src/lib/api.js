@@ -163,6 +163,18 @@ export async function bootstrapAdmin({ setupCode, username, password, confirmPas
     body: { setupCode, username, password, confirmPassword } });
 }
 
+// --- DB-choice (Step 1 of install, gated on the bootstrap Bearer verify-code already handed back —
+// setToken() stored it, so `auth: true` (default) picks it up the same way setupStatus() does).
+// Routes are owned by the postgres plugin (R1: zero-core, no sqlalchemy in the kernel), not the
+// kernel's own /setup/*; the client stays here since other plugin API clients (knowledge, below)
+// follow the same precedent — Core's api.js is the one fetch transport every screen shares. ---
+export async function dbTest(payload) { return raw("/postgres/db-test", { method: "POST", body: payload }); }
+export async function dbConfig(payload) { return raw("/postgres/db-config", { method: "POST", body: payload }); }  // { ok, restart_required }
+// Whether Step 1 (DB choice) still needs completing — App.jsx merges this into its `bootstrap` state
+// alongside /setup/status (resolveShellMode() reads bootstrap.needsDbConfig). Tolerate a 404 (plugin
+// not installed/enabled) or network failure by resolving `needsDbConfig: false` — the caller catches.
+export async function dbStatus() { return raw("/postgres/db-status"); }   // { needsDbConfig }
+
 // --- app version / build hash (AppBoot's mascot-cache check; also the seam release-and-
 // rollback.md §4's SPA version-skew policy is meant to use) ---
 export async function getVersion() { return raw("/version", { auth: false }); }   // { version, build, name }

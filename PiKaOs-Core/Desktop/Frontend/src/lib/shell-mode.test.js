@@ -35,3 +35,16 @@ it('first-admin window never overrides a live session', () => {
   expect(resolveShellMode({ ready: true, caps: { authMode: 'login' },
     bootstrap: { needsFirstAdmin: true }, loggedIn: true })).toBe('full');
 });
+
+it('authorized operator with no DB configured → db-choice (before the app)', () => {
+  expect(resolveShellMode({ ready: true, caps: { authMode: 'open' }, loggedIn: false,
+    bootstrap: { needsDbConfig: true, bootstrapAuthorized: true } })).toBe('db-choice');
+});
+it('db-choice takes precedence over open/full so the DB is set before use', () => {
+  expect(resolveShellMode({ ready: true, caps: { authMode: 'open' }, loggedIn: true,
+    bootstrap: { needsDbConfig: true } })).toBe('db-choice');
+});
+it('once a DB is configured, open mode renders full again', () => {
+  expect(resolveShellMode({ ready: true, caps: { authMode: 'open' }, loggedIn: false,
+    bootstrap: { needsDbConfig: false, bootstrapAuthorized: true } })).toBe('full');
+});

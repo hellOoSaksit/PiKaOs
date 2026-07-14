@@ -21,10 +21,19 @@ import pytest
 from fastapi import APIRouter
 
 from app import modules, plugin_loader
+from app.core import kernel_state
 
 SAMPLE_CONTRACT = "sample.Thing"
 TOOL_CONTRACT = "sampletool.Connection"
 SAMPLE_ROUTE = "/api/sample/ping"
+
+
+@pytest.fixture
+def tmp_state(tmp_path, monkeypatch):
+    """Point `kernel_state` at a fresh temp dir for one test — the same isolation pattern
+    `test_git_installer.py`'s autouse `_isolate_kernel_state` uses, shared here so any
+    kernel-state-touching test can just ask for `tmp_state`."""
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
 
 
 def seed_manifest(mf) -> None:

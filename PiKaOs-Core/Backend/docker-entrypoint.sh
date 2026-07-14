@@ -13,6 +13,16 @@ if RESOLVED="$(python -m scripts.compute_enabled)"; then
   export ENABLED_MODULES="${RESOLVED}"
 fi
 
+# Dev/deploy-baked DB marker: when DB_CONFIG_SOURCE=env, tell the postgres plugin its DSN comes from
+# env (DATABASE_URL) rather than the install-time db-choice wizard, so `needsDbConfig` is false and
+# dev/CI stacks boot straight through (see PiKaOs-Plugin-Tools-Postgres/backend/db_config.py mark_env).
+# Guarded two ways: the env var must be set (prod leaves it unset → the wizard runs), and the postgres
+# plugin must actually be linked in — `find_spec` returns None (falsy) when it isn't, so this is a
+# silent no-op rather than an ImportError; `|| true` additionally never fails the boot either way.
+if [ "${DB_CONFIG_SOURCE:-}" = "env" ]; then
+  python -c "import importlib.util as u; (u.find_spec('app.plugins.postgres') and __import__('app.plugins.postgres.db_config', fromlist=['mark_env']).mark_env())" || true
+fi
+
 # Bootstrap gate: print this boot's console-only setup code (once, before any uvicorn worker spawns —
 # see scripts/generate_setup_code.py for why it can't just happen at app import time). No-ops once
 # `auth` is enabled.
