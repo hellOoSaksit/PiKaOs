@@ -60,3 +60,6 @@ desktop.ini
 
 # Local git worktrees (subagent-driven-development isolation)
 .worktrees/
+
+# transient UAT/verify screenshots at the repo root — never history
+/*.png
