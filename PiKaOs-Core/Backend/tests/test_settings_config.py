@@ -42,13 +42,6 @@ def test_reserved_keys_cannot_be_written_via_generic_settings(client, key):
     assert kernel_state.read_json("app_settings", {}).get(key) is None
 
 
-def test_db_config_is_reserved_from_generic_settings_api(client):
-    # generic settings PUT/GET must 404 on db_config (like mcp_allowlist / credentials)
-    put = client.put("/api/settings/global/db_config", json={"value": {"dsn": "x"}}, headers=_AUTH)
-    assert put.status_code == 404
-    assert client.get("/api/settings/global/db_config", headers=_AUTH).status_code == 404
-
-
 def test_a_normal_global_key_still_round_trips(client):
     put = client.put("/api/settings/global/theme", json={"value": {"mode": "dark"}}, headers=_AUTH)
     assert put.status_code == 200

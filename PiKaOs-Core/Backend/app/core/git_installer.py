@@ -29,10 +29,9 @@ _CREDENTIALS_KEY = "plugin_git_credentials"         # {value: {host: encrypted_t
 # RCE allowlist or overwrite credentials via PUT, and any authenticated user could read the (encrypted)
 # credential blob via GET. `mcp_allowlist` joins them for the same reason — widening what an external AI may
 # invoke is `plugins.manage` authority too. (Spelled literally rather than imported from `mcp_catalog`, which
-# would cycle; test_mcp_catalog.py asserts the two agree.) `db_config` joins them too — it's the operator's
-# encrypted system-DB DSN (db_config.py), the same class of installer-owned secret. settings_config.py
-# imports this to build its reserved-key denylist.
-RESERVED_SETTINGS_KEYS: frozenset[str] = frozenset({_ALLOWLIST_KEY, _CREDENTIALS_KEY, "mcp_allowlist", "db_config"})
+# would cycle; test_mcp_catalog.py asserts the two agree.) settings_config.py imports this to build its
+# reserved-key denylist.
+RESERVED_SETTINGS_KEYS: frozenset[str] = frozenset({_ALLOWLIST_KEY, _CREDENTIALS_KEY, "mcp_allowlist"})
 _STDERR_LOG_LIMIT = 2000                            # cap so one runaway git error can't flood the log
 
 

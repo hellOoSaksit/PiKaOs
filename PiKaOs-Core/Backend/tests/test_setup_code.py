@@ -162,7 +162,6 @@ def test_status_reports_needs_setup_true_when_code_present(tmp_state, client):
 def test_status_reports_needs_setup_false_when_no_code(tmp_state, client):
     assert client.get("/api/setup/status").json() == {
         "needsSetup": False, "bootstrapAuthorized": False, "needsFirstAdmin": False,
-        "needsDbConfig": False,
     }
 
 
