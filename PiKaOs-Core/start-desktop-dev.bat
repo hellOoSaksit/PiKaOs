@@ -56,7 +56,7 @@ if errorlevel 1 (
     "%DOCKER%" info >nul 2>&1 && goto dockerup
     timeout /t 2 >nul
   )
-  echo       Docker still not up - try fix-docker.bat, then re-run this.
+  echo       Docker still not up - see README.md Troubleshooting, then re-run this.
   pause & exit /b 1
 )
 :dockerup
