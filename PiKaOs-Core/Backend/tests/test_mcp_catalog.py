@@ -15,7 +15,6 @@ import pytest
 from fastapi import APIRouter, Depends, FastAPI
 
 from app.core import kernel_state, mcp_catalog
-from app.core.git_installer import RESERVED_SETTINGS_KEYS
 from app.core.identity import require_perm
 from app.core.mcp_catalog import (
     EFFECT_IDEMPOTENT_WRITE,
@@ -156,12 +155,6 @@ def test_a_directly_decorated_app_route_is_reflected_too():
 
 
 # --- the operator allowlist: layer 1 of the two-layer filter ----------------------------------------
-
-
-def test_the_allowlist_is_a_reserved_settings_key():
-    """Widening what an external AI may invoke is plugins.manage authority. If the generic settings
-    KV could write it, options.manage would escalate to it (git_installer.py K4)."""
-    assert mcp_catalog.ALLOWLIST_KEY in RESERVED_SETTINGS_KEYS
 
 
 def test_missing_allowlist_exposes_nothing(state_dir):

@@ -22,13 +22,14 @@ from .crypto import decrypt, encrypt
 log = logging.getLogger("pikaos.plugins.git_installer")
 
 _APP = "app_settings"                              # same kernel-local blob settings_config.py uses
+# Installer-owned keys in the shared `app_settings` blob. K4 (2026-07-06) additionally reserved them
+# out of the generic `/api/settings/global/{key}` KV so an `options.manage` caller could not read the
+# credentials or widen the host allowlist. G1 (2026-07-14) removed that KV tier outright, so the reserve
+# list it fed went with it: no route takes a caller-supplied `app_settings` key any more — the settings
+# API's only writer (`put_nav`) hardcodes "nav", and these two keys are written here, behind the
+# plugins.manage-gated installer routes.
 _ALLOWLIST_KEY = "plugin_install_allowed_hosts"     # {value: [host, ...]}
 _CREDENTIALS_KEY = "plugin_git_credentials"         # {value: {host: encrypted_token}}
-# Installer-owned keys that live in the shared `app_settings` blob (git allowlist / credentials). The
-# generic `/api/settings/global/{key}` KV that could once read/widen them was removed (G1, 2026-07-14),
-# so no generic settings API can reach these keys — they are managed only through the plugins.manage-gated
-# installer routes. Kept as the single source of truth for which keys the installer owns.
-RESERVED_SETTINGS_KEYS: frozenset[str] = frozenset({_ALLOWLIST_KEY, _CREDENTIALS_KEY, "mcp_allowlist"})
 _STDERR_LOG_LIMIT = 2000                            # cap so one runaway git error can't flood the log
 
 
