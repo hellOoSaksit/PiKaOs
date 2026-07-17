@@ -61,10 +61,11 @@ _SELF_PREFIX = "/api/mcp"
 
 _EFFECTS = frozenset(EFFECT_BY_METHOD.values())
 
-# The operator's explicit opt-in list, in kernel local-JSON (the kernel keeps no tables of its own).
-# `{tool_name: {"effect": <override>}}` — presence is the grant; the value only tunes it.
-# RESERVED in git_installer.RESERVED_SETTINGS_KEYS: widening what an external AI may invoke is
-# `plugins.manage` authority, so the generic settings KV must never reach it (K4).
+# The operator's explicit opt-in list, in its own kernel local-JSON file (the kernel keeps no tables of
+# its own). `{tool_name: {"effect": <override>}}` — presence is the grant; the value only tunes it.
+# Widening what an external AI may invoke is `plugins.manage` authority, never `options.manage`: the only
+# writer is `write_allowlist`, behind the plugins.manage-gated /api/mcp/allowlist route. Living in its own
+# file (never the shared `app_settings` blob) is what keeps the settings API structurally unable to name it.
 ALLOWLIST_KEY = "mcp_allowlist"
 
 

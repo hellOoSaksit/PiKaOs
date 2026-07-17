@@ -25,10 +25,6 @@ class UserSettingsOut(BaseModel):
     values: dict   # {key: value} of the current user's settings
 
 
-class GlobalConfigOut(BaseModel):
-    value: Any = None   # a shared (global) config blob — shape owned by the frontend
-
-
 class PluginHealth(BaseModel):
     """One plugin's state for /health (plugin-architecture.md §14). `version` comes from the plugin's
     manifest (never hardcoded — ties to versions.md); `state` is active · degraded · disabled."""
