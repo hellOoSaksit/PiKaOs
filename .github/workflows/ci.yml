@@ -1,7 +1,8 @@
 # CI — makes the pre-ship checks machine-enforced, not human memory (A6).
 # Monorepo: the app lives under PiKaOs-Core/, so every path is prefixed with it. GitHub Actions only
 # reads workflows from the repo-root .github/, which is why this lives here (not PiKaOs-Core/.github/).
-# Frontend: lint (react-hooks) + build + component-first guard. Architecture: static plugin gates.
+# Frontend: lint (react-hooks) + build + component-first guard. Desktop: tsc + vitest (Electron main).
+# Architecture: static plugin gates.
 # Backend: pytest on the real stack (tests hit the live server, so we spin docker compose).
 name: CI
 
@@ -41,6 +42,27 @@ jobs:
             echo "::error::raw <select> found — use ui/Dropdown.jsx (CLAUDE.md §1.1)"
             exit 1
           fi
+
+  # The Electron main process. Its suite mocks `electron` itself, so this needs no display and no
+  # running app — just node. Until this job existed the Desktop gates ran only on the dev machine,
+  # which is how "green locally, broken on main" gets in (roadmap-v3 T0).
+  desktop:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: PiKaOs-Core/Desktop
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: PiKaOs-Core/Desktop/package-lock.json
+      - run: npm ci
+      - name: Typecheck (tsc --noEmit, strict)
+        run: npx tsc --noEmit
+      - name: Test (vitest)
+        run: npm test
 
   # Static architecture gates (plugin-architecture.md §15) — no DB/stack needed, so this is fast.
   # grimp/import-linter parse source (they don't import modules); the manifest check is pure jsonschema.
