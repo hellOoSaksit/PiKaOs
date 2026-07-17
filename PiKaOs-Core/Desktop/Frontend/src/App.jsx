@@ -3,7 +3,7 @@ import React from 'react';
 const { useState, useEffect, useRef } = React;
 import { NAV } from './data/data.jsx';
 import { loadNav, saveNav, mergeWithDefault } from './data/data-nav.jsx';
-import { getNavConfig, setNavConfig, getMySettings, setMySetting, setupStatus, dbStatus, setToken, getCapabilities } from './lib/api.js';
+import { getNavConfig, setNavConfig, getMySettings, setMySetting, setupStatus, dbStatus, setToken, getCapabilities, raw } from './lib/api.js';
 import { resolveShellMode } from './lib/shell-mode.js';
 import { useShellNav } from './lib/shell-nav.js';
 import { Settings } from './screens/screens-extra.jsx';
@@ -386,7 +386,7 @@ function App() {
       case "settings": return <Settings theme={theme} setTheme={setTheme} lex={lex} setLex={setLex} pickLanguage={pickLanguage} language={language} formal={formal} t={t} />;
       default: {
         // a route owned by an enabled plugin (Phase 6 seam) — else fall back to kernel Home.
-        const pluginEl = renderPluginRoute(route, { t, can, language, go, me });
+        const pluginEl = renderPluginRoute(route, { t, can, language, go, me, api: { raw } });
         return pluginEl || <KernelHome Sys={Sys} caps={caps} go={go} />;
       }
     }
