@@ -290,13 +290,23 @@ function App() {
   // bell feed (audit-notifications v2): fetch on sign-in, mark-read on open. The rows arrive
   // i18n-clean ({key, params}); toDisplayNotification() localizes them via the active `t` so the
   // language packs stay the single source of copy.
-  const [notifs, setNotifs] = useState([]);
-  const loadNotifs = React.useCallback(() => {
-    listNotifications()
-      .then((rows) => setNotifs((Array.isArray(rows) ? rows : []).map((n) => toDisplayNotification(n, t))))
-      .catch(() => {});   // the bell is best-effort UI — never block the shell on it
-  }, [t]);
+  //
+  // Rows are stored RAW and localized at render — `t` must never enter the fetch path. `makeT` builds
+  // a new function every render, so a `t` dep re-runs the effect on every render, and each fetch's
+  // `.map()` yields a fresh array that React can't bail out of → re-render → an unbounded request
+  // loop for as long as the session lasts. Localizing at render also re-labels the feed on a language
+  // switch without refetching.
+  const [notifRows, setNotifRows] = useState([]);
+  const loadNotifs = React.useCallback(
+    () => listNotifications()
+      .then((rows) => setNotifRows(Array.isArray(rows) ? rows : []))
+      .catch(() => {}),   // the bell is best-effort UI — never block the shell on it
+    [],
+  );
   useEffect(() => { if (signedIn) loadNotifs(); }, [signedIn, loadNotifs]);
+  const notifs = React.useMemo(
+    () => notifRows.map((n) => toDisplayNotification(n, t)), [notifRows, t],
+  );
 
   const go = (r) => {
     // closing every open overlay/popup when navigating away
@@ -419,7 +429,8 @@ function App() {
         t={t} route={route} onHome={() => go("home")} onToggleNav={toggleNav}
         profile={renderPluginProfile({ t, me, onSignOut: auth.logout })}
         notifications={notifs}
-        onNotificationsOpened={() => { markNotificationsRead().catch(() => {}); loadNotifs(); }}
+        // sequenced: an unsequenced reload races the mark and usually re-reads the pre-mark rows
+        onNotificationsOpened={() => { markNotificationsRead().catch(() => {}).finally(loadNotifs); }}
         chatThreads={[]}
       />
       <UIModalHost />
