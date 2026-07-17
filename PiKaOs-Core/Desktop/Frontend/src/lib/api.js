@@ -257,3 +257,7 @@ export async function purgePlugin(id) { return raw(`/plugins/${id}/purge`, { met
 export async function setGitCredential(host, token) {
   return raw(`/plugins/git-credentials/${host}`, { method: "PUT", body: { token } });
 }
+
+// The plugin-ctx seam (audit-notifications v2): plugins can't import this module directly
+// (isolation), so App.jsx hands them { raw } through renderPluginRoute's ctx.
+export { raw };
