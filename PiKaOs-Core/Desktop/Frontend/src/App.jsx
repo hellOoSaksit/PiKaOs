@@ -21,7 +21,7 @@ import { ToastProvider } from './components/ui/Toast.jsx';
 import { UILoadingHost, UIModalHost } from './lib/ui-modal.jsx';
 import { makeT, DEFAULT_LANG, DEFAULT_STYLE, packById, defaultPack, defaultPackForLang, LEX_PACKS } from './lib/i18n.jsx';
 import { renderPluginRoute, renderPluginProfile, renderPluginBootstrap, PLUGIN_ROUTE_META, PLUGIN_ROUTE_OWNERS } from './plugins/index.jsx';
-import { activePluginIds, filterPluginNav } from './lib/plugin-gate.js';
+import { authoritativePluginIds, filterPluginNav } from './lib/plugin-gate.js';
 
 // ชุดเริ่มต้นตอนเปิดแอป = master ของ i18n (English + Formal — มาจาก flag isDefault* ในไฟล์ ไม่ hardcode)
 const I18N_DEFAULT_PACK = (LEX_PACKS.find(p => p.lang === DEFAULT_LANG && p.styleKey === DEFAULT_STYLE) || defaultPack() || {}).id || "english_pro";
@@ -198,17 +198,28 @@ function App() {
   // C1 capability handshake (spec §2): the server declares authMode. 404/network (legacy or dead
   // server) resolves as login mode so the pre-handshake flow is byte-identical (spec §2 fallback).
   const [caps, setCaps] = useState(null);
-  useEffect(() => {
-    // re-runs on sign-in/out: production's recon discipline hides the plugin list from
-    // unauthenticated login-mode callers, so the post-login fetch is what reveals it (Fix-SEC-10).
-    getCapabilities().then(setCaps).catch(() => setCaps({ v: 0, authMode: 'login' }));
-  }, [auth.loggedIn]);
+  // Every handshake goes through here so that only the LATEST one may write: the effect below
+  // re-fires when a restored session flips `loggedIn`, and the token turns an anonymous (possibly
+  // redacted) answer into the real one. Unguarded, a slow anonymous response could land last and
+  // win. Same shape as useAuth's restore guard (lib/auth.jsx), by sequence since three call sites
+  // share it.
+  const capsSeq = useRef(0);
+  const refreshCaps = React.useCallback(() => {
+    const seq = ++capsSeq.current;
+    return getCapabilities()
+      .then((c) => { if (seq === capsSeq.current) setCaps(c); })
+      // The shell still needs a mode to render by (spec §2 fallback), but a fabricated payload is
+      // evidence of nothing — never let it overwrite a real answer we already hold.
+      .catch(() => { if (seq === capsSeq.current) setCaps((prev) => prev || { v: 0, authMode: 'login' }); });
+  }, []);
+  useEffect(() => { refreshCaps(); }, [auth.loggedIn, refreshCaps]);
   const openMode = caps?.authMode === 'open';
   const signedIn = auth.loggedIn || openMode;
   // Runtime gate for plugin-contributed UI (plugin-gate.js): the desktop bundle carries every
-  // plugin's frontend, but only the ones the server reports running may render. null until the
-  // handshake resolves — deny-by-default, so plugin UI never flashes on a server that lacks it.
-  const activePlugins = React.useMemo(() => (caps ? activePluginIds(caps) : null), [caps]);
+  // plugin's frontend, but only the ones the server reports running may render. Null (no
+  // trustworthy list — pending, failed, or redacted pre-auth) leaves the UI ungated rather than
+  // hidden: this is UI honesty, not authz, and it must never leave the shell worse than no gate.
+  const activePlugins = React.useMemo(() => authoritativePluginIds(caps), [caps]);
 
   const [route, setRoute] = useState("home");
   const histRef = useRef({ stack: ["home"], idx: 0 });
@@ -368,7 +379,7 @@ function App() {
                 // the bell catches up AND the plugin-UI gate re-reads the running set — a lifecycle
                 // mutation from this client is exactly when either can change (restart-to-apply means
                 // most flips land on reconnect, but immediate ones shouldn't wait for a re-login)
-                onAdminMutated: () => { loadNotifs(); getCapabilities().then(setCaps).catch(() => {}); } };
+                onAdminMutated: () => { loadNotifs(); refreshCaps(); } };
 
   // Native window chrome wraps EVERY screen on desktop (frameless window has no OS titlebar), so the
   // close/minimize/maximize controls are present on the pre-login screens too — not just the signed-in
@@ -413,7 +424,7 @@ function App() {
         setToken(token);
         refreshBootstrap();
         // verify-code flips the server open (spec §4) — refetch so this render pass sees it
-        getCapabilities().then(setCaps).catch(() => {});
+        refreshCaps();
       }} />);
   }
 
