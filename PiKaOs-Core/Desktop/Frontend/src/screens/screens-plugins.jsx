@@ -170,9 +170,13 @@ export function PluginsManager({ Sys, view = 'modules' }) {
     });
   }, [plugins]);
 
+  // Every successful mutation funnels through here (install · enable · disable · uninstall · git
+  // install), which makes it the one place the shell needs telling that the server just emitted a
+  // notification for it — otherwise the bell's badge sits stale until the next sign-in.
   const applyResult = (res) => {
     if (res && res.plugins) { setPlugins(res.plugins); setRestartHint(!!res.restart_required); }
     else load();
+    Sys.onAdminMutated?.();
   };
   const act = async (id, fn) => {
     setBusy(id); setErr(null);

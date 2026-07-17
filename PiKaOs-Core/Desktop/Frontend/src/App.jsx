@@ -350,7 +350,14 @@ function App() {
   // persist a nav edit: update the UI now + push to the shared server config (best-effort)
   const saveNavCfg = (cfg) => { setNavCfg(cfg); setNavConfig(cfg).catch(() => {}); };
 
-  const Sys = { t, T, can, me, go, language, nav: navCfg, setNav: saveNavCfg };
+  // `onAdminMutated` — a screen tells the shell it just changed the admin plane, so the bell can catch
+  // up. Without it the badge only refreshes on sign-in and on opening the popover, which is circular:
+  // you would have to open the bell to learn the bell has something. Every notify.emit() today is a
+  // plugin-lifecycle event raised from this client, so a callback covers them precisely — no polling.
+  // A second admin's action still won't badge until sign-in/open; that needs a server push, and the
+  // spec doesn't ask for one.
+  const Sys = { t, T, can, me, go, language, nav: navCfg, setNav: saveNavCfg,
+                onAdminMutated: loadNotifs };
 
   // Native window chrome wraps EVERY screen on desktop (frameless window has no OS titlebar), so the
   // close/minimize/maximize controls are present on the pre-login screens too — not just the signed-in
