@@ -11,17 +11,24 @@ of **synthetic** plugins that stand in for whatever real plugin a kernel-mechani
 
 They are injected both into ``sys.modules`` (so the Loader's ``importlib.import_module`` finds them)
 and into the discovered manifest catalog (so ``modules``/``plugin_loader`` list + enable them).
+
+Also here: the **route-test identity harness** (``client`` / ``AUTH_HEADER`` / ``bind_identity`` /
+``StubProvider``) — every kernel router test needs the same authenticated caller, so it is shared
+rather than re-pasted per file.
 """
 from __future__ import annotations
 
 import sys
 from types import ModuleType, SimpleNamespace
+from uuid import UUID
 
 import pytest
 from fastapi import APIRouter
+from starlette.testclient import TestClient
 
 from app import modules, plugin_loader
-from app.core import kernel_state
+from app.core import kernel_state, setup_state
+from app.core.contracts import IDENTITY
 
 SAMPLE_CONTRACT = "sample.Thing"
 TOOL_CONTRACT = "sampletool.Connection"
@@ -34,6 +41,54 @@ def tmp_state(tmp_path, monkeypatch):
     `test_git_installer.py`'s autouse `_isolate_kernel_state` uses, shared here so any
     kernel-state-touching test can just ask for `tmp_state`."""
     monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+
+
+# --- route-test identity harness --------------------------------------------------------------------
+
+AUTH_HEADER = {"Authorization": "Bearer a-session-token"}
+
+
+class StubUser:
+    """The identity `StubProvider` authenticates — satisfies `UserLike` structurally."""
+    id = UUID(int=1)
+    role = "member"      # deliberately NOT admin, so no role==admin shortcut can mask a missing perm
+    status = "active"
+
+
+class StubProvider:
+    """Authenticates any bearer to a fixed non-admin user; `has_perm` answers from a fixed perm set."""
+
+    def __init__(self, perms):
+        self._perms = set(perms)
+
+    async def authenticate(self, token):
+        return StubUser() if token else None
+
+    async def has_perm(self, user, perm):
+        return perm in self._perms
+
+    def has_role(self, user, *roles):
+        return StubUser.role in roles
+
+
+@pytest.fixture
+def client(tmp_state):
+    """A TestClient over the real app, isolated to a temp kernel state (`tmp_state`) that holds a
+    bootstrap session token matching `AUTH_HEADER`. With no auth plugin bound, `BootstrapProvider`
+    grants that token the synthetic admin, so a route test can reach any gate; a test that needs an
+    exact perm set rebinds IDENTITY via `bind_identity`. Imported inside the fixture so app.main is
+    only built once the state dir is redirected."""
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.main as main
+    with TestClient(main.app) as c:
+        yield c
+
+
+def bind_identity(client, perms) -> None:
+    """Swap the app's IDENTITY binding for a `StubProvider` holding exactly `perms`, so the caller is
+    authenticated but non-admin — that is what makes a 403 prove the route's permission gate rather
+    than an authentication failure."""
+    client.app.state.container.bind(IDENTITY, StubProvider(perms))
 
 
 def seed_manifest(mf) -> None:

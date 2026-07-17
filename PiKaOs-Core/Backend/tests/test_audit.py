@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from app.core import audit, kernel_state
+from tests.conftest import AUTH_HEADER, bind_identity
 
 
 @pytest.fixture(autouse=True)
@@ -60,3 +61,24 @@ def test_actor_of_reads_id_or_falls_back():
         id = 42
     assert audit.actor_of(U()) == "42"
     assert audit.actor_of(object()) == "unknown"
+
+
+# --- route: GET /api/audit is authenticated + gated on audit.view --------------------------------
+
+def test_audit_route_requires_authentication(client):
+    assert client.get("/api/audit").status_code == 401
+
+
+def test_audit_route_is_forbidden_without_audit_view(client):
+    bind_identity(client, perms=set())
+    assert client.get("/api/audit", headers=AUTH_HEADER).status_code == 403
+
+
+def test_audit_route_returns_rows_with_audit_view_and_respects_filters(client):
+    bind_identity(client, perms={"audit.view"})
+    audit.log("u1", "plugin.install", "crm")
+    audit.log("u2", "plugin.disable", "crm")
+    rows = client.get("/api/audit", headers=AUTH_HEADER).json()
+    assert [r["action"] for r in rows] == ["plugin.disable", "plugin.install"]
+    only = client.get("/api/audit?actor=u2&limit=1", headers=AUTH_HEADER).json()
+    assert len(only) == 1 and only[0]["actor"] == "u2"
