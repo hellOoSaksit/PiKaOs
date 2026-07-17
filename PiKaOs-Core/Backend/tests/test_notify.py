@@ -24,13 +24,18 @@ def test_emit_list_and_cap():
     assert rows[0]["read"] is False and rows[0]["id"].startswith("ntf_")
 
 
-def test_params_must_be_small_strings():
-    with pytest.raises(ValueError):
-        notify.emit("x", "k", {"big": "y" * 500})
-    with pytest.raises(ValueError):
-        notify.emit("x", "k", {"obj": {"nested": True}})
-    with pytest.raises(ValueError):
-        notify.emit("x", "k", {f"k{i}": "v" for i in range(9)})    # > 8 entries
+def test_bad_params_are_coerced_not_rejected():
+    # emit() runs after the mutation it announces already persisted — it must never raise a
+    # succeeded action into a 500. Oversized/wrong-typed params get sanitized and stored.
+    notify.emit("x", "k", {"big": "y" * 500})
+    assert notify.list_all()[0]["params"] == {"big": "y" * 200}     # truncated to _MAX_PARAM_CHARS
+
+    notify.emit("x", "k", {"obj": {"nested": True}})
+    assert notify.list_all()[0]["params"] == {"obj": "{'nested': True}"}   # non-str stringified
+
+    notify.emit("x", "k", {f"k{i}": "v" for i in range(9)})
+    stored = notify.list_all()[0]["params"]
+    assert len(stored) == 8 and stored == {f"k{i}": "v" for i in range(8)}   # overflow dropped
 
 
 def test_mark_read_specific_all_and_idempotent():
