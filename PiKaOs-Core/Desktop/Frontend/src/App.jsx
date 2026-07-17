@@ -3,7 +3,8 @@ import React from 'react';
 const { useState, useEffect, useRef } = React;
 import { NAV } from './data/data.jsx';
 import { loadNav, saveNav, mergeWithDefault } from './data/data-nav.jsx';
-import { getNavConfig, setNavConfig, getMySettings, setMySetting, setupStatus, dbStatus, setToken, getCapabilities, raw } from './lib/api.js';
+import { getNavConfig, setNavConfig, getMySettings, setMySetting, setupStatus, dbStatus, setToken, getCapabilities, raw, listNotifications, markNotificationsRead } from './lib/api.js';
+import { toDisplayNotification } from './lib/notifications.js';
 import { resolveShellMode } from './lib/shell-mode.js';
 import { useShellNav } from './lib/shell-nav.js';
 import { Settings } from './screens/screens-extra.jsx';
@@ -286,6 +287,17 @@ function App() {
   const t = makeT(language, styleKey);                // t("some.key", { var }) — ไม่ hardcode
   lastByLang.current[language] = lex;   // จำสไตล์ล่าสุดของภาษาปัจจุบัน
 
+  // bell feed (audit-notifications v2): fetch on sign-in, mark-read on open. The rows arrive
+  // i18n-clean ({key, params}); toDisplayNotification() localizes them via the active `t` so the
+  // language packs stay the single source of copy.
+  const [notifs, setNotifs] = useState([]);
+  const loadNotifs = React.useCallback(() => {
+    listNotifications()
+      .then((rows) => setNotifs((Array.isArray(rows) ? rows : []).map((n) => toDisplayNotification(n, t))))
+      .catch(() => {});   // the bell is best-effort UI — never block the shell on it
+  }, [t]);
+  useEffect(() => { if (signedIn) loadNotifs(); }, [signedIn, loadNotifs]);
+
   const go = (r) => {
     // closing every open overlay/popup when navigating away
     try { window.dispatchEvent(new Event("guildos-route-change")); } catch (e) { }
@@ -406,7 +418,9 @@ function App() {
       <BottomUtilityBar
         t={t} route={route} onHome={() => go("home")} onToggleNav={toggleNav}
         profile={renderPluginProfile({ t, me, onSignOut: auth.logout })}
-        notifications={[]} chatThreads={[]}
+        notifications={notifs}
+        onNotificationsOpened={() => { markNotificationsRead().catch(() => {}); loadNotifs(); }}
+        chatThreads={[]}
       />
       <UIModalHost />
       <UILoadingHost />
