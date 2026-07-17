@@ -1,7 +1,9 @@
 # CI — makes the pre-ship checks machine-enforced, not human memory (A6).
 # Monorepo: the app lives under PiKaOs-Core/, so every path is prefixed with it. GitHub Actions only
 # reads workflows from the repo-root .github/, which is why this lives here (not PiKaOs-Core/.github/).
-# Frontend: lint (react-hooks) + build + component-first guard. Desktop: tsc + vitest (Electron main).
+# Frontend: lint (react-hooks) + vitest + build + component-first guard. Desktop: tsc + vitest (the
+# Electron main process only — Frontend/ lives inside Desktop/, so Desktop's vitest.config.ts scopes it
+# out; the renderer is this frontend job's business, from its own install).
 # Architecture: static plugin gates.
 # Backend: pytest on the real stack (tests hit the live server, so we spin docker compose).
 name: CI
@@ -34,6 +36,8 @@ jobs:
       - run: npm ci
       - name: Lint (react-hooks/rules-of-hooks = error)
         run: npm run lint
+      - name: Test (vitest)
+        run: npm test
       - name: Build
         run: npm run build
       - name: Component-first guard (no raw <select> in screens — use ui/Dropdown.jsx)
