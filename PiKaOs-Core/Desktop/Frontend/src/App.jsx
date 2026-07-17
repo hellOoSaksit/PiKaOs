@@ -394,7 +394,7 @@ function App() {
   // 'db-choice' is owned by whichever installed plugin claims that bootstrap stage (postgres, R2) —
   // Core has no DB-choice screen of its own anymore; a kernel with no such plugin enabled falls back
   // to the kernel-only shell rather than getting stuck on a screen nothing renders.
-  if (shell === 'db-choice') return withChrome(renderPluginBootstrap('db-choice', { t, language, onLang: pickLanguage }, activePlugins) || <KernelOnlyShell language={language} />);
+  if (shell === 'db-choice') return withChrome(renderPluginBootstrap('db-choice', { t, language, onLang: pickLanguage }) || <KernelOnlyShell language={language} />);
   if (shell === 'kernel-shell') return withChrome(<KernelOnlyShell language={language} />);
   if (shell === 'first-admin') {
     return withChrome(<FirstAdmin t={t} language={language} onLang={pickLanguage}
