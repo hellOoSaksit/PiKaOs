@@ -4,7 +4,8 @@ t(key, params), so the language packs stay the single source of copy. Backed by 
 `notifications` kernel-state blob through kernel_state.update (cross-process-safe
 read-modify-write); newest first, truncated to CAP on every emit. emit() is called at the success
 point of a mutation that has already persisted, so — like audit.log() — it never raises into a
-request path: bad params are coerced, not rejected."""
+request path: bad params are coerced rather than rejected, AND a failed write is logged rather than
+propagated."""
 from __future__ import annotations
 
 import logging
@@ -61,7 +62,13 @@ def emit(kind: str, key: str, params: dict[str, str] | None = None) -> dict:
         rows = current if isinstance(current, list) else []
         return [entry] + rows[: CAP - 1]
 
-    kernel_state.update(_STORE, mutate, [])
+    try:
+        kernel_state.update(_STORE, mutate, [])
+    except Exception:
+        # Coercing bad params was only half of "never raises": the write itself can still fail (full
+        # disk, unwritable state dir), and emit() runs AFTER the mutation it records has persisted —
+        # so raising here 500s a plugin install that really did succeed. Mirrors audit.log().
+        _log.exception("notification emit failed for %s", key)
     return entry
 
 
