@@ -51,6 +51,30 @@ def test_rotation_keeps_two_files(monkeypatch):
     assert audit.read(limit=5)                      # still serving after rotation
 
 
+def test_oversized_target_cannot_push_history_out_of_the_trail():
+    """An oversized field must not become a history-wiping tool.
+
+    Rotation keeps exactly one predecessor, so a caller able to write huge entries can erase the whole
+    trail in three writes: one to overflow, one to rotate real history into `.jsonl.1`, one to overwrite
+    it. That was reachable ANONYMOUSLY — the auth plugin audits failed logins with the submitted
+    username. Clipping at the sink is what makes the trail's retention independent of its callers.
+    """
+    audit.log("admin-42", "plugin.install", "crm")           # real history a wiper would target
+    for _ in range(3):
+        audit.log("anonymous", "auth.login.failed", "A" * (6 * 1024 * 1024))
+
+    rows = audit.read(limit=999)
+    assert any(r["action"] == "plugin.install" for r in rows), "history was wiped by oversized entries"
+    assert all(len(r["target"]) <= audit.MAX_FIELD_CHARS + 1 for r in rows)   # +1 for the … marker
+
+
+def test_oversized_detail_is_replaced_wholesale_and_stays_valid_json():
+    audit.log("u1", "big.detail", "t", {"blob": "x" * (audit.MAX_DETAIL_CHARS + 500)})
+    row = audit.read(limit=1)[0]
+    assert row["detail"]["clipped"] is True          # replaced, not half-serialized into broken JSON
+    assert "blob" not in row["detail"]
+
+
 def test_log_never_raises(monkeypatch):
     monkeypatch.setattr(audit, "_path", lambda: Path("/nonexistent-root/x/audit.jsonl"))
     audit.log("u1", "boom", "t")                    # must swallow, not raise
