@@ -126,3 +126,37 @@ def test_audit_route_returns_rows_with_audit_view_and_respects_filters(client):
     assert [r["action"] for r in rows] == ["plugin.disable", "plugin.install"]
     only = client.get("/api/audit?actor=u2&limit=1", headers=AUTH_HEADER).json()
     assert len(only) == 1 and only[0]["actor"] == "u2"
+
+
+# --- secrets canary: drive the instrumented routes that take a secret-shaped input, then grep the -----
+#     WHOLE trail for it. This is the defense-in-depth the security doc used to *claim* existed. There is
+#     no sink-side redaction — the guarantee is "every call site passes safe values by hand" — so this is
+#     what actually holds that convention to account. A new emit that leaks its secret fails HERE.
+#
+#     Extend this table when you instrument a new route that receives a credential / value / URL. Each
+#     entry drives the real route with a unique sentinel; the single assertion below proves none reached
+#     the trail. Routes needing a live clone (plugin.install_git) are covered by reading the call site —
+#     it logs pid + tag, deliberately never body.repoUrl — not by this canary.
+def test_secrets_canary_no_instrumented_route_leaks_its_secret(client):
+    import json as _json
+
+    # (label, request, sentinel that must NOT reach the trail)
+    cases = [
+        ("git credential token",
+         lambda: client.put("/api/plugins/git-credentials/github.com",
+                            json={"token": "CANARY-GITTOKEN-a1"}, headers=AUTH_HEADER),
+         "CANARY-GITTOKEN-a1"),
+        ("nav settings value",
+         lambda: client.put("/api/settings/nav",
+                            json={"value": [{"id": "CANARY-NAVVALUE-b2"}]}, headers=AUTH_HEADER),
+         "CANARY-NAVVALUE-b2"),
+    ]
+    for label, drive, _sentinel in cases:
+        assert drive().status_code == 200, f"{label}: route did not accept the request"
+
+    trail = _json.dumps(audit.read(limit=999))
+    for label, _drive, sentinel in cases:
+        assert sentinel not in trail, f"{label}: a secret reached the audit trail"
+    # sanity: the routes really did write their (safe) audit lines, so the grep above wasn't vacuous
+    actions = {r["action"] for r in audit.read(limit=999)}
+    assert {"gitcred.set", "settings.write"} <= actions
