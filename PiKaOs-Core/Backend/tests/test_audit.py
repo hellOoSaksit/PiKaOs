@@ -43,6 +43,26 @@ def test_corrupt_lines_are_skipped_not_fatal():
     assert actions[0] == "after.corrupt" and "ok.line" in actions
 
 
+def test_a_truncated_multibyte_write_does_not_kill_the_reader():
+    """The corruption that actually happens is a half-written UTF-8 sequence, not `{corrupt`.
+
+    An append cut short by a crash or a full disk leaves a partial multi-byte character — and this
+    trail writes Thai targets with ensure_ascii=False, so multi-byte is the norm, not an edge case.
+    Strict decoding made GET /api/audit 500 forever, recoverable only by hand-editing the file, which
+    contradicts the spec's "the trail keeps serving". The test above cannot catch this: `{corrupt` is
+    perfectly valid UTF-8, so it only ever exercised the json.loads skip.
+    """
+    audit.log("u1", "before.truncation", "t")
+    with audit._path().open("ab") as f:
+        f.write(b'{"at":"2026-01-01","actor":"u","action":"a","target":"\xe0\xb8')   # cut mid-character
+        f.write(b"\n")
+    audit.log("u1", "after.truncation", "t")
+
+    actions = [r["action"] for r in audit.read()]          # must not raise UnicodeDecodeError
+    assert actions[0] == "after.truncation"
+    assert "before.truncation" in actions                  # history before the bad byte still serves
+
+
 def test_rotation_keeps_two_files(monkeypatch):
     monkeypatch.setattr(audit, "MAX_BYTES", 500)
     for i in range(80):

@@ -24,6 +24,18 @@ def test_emit_list_and_cap():
     assert rows[0]["read"] is False and rows[0]["id"].startswith("ntf_")
 
 
+def test_emit_never_raises_when_the_store_cannot_be_written(monkeypatch):
+    """Coercing bad params was only half of the guarantee — the WRITE can fail too.
+
+    emit() runs at the success point of a mutation that has already persisted, so a full disk or an
+    unwritable state dir must not turn a plugin install that really happened into a 500. audit.log()
+    has had `test_log_never_raises` from the start; this is its missing twin, and without it the
+    unguarded kernel_state.update() went unnoticed.
+    """
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", "/proc/nonexistent-root/nope")
+    notify.emit("plugin", "notif.plugin.installed", {"plugin": "crm"})   # must swallow, not raise
+
+
 def test_bad_params_are_coerced_not_rejected():
     # emit() runs after the mutation it announces already persisted — it must never raise a
     # succeeded action into a 500. Oversized/wrong-typed params get sanitized and stored.

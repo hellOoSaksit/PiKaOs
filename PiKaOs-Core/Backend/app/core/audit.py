@@ -73,15 +73,21 @@ def read(*, limit: int = 100, action: str | None = None, actor: str | None = Non
     rows: list[dict] = []
     for p in (_path().with_suffix(".jsonl.1"), _path()):
         try:
-            for line in p.read_text(encoding="utf-8").splitlines():
-                try:
-                    e = json.loads(line)
-                except json.JSONDecodeError:
-                    continue                                   # a corrupt line never blocks the trail
-                if isinstance(e, dict):
-                    rows.append(e)
+            # errors="replace", not strict: an append cut short by a crash or a full disk leaves a
+            # partial multi-byte sequence, and this trail writes Thai targets with ensure_ascii=False,
+            # so that is the expected corruption — not an exotic one. Strict decoding turns it into a
+            # permanent 500 on GET /api/audit, fixable only by hand-editing the file. The replacement
+            # char then fails json.loads below and the line is skipped like any other corrupt one.
+            text = p.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
+        for line in text.splitlines():
+            try:
+                e = json.loads(line)
+            except json.JSONDecodeError:
+                continue                                       # a corrupt line never blocks the trail
+            if isinstance(e, dict):
+                rows.append(e)
     if action:
         rows = [r for r in rows if r.get("action") == action]
     if actor:
