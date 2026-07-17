@@ -19,12 +19,12 @@ it('no pack carries the dead window-control labels', () => {
     for (const k of DEAD) expect(pack.translations[k], `${name} still has ${k}`).toBeUndefined();
 });
 
-it('every pack defines the first-admin screen labels', () => {
-  const FA = ['firstadmin.kicker', 'firstadmin.title', 'firstadmin.subtitle', 'firstadmin.code',
-    'firstadmin.codePh', 'firstadmin.username', 'firstadmin.password', 'firstadmin.confirm',
-    'firstadmin.submit', 'firstadmin.submitting', 'firstadmin.errEmpty', 'firstadmin.errMismatch',
-    'firstadmin.errUsername', 'firstadmin.errCode', 'firstadmin.errWeak', 'firstadmin.errClosed',
-    'firstadmin.errNetwork', 'firstadmin.ok'];
-  for (const [name, pack] of PACKS)
-    for (const k of FA) expect(pack.translations[k], `${name} missing ${k}`).toBeTruthy();
+// The create-first-admin screen moved to the auth plugin (zero-core: no identity, no such screen), and
+// its strings went with it — PiKaOs-Plugin-Auth/frontend/i18n/*, guarded by that plugin's own
+// firstadmin.test.js. A Base pack carrying them again would mean the screen crept back into Core.
+it('no pack carries the first-admin strings — they ship with the auth plugin', () => {
+  for (const [name, pack] of PACKS) {
+    const strays = Object.keys(pack.translations).filter((k) => k.startsWith('firstadmin.'));
+    expect(strays, `${name} still has ${strays.join(', ')}`).toEqual([]);
+  }
 });

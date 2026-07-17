@@ -9,7 +9,6 @@ import { resolveShellMode } from './lib/shell-mode.js';
 import { useShellNav } from './lib/shell-nav.js';
 import { Settings } from './screens/screens-extra.jsx';
 import { FirstRun } from './screens/FirstRun.jsx';
-import { FirstAdmin } from './screens/FirstAdmin.jsx';
 import { KernelOnlyShell } from './screens/KernelOnlyShell.jsx';
 import { KernelHome } from './screens/KernelHome.jsx';
 import { PluginsManager } from './screens/screens-plugins.jsx';
@@ -21,7 +20,8 @@ import { Icon, renderIcon } from './components/ui/icons.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
 import { UILoadingHost, UIModalHost } from './lib/ui-modal.jsx';
 import { makeT, DEFAULT_LANG, DEFAULT_STYLE, packById, defaultPack, defaultPackForLang, LEX_PACKS } from './lib/i18n.jsx';
-import { renderPluginRoute, renderPluginProfile, renderPluginBootstrap, PLUGIN_ROUTE_META } from './plugins/index.jsx';
+import { renderPluginRoute, renderPluginProfile, renderPluginBootstrap, PLUGIN_ROUTE_META, PLUGIN_ROUTE_OWNERS } from './plugins/index.jsx';
+import { authoritativePluginIds, filterPluginNav } from './lib/plugin-gate.js';
 
 // ชุดเริ่มต้นตอนเปิดแอป = master ของ i18n (English + Formal — มาจาก flag isDefault* ในไฟล์ ไม่ hardcode)
 const I18N_DEFAULT_PACK = (LEX_PACKS.find(p => p.lang === DEFAULT_LANG && p.styleKey === DEFAULT_STYLE) || defaultPack() || {}).id || "english_pro";
@@ -198,11 +198,28 @@ function App() {
   // C1 capability handshake (spec §2): the server declares authMode. 404/network (legacy or dead
   // server) resolves as login mode so the pre-handshake flow is byte-identical (spec §2 fallback).
   const [caps, setCaps] = useState(null);
-  useEffect(() => {
-    getCapabilities().then(setCaps).catch(() => setCaps({ v: 0, authMode: 'login' }));
+  // Every handshake goes through here so that only the LATEST one may write: the effect below
+  // re-fires when a restored session flips `loggedIn`, and the token turns an anonymous (possibly
+  // redacted) answer into the real one. Unguarded, a slow anonymous response could land last and
+  // win. Same shape as useAuth's restore guard (lib/auth.jsx), by sequence since three call sites
+  // share it.
+  const capsSeq = useRef(0);
+  const refreshCaps = React.useCallback(() => {
+    const seq = ++capsSeq.current;
+    return getCapabilities()
+      .then((c) => { if (seq === capsSeq.current) setCaps(c); })
+      // The shell still needs a mode to render by (spec §2 fallback), but a fabricated payload is
+      // evidence of nothing — never let it overwrite a real answer we already hold.
+      .catch(() => { if (seq === capsSeq.current) setCaps((prev) => prev || { v: 0, authMode: 'login' }); });
   }, []);
+  useEffect(() => { refreshCaps(); }, [auth.loggedIn, refreshCaps]);
   const openMode = caps?.authMode === 'open';
   const signedIn = auth.loggedIn || openMode;
+  // Runtime gate for plugin-contributed UI (plugin-gate.js): the desktop bundle carries every
+  // plugin's frontend, but only the ones the server reports running may render. Null (no
+  // trustworthy list — pending, failed, or redacted pre-auth) leaves the UI ungated rather than
+  // hidden: this is UI honesty, not authz, and it must never leave the shell worse than no gate.
+  const activePlugins = React.useMemo(() => authoritativePluginIds(caps), [caps]);
 
   const [route, setRoute] = useState("home");
   const histRef = useRef({ stack: ["home"], idx: 0 });
@@ -359,7 +376,10 @@ function App() {
   // A second admin's action still won't badge until sign-in/open; that needs a server push, and the
   // spec doesn't ask for one.
   const Sys = { t, T, can, me, go, language, nav: navCfg, setNav: saveNavCfg,
-                onAdminMutated: loadNotifs };
+                // the bell catches up AND the plugin-UI gate re-reads the running set — a lifecycle
+                // mutation from this client is exactly when either can change (restart-to-apply means
+                // most flips land on reconnect, but immediate ones shouldn't wait for a re-login)
+                onAdminMutated: () => { loadNotifs(); refreshCaps(); } };
 
   // Native window chrome wraps EVERY screen on desktop (frameless window has no OS titlebar), so the
   // close/minimize/maximize controls are present on the pre-login screens too — not just the signed-in
@@ -386,12 +406,17 @@ function App() {
   // to the kernel-only shell rather than getting stuck on a screen nothing renders.
   if (shell === 'db-choice') return withChrome(renderPluginBootstrap('db-choice', { t, language, onLang: pickLanguage }) || <KernelOnlyShell language={language} />);
   if (shell === 'kernel-shell') return withChrome(<KernelOnlyShell language={language} />);
+  // Owned by whichever installed plugin claims the stage (auth) — creating the first owner means
+  // nothing without an identity provider, so Core carries no screen of its own here. A kernel that
+  // somehow reaches the stage with no such plugin falls back to the kernel-only shell.
   if (shell === 'first-admin') {
-    return withChrome(<FirstAdmin t={t} language={language} onLang={pickLanguage}
-      onDone={async (username, password) => {
+    return withChrome(renderPluginBootstrap('first-admin', {
+      t, language, onLang: pickLanguage,
+      onDone: async (username, password) => {
         await auth.login(username, password);   // normal session; shell flips to 'full' on loggedIn
         refreshBootstrap();                     // needsFirstAdmin is now false server-side
-      }} />);
+      },
+    }) || <KernelOnlyShell language={language} />);
   }
   if (shell === 'firstrun') {
     return withChrome(<FirstRun t={t} language={language} onLang={pickLanguage}
@@ -399,7 +424,7 @@ function App() {
         setToken(token);
         refreshBootstrap();
         // verify-code flips the server open (spec §4) — refetch so this render pass sees it
-        getCapabilities().then(setCaps).catch(() => {});
+        refreshCaps();
       }} />);
   }
 
@@ -417,7 +442,7 @@ function App() {
       case "settings": return <Settings theme={theme} setTheme={setTheme} lex={lex} setLex={setLex} pickLanguage={pickLanguage} language={language} formal={formal} t={t} />;
       default: {
         // a route owned by an enabled plugin (Phase 6 seam) — else fall back to kernel Home.
-        const pluginEl = renderPluginRoute(route, { t, can, language, go, me, api: { raw } });
+        const pluginEl = renderPluginRoute(route, { t, can, language, go, me, api: { raw } }, activePlugins);
         return pluginEl || <KernelHome Sys={Sys} caps={caps} go={go} />;
       }
     }
@@ -427,7 +452,8 @@ function App() {
     <ToastProvider>
     <div className="app" key={lex}
       data-nav={navRail ? "rail" : "full"} data-drawer={drawerOpen ? "open" : undefined}>
-      <Sidebar route={route} go={go} t={t} can={can} nav={navCfg} openMode={openMode}
+      <Sidebar route={route} go={go} t={t} can={can} openMode={openMode}
+        nav={filterPluginNav(navCfg, PLUGIN_ROUTE_OWNERS, activePlugins)}
         rail={navRail} onToggle={toggleNav} />
       <div className="nav-scrim" onClick={closeDrawer} />
       <div className="main">
@@ -436,7 +462,7 @@ function App() {
       </div>
       <BottomUtilityBar
         t={t} route={route} onHome={() => go("home")} onToggleNav={toggleNav}
-        profile={renderPluginProfile({ t, me, onSignOut: auth.logout })}
+        profile={renderPluginProfile({ t, me, onSignOut: auth.logout }, activePlugins)}
         notifications={notifs}
         // sequenced: an unsequenced reload races the mark and usually re-reads the pre-mark rows
         onNotificationsOpened={() => { markNotificationsRead().catch(() => {}).finally(loadNotifs); }}

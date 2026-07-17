@@ -63,9 +63,19 @@ if errorlevel 1 (
 echo       Docker engine OK.
 
 rem ---- 2. Backend (Docker) -----------------------------------
-echo [2/4] Starting backend...
+rem  If a backend already answers on :8000 (e.g. the full generated stack from
+rem  start.bat), use it — bringing up dev.yml's own backend would fight it for
+rem  the port and this launcher would die before ever reaching the UI steps.
+echo [2/4] Checking for a running backend on :8000...
+curl -fsS -m 2 -o nul http://127.0.0.1:8000/api/health >nul 2>&1
+if not errorlevel 1 (
+  echo       Backend already running - using it.
+  goto backendup
+)
+echo       No backend yet - starting it...
 "%DOCKER%" compose -f "%COMPOSE%" up -d backend
 if errorlevel 1 ( echo       compose up failed. & pause & exit /b 1 )
+:backendup
 
 rem ---- 3. Vite dev server on the host ------------------------
 echo [3/4] Starting Vite on the host (http://localhost:5173)...
