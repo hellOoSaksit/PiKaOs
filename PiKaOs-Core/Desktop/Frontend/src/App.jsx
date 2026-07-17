@@ -9,7 +9,6 @@ import { resolveShellMode } from './lib/shell-mode.js';
 import { useShellNav } from './lib/shell-nav.js';
 import { Settings } from './screens/screens-extra.jsx';
 import { FirstRun } from './screens/FirstRun.jsx';
-import { FirstAdmin } from './screens/FirstAdmin.jsx';
 import { KernelOnlyShell } from './screens/KernelOnlyShell.jsx';
 import { KernelHome } from './screens/KernelHome.jsx';
 import { PluginsManager } from './screens/screens-plugins.jsx';
@@ -396,12 +395,17 @@ function App() {
   // to the kernel-only shell rather than getting stuck on a screen nothing renders.
   if (shell === 'db-choice') return withChrome(renderPluginBootstrap('db-choice', { t, language, onLang: pickLanguage }) || <KernelOnlyShell language={language} />);
   if (shell === 'kernel-shell') return withChrome(<KernelOnlyShell language={language} />);
+  // Owned by whichever installed plugin claims the stage (auth) — creating the first owner means
+  // nothing without an identity provider, so Core carries no screen of its own here. A kernel that
+  // somehow reaches the stage with no such plugin falls back to the kernel-only shell.
   if (shell === 'first-admin') {
-    return withChrome(<FirstAdmin t={t} language={language} onLang={pickLanguage}
-      onDone={async (username, password) => {
+    return withChrome(renderPluginBootstrap('first-admin', {
+      t, language, onLang: pickLanguage,
+      onDone: async (username, password) => {
         await auth.login(username, password);   // normal session; shell flips to 'full' on loggedIn
         refreshBootstrap();                     // needsFirstAdmin is now false server-side
-      }} />);
+      },
+    }) || <KernelOnlyShell language={language} />);
   }
   if (shell === 'firstrun') {
     return withChrome(<FirstRun t={t} language={language} onLang={pickLanguage}
