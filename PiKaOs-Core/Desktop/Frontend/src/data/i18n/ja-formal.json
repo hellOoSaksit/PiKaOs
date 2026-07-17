@@ -263,6 +263,9 @@
     "menu.toggleSidebar": "サイドバーの切り替え",
     "menu.devtools": "開発者ツール",
     "menu.about": "情報",
-    "menu.close": "閉じる"
+    "menu.close": "閉じる",
+    "notif.plugin.installed": "プラグイン {plugin} をインストールしました — 反映には再起動してください",
+    "notif.plugin.removed": "プラグイン {plugin} を削除しました — 反映には再起動してください",
+    "notif.plugin.updated": "プラグイン {plugin} を {tag} に更新しました — 反映には再起動してください"
   }
 }

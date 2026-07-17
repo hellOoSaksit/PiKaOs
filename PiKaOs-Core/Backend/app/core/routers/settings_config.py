@@ -16,7 +16,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from .. import kernel_state
+from .. import audit, kernel_state
 from ..identity import UserLike, get_current_user, require_perm
 from ..schemas import NavConfigIn, NavConfigOut, SettingValueIn, UserSettingsOut
 
@@ -77,6 +77,7 @@ async def put_nav(
     """Replace the shared sidebar arrangement (admin only). The frontend owns the value's shape."""
     _guard_value_size(body.value)
     entry = _app_upsert(_NAV_KEY, body.value)
+    audit.log(audit.actor_of(user), "settings.write", _NAV_KEY)   # key only — the value never enters the trail
     return NavConfigOut(value=entry["value"], updated_at=entry["updated_at"])
 
 

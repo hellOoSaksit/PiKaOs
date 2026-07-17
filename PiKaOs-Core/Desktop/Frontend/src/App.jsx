@@ -3,7 +3,8 @@ import React from 'react';
 const { useState, useEffect, useRef } = React;
 import { NAV } from './data/data.jsx';
 import { loadNav, saveNav, mergeWithDefault } from './data/data-nav.jsx';
-import { getNavConfig, setNavConfig, getMySettings, setMySetting, setupStatus, dbStatus, setToken, getCapabilities } from './lib/api.js';
+import { getNavConfig, setNavConfig, getMySettings, setMySetting, setupStatus, dbStatus, setToken, getCapabilities, raw, listNotifications, markNotificationsRead } from './lib/api.js';
+import { toDisplayNotification } from './lib/notifications.js';
 import { resolveShellMode } from './lib/shell-mode.js';
 import { useShellNav } from './lib/shell-nav.js';
 import { Settings } from './screens/screens-extra.jsx';
@@ -286,6 +287,29 @@ function App() {
   const t = makeT(language, styleKey);                // t("some.key", { var }) — ไม่ hardcode
   lastByLang.current[language] = lex;   // จำสไตล์ล่าสุดของภาษาปัจจุบัน
 
+  // bell feed (audit-notifications v2): fetch on sign-in, mark-read on open. The rows arrive
+  // i18n-clean ({key, params}); toDisplayNotification() localizes them via the active `t` so the
+  // language packs stay the single source of copy.
+  //
+  // Rows are stored RAW and localized at render — `t` must never enter the fetch path. `makeT` builds
+  // a new function every render, so a `t` dep re-runs the effect on every render, and each fetch's
+  // `.map()` yields a fresh array that React can't bail out of → re-render → an unbounded request
+  // loop for as long as the session lasts. Localizing at render also re-labels the feed on a language
+  // switch without refetching.
+  const [notifRows, setNotifRows] = useState([]);
+  const loadNotifs = React.useCallback(
+    () => listNotifications()
+      .then((rows) => setNotifRows(Array.isArray(rows) ? rows : []))
+      // best-effort UI — never block the shell on it, but a warn turns a silently dead bell into a
+      // diagnosable one (a 404 before the backend merges is expected; a 500 is not)
+      .catch((e) => { console.warn('notifications fetch failed', e); }),
+    [],
+  );
+  useEffect(() => { if (signedIn) loadNotifs(); }, [signedIn, loadNotifs]);
+  const notifs = React.useMemo(
+    () => notifRows.map((n) => toDisplayNotification(n, t)), [notifRows, t],
+  );
+
   const go = (r) => {
     // closing every open overlay/popup when navigating away
     try { window.dispatchEvent(new Event("guildos-route-change")); } catch (e) { }
@@ -328,7 +352,14 @@ function App() {
   // persist a nav edit: update the UI now + push to the shared server config (best-effort)
   const saveNavCfg = (cfg) => { setNavCfg(cfg); setNavConfig(cfg).catch(() => {}); };
 
-  const Sys = { t, T, can, me, go, language, nav: navCfg, setNav: saveNavCfg };
+  // `onAdminMutated` — a screen tells the shell it just changed the admin plane, so the bell can catch
+  // up. Without it the badge only refreshes on sign-in and on opening the popover, which is circular:
+  // you would have to open the bell to learn the bell has something. Every notify.emit() today is a
+  // plugin-lifecycle event raised from this client, so a callback covers them precisely — no polling.
+  // A second admin's action still won't badge until sign-in/open; that needs a server push, and the
+  // spec doesn't ask for one.
+  const Sys = { t, T, can, me, go, language, nav: navCfg, setNav: saveNavCfg,
+                onAdminMutated: loadNotifs };
 
   // Native window chrome wraps EVERY screen on desktop (frameless window has no OS titlebar), so the
   // close/minimize/maximize controls are present on the pre-login screens too — not just the signed-in
@@ -386,7 +417,7 @@ function App() {
       case "settings": return <Settings theme={theme} setTheme={setTheme} lex={lex} setLex={setLex} pickLanguage={pickLanguage} language={language} formal={formal} t={t} />;
       default: {
         // a route owned by an enabled plugin (Phase 6 seam) — else fall back to kernel Home.
-        const pluginEl = renderPluginRoute(route, { t, can, language, go, me });
+        const pluginEl = renderPluginRoute(route, { t, can, language, go, me, api: { raw } });
         return pluginEl || <KernelHome Sys={Sys} caps={caps} go={go} />;
       }
     }
@@ -406,7 +437,10 @@ function App() {
       <BottomUtilityBar
         t={t} route={route} onHome={() => go("home")} onToggleNav={toggleNav}
         profile={renderPluginProfile({ t, me, onSignOut: auth.logout })}
-        notifications={[]} chatThreads={[]}
+        notifications={notifs}
+        // sequenced: an unsequenced reload races the mark and usually re-reads the pre-mark rows
+        onNotificationsOpened={() => { markNotificationsRead().catch(() => {}).finally(loadNotifs); }}
+        chatThreads={[]}
       />
       <UIModalHost />
       <UILoadingHost />

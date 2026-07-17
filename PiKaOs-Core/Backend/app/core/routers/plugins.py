@@ -14,18 +14,24 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from .. import git_installer, plugin_readiness
+from .. import audit, git_installer, notify, plugin_readiness
 from .. import plugin_registry as registry
 from ..contracts import POSTGRES_CONNECTION
 from ..identity import UserLike, get_current_user, require_perm
 
 log = logging.getLogger("pikaos.plugins.router")
+
+# A git host: labels of alnum/hyphen joined by dots, optional :port. Rejects an embedded credential
+# (`user:tok@host`), a path, or whitespace — none of which is a host, and all of which would otherwise
+# be stored as one and written to the audit trail.
+_HOST_RE = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9-]{0,62})(\.[A-Za-z0-9]([A-Za-z0-9-]{0,62}))*(:[0-9]{1,5})?$")
 
 router = APIRouter(prefix="/api/plugins", tags=["plugins"])
 
@@ -182,6 +188,8 @@ async def install(
     for pid in plan["to_install"]:                       # deps first, target last (topo order)
         reg = registry.set_state(pid, registry.ENABLED,
                                        version=_manifests()[pid].version)
+    audit.log(audit.actor_of(user), "plugin.install", plugin_id)
+    notify.emit("plugin", "notif.plugin.installed", {"plugin": plugin_id})
     return _action_response(reg)
 
 
@@ -271,6 +279,8 @@ async def install_from_git(
     # `_view` renders only discovered manifests — the plugin just installed isn't among them until the
     # restart, so its own pending visibility is what makes a restart required, not any row's flag.
     out.restart_required = True
+    audit.log(audit.actor_of(user), "plugin.install_git", pid, {"tag": tag or "HEAD"})
+    notify.emit("plugin", "notif.plugin.installed", {"plugin": pid})
     return out
 
 
@@ -401,6 +411,8 @@ async def update(
     out = _action_response(reg)
     # the updated code isn't running (and `_view` still shows the old manifest) until the restart
     out.restart_required = True
+    audit.log(audit.actor_of(user), "plugin.update", plugin_id, {"tag": tag})
+    notify.emit("plugin", "notif.plugin.updated", {"plugin": plugin_id, "tag": tag})
     return out
 
 
@@ -415,6 +427,7 @@ async def enable(
     _require_not_pending_purge(reg, plugin_id)
     reg = registry.set_state(plugin_id, registry.ENABLED,
                                    version=_manifests()[plugin_id].version)
+    audit.log(audit.actor_of(user), "plugin.enable", plugin_id)
     return _action_response(reg)
 
 
@@ -428,6 +441,7 @@ async def disable(
     reg = registry.read()
     _require_not_pending_purge(reg, plugin_id)
     reg = registry.set_state(plugin_id, registry.DISABLED)
+    audit.log(audit.actor_of(user), "plugin.disable", plugin_id)
     return _action_response(reg)
 
 
@@ -447,8 +461,12 @@ async def uninstall(
     if registry.installed_via(reg, plugin_id) == "git":
         shutil.rmtree(plugin_loader.PLUGINS_DIR / plugin_id, ignore_errors=True)
         reg = registry.uninstall_git(plugin_id)
+        audit.log(audit.actor_of(user), "plugin.uninstall", plugin_id)
+        notify.emit("plugin", "notif.plugin.removed", {"plugin": plugin_id})
         return _action_response(reg)
     reg = registry.remove(plugin_id)
+    audit.log(audit.actor_of(user), "plugin.uninstall", plugin_id)
+    notify.emit("plugin", "notif.plugin.removed", {"plugin": plugin_id})
     return _action_response(reg)
 
 
@@ -502,6 +520,7 @@ async def purge(
 
     plugin_loader.deregister_discovered(plugin_id)
     reg = registry.purge_complete(plugin_id)
+    audit.log(audit.actor_of(user), "plugin.purge", plugin_id)
     return _action_response(reg)
 
 
@@ -515,5 +534,10 @@ async def set_git_credential(
     check-update / update to authenticate against a private repo on that host. Write-only: the token is
     never echoed back here, and no read endpoint in this router (e.g. `list_plugins`/`PluginOut`) ever
     surfaces a stored credential, encrypted or not."""
+    # Validate the host shape at the edge (rule 10): it is a path param that becomes both a storage key
+    # and an audit target, so a value like `user:tok@github.com` must not be accepted as a "host".
+    if not _HOST_RE.match(host):
+        raise HTTPException(status_code=422, detail="invalid host")
     git_installer.set_credential(host, body.token)
+    audit.log(audit.actor_of(user), "gitcred.set", host)   # host only — the token never enters the trail
     return {"ok": True}

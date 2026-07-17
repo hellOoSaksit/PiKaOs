@@ -1359,3 +1359,49 @@ def test_set_git_credential_requires_plugins_manage_permission(sample_plugins, t
     with TestClient(main.app) as client:
         resp = client.put("/api/plugins/git-credentials/github.com", json={"token": "ghp_secret"})
     assert resp.status_code == 401
+
+
+# --- audit trail + notifications on the mutation sites -------------------------------------------------
+
+def test_plugin_install_lands_in_audit_trail_and_notifies(sample_plugins, tmp_path, monkeypatch):
+    from app.core import audit, notify
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.post("/api/plugins/sample/install",
+                           headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 200
+    assert "plugin.install" in [r["action"] for r in audit.read()]
+    assert notify.list_all()[0]["key"] == "notif.plugin.installed"
+    assert notify.list_all()[0]["params"]["plugin"] == "sample"
+
+
+def test_git_credential_audit_never_contains_the_token(sample_plugins, tmp_path, monkeypatch):
+    import json as _json
+    from app.core import audit
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.put("/api/plugins/git-credentials/github.com",
+                          json={"token": "SECRET-TOKEN-123"},
+                          headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 200
+    trail = _json.dumps(audit.read())
+    assert "gitcred.set" in trail and "github.com" in trail
+    assert "SECRET-TOKEN-123" not in trail          # the pinned secrets-never-in-the-trail guarantee
+
+
+def test_set_git_credential_rejects_a_credential_shaped_host(sample_plugins, tmp_path, monkeypatch):
+    # A host is validated at the edge (rule 10): `user:tok@github.com` is not a host, and must not be
+    # stored as one nor written to the trail. 422, and nothing lands.
+    from app.core import audit
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.put("/api/plugins/git-credentials/evil:tok@github.com",
+                          json={"token": "T"}, headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 422
+    assert "gitcred.set" not in [r["action"] for r in audit.read()]

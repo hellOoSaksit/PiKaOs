@@ -257,3 +257,12 @@ export async function purgePlugin(id) { return raw(`/plugins/${id}/purge`, { met
 export async function setGitCredential(host, token) {
   return raw(`/plugins/git-credentials/${host}`, { method: "PUT", body: { token } });
 }
+
+// --- notifications (audit-notifications v2): capped in-memory store on the server; the bell
+// reads via listNotifications() and marks them read on open (ids=null marks all).
+export async function listNotifications() { return raw(`/notifications`); }
+export async function markNotificationsRead(ids) { return raw(`/notifications/read`, { method: "PUT", body: { ids: ids ?? null } }); }
+
+// The plugin-ctx seam (audit-notifications v2): plugins can't import this module directly
+// (isolation), so App.jsx hands them { raw } through renderPluginRoute's ctx.
+export { raw };
