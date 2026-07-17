@@ -3,6 +3,7 @@ import { UtilityBarButton } from './UtilityBarButton.jsx';
 import { PopoverPanel } from './PopoverPanel.jsx';
 import { Icon } from './icons.jsx';
 import Tooltip from './Tooltip.jsx';
+import { unreadCount } from '../../lib/notifications.js';
 
 // The bar's buttons size their own glyph (no CSS slot owns it), so `size` is explicit here.
 const ICONS = {
@@ -24,6 +25,7 @@ const ICONS = {
 export function BottomUtilityBar({
   t, route, onHome, onToggleNav, profile = null,
   notifications = [], chatThreads = [], onSearch, onAdd, showLabels = false,
+  onNotificationsOpened,
 }) {
   const [active, setActive] = useState(route === 'me' ? 'home' : null);
   const [openPop, setOpenPop] = useState(null);
@@ -33,14 +35,18 @@ export function BottomUtilityBar({
 
   const go = (tab, fn) => { setActive(tab); setOpenPop(null); fn && fn(); };
   const togglePop = (tab) => {
-    setOpenPop((p) => (p === tab ? null : tab));
+    setOpenPop((p) => {
+      const next = p === tab ? null : tab;
+      if (tab === 'notifications' && next) onNotificationsOpened?.();
+      return next;
+    });
     setActive(tab);
     if (tab === 'notifications') setClearedNotif(true);
     if (tab === 'chat') setClearedChat(true);
   };
   const closePop = () => setOpenPop(null);
 
-  const notifCount = clearedNotif ? 0 : notifications.length;
+  const notifCount = clearedNotif ? 0 : unreadCount(notifications);
   const chatCount = clearedChat ? 0 : chatThreads.length;
 
   const submitSearch = (e) => {
