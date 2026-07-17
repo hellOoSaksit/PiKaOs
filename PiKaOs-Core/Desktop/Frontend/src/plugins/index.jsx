@@ -71,15 +71,22 @@ export function renderPluginRoute(routeId, ctx, active) {
    rule renderPluginProfile below already uses. */
 const _bootstrap = {};
 for (const p of PLUGINS) for (const [stage, render] of Object.entries(p.bootstrapScreens || {})) {
-  (_bootstrap[stage] ||= []).push({ plugin: p.id, render });
+  if (!(stage in _bootstrap)) _bootstrap[stage] = render;
 }
 
-/** Render an ACTIVE plugin's bootstrap-window screen, or null when no active plugin owns that stage
- *  (Core falls back to its own default shell for that stage). First ACTIVE claimer wins — a bundled
- *  but inactive plugin doesn't shadow the stage for whoever actually runs. */
-export function renderPluginBootstrap(stage, ctx, active) {
-  const claim = (_bootstrap[stage] || []).find((c) => isPluginUiActive(c.plugin, active));
-  return claim ? claim.render(ctx) : null;
+/** Render an enabled plugin's bootstrap-window screen, or null when no plugin owns that stage
+ *  (Core falls back to its own default shell for that stage).
+ *
+ *  DELIBERATELY NOT gated on the running-plugin set, unlike every accessor above: a bootstrap stage is
+ *  by definition pre-auth, and in production /capabilities hides the plugin list from anonymous
+ *  login-mode callers (backend `test_production_login_mode_hides_plugins_from_anonymous`) — exactly the
+ *  state the 'first-admin' window runs in. Gating here would render nothing and brick onboarding on the
+ *  one deployment that matters. It costs nothing: a stage only activates on a server signal that already
+ *  implies its owner (`needsFirstAdmin` = a live code in login mode, i.e. an identity plugin is enabled;
+ *  `needsDbConfig` = the postgres plugin's own route answering), so the signal IS the gate. */
+export function renderPluginBootstrap(stage, ctx) {
+  const render = _bootstrap[stage];
+  return render ? render(ctx) : null;
 }
 
 /** Topbar metadata ({icon,title,en}) for every plugin route — merged into Core's ROUTE_META. */
