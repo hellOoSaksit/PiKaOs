@@ -16,6 +16,8 @@
    carries none of it. So this file never changes per plugin, and Core builds with 0..N plugins present.
    Load order is dependency-aware: a plugin listing `dependencies:[...]` loads after them (topo sort),
    which is what lets a feature rely on a foundational plugin like `ai` (plugin-architecture.md §2.4 §6). */
+import { isPluginUiActive } from '../lib/plugin-gate.js';
+
 const _mods = import.meta.glob('./*/index.jsx', { eager: true });
 const _descriptors = Object.values(_mods).map(m => m && m.default).filter(Boolean);
 
@@ -41,12 +43,24 @@ function _orderByDeps(list) {
 const PLUGINS = _orderByDeps(_descriptors);
 
 const _routes = {};
-for (const p of PLUGINS) for (const r of p.routes || []) _routes[r.id] = r;
+const _owners = {};
+for (const p of PLUGINS) for (const r of p.routes || []) { _routes[r.id] = r; _owners[r.id] = p.id; }
 
-/** Render an enabled plugin's route, or null when no plugin owns it (Core falls back to its default). */
-export function renderPluginRoute(routeId, ctx) {
+/* RUNTIME GATE (plugin-ui-runtime-gate): folder presence ≠ installed. Every accessor below that can
+   put plugin UI on screen also takes `active` — the Set of plugin ids the server's /health reports
+   as running (null until known). A bundled-but-inactive plugin renders nothing, so a Zero/kernel-only
+   server shows a Zero UI even though the desktop build carries every plugin's frontend. Predicate
+   lives in lib/plugin-gate.js (deny-by-default: unknown → hidden). */
+
+/** route id -> owning plugin id, for consumers that gate outside the barrel (e.g. the sidebar nav). */
+export const PLUGIN_ROUTE_OWNERS = _owners;
+
+/** Render an ACTIVE plugin's route, or null when no active plugin owns it (Core falls back to its
+ *  default). `active` = Set of running plugin ids from /health (null = unknown → nothing renders). */
+export function renderPluginRoute(routeId, ctx, active) {
   const r = _routes[routeId];
-  return r ? r.render(ctx) : null;
+  if (!r || !isPluginUiActive(_owners[routeId], active)) return null;
+  return r.render(ctx);
 }
 
 /* `bootstrapScreens` is the same seam as `routes`, one step earlier: it lets a plugin own a screen
@@ -57,14 +71,15 @@ export function renderPluginRoute(routeId, ctx) {
    rule renderPluginProfile below already uses. */
 const _bootstrap = {};
 for (const p of PLUGINS) for (const [stage, render] of Object.entries(p.bootstrapScreens || {})) {
-  if (!(stage in _bootstrap)) _bootstrap[stage] = render;
+  (_bootstrap[stage] ||= []).push({ plugin: p.id, render });
 }
 
-/** Render an enabled plugin's bootstrap-window screen, or null when no plugin owns that stage
- *  (Core falls back to its own default shell for that stage). */
-export function renderPluginBootstrap(stage, ctx) {
-  const render = _bootstrap[stage];
-  return render ? render(ctx) : null;
+/** Render an ACTIVE plugin's bootstrap-window screen, or null when no active plugin owns that stage
+ *  (Core falls back to its own default shell for that stage). First ACTIVE claimer wins — a bundled
+ *  but inactive plugin doesn't shadow the stage for whoever actually runs. */
+export function renderPluginBootstrap(stage, ctx, active) {
+  const claim = (_bootstrap[stage] || []).find((c) => isPluginUiActive(c.plugin, active));
+  return claim ? claim.render(ctx) : null;
 }
 
 /** Topbar metadata ({icon,title,en}) for every plugin route — merged into Core's ROUTE_META. */
@@ -75,11 +90,12 @@ export const PLUGIN_ROUTE_META = Object.fromEntries(
 /** Sidebar groups/items each plugin contributes — merged into the nav default (data-nav.js). */
 export const PLUGIN_NAV = PLUGINS.flatMap(p => p.nav || []);
 
-/** The utility bar's account control, if any plugin owns identity. Kernel-only Core has no notion of a
- *  signed-in person, so it renders no profile button at all rather than a decorative one — the auth
- *  plugin brings the whole control with it. First plugin to claim the slot wins (identity is singular). */
-export function renderPluginProfile(ctx) {
-  const owner = PLUGINS.find(p => typeof p.profile === 'function');
+/** The utility bar's account control, if any ACTIVE plugin owns identity. Kernel-only Core has no
+ *  notion of a signed-in person, so it renders no profile button at all rather than a decorative one —
+ *  the auth plugin brings the whole control with it. First active plugin to claim the slot wins
+ *  (identity is singular). */
+export function renderPluginProfile(ctx, active) {
+  const owner = PLUGINS.find(p => typeof p.profile === 'function' && isPluginUiActive(p.id, active));
   return owner ? owner.profile(ctx) : null;
 }
 
