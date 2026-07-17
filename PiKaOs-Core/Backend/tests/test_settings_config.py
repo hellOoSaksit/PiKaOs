@@ -102,3 +102,15 @@ def test_the_cap_counts_utf8_bytes_not_ascii_escapes(client):
     thai = "ก" * 20_000                                        # 60 KB UTF-8; 120 KB escaped
     resp = client.put("/api/settings/nav", json={"value": [thai]}, headers=_AUTH)
     assert resp.status_code == 200
+
+
+# --- the nav write is audited (key only) ------------------------------------------------------------
+
+def test_nav_write_lands_in_audit_trail_with_key_only(client):
+    from app.core import audit
+    _bind_identity(client, perms={"options.manage"})
+    assert client.put("/api/settings/nav", json={"value": ["secret-layout"]}, headers=_AUTH).status_code == 200
+    rows = audit.read(action="settings.write")
+    assert rows and rows[0]["target"] == "nav"
+    import json as _json
+    assert "secret-layout" not in _json.dumps(rows)   # key only — never the value

@@ -186,6 +186,17 @@ async def test_writing_the_allowlist_needs_plugins_manage(app, state_dir, monkey
     assert mcp_catalog.read_allowlist() == {"pikaos.knowledge.search": {}}
 
 
+async def test_allowlist_write_lands_in_audit_trail(app, state_dir, monkeypatch):
+    from app.core import audit
+    _grant(monkeypatch, {"plugins.manage"})
+    async with _client(app) as c:
+        r = await c.put("/api/mcp/allowlist", headers={"Authorization": "Bearer t"},
+                        json={"entries": {"pikaos.knowledge.search": {}}})
+    assert r.status_code == 200
+    rows = audit.read(action="mcp.allowlist")
+    assert rows and rows[0]["detail"] == {"count": 1}
+
+
 async def test_reading_the_allowlist_needs_plugins_manage(app, state_dir, monkeypatch):
     """The allowlist names the whole reachable surface — it is not general-audience config."""
     _grant(monkeypatch, {"options.manage"})
