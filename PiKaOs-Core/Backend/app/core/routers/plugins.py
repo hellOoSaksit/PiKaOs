@@ -20,7 +20,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from .. import git_installer, plugin_readiness
+from .. import audit, git_installer, notify, plugin_readiness
 from .. import plugin_registry as registry
 from ..contracts import POSTGRES_CONNECTION
 from ..identity import UserLike, get_current_user, require_perm
@@ -182,6 +182,8 @@ async def install(
     for pid in plan["to_install"]:                       # deps first, target last (topo order)
         reg = registry.set_state(pid, registry.ENABLED,
                                        version=_manifests()[pid].version)
+    audit.log(audit.actor_of(user), "plugin.install", plugin_id)
+    notify.emit("plugin", "notif.plugin.installed", {"plugin": plugin_id})
     return _action_response(reg)
 
 
@@ -271,6 +273,8 @@ async def install_from_git(
     # `_view` renders only discovered manifests — the plugin just installed isn't among them until the
     # restart, so its own pending visibility is what makes a restart required, not any row's flag.
     out.restart_required = True
+    audit.log(audit.actor_of(user), "plugin.install_git", pid, {"tag": tag or "HEAD"})
+    notify.emit("plugin", "notif.plugin.installed", {"plugin": pid})
     return out
 
 
@@ -401,6 +405,8 @@ async def update(
     out = _action_response(reg)
     # the updated code isn't running (and `_view` still shows the old manifest) until the restart
     out.restart_required = True
+    audit.log(audit.actor_of(user), "plugin.update", plugin_id, {"tag": tag})
+    notify.emit("plugin", "notif.plugin.updated", {"plugin": plugin_id, "tag": tag})
     return out
 
 
@@ -415,6 +421,7 @@ async def enable(
     _require_not_pending_purge(reg, plugin_id)
     reg = registry.set_state(plugin_id, registry.ENABLED,
                                    version=_manifests()[plugin_id].version)
+    audit.log(audit.actor_of(user), "plugin.enable", plugin_id)
     return _action_response(reg)
 
 
@@ -428,6 +435,7 @@ async def disable(
     reg = registry.read()
     _require_not_pending_purge(reg, plugin_id)
     reg = registry.set_state(plugin_id, registry.DISABLED)
+    audit.log(audit.actor_of(user), "plugin.disable", plugin_id)
     return _action_response(reg)
 
 
@@ -447,8 +455,12 @@ async def uninstall(
     if registry.installed_via(reg, plugin_id) == "git":
         shutil.rmtree(plugin_loader.PLUGINS_DIR / plugin_id, ignore_errors=True)
         reg = registry.uninstall_git(plugin_id)
+        audit.log(audit.actor_of(user), "plugin.uninstall", plugin_id)
+        notify.emit("plugin", "notif.plugin.removed", {"plugin": plugin_id})
         return _action_response(reg)
     reg = registry.remove(plugin_id)
+    audit.log(audit.actor_of(user), "plugin.uninstall", plugin_id)
+    notify.emit("plugin", "notif.plugin.removed", {"plugin": plugin_id})
     return _action_response(reg)
 
 
@@ -502,6 +514,7 @@ async def purge(
 
     plugin_loader.deregister_discovered(plugin_id)
     reg = registry.purge_complete(plugin_id)
+    audit.log(audit.actor_of(user), "plugin.purge", plugin_id)
     return _action_response(reg)
 
 
@@ -516,4 +529,5 @@ async def set_git_credential(
     never echoed back here, and no read endpoint in this router (e.g. `list_plugins`/`PluginOut`) ever
     surfaces a stored credential, encrypted or not."""
     git_installer.set_credential(host, body.token)
+    audit.log(audit.actor_of(user), "gitcred.set", host)   # host only — the token never enters the trail
     return {"ok": True}

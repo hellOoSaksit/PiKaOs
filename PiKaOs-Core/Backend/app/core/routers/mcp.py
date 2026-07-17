@@ -18,7 +18,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from httpx import ASGITransport, AsyncClient
 
-from .. import identity, mcp_catalog
+from .. import audit, identity, mcp_catalog
 from ..identity import UserLike, get_current_user, require_perm
 from ..schemas import McpAllowlistIn, McpAllowlistOut, McpCallIn, McpCallOut, McpToolsOut
 
@@ -105,4 +105,6 @@ async def put_allowlist(body: McpAllowlistIn,
                         user: UserLike = Depends(require_perm("plugins.manage"))) -> McpAllowlistOut:
     """Widening what an external AI may invoke is the same authority as installing a plugin — never
     `options.manage` (git_installer.py K4)."""
-    return McpAllowlistOut(entries=mcp_catalog.write_allowlist(body.entries))
+    entries = mcp_catalog.write_allowlist(body.entries)
+    audit.log(audit.actor_of(user), "mcp.allowlist", "", {"count": len(entries)})
+    return McpAllowlistOut(entries=entries)
