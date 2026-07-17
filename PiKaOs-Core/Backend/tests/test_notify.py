@@ -7,6 +7,7 @@ from __future__ import annotations
 import pytest
 
 from app.core import kernel_state, notify
+from tests.conftest import AUTH_HEADER
 
 
 @pytest.fixture(autouse=True)
@@ -47,3 +48,19 @@ def test_corrupt_blob_self_heals(tmp_path):
     assert notify.list_all() == []
     notify.emit("x", "k")
     assert len(notify.list_all()) == 1
+
+
+# --- routes: the bell feed is any-authenticated-user, never anonymous ----------------------------
+
+def test_notifications_routes_require_authentication(client):
+    assert client.get("/api/notifications").status_code == 401
+    assert client.put("/api/notifications/read", json={"ids": None}).status_code == 401
+
+
+def test_notifications_read_and_mark(client):
+    notify.emit("plugin", "notif.plugin.installed", {"plugin": "crm"})
+    rows = client.get("/api/notifications", headers=AUTH_HEADER).json()
+    assert rows[0]["key"] == "notif.plugin.installed" and rows[0]["read"] is False
+    marked = client.put("/api/notifications/read", json={"ids": None}, headers=AUTH_HEADER).json()
+    assert marked == {"marked": 1}
+    assert client.get("/api/notifications", headers=AUTH_HEADER).json()[0]["read"] is True
