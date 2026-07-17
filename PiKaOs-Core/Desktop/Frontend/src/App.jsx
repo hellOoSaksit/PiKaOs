@@ -21,7 +21,8 @@ import { Icon, renderIcon } from './components/ui/icons.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
 import { UILoadingHost, UIModalHost } from './lib/ui-modal.jsx';
 import { makeT, DEFAULT_LANG, DEFAULT_STYLE, packById, defaultPack, defaultPackForLang, LEX_PACKS } from './lib/i18n.jsx';
-import { renderPluginRoute, renderPluginProfile, renderPluginBootstrap, PLUGIN_ROUTE_META } from './plugins/index.jsx';
+import { renderPluginRoute, renderPluginProfile, renderPluginBootstrap, PLUGIN_ROUTE_META, PLUGIN_ROUTE_OWNERS } from './plugins/index.jsx';
+import { activePluginIds, filterPluginNav } from './lib/plugin-gate.js';
 
 // ชุดเริ่มต้นตอนเปิดแอป = master ของ i18n (English + Formal — มาจาก flag isDefault* ในไฟล์ ไม่ hardcode)
 const I18N_DEFAULT_PACK = (LEX_PACKS.find(p => p.lang === DEFAULT_LANG && p.styleKey === DEFAULT_STYLE) || defaultPack() || {}).id || "english_pro";
@@ -199,10 +200,16 @@ function App() {
   // server) resolves as login mode so the pre-handshake flow is byte-identical (spec §2 fallback).
   const [caps, setCaps] = useState(null);
   useEffect(() => {
+    // re-runs on sign-in/out: production's recon discipline hides the plugin list from
+    // unauthenticated login-mode callers, so the post-login fetch is what reveals it (Fix-SEC-10).
     getCapabilities().then(setCaps).catch(() => setCaps({ v: 0, authMode: 'login' }));
-  }, []);
+  }, [auth.loggedIn]);
   const openMode = caps?.authMode === 'open';
   const signedIn = auth.loggedIn || openMode;
+  // Runtime gate for plugin-contributed UI (plugin-gate.js): the desktop bundle carries every
+  // plugin's frontend, but only the ones the server reports running may render. null until the
+  // handshake resolves — deny-by-default, so plugin UI never flashes on a server that lacks it.
+  const activePlugins = React.useMemo(() => (caps ? activePluginIds(caps) : null), [caps]);
 
   const [route, setRoute] = useState("home");
   const histRef = useRef({ stack: ["home"], idx: 0 });
@@ -359,7 +366,10 @@ function App() {
   // A second admin's action still won't badge until sign-in/open; that needs a server push, and the
   // spec doesn't ask for one.
   const Sys = { t, T, can, me, go, language, nav: navCfg, setNav: saveNavCfg,
-                onAdminMutated: loadNotifs };
+                // the bell catches up AND the plugin-UI gate re-reads the running set — a lifecycle
+                // mutation from this client is exactly when either can change (restart-to-apply means
+                // most flips land on reconnect, but immediate ones shouldn't wait for a re-login)
+                onAdminMutated: () => { loadNotifs(); getCapabilities().then(setCaps).catch(() => {}); } };
 
   // Native window chrome wraps EVERY screen on desktop (frameless window has no OS titlebar), so the
   // close/minimize/maximize controls are present on the pre-login screens too — not just the signed-in
@@ -384,7 +394,7 @@ function App() {
   // 'db-choice' is owned by whichever installed plugin claims that bootstrap stage (postgres, R2) —
   // Core has no DB-choice screen of its own anymore; a kernel with no such plugin enabled falls back
   // to the kernel-only shell rather than getting stuck on a screen nothing renders.
-  if (shell === 'db-choice') return withChrome(renderPluginBootstrap('db-choice', { t, language, onLang: pickLanguage }) || <KernelOnlyShell language={language} />);
+  if (shell === 'db-choice') return withChrome(renderPluginBootstrap('db-choice', { t, language, onLang: pickLanguage }, activePlugins) || <KernelOnlyShell language={language} />);
   if (shell === 'kernel-shell') return withChrome(<KernelOnlyShell language={language} />);
   if (shell === 'first-admin') {
     return withChrome(<FirstAdmin t={t} language={language} onLang={pickLanguage}
@@ -417,7 +427,7 @@ function App() {
       case "settings": return <Settings theme={theme} setTheme={setTheme} lex={lex} setLex={setLex} pickLanguage={pickLanguage} language={language} formal={formal} t={t} />;
       default: {
         // a route owned by an enabled plugin (Phase 6 seam) — else fall back to kernel Home.
-        const pluginEl = renderPluginRoute(route, { t, can, language, go, me, api: { raw } });
+        const pluginEl = renderPluginRoute(route, { t, can, language, go, me, api: { raw } }, activePlugins);
         return pluginEl || <KernelHome Sys={Sys} caps={caps} go={go} />;
       }
     }
@@ -427,7 +437,8 @@ function App() {
     <ToastProvider>
     <div className="app" key={lex}
       data-nav={navRail ? "rail" : "full"} data-drawer={drawerOpen ? "open" : undefined}>
-      <Sidebar route={route} go={go} t={t} can={can} nav={navCfg} openMode={openMode}
+      <Sidebar route={route} go={go} t={t} can={can} openMode={openMode}
+        nav={filterPluginNav(navCfg, PLUGIN_ROUTE_OWNERS, activePlugins)}
         rail={navRail} onToggle={toggleNav} />
       <div className="nav-scrim" onClick={closeDrawer} />
       <div className="main">
@@ -436,7 +447,7 @@ function App() {
       </div>
       <BottomUtilityBar
         t={t} route={route} onHome={() => go("home")} onToggleNav={toggleNav}
-        profile={renderPluginProfile({ t, me, onSignOut: auth.logout })}
+        profile={renderPluginProfile({ t, me, onSignOut: auth.logout }, activePlugins)}
         notifications={notifs}
         // sequenced: an unsequenced reload races the mark and usually re-reads the pre-mark rows
         onNotificationsOpened={() => { markNotificationsRead().catch(() => {}).finally(loadNotifs); }}
