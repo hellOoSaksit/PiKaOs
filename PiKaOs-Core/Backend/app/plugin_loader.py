@@ -16,6 +16,7 @@ import importlib
 import json
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
@@ -424,15 +425,22 @@ PLUGIN_MANIFESTS: dict[str, Manifest] = discover()
 OPTIONAL_MODULE_NAMES: tuple[str, ...] = tuple(sorted(PLUGIN_MANIFESTS))
 
 
-def _sync_modules_reexport() -> None:
-    """`app/modules.py` re-exports `PLUGIN_MANIFESTS`/`OPTIONAL_MODULE_NAMES` as a snapshot taken at
-    import time (`modules.PLUGIN_MANIFESTS = plugin_loader.PLUGIN_MANIFESTS`), not a live reference —
-    rebinding this module's globals alone leaves that snapshot stale. Deferred import: `app.modules`
-    imports `plugin_loader` at top level, so importing it back at module scope here would cycle."""
-    from . import modules
+# Anyone holding a snapshot of the two globals above needs telling when a rebind makes it stale. The
+# kernel must not reach UP into the composition seam to push the new values (§2.1 — Core ↛ App; doing so
+# via a deferred `from . import modules` still put `app.core → plugin_loader → app.modules` in the import
+# graph and broke the contract), so the dependency is inverted: interested modules register here, and the
+# kernel only calls back. Same inversion the `plugin_states()` breach took via app.state.
+_catalog_listeners: list[Callable[[], None]] = []
 
-    modules.PLUGIN_MANIFESTS = PLUGIN_MANIFESTS
-    modules.OPTIONAL_MODULE_NAMES = OPTIONAL_MODULE_NAMES
+
+def on_catalog_change(listener: Callable[[], None]) -> None:
+    """Register `listener` to run after this process's manifest catalog changes."""
+    _catalog_listeners.append(listener)
+
+
+def _notify_catalog_change() -> None:
+    for listener in _catalog_listeners:
+        listener()
 
 
 def deregister_discovered(pid: str) -> None:
@@ -444,7 +452,7 @@ def deregister_discovered(pid: str) -> None:
     global PLUGIN_MANIFESTS, OPTIONAL_MODULE_NAMES
     PLUGIN_MANIFESTS = {k: v for k, v in PLUGIN_MANIFESTS.items() if k != pid}
     OPTIONAL_MODULE_NAMES = tuple(sorted(PLUGIN_MANIFESTS))
-    _sync_modules_reexport()
+    _notify_catalog_change()
 
 
 def enabled_optional_modules() -> set[str]:
