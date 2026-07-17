@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import shutil
 from pathlib import Path
 
@@ -26,6 +27,11 @@ from ..contracts import POSTGRES_CONNECTION
 from ..identity import UserLike, get_current_user, require_perm
 
 log = logging.getLogger("pikaos.plugins.router")
+
+# A git host: labels of alnum/hyphen joined by dots, optional :port. Rejects an embedded credential
+# (`user:tok@host`), a path, or whitespace — none of which is a host, and all of which would otherwise
+# be stored as one and written to the audit trail.
+_HOST_RE = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9-]{0,62})(\.[A-Za-z0-9]([A-Za-z0-9-]{0,62}))*(:[0-9]{1,5})?$")
 
 router = APIRouter(prefix="/api/plugins", tags=["plugins"])
 
@@ -528,6 +534,10 @@ async def set_git_credential(
     check-update / update to authenticate against a private repo on that host. Write-only: the token is
     never echoed back here, and no read endpoint in this router (e.g. `list_plugins`/`PluginOut`) ever
     surfaces a stored credential, encrypted or not."""
+    # Validate the host shape at the edge (rule 10): it is a path param that becomes both a storage key
+    # and an audit target, so a value like `user:tok@github.com` must not be accepted as a "host".
+    if not _HOST_RE.match(host):
+        raise HTTPException(status_code=422, detail="invalid host")
     git_installer.set_credential(host, body.token)
     audit.log(audit.actor_of(user), "gitcred.set", host)   # host only — the token never enters the trail
     return {"ok": True}

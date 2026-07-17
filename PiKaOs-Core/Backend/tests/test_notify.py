@@ -7,7 +7,7 @@ from __future__ import annotations
 import pytest
 
 from app.core import kernel_state, notify
-from tests.conftest import AUTH_HEADER
+from tests.conftest import AUTH_HEADER, bind_identity
 
 
 @pytest.fixture(autouse=True)
@@ -81,3 +81,14 @@ def test_notifications_read_and_mark(client):
     marked = client.put("/api/notifications/read", json={"ids": None}, headers=AUTH_HEADER).json()
     assert marked == {"marked": 1}
     assert client.get("/api/notifications", headers=AUTH_HEADER).json()[0]["read"] is True
+
+
+def test_notifications_are_readable_by_any_authenticated_user_even_with_no_perms(client):
+    # Pins the store's ACTUAL contract, honestly: the feed is global and authenticated-only, so a user
+    # holding ZERO permissions reads the whole admin-plane feed (plugin ids, git tags) — not just their
+    # own. If per-user targeting is ever added (spec §4 lists it as YAGNI), this test must change with it.
+    bind_identity(client, perms=set())
+    notify.emit("plugin", "notif.plugin.installed", {"plugin": "crm"})
+    resp = client.get("/api/notifications", headers=AUTH_HEADER)
+    assert resp.status_code == 200
+    assert resp.json()[0]["params"]["plugin"] == "crm"

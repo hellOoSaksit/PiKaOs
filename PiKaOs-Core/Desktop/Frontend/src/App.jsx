@@ -300,7 +300,9 @@ function App() {
   const loadNotifs = React.useCallback(
     () => listNotifications()
       .then((rows) => setNotifRows(Array.isArray(rows) ? rows : []))
-      .catch(() => {}),   // the bell is best-effort UI — never block the shell on it
+      // best-effort UI — never block the shell on it, but a warn turns a silently dead bell into a
+      // diagnosable one (a 404 before the backend merges is expected; a 500 is not)
+      .catch((e) => { console.warn('notifications fetch failed', e); }),
     [],
   );
   useEffect(() => { if (signedIn) loadNotifs(); }, [signedIn, loadNotifs]);
