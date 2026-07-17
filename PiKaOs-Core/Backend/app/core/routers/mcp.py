@@ -18,7 +18,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from httpx import ASGITransport, AsyncClient
 
-from .. import audit, identity, mcp_catalog
+from .. import audit, identity, mcp_catalog, notify
 from ..identity import UserLike, get_current_user, require_perm
 from ..schemas import McpAllowlistIn, McpAllowlistOut, McpCallIn, McpCallOut, McpToolsOut
 
@@ -107,4 +107,5 @@ async def put_allowlist(body: McpAllowlistIn,
     `options.manage` (git_installer.py K4)."""
     entries = mcp_catalog.write_allowlist(body.entries)
     audit.log(audit.actor_of(user), "mcp.allowlist", "", {"count": len(entries)})
+    notify.emit("mcp", "notif.mcp.allowlist_changed", {"count": str(len(entries))})
     return McpAllowlistOut(entries=entries)

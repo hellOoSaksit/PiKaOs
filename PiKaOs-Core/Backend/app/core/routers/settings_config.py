@@ -16,7 +16,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from .. import audit, kernel_state
+from .. import audit, kernel_state, notify
 from ..identity import UserLike, get_current_user, require_perm
 from ..schemas import NavConfigIn, NavConfigOut, SettingValueIn, UserSettingsOut
 
@@ -78,6 +78,7 @@ async def put_nav(
     _guard_value_size(body.value)
     entry = _app_upsert(_NAV_KEY, body.value)
     audit.log(audit.actor_of(user), "settings.write", _NAV_KEY)   # key only — the value never enters the trail
+    notify.emit("settings", "notif.settings.nav_updated")
     return NavConfigOut(value=entry["value"], updated_at=entry["updated_at"])
 
 
