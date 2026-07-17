@@ -18,6 +18,19 @@ _SAFE = dict(
 )
 
 
+def _defaults() -> Settings:
+    """Settings as a **fresh install** would build them — the code defaults, nothing ambient.
+
+    Every other test here passes explicit kwargs, so it can't see the environment. A test that asserts a
+    *default* is the one case that can, and `_env_file=None` alone is not enough: it stops `.env` being
+    read but pydantic-settings still layers OS environment variables on top. That matters because CI runs
+    pytest **inside the dev container**, whose compose deliberately sets BIND_HOST=0.0.0.0,
+    ALLOW_OPEN_LAN=1 and SEED_DEV_USERS=1 — so an un-isolated assert here checks the dev stack's config
+    and calls it "the default". Callers `monkeypatch.delenv` the vars they assert on.
+    """
+    return Settings(_env_file=None)
+
+
 def test_dev_defaults_flagged_in_production():
     s = Settings(environment="production", jwt_secret="change-me-in-.env",
                  cookie_secure=False, seed_password="pikaos123", minio_secret_key="pikaos-secret")
@@ -87,13 +100,16 @@ def test_public_bind_acknowledged_is_allowed():
     assert Settings(bind_host="0.0.0.0", allow_open_lan=True).open_mode_lan_violation("open") is None
 
 
-def test_bind_host_defaults_to_loopback():
+def test_bind_host_defaults_to_loopback(monkeypatch):
     # safe-by-default: a bare run / naive deploy binds loopback until the operator opts into LAN
-    assert Settings().bind_host == "127.0.0.1"
-    assert Settings().allow_open_lan is False
+    for var in ("BIND_HOST", "ALLOW_OPEN_LAN"):
+        monkeypatch.delenv(var, raising=False)
+    s = _defaults()
+    assert s.bind_host == "127.0.0.1"
+    assert s.allow_open_lan is False
 
 
-def test_seed_dev_users_defaults_off():
+def test_seed_dev_users_defaults_off(monkeypatch):
     """Fresh installs must never ship the shared dev credential; dev stacks opt in via SEED_DEV_USERS."""
-    from app.core.config import Settings
-    assert Settings(_env_file=None).seed_dev_users is False
+    monkeypatch.delenv("SEED_DEV_USERS", raising=False)
+    assert _defaults().seed_dev_users is False
