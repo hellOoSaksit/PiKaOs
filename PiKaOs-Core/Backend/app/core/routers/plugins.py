@@ -422,7 +422,6 @@ async def enable(
     reg = registry.set_state(plugin_id, registry.ENABLED,
                                    version=_manifests()[plugin_id].version)
     audit.log(audit.actor_of(user), "plugin.enable", plugin_id)
-    notify.emit("plugin", "notif.plugin.enabled", {"plugin": plugin_id})
     return _action_response(reg)
 
 
@@ -437,7 +436,6 @@ async def disable(
     _require_not_pending_purge(reg, plugin_id)
     reg = registry.set_state(plugin_id, registry.DISABLED)
     audit.log(audit.actor_of(user), "plugin.disable", plugin_id)
-    notify.emit("plugin", "notif.plugin.disabled", {"plugin": plugin_id})
     return _action_response(reg)
 
 
@@ -517,7 +515,6 @@ async def purge(
     plugin_loader.deregister_discovered(plugin_id)
     reg = registry.purge_complete(plugin_id)
     audit.log(audit.actor_of(user), "plugin.purge", plugin_id)
-    notify.emit("plugin", "notif.plugin.purged", {"plugin": plugin_id})
     return _action_response(reg)
 
 

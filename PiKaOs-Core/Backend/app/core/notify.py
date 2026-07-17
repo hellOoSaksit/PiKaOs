@@ -2,14 +2,18 @@
 message KEY + small string params — never rendered text — and the client localizes with
 t(key, params), so the language packs stay the single source of copy. Backed by the
 `notifications` kernel-state blob through kernel_state.update (cross-process-safe
-read-modify-write); newest first, truncated to CAP on every emit."""
+read-modify-write); newest first, truncated to CAP on every emit. emit() is called at the success
+point of a mutation that has already persisted, so — like audit.log() — it never raises into a
+request path: bad params are coerced, not rejected."""
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timezone
 
 from . import kernel_state
 
+_log = logging.getLogger("pikaos.notify")
 CAP = 100
 _STORE = "notifications"
 _MAX_PARAM_CHARS = 200
@@ -21,13 +25,26 @@ def _entries() -> list[dict]:
     return value if isinstance(value, list) else []    # corrupt blob self-heals to empty
 
 
-def _validated(params: dict) -> dict:
-    if len(params) > _MAX_PARAMS:
-        raise ValueError(f"too many notification params (max {_MAX_PARAMS})")
-    for k, v in params.items():
-        if not isinstance(v, str) or len(v) > _MAX_PARAM_CHARS:
-            raise ValueError(f"notification param {k!r} must be a str of <= {_MAX_PARAM_CHARS} chars")
-    return params
+def _sanitized(params: dict) -> dict:
+    """Force `params` into the shape the store guarantees. Rejecting here would turn an already-
+    persisted mutation into a 500 — the caller's plugin really did install — so an emitter's bug is
+    logged and survivable instead. Reachable with admin-supplied or remote-derived values (an
+    install ref, a git tag), neither of which is length-capped upstream."""
+    kept = dict(list(params.items())[:_MAX_PARAMS])
+    if len(params) > len(kept):
+        _log.warning("notification params over %d — dropped %s", _MAX_PARAMS,
+                     sorted(set(params) - set(kept)))
+    out = {}
+    for k, v in kept.items():
+        if not isinstance(v, str):
+            _log.warning("notification param %r is %s, not str — coerced", k, type(v).__name__)
+            v = str(v)
+        if len(v) > _MAX_PARAM_CHARS:
+            _log.warning("notification param %r is %d chars — truncated to %d", k, len(v),
+                         _MAX_PARAM_CHARS)
+            v = v[:_MAX_PARAM_CHARS]
+        out[k] = v
+    return out
 
 
 def emit(kind: str, key: str, params: dict[str, str] | None = None) -> dict:
@@ -35,7 +52,7 @@ def emit(kind: str, key: str, params: dict[str, str] | None = None) -> dict:
         "id": f"ntf_{uuid.uuid4().hex[:12]}",
         "kind": kind,
         "key": key,
-        "params": _validated(dict(params or {})),
+        "params": _sanitized(dict(params or {})),
         "at": datetime.now(timezone.utc).isoformat(),
         "read": False,
     }
