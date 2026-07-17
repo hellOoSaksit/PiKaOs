@@ -61,6 +61,20 @@ OPTIONAL_MODULE_NAMES: tuple[str, ...] = plugin_loader.OPTIONAL_MODULE_NAMES
 enabled_optional_modules = plugin_loader.enabled_optional_modules
 
 
+def _resync_catalog() -> None:
+    """Re-take the snapshots above after the kernel rebinds its catalog (a purge → `deregister_discovered`).
+
+    The two re-exports are import-time snapshots, so a kernel-side rebind would strand them. The kernel
+    can't push the new values back without importing this composition seam (§2.1 — Core ↛ App), so the
+    direction is inverted: the App registers its own resync and the kernel just calls back."""
+    global PLUGIN_MANIFESTS, OPTIONAL_MODULE_NAMES
+    PLUGIN_MANIFESTS = plugin_loader.PLUGIN_MANIFESTS
+    OPTIONAL_MODULE_NAMES = plugin_loader.OPTIONAL_MODULE_NAMES
+
+
+plugin_loader.on_catalog_change(_resync_catalog)
+
+
 def is_module_active(name: str) -> bool:
     """True if module `name` loads in this build — the Base always does; a plugin does only when listed
     in ENABLED_MODULES. Used by worker.py to gate that plugin's jobs."""

@@ -98,7 +98,7 @@ def seed_manifest(mf) -> None:
     monkeypatch teardown, same as ``register_discovered``'s used to be."""
     plugin_loader.PLUGIN_MANIFESTS = {**plugin_loader.PLUGIN_MANIFESTS, mf.id: mf}
     plugin_loader.OPTIONAL_MODULE_NAMES = tuple(sorted(plugin_loader.PLUGIN_MANIFESTS))
-    plugin_loader._sync_modules_reexport()
+    plugin_loader._notify_catalog_change()
 
 
 def _make_sample_module() -> ModuleType:
