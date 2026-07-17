@@ -30,7 +30,11 @@ export function BottomUtilityBar({
   const [active, setActive] = useState(route === 'me' ? 'home' : null);
   const [openPop, setOpenPop] = useState(null);
   const [query, setQuery] = useState('');
-  const [clearedNotif, setClearedNotif] = useState(false);
+  // No `clearedNotif` twin for chat's latch: notifications now carry a server-side `read` flag, so
+  // opening the bell marks them read and the refetched rows report unread = 0 on their own. A local
+  // latch would only ever disagree with the server — and the one that used to live here latched `true`
+  // on first open and never reset, pinning the badge to 0 for the rest of the session. Chat keeps its
+  // latch because chat threads have no read state to ask about yet.
   const [clearedChat, setClearedChat] = useState(false);
 
   const go = (tab, fn) => { setActive(tab); setOpenPop(null); fn && fn(); };
@@ -41,12 +45,11 @@ export function BottomUtilityBar({
       return next;
     });
     setActive(tab);
-    if (tab === 'notifications') setClearedNotif(true);
     if (tab === 'chat') setClearedChat(true);
   };
   const closePop = () => setOpenPop(null);
 
-  const notifCount = clearedNotif ? 0 : unreadCount(notifications);
+  const notifCount = unreadCount(notifications);
   const chatCount = clearedChat ? 0 : chatThreads.length;
 
   const submitSearch = (e) => {
