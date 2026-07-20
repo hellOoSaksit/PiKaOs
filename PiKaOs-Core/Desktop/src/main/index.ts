@@ -12,7 +12,9 @@ import { RecoveryService } from './recovery'
 import { getBackendConfig } from './config'
 import { registerCrashHandlers, registerRendererCrashHandler } from './crash'
 import { registerSingleInstanceFocus, registerQuitCleanup } from './lifecycle'
+import { registerAiIpc } from './ai/ipc'
 import type { McpServerDef } from './mcp/registry'
+import type { CatalogTool } from './ai/toolClient'
 
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) app.quit()
@@ -47,6 +49,20 @@ async function confirmMcpStart(def: McpServerDef, hash: string): Promise<boolean
   return response === 1
 }
 
+// Effect-class tool-call consent (the AI Console's side_effect gate) — a DIFFERENT surface from
+// confirmMcpStart's process-spawn consent above. Default-Cancel so a stray Enter never approves a
+// state-changing call.
+async function confirmToolCall(tool: CatalogTool): Promise<boolean> {
+  const { response } = await dialog.showMessageBox({
+    type: 'warning',
+    buttons: ['Cancel', 'Allow'],
+    defaultId: 0, cancelId: 0,
+    message: `Allow the AI to run "${tool.name}"?`,
+    detail: `${tool.description || '(no description)'}\nEffect: ${tool.effect} — this call changes server state.`,
+  })
+  return response === 1
+}
+
 app.whenReady().then(() => {
   registerAppProtocol(distDir)
 
@@ -65,6 +81,7 @@ app.whenReady().then(() => {
   })
 
   registerIpc({ vault, broker, registry, manager, recovery })
+  registerAiIpc({ vault, broker, askConsent: confirmToolCall })
 
   manager.on('status', (id: string, status: string) => {
     for (const win of BrowserWindow.getAllWindows()) {
