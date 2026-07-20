@@ -34,11 +34,12 @@ function AiConsoleInner({ t, bridge }) {
 
   useEffect(() => {
     bridge.ai.getConfig().then(setCfg);
-    bridge.ai.onEvent((ev) => {
+    const unsubscribe = bridge.ai.onEvent((ev) => {
       if (ev.type === 'tool') setStatus(t('ai.tool.running') + ' ' + ev.name);
       if (ev.type === 'error') setStatus(t('ai.error.generic'));
       if (ev.type === 'done') setStatus(null);
     });
+    return () => unsubscribe?.();
   }, [bridge, t]);
   useEffect(() => { logRef.current?.scrollTo(0, logRef.current.scrollHeight); }, [log]);
 
