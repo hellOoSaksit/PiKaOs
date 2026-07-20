@@ -27,10 +27,14 @@ class UserSettingsOut(BaseModel):
 
 class PluginHealth(BaseModel):
     """One plugin's state for /health (plugin-architecture.md §14). `version` comes from the plugin's
-    manifest (never hardcoded — ties to versions.md); `state` is active · degraded · disabled."""
+    manifest (never hardcoded — ties to versions.md), and is **None for a quarantined plugin** whose
+    manifest failed validation (it never got a version to read); `state` is active · degraded · disabled ·
+    quarantined; `reason` carries the quarantine cause (K1) so an operator sees WHY a bad plugin didn't
+    load, else None."""
     id: str
-    version: str
-    state: str         # active | degraded (enabled but its router failed to mount, §8) | disabled
+    version: str | None = None
+    state: str         # active | degraded (enabled but its router failed to mount, §8) | disabled | quarantined
+    reason: str | None = None
 
 
 class HealthOut(BaseModel):
