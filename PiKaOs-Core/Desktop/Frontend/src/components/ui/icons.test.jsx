@@ -1,5 +1,6 @@
 import { it, expect } from 'vitest';
-import { ICON_NAMES, renderIcon } from './icons.jsx';
+import { Fragment } from 'react';
+import { ICON_NAMES, renderIcon, Icon } from './icons.jsx';
 import { NAV } from '../../data/data.jsx';
 
 const walk = (items) => items.flatMap(n => [n, ...walk(n.children || [])]);
@@ -23,4 +24,15 @@ it('resolves a known name to an element', () => {
 it('passes an unknown icon value through untouched', () => {
   expect(renderIcon('🏠')).toBe('🏠');
   expect(renderIcon(undefined)).toBe(undefined);
+});
+
+// No @testing-library/react + jsdom in this project (see Table.test.js's pattern) — call the
+// component as a plain function and walk the returned element tree instead of a real DOM.
+it('renders the ai icon as an svg with two path children (spark + plus)', () => {
+  const el = Icon({ name: 'ai' });
+  expect(el.type).toBe('svg');
+  const group = el.props.children;
+  expect(group.type).toBe(Fragment);
+  expect(group.props.children.length).toBe(2);
+  expect(group.props.children.every(p => p.type === 'path')).toBe(true);
 });
