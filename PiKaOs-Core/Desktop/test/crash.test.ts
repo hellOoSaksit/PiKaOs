@@ -60,3 +60,89 @@ it('unhandledRejection logs and never exits/relaunches/dialogs', () => {
   expect(d.app.relaunch).not.toHaveBeenCalled()
   expect(d.dialog.showMessageBox).not.toHaveBeenCalled()
 })
+
+import { registerRendererCrashHandler, withRecoveryHash, RENDER_CRASH_COOLDOWN_MS } from '../src/main/crash'
+
+function makeWin(url = 'http://localhost:5173/') {
+  const wc = new FakeEmitter() as any
+  wc.getURL = vi.fn(() => url)
+  return {
+    reload: vi.fn(), loadURL: vi.fn(), isDestroyed: () => false, webContents: wc,
+    crash(reason = 'crashed') { wc.emit('render-process-gone', {}, { reason, exitCode: 5 }) },
+  }
+}
+
+it('withRecoveryHash appends #recovery and replaces any existing hash', () => {
+  expect(withRecoveryHash('http://localhost:5173/')).toBe('http://localhost:5173/#recovery')
+  expect(withRecoveryHash('app://pikaos/index.html#old')).toBe('app://pikaos/index.html#recovery')
+})
+
+it('first renderer crash → one silent reload, no dialog', () => {
+  const d = makeDeps(Promise.resolve({ response: 0 }))
+  const win = makeWin()
+  registerRendererCrashHandler(win as any, { ...d, now: () => 1000 } as any)
+  win.crash()
+  expect(win.reload).toHaveBeenCalledTimes(1)
+  expect(d.dialog.showMessageBox).not.toHaveBeenCalled()
+})
+
+it('a second crash inside the cooldown → dialog, not another silent reload', () => {
+  const d = makeDeps(new Promise(() => {}))
+  const win = makeWin()
+  let t = 1000
+  registerRendererCrashHandler(win as any, { ...d, now: () => t } as any)
+  win.crash(); t += 2000; win.crash()
+  expect(win.reload).toHaveBeenCalledTimes(1)   // only the first crash reloaded
+  const opts = d.dialog.showMessageBox.mock.calls[0][0] as any
+  expect(opts.buttons).toEqual([STRINGS.rendererReload, STRINGS.rendererRecovery, STRINGS.rendererQuit])
+})
+
+it('a crash after the cooldown resets the counter → silent reload again', () => {
+  const d = makeDeps(Promise.resolve({ response: 0 }))
+  const win = makeWin()
+  let t = 1000
+  registerRendererCrashHandler(win as any, { ...d, now: () => t } as any)
+  win.crash(); t += RENDER_CRASH_COOLDOWN_MS + 1; win.crash()
+  expect(win.reload).toHaveBeenCalledTimes(2)
+  expect(d.dialog.showMessageBox).not.toHaveBeenCalled()
+})
+
+it('loop dialog: Reload resets the counter and reloads', async () => {
+  const d = makeDeps(Promise.resolve({ response: 0 }))
+  const win = makeWin()
+  let t = 1000
+  registerRendererCrashHandler(win as any, { ...d, now: () => t } as any)
+  win.crash(); t += 1000; win.crash()
+  await vi.waitFor(() => expect(win.reload).toHaveBeenCalledTimes(2))  // 1 silent + 1 from Reload
+  t += 1000; win.crash()                                              // counter was reset →
+  expect(win.reload).toHaveBeenCalledTimes(3)                         // silent reload, no 2nd dialog
+  expect(d.dialog.showMessageBox).toHaveBeenCalledTimes(1)
+})
+
+it('loop dialog: Open Recovery loads the current URL with #recovery', async () => {
+  const d = makeDeps(Promise.resolve({ response: 1 }))
+  const win = makeWin('app://pikaos/index.html')
+  let t = 1000
+  registerRendererCrashHandler(win as any, { ...d, now: () => t } as any)
+  win.crash(); t += 1000; win.crash()
+  await vi.waitFor(() =>
+    expect(win.loadURL).toHaveBeenCalledWith('app://pikaos/index.html#recovery'))
+})
+
+it('loop dialog: Quit quits the app', async () => {
+  const d = makeDeps(Promise.resolve({ response: 2 }))
+  const win = makeWin()
+  let t = 1000
+  registerRendererCrashHandler(win as any, { ...d, now: () => t } as any)
+  win.crash(); t += 1000; win.crash()
+  await vi.waitFor(() => expect(d.app.quit).toHaveBeenCalled())
+})
+
+it('intentional reasons (clean-exit, killed) are ignored entirely', () => {
+  const d = makeDeps(Promise.resolve({ response: 0 }))
+  const win = makeWin()
+  registerRendererCrashHandler(win as any, { ...d, now: () => 1000 } as any)
+  win.crash('clean-exit'); win.crash('killed')
+  expect(win.reload).not.toHaveBeenCalled()
+  expect(d.dialog.showMessageBox).not.toHaveBeenCalled()
+})

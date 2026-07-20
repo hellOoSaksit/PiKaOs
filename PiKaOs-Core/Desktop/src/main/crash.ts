@@ -63,3 +63,57 @@ export function registerCrashHandlers({ app, dialog, proc = process, log = conso
     log(`[crash] unhandledRejection ${String(reason)}`)
   })
 }
+
+export interface CrashWindowLike {
+  reload(): void
+  loadURL(url: string): void
+  isDestroyed(): boolean
+  webContents: { on(event: string, cb: (...args: any[]) => void): void; getURL(): string }
+}
+
+// DevTools kills and normal teardown — not crashes.
+const IGNORED_RENDER_REASONS = new Set(['clean-exit', 'killed'])
+
+/** The Recovery boot flag rides the URL because at render-process-gone time there is no live
+ *  renderer to execute JS into — the URL is the one channel main fully owns (spec §3). */
+export function withRecoveryHash(url: string): string {
+  return url.split('#')[0] + '#recovery'
+}
+
+/** Per-window renderer-crash policy: silent reload once (most crashes are transient), a native
+ *  dialog on a loop — native so the decision surface can never re-crash with the SPA. */
+export function registerRendererCrashHandler(
+  win: CrashWindowLike,
+  { app, dialog, log = console.error, now = Date.now }: CrashDeps & { now?: () => number },
+): void {
+  let lastCrashAt = 0
+  let crashCount = 0
+  let dialogOpen = false
+
+  win.webContents.on('render-process-gone', (_e: unknown, details: { reason?: string; exitCode?: number }) => {
+    const reason = details?.reason ?? 'unknown'
+    if (IGNORED_RENDER_REASONS.has(reason)) return
+    log(`[crash] render-process-gone ${reason} exitCode=${details?.exitCode}`)
+
+    const t = now()
+    crashCount = t - lastCrashAt <= RENDER_CRASH_COOLDOWN_MS ? crashCount + 1 : 1
+    lastCrashAt = t
+
+    if (crashCount < RENDER_CRASH_LOOP_COUNT) { win.reload(); return }
+    if (dialogOpen) return
+    dialogOpen = true
+    void dialog.showMessageBox({
+      type: 'error',
+      message: STRINGS.rendererLoopMessage,
+      buttons: [STRINGS.rendererReload, STRINGS.rendererRecovery, STRINGS.rendererQuit],
+      defaultId: 0,
+      cancelId: 0,   // Esc = safe Reload, not Quit
+    }).then(({ response }) => {
+      dialogOpen = false
+      if (win.isDestroyed()) return
+      if (response === 0) { crashCount = 0; win.reload() }
+      else if (response === 1) { crashCount = 0; win.loadURL(withRecoveryHash(win.webContents.getURL())) }
+      else app.quit()
+    })
+  })
+}
