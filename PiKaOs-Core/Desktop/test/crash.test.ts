@@ -159,3 +159,12 @@ it('intentional reasons (clean-exit, killed) are ignored entirely', () => {
   expect(win.reload).not.toHaveBeenCalled()
   expect(d.dialog.showMessageBox).not.toHaveBeenCalled()
 })
+
+it('child-process-gone (Electron internal) is logged, nothing else', () => {
+  const d = makeDeps(Promise.resolve({ response: 0 }))
+  registerCrashHandlers(d as any)
+  d.app.emit('child-process-gone', {}, { type: 'GPU', reason: 'crashed' })
+  expect(d.log).toHaveBeenCalledWith(expect.stringContaining('[crash] child-process-gone GPU crashed'))
+  expect(d.dialog.showMessageBox).not.toHaveBeenCalled()
+  expect(d.app.exit).not.toHaveBeenCalled()
+})

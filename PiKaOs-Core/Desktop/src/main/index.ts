@@ -10,6 +10,7 @@ import { McpRegistry } from './mcp/registry'
 import { McpManager } from './mcp/manager'
 import { RecoveryService } from './recovery'
 import { getBackendConfig } from './config'
+import { registerCrashHandlers, registerRendererCrashHandler } from './crash'
 import type { McpServerDef } from './mcp/registry'
 
 const gotLock = app.requestSingleInstanceLock()
@@ -72,9 +73,19 @@ app.whenReady().then(() => {
 
   removeAppMenu(Menu)
   const win = createWindow()
+
+  // Last-resort crash handling (crash spec 2026-07-20): main fatal → dialog → relaunch/quit;
+  // renderer crash → reload-once-then-ask with a Recovery escape; internal children → log.
+  registerCrashHandlers({ app, dialog })
+  registerRendererCrashHandler(win, { app, dialog })
+
   registerDevtoolsShortcut(win, app.isPackaged)
   registerZoomShortcuts(win)
   forwardMaximizeState(win)
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      registerRendererCrashHandler(createWindow(), { app, dialog })
+    }
+  })
 })
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
