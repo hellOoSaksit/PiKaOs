@@ -682,7 +682,7 @@ body {
 /* Meter / bar — kit progress: flat token fills, no colored glow; puffy inset track */
 .meter { height: 10px; border-radius: 999px; background: var(--bg-4); overflow: hidden; box-shadow: inset 0 1px 2px rgba(17,24,39,0.08); }
 .meter > i { display: block; height: 100%; border-radius: 999px; transition: width .5s var(--spring-soft); }
-.meter.mana > i { background: var(--sapphire); }
+.meter.quota > i { background: var(--sapphire); }
 .meter.xp > i { background: linear-gradient(90deg, var(--gold), var(--gold-bright)); }
 .meter.hp > i { background: linear-gradient(90deg,#a8463a,#d07a55); }
 
