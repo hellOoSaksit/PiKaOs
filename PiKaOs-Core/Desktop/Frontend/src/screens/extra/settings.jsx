@@ -2,7 +2,7 @@
    ไม่ hardcode ภาษา/รูปแบบคำศัพท์ — สแกนจาก src/data/i18n/*.json (เมตาในแต่ละไฟล์):
    LEX_LANGS = รายการภาษา (ตัดซ้ำแล้ว) · stylesForLang(code) = ทุกรูปแบบคำศัพท์ของภาษานั้น
    (LLM API keys live in the tools screen via the backend /llm/connections flow — F4.) */
-import { PageHead, Panel } from '../../components/components.jsx';
+import { PageHead, Panel } from '../../components/ui';
 import { LEX_LANGS, langByCode, stylesForLang, packById } from '../../lib/i18n.jsx';
 
 const THEME_CARDS = [

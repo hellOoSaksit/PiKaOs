@@ -12,7 +12,8 @@
    main process (mcp/manager.ts) and isn't reproduced here. */
 import React from 'react';
 const { useEffect, useState } = React;
-import { Btn, Empty, HelpNote, PageHead, Panel } from '../../components/components.jsx';
+import { Btn } from '../../components/components.jsx';
+import { Empty, HelpNote, PageHead, Panel } from '../../components/ui';
 
 const STATUS_BADGE = {
   running:  { cls: 'on',   en: 'Running',  th: 'กำลังทำงาน' },
