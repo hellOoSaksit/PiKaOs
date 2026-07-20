@@ -11,6 +11,7 @@ import { McpManager } from './mcp/manager'
 import { RecoveryService } from './recovery'
 import { getBackendConfig } from './config'
 import { registerCrashHandlers, registerRendererCrashHandler } from './crash'
+import { registerSingleInstanceFocus, registerQuitCleanup } from './lifecycle'
 import type { McpServerDef } from './mcp/registry'
 
 const gotLock = app.requestSingleInstanceLock()
@@ -78,6 +79,11 @@ app.whenReady().then(() => {
   // renderer crash → reload-once-then-ask with a Recovery escape; internal children → log.
   registerCrashHandlers({ app, dialog })
   registerRendererCrashHandler(win, { app, dialog })
+
+  // Instance lifecycle (crash spec §2.4): focus the running window on a second launch instead
+  // of silently killing the new instance; stop every MCP child so none orphans on quit.
+  registerSingleInstanceFocus(app, () => (win.isDestroyed() ? null : win))
+  registerQuitCleanup(app, () => manager.stopAll())
 
   registerDevtoolsShortcut(win, app.isPackaged)
   registerZoomShortcuts(win)
