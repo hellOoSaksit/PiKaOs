@@ -1,6 +1,5 @@
-import Tooltip from './Tooltip.jsx';
+import Button from './Button.jsx';
 import TitleMenu from './TitleMenu.jsx';
-import { renderIcon } from './icons.jsx';
 
 const desk = () => (typeof window !== 'undefined' ? window.pikaosDesktop : undefined);
 
@@ -32,22 +31,16 @@ export default function TitleBar({ t, onSidebar, onSearch, onBack, onForward, ca
     });
   };
 
-  const Btn = ({ icon, label, onClick, disabled }) => (
-    <Tooltip label={label}>
-      <button type="button" className="tb-btn" aria-label={label} onClick={onClick} disabled={disabled}>
-        {renderIcon(icon)}
-      </button>
-    </Tooltip>
-  );
-
+  // Icon-only Buttons carrying the flat title-bar chrome via `.tb-btn` (see styles.css — scoped to
+  // `.btn.tb-btn` so it overrides the physical-button base). Button handles the tooltip + aria-label.
   return (
     <header className="titlebar" data-no-lex>
       <div className="titlebar-tools">
         <TitleMenu t={t} onSettings={onMenuSettings} onToggleSidebar={onSidebar} version={version} />
-        <Btn icon="sidebar" label={t('titlebar.sidebar')} onClick={onSidebar} />
-        <Btn icon="search" label={t('titlebar.search')} onClick={onSearch} />
-        <Btn icon="chevron-left" label={t('titlebar.back')} onClick={onBack} disabled={!canBack} />
-        <Btn icon="chevron-right" label={t('titlebar.forward')} onClick={onForward} disabled={!canForward} />
+        <Button className="tb-btn" icon="sidebar" label={t('titlebar.sidebar')} onClick={onSidebar} />
+        <Button className="tb-btn" icon="search" label={t('titlebar.search')} onClick={onSearch} />
+        <Button className="tb-btn" icon="chevron-left" label={t('titlebar.back')} onClick={onBack} disabled={!canBack} />
+        <Button className="tb-btn" icon="chevron-right" label={t('titlebar.forward')} onClick={onForward} disabled={!canForward} />
       </div>
       <div className="titlebar-draghandle" onMouseDown={onDragDown} onDoubleClick={() => api.window.toggleMaximize()} />
     </header>

@@ -6,8 +6,7 @@
    "restart" hint when the registry now differs from what this process mounted (plugin-lifecycle-ui §7). */
 import React, { useEffect, useState } from 'react';
 
-import { Btn } from '../components/components.jsx';
-import { Empty, HelpNote, PageHead, Panel, Segmented } from '../components/ui/index.js';
+import { Button, Empty, HelpNote, PageHead, Panel, Segmented } from '../components/ui/index.js';
 import { LocalMcp } from './secondary/LocalMcp.jsx';
 import * as api from '../lib/api.js';
 
@@ -45,13 +44,13 @@ function PluginRow({ p, T, may, busy, onInstall, onEnable, onDisable, onUninstal
         {may && (
           <div className="row" style={{ gap: 6 }}>
             {p.state === 'pending_purge'
-              ? <Btn kind="danger" sm onClick={onPurge}>{lbl('Purge data', 'ล้างข้อมูล')}</Btn>
+              ? <Button kind="danger" size="sm" onClick={onPurge}>{lbl('Purge data', 'ล้างข้อมูล')}</Button>
               : <>
-                  {p.state === 'available' && <Btn kind="gold" sm icon="⬇" onClick={onInstall}>{lbl('Install', 'ติดตั้ง')}</Btn>}
-                  {p.state === 'enabled' && <Btn kind="ghost" sm onClick={onDisable}>{lbl('Disable', 'ปิด')}</Btn>}
-                  {(p.state === 'disabled' || p.state === 'installed') && <Btn kind="gold" sm onClick={onEnable}>{lbl('Enable', 'เปิด')}</Btn>}
-                  {p.installedVia === 'git' && updateInfo?.hasUpdate && <Btn kind="gold" sm onClick={onCheckUpdate}>{lbl('Update', 'อัปเดต')}</Btn>}
-                  {p.state !== 'available' && <Btn kind="danger" sm icon="🗑" onClick={onUninstall}>{lbl('Uninstall', 'ถอน')}</Btn>}
+                  {p.state === 'available' && <Button kind="gold" size="sm" icon="download" onClick={onInstall}>{lbl('Install', 'ติดตั้ง')}</Button>}
+                  {p.state === 'enabled' && <Button kind="ghost" size="sm" onClick={onDisable}>{lbl('Disable', 'ปิด')}</Button>}
+                  {(p.state === 'disabled' || p.state === 'installed') && <Button kind="gold" size="sm" onClick={onEnable}>{lbl('Enable', 'เปิด')}</Button>}
+                  {p.installedVia === 'git' && updateInfo?.hasUpdate && <Button kind="gold" size="sm" onClick={onCheckUpdate}>{lbl('Update', 'อัปเดต')}</Button>}
+                  {p.state !== 'available' && <Button kind="danger" size="sm" icon="delete" onClick={onUninstall}>{lbl('Uninstall', 'ถอน')}</Button>}
                 </>}
           </div>
         )}
@@ -79,9 +78,9 @@ function GitCredentialsPanel({ T, t, busy, onSave }) {
           value={host} onChange={e => setHost(e.target.value)} />
         <input className="bf-input" type="password" style={{ flex: 2, minWidth: 200 }} placeholder={T('Access token', 'โทเคน')}
           value={token} onChange={e => setToken(e.target.value)} />
-        <Btn kind="ghost" sm disabled={busy === 'git-cred'} onClick={submit}>
+        <Button kind="ghost" size="sm" disabled={busy === 'git-cred'} onClick={submit}>
           {busy === 'git-cred' ? '…' : T('Save credential', 'บันทึกโทเคน')}
-        </Btn>
+        </Button>
       </div>
     </Panel>
   );
@@ -117,8 +116,8 @@ function InstallPlanModal({ plan, target, T, busy, onConfirm, onCancel }) {
             </>
           )}
           <div className="row" style={{ gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
-            <Btn kind="ghost" sm onClick={onCancel}>{T('Cancel', 'ยกเลิก')}</Btn>
-            <Btn kind="gold" sm icon="⬇" onClick={onConfirm}>{busy ? '…' : T('Install all', 'ติดตั้งทั้งหมด')}</Btn>
+            <Button kind="ghost" size="sm" onClick={onCancel}>{T('Cancel', 'ยกเลิก')}</Button>
+            <Button kind="gold" size="sm" icon="download" onClick={onConfirm}>{busy ? '…' : T('Install all', 'ติดตั้งทั้งหมด')}</Button>
           </div>
         </div>
       </div>
@@ -278,7 +277,7 @@ export function PluginsManager({ Sys, view = 'modules' }) {
             title={T('Modules / Plugins', 'โมดูล / ปลั๊กอิน')}
             desc={T('Choose which features this deployment runs. Installing a feature also pulls in anything it depends on (e.g. RAG needs AI); a dependency that is already installed is reused, never installed twice.',
                     'เลือกว่าระบบนี้จะเปิดฟีเจอร์ไหน · การติดตั้งฟีเจอร์จะดึงสิ่งที่มันพึ่งพามาด้วย (เช่น RAG ต้องการ AI) · ตัวที่ติดตั้งแล้วจะถูกใช้ซ้ำ ไม่ลงซ้ำ')}
-            actions={<Btn kind="ghost" sm icon="↻" onClick={load}>{T('Refresh', 'รีเฟรช')}</Btn>} />
+            actions={<Button kind="ghost" size="sm" icon="refresh" onClick={load}>{T('Refresh', 'รีเฟรช')}</Button>} />
           {plugins.length === 0
             ? <Empty icon="🧩" title={T('No plugins discovered', 'ไม่พบปลั๊กอิน')} sub={T('This is a Base-only build.', 'บิลด์นี้เป็น Base ล้วน')} />
             : <div style={{ display: 'grid', gap: 12 }}>
@@ -308,9 +307,9 @@ export function PluginsManager({ Sys, view = 'modules' }) {
                     value={gitUrl} onChange={e => setGitUrl(e.target.value)} disabled={!may} />
                   <input className="bf-input" style={{ flex: 1, minWidth: 120 }} placeholder={T('Tag (optional)', 'แท็ก (ไม่บังคับ)')}
                     value={gitRef} onChange={e => setGitRef(e.target.value)} disabled={!may} />
-                  <Btn kind="gold" sm icon="⬇" disabled={!may || busy === 'git-install'} onClick={submitGitInstall}>
+                  <Button kind="gold" size="sm" icon="download" disabled={!may || busy === 'git-install'} onClick={submitGitInstall}>
                     {busy === 'git-install' ? '…' : T('Install from Git', 'ติดตั้งจาก Git')}
-                  </Btn>
+                  </Button>
                 </div>
                 <label className="row" style={{ gap: 6, alignItems: 'center', marginTop: 6, fontSize: 12 }}>
                   <input type="checkbox" checked={allowHead} onChange={e => setAllowHead(e.target.checked)} disabled={!may} />

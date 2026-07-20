@@ -10,7 +10,7 @@
    `Sys.setNav` (which persists) when Save is pressed; Discard drops the draft. */
 import React from 'react';
 const { useEffect, useMemo, useState } = React;
-import { Btn } from '../components/components.jsx';
+import { Button } from '../components/ui';
 import { renderIcon } from '../components/ui/icons.jsx';
 import {
   MAX_DEPTH, moveUp, moveDown, indent, outdent, canIndent, canOutdent,
@@ -83,7 +83,7 @@ function NavManagerPanel({ Sys, t }) {
       <div className="navmgr-bar">
         <div className="sm-set-note mono">{T(`Shared for everyone — drag or ↑↓ to reorder, indent/outdent to nest up to ${MAX_DEPTH} levels, hide, rename. Hidden items leave the sidebar; their pages still open by link.`,
           `ใช้ร่วมกันทุกคน — ลาก หรือ ↑↓ จัดลำดับ · เลื่อนเข้า/ออกเพื่อซ้อนได้ถึง ${MAX_DEPTH} ระดับ · ซ่อน · เปลี่ยนชื่อ · รายการที่ซ่อนจะหายจาก sidebar แต่หน้ายังเข้าได้ผ่านลิงก์`)}</div>
-        <Btn kind="ghost" sm onClick={doReset}>{tx("navmgr.reset")}</Btn>
+        <Button kind="ghost" size="sm" onClick={doReset}>{tx("navmgr.reset")}</Button>
       </div>
 
       {draft.map(g => (
@@ -98,8 +98,8 @@ function NavManagerPanel({ Sys, t }) {
       {/* Nothing above this line has touched the shared config — Save is the only writer. */}
       <div className="navmgr-bar navmgr-save">
         <span className={`navmgr-dirty ${dirty ? "on" : ""}`}>{dirty ? tx("navmgr.unsaved") : tx("navmgr.saved")}</span>
-        <Btn kind="ghost" sm disabled={!dirty} onClick={doDiscard}>{tx("navmgr.discard")}</Btn>
-        <Btn kind="gold" sm disabled={!dirty} onClick={doSave}>{tx("navmgr.save")}</Btn>
+        <Button kind="ghost" size="sm" disabled={!dirty} onClick={doDiscard}>{tx("navmgr.discard")}</Button>
+        <Button kind="gold" size="sm" disabled={!dirty} onClick={doSave}>{tx("navmgr.save")}</Button>
       </div>
     </div>
   );
