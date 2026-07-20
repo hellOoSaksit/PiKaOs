@@ -20,7 +20,9 @@ const bootKey = () => `pikaos.boot.v1:${serverKeyFor(getApiBase())}`;
 // one-time scrub of the old global key (same pattern as api.js's localStorage scrub)
 try { localStorage.removeItem('pikaos.boot.v1'); } catch (e) { /* ignore */ }
 const LEX_KEY = 'guild-lex';        // same key App.jsx reads for the active lexicon/language
-const BOOT_MIN = 1300;              // minimum curtain display so the animation doesn't flash by
+const BOOT_MIN = 700;               // minimum curtain display so the animation doesn't flash by (tuned
+                                    // down from 1300: the curtain only shows on a cold start / first
+                                    // launch after a build change, so it was the dominant cold-load delay)
 const BOOT_HARD_CAP = 4000;         // never trap the user on the splash if the mascot fails to load
 
 // sessionStorage flag: '1' = show Connect-Server even when the saved server is reachable
