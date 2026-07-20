@@ -314,6 +314,11 @@ body {
   box-shadow: none; transform: none;
   transition: background .12s, color .12s;
 }
+/* Icons inside a button own their size from this slot (icons.jsx renders a viewBox-only svg with no
+   width/height — "size comes from CSS where the slot owns it"). Before U1 buttons carried emoji glyphs;
+   the merged Button renders design-system svg icons next to text, so without this the svg balloons. */
+.btn .ico { width: 18px; height: 18px; flex-shrink: 0; }
+.btn-sm .ico { width: 16px; height: 16px; }
 .btn.tb-btn > svg { width: 17px; height: 17px; }
 .btn.tb-btn:hover:not(:disabled) { background: var(--bg-4); color: var(--ink); box-shadow: none; transform: none; }
 .btn.tb-btn:disabled { opacity: .4; cursor: default; }
