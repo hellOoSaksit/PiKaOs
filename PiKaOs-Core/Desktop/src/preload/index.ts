@@ -26,6 +26,15 @@ const api = {
   secrets: {
     setForServer: (sid: string, key: string, value: string) => ipcRenderer.invoke('secrets:setForServer', sid, key, value),
   },
+  ai: {
+    setKey: (provider: string, apiKey: string) => ipcRenderer.invoke('ai:setKey', { provider, apiKey }),
+    clearKey: (provider: string) => ipcRenderer.invoke('ai:clearKey', { provider }),
+    getConfig: () => ipcRenderer.invoke('ai:getConfig'),
+    setConfig: (c: any) => ipcRenderer.invoke('ai:setConfig', c),
+    chat: (messages: Array<{ role: string; content: string }>) => ipcRenderer.invoke('ai:chat', { messages }),
+    stop: () => ipcRenderer.invoke('ai:stop'),
+    onEvent: (cb: (ev: any) => void) => ipcRenderer.on('ai:event', (_e, ev) => cb(ev)),
+  },
   recovery: {
     diagnose: () => ipcRenderer.invoke('recovery:diagnose'),
     repair: (id: string, subId?: string) => ipcRenderer.invoke('recovery:repair', id, subId),
