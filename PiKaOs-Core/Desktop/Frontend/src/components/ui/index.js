@@ -38,3 +38,4 @@ export { default as PageHead } from './PageHead.jsx';
 export { default as HelpNote } from './HelpNote.jsx';
 export { default as StatTile } from './StatTile.jsx';
 export { default as Empty } from './Empty.jsx';
+export { default as Table } from './Table.jsx';
