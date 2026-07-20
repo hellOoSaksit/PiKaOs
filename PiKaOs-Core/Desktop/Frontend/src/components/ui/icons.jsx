@@ -1,7 +1,6 @@
-/* PiKaOs icon set — 60 line icons on a 24x24 grid, 1.8 stroke, round caps/joins.
-   Source of truth: PiKaOs-Docs/design-system/"Icon System.dc.html" (50 icons) plus 10 drawn
-   for shell surfaces the sheet didn't cover (key, tools, puzzle, components, package, monitor,
-   clipboard-list, book, globe, sidebar).
+/* PiKaOs icon set — 59 line icons on a 24x24 grid, 1.8 stroke, round caps/joins.
+   Source of truth: PiKaOs-Docs/design-system/"Icon System.dc.html" — every icon here has a
+   matching tile there.
 
    Monochrome by construction: paths never carry their own colour, they inherit `currentColor`,
    so one icon serves both themes. Semantic colour is the caller's choice via `tone` — never
@@ -9,6 +8,8 @@
 import React from 'react';
 
 const PATHS = {
+  /* ai */
+  "ai": <><path d="M11 4.5 12.6 9.4 17.5 11 12.6 12.6 11 17.5 9.4 12.6 4.5 11 9.4 9.4 11 4.5z"/><path d="M17.5 15.5v4M15.5 17.5h4"/></>,
   /* account */
   "add-account": <><circle cx="9.5" cy="8" r="3.5"/><path d="M3.5 19.5c0-3.4 2.7-5.8 6-5.8 1 0 1.9.2 2.7.5"/><path d="M17.5 14.5v6M14.5 17.5h6"/></>,
   "user": <><circle cx="12" cy="8" r="3.6"/><path d="M5.5 19.5c0-3.7 2.9-6.2 6.5-6.2s6.5 2.5 6.5 6.2"/></>,
