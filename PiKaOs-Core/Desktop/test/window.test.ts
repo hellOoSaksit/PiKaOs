@@ -118,6 +118,28 @@ it('blocks navigation away from app://pikaos and the dev server URL', async () =
   expect(lookalike.preventDefault).toHaveBeenCalled()
 })
 
+it('allows a RELOAD of the dev server even at a trailing-slash / SPA path — window.location.reload() (and disconnect) navigate to the full document URL http://localhost:5173/, not the bare origin string, so an exact-string check silently blocks every in-app reload in dev', async () => {
+  process.env.VITE_DEV_SERVER_URL = 'http://localhost:5173'
+  const { createWindow } = await import('../src/main/window')
+  const win = createWindow() as unknown as FakeBrowserWindow
+  const onWillNavigate = win.webContents.on.mock.calls.find((c) => c[0] === 'will-navigate')![1]
+
+  // the URL a reload / Vite full-reload actually navigates to: origin + '/', not the bare origin
+  const reload = { preventDefault: vi.fn() }
+  onWillNavigate(reload, 'http://localhost:5173/')
+  expect(reload.preventDefault).not.toHaveBeenCalled()
+
+  // an SPA sub-path on the same origin is still same-origin → allowed
+  const subpath = { preventDefault: vi.fn() }
+  onWillNavigate(subpath, 'http://localhost:5173/some/route')
+  expect(subpath.preventDefault).not.toHaveBeenCalled()
+
+  // a different host on the same port is a DIFFERENT origin → still blocked (guard stays strict)
+  const lookalike = { preventDefault: vi.fn() }
+  onWillNavigate(lookalike, 'http://localhost.evil.com:5173/')
+  expect(lookalike.preventDefault).toHaveBeenCalled()
+})
+
 it('denies every permission request by default', async () => {
   const { createWindow } = await import('../src/main/window')
   createWindow()

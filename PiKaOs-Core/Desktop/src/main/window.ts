@@ -58,12 +58,21 @@ export function createWindow(): BrowserWindow {
   return win
 }
 
-// Exact-origin navigation allow-check: only the bundled app origin (app://pikaos) or the exact
-// dev server URL. Rejects lookalike hosts (app://pikaosevil.com) and unparseable URLs.
+// Exact-ORIGIN navigation allow-check: only the bundled app origin (app://pikaos) or the dev server
+// origin. Compare protocol+host (not the raw string) so an in-app reload survives: window.location
+// .reload() — and DisconnectButton/TitleMenu, which reload to drop the server — fire will-navigate
+// with the full document URL (http://localhost:5173/, trailing slash + any SPA path), which never
+// equals the bare VITE_DEV_SERVER_URL string, so the old exact-string check silently blocked every
+// reload in dev. Still rejects lookalike hosts (app://pikaosevil.com, localhost.evil:5173) since
+// host includes the port and must match exactly.
 export function isAllowedNavigation(url: string): boolean {
-  if (process.env.VITE_DEV_SERVER_URL && url === process.env.VITE_DEV_SERVER_URL) return true
   try {
     const u = new URL(url)
+    const devUrl = process.env.VITE_DEV_SERVER_URL
+    if (devUrl) {
+      const dev = new URL(devUrl)
+      if (u.protocol === dev.protocol && u.host === dev.host) return true
+    }
     return u.protocol === 'app:' && u.host === 'pikaos'
   } catch {
     return false
