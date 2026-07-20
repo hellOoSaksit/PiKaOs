@@ -1,13 +1,14 @@
 import { useEffect, useRef } from 'react';
 import { focusables, nextTrapTarget } from './focus-trap.js';
+import { renderIcon } from './icons.jsx';
 
 /**
  * Modal — overlay (blur) + spring-pop dialog. Controlled via `open`.
- * Esc / overlay-click → onClose; pass `showClose` for a built-in ✕ in the header.
+ * Esc / overlay-click → onClose; pass `showClose` for a built-in close icon in the header.
  * footer is right-aligned (pass via `footer`). While open it traps Tab focus inside
  * the dialog and restores focus to the previously-focused element on close (a11y).
  * Reduced-motion is handled in CSS.
- * Modal has no `Sys`/`t` in scope (Core primitive), so the ✕ button's accessible name
+ * Modal has no `Sys`/`t` in scope (Core primitive), so the close button's accessible name
  * must come from the caller via `closeLabel` — no hardcoded literal here (i18n hard rule).
  */
 export default function Modal({ open, onClose, title, children, footer, showClose = false, closeLabel, className = '' }) {
@@ -41,7 +42,7 @@ export default function Modal({ open, onClose, title, children, footer, showClos
         {showClose && onClose
           ? <div className="pk-modal-head">
               {title && <h3>{title}</h3>}
-              <button type="button" className="pk-modal-close" onClick={onClose} aria-label={closeLabel || undefined}>✕</button>
+              <button type="button" className="pk-modal-close" onClick={onClose} aria-label={closeLabel || undefined}>{renderIcon('close')}</button>
             </div>
           : title && <h3>{title}</h3>}
         {typeof children === 'string' ? <p>{children}</p> : children}
