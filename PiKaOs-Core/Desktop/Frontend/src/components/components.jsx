@@ -8,10 +8,6 @@ import { renderIcon } from './ui/icons.jsx';
 
 function RankGem({ r }) { return <span className={`rank ${r}`}>{r}</span>; }
 
-function Meter({ kind = "mana", val }) {
-  return <div className={`meter ${kind}`}><i style={{ width: `${val}%` }} /></div>;
-}
-
 function Panel({ title, en, icon, right, children, className = "", ornate = false, bodyPad = true }) {
   return (
     <section className={`panel ${ornate ? "ornate" : ""} ${className}`}>
@@ -128,7 +124,7 @@ function HelpNote({ children, tag }) {
 }
 
 Object.assign(window, {
-  RankGem, Meter, Panel, Btn, StatTile, Divider,
+  RankGem, Panel, Btn, StatTile, Divider,
   TypingDots, Empty, PageHead,
   FeatureTag, HelpNote,
 });
@@ -140,7 +136,6 @@ export {
   FEATURE_TAGS,
   FeatureTag,
   HelpNote,
-  Meter,
   PageHead,
   Panel,
   RankGem,

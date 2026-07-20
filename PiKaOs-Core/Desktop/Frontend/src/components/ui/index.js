@@ -12,6 +12,7 @@ export { default as Checkbox } from './Checkbox.jsx';
 export { default as Switch } from './Switch.jsx';
 export { default as Segmented } from './Segmented.jsx';
 export { default as Field } from './Input.jsx';
+export { default as Meter } from './Meter.jsx';
 export { default as Badge } from './Badge.jsx';
 export { default as Tooltip } from './Tooltip.jsx';
 export { default as Progress } from './Progress.jsx';
