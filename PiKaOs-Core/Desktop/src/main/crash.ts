@@ -95,12 +95,15 @@ export function registerRendererCrashHandler(
     if (IGNORED_RENDER_REASONS.has(reason)) return
     log(`[crash] render-process-gone ${reason} exitCode=${details?.exitCode}`)
 
+    // The loop dialog owns the decision once it's up — a late crash (slow user) must not
+    // reload the window out from under an open dialog whose .then() still targets it.
+    if (dialogOpen) return
+
     const t = now()
     crashCount = t - lastCrashAt <= RENDER_CRASH_COOLDOWN_MS ? crashCount + 1 : 1
     lastCrashAt = t
 
     if (crashCount < RENDER_CRASH_LOOP_COUNT) { win.reload(); return }
-    if (dialogOpen) return
     dialogOpen = true
     void dialog.showMessageBox({
       type: 'error',

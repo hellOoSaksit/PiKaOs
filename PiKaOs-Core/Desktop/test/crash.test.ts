@@ -138,6 +138,19 @@ it('loop dialog: Quit quits the app', async () => {
   await vi.waitFor(() => expect(d.app.quit).toHaveBeenCalled())
 })
 
+it('while the loop dialog is open, a later crash does not reload under it', () => {
+  const d = makeDeps(new Promise(() => {}))   // dialog never resolves → stays open
+  const win = makeWin()
+  let t = 1000
+  registerRendererCrashHandler(win as any, { ...d, now: () => t } as any)
+  win.crash(); t += 1000; win.crash()          // 2nd crash → loop dialog opens
+  expect(d.dialog.showMessageBox).toHaveBeenCalledTimes(1)
+  const reloadsBefore = win.reload.mock.calls.length
+  t += RENDER_CRASH_COOLDOWN_MS + 5000; win.crash()   // slow user: crash after cooldown, dialog still open
+  expect(win.reload).toHaveBeenCalledTimes(reloadsBefore)   // no reload under the open dialog
+  expect(d.dialog.showMessageBox).toHaveBeenCalledTimes(1)  // and no second dialog
+})
+
 it('intentional reasons (clean-exit, killed) are ignored entirely', () => {
   const d = makeDeps(Promise.resolve({ response: 0 }))
   const win = makeWin()
