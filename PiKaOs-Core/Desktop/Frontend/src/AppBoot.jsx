@@ -12,6 +12,8 @@ import { packById, defaultPack, makeT } from './lib/i18n.jsx';
 import { getBrand } from './lib/brand.js';
 import { probeServer, serverKeyFor } from './lib/server-url.js';
 import { ConnectServer } from './screens/ConnectServer.jsx';
+import { RecoveryView } from './screens/RecoveryView.jsx';
+import { consumeRecoveryHash } from './lib/recovery-hash.js';
 
 // build-hash cache key, per server (spec §5): the same desktop talks to many servers, and server
 // A's build must not satisfy server B's curtain check. Computed at USE time — the desktop transport
@@ -53,7 +55,7 @@ function wireDesktopTransport(apiBaseUrl) {
 }
 
 export function AppBoot({ children }) {
-  const [phase, setPhase] = useState('checking'); // 'checking' | 'connect' | 'booting' | 'ready'
+  const [phase, setPhase] = useState('checking'); // 'checking' | 'connect' | 'recovery' | 'booting' | 'ready'
   const frame = useRef(null);
   const mascotReady = useRef(false);
   const bootDone = useRef(false);
@@ -83,6 +85,10 @@ export function AppBoot({ children }) {
   useEffect(() => {
     mounted.current = true;
     (async () => {
+      // Crash-recovery boot flag (crash spec §3): checked before any transport wiring or server
+      // probe, so Recovery opens even when the crash came from connect/boot code itself.
+      // Desktop-gated like the flag's producer — on web nothing ever sets it.
+      if (window.pikaosDesktop?.isDesktop && consumeRecoveryHash()) { setPhase('recovery'); return; }
       if (window.pikaosDesktop?.isDesktop) {
         let force = false;
         try { force = sessionStorage.getItem(FORCE_CONNECT_KEY) === '1'; } catch (e) { /* ignore */ }
@@ -146,6 +152,9 @@ export function AppBoot({ children }) {
 
   if (phase === 'checking') return null;
   if (phase === 'connect') return <ConnectServer language={currentLanguage()} onConnected={onConnected} />;
+  if (phase === 'recovery') {
+    return <RecoveryView t={makeT(currentLanguage())} onBack={() => window.location.reload()} />;
+  }
   if (phase === 'ready') return children;
 
   // brand + copy from the white-label seam / i18n packs — never a hardcoded literal here (the
