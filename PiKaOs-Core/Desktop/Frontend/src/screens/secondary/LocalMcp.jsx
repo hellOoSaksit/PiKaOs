@@ -12,8 +12,7 @@
    main process (mcp/manager.ts) and isn't reproduced here. */
 import React from 'react';
 const { useEffect, useState } = React;
-import { Btn } from '../../components/components.jsx';
-import { Empty, HelpNote, PageHead, Panel } from '../../components/ui';
+import { Button, Empty, HelpNote, PageHead, Panel } from '../../components/ui';
 
 const STATUS_BADGE = {
   running:  { cls: 'on',   en: 'Running',  th: 'กำลังทำงาน' },
@@ -68,7 +67,7 @@ function AddServerForm({ T, busy, onSubmit }) {
           value={secretKey} onChange={e => setSecretKey(e.target.value)} />
         <input className="bf-input" type="password" style={{ flex: 1, minWidth: 160 }} placeholder={T('Secret value (optional)', 'ค่าคีย์ลับ (ไม่บังคับ)')}
           value={secretValue} onChange={e => setSecretValue(e.target.value)} autoComplete="new-password" />
-        <Btn kind="gold" sm disabled={!ok || busy} onClick={submit}>{busy ? '…' : T('Add server', 'เพิ่ม server')}</Btn>
+        <Button kind="gold" size="sm" disabled={!ok || busy} onClick={submit}>{busy ? '…' : T('Add server', 'เพิ่ม server')}</Button>
       </div>
     </Panel>
   );
@@ -85,8 +84,8 @@ function McpRow({ d, status, T, busy, onStart, onStop }) {
         <div className="mono faint" style={{ fontSize: 11, marginTop: 3 }}>{d.id} · {d.command} {(d.args || []).join(' ')}</div>
       </div>
       {running
-        ? <Btn kind="ghost" sm disabled={busy} onClick={onStop}>{busy ? '…' : T('Stop', 'หยุด')}</Btn>
-        : <Btn kind="gold" sm disabled={busy} onClick={onStart}>{busy ? '…' : T('Start', 'เริ่ม')}</Btn>}
+        ? <Button kind="ghost" size="sm" disabled={busy} onClick={onStop}>{busy ? '…' : T('Stop', 'หยุด')}</Button>
+        : <Button kind="gold" size="sm" disabled={busy} onClick={onStart}>{busy ? '…' : T('Start', 'เริ่ม')}</Button>}
     </div>
   );
 }
@@ -151,7 +150,7 @@ export function LocalMcp({ Sys }) {
         title={T('Local MCP Servers', 'MCP Server ในเครื่อง')}
         desc={T('Manage MCP servers that run as local child processes on this machine. Starting one for the first time (or after its command/args change) asks for your consent.',
                 'จัดการ MCP server ที่รันเป็นโปรเซสในเครื่องนี้ · การเริ่มใช้งานครั้งแรก (หรือหลังแก้ไข command/args) จะขอความยินยอมจากคุณก่อนเสมอ')}
-        actions={<Btn kind="ghost" sm icon="↻" onClick={load}>{T('Refresh', 'รีเฟรช')}</Btn>} />
+        actions={<Button kind="ghost" size="sm" icon="refresh" onClick={load}>{T('Refresh', 'รีเฟรช')}</Button>} />
 
       {err && <HelpNote>{T('Error: ', 'ผิดพลาด: ')}{err}</HelpNote>}
 

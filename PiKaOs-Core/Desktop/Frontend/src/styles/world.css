@@ -2,7 +2,7 @@
    WORLD — shared kernel selectors survived from the deleted RPG/game
    world (rooms, quests, agents, HERMES chat). Everything that was
    only consumed by game screens (already deleted) or by the orphaned
-   game-component cluster (components.jsx, CharacterSprite.jsx,
+   game-component cluster (the old game components module, CharacterSprite.jsx,
    avatar-style.js — deleted in the same cleanup) was pruned; anything
    still grep-confirmed live in a kept screen/component was kept as-is.
    ============================================================ */

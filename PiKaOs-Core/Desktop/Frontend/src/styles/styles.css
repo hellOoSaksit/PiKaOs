@@ -304,14 +304,19 @@ body {
   user-select: none;
 }
 .titlebar-tools { display: flex; align-items: center; gap: 2px; padding-left: 8px; }
-.tb-btn {
-  width: 34px; height: 28px; display: grid; place-items: center;
+/* Title-bar tools render through the shared Button primitive (icon-only), so they carry the physical
+   `.btn`/`.btn-ghost` base. `.tb-btn` must stay FLAT (transparent, no 3D shadow, fixed 34×28) — scope
+   it to `.btn.tb-btn` so it out-specifies `.btn*` regardless of stylesheet order, and null the base
+   padding/shadow/transform it would otherwise inherit. */
+.btn.tb-btn {
+  width: 34px; height: 28px; padding: 0; display: grid; place-items: center;
   border: 0; background: transparent; color: var(--ink-3); border-radius: 8px; cursor: pointer;
+  box-shadow: none; transform: none;
   transition: background .12s, color .12s;
 }
-.tb-btn > svg { width: 17px; height: 17px; }
-.tb-btn:hover:not(:disabled) { background: var(--bg-4); color: var(--ink); }
-.tb-btn:disabled { opacity: .4; cursor: default; }
+.btn.tb-btn > svg { width: 17px; height: 17px; }
+.btn.tb-btn:hover:not(:disabled) { background: var(--bg-4); color: var(--ink); box-shadow: none; transform: none; }
+.btn.tb-btn:disabled { opacity: .4; cursor: default; }
 .titlebar-draghandle { flex: 1; align-self: stretch; }
 
 /* ☰ app menu (File / View / Help) collapsed into the title bar. The ☰ is the leftmost control, so
@@ -647,6 +652,11 @@ body {
 .btn-sm { padding: 7px 14px; font-size: 12.5px; font-weight: 600; border-radius: var(--radius-sm); }
 .btn-icon { padding: 8px 10px; }
 .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--gold-glow); }
+/* Reduced motion — neutralize the physical press-spring (transform/box-shadow easing) while keeping
+   the colour fades. The button still depresses, just without the springy transition. */
+@media (prefers-reduced-motion: reduce) {
+  .btn, .btn:active { transition: background .14s, border-color .14s, filter .14s; }
+}
 
 /* Rank chip — disciplined: neutral base, indigo for top tiers */
 .rank {

@@ -3,7 +3,6 @@ import './styles/index.css';
 
 // ---- app modules, imported in dependency order for side effects + window bus ----
 import './lib/i18n.jsx';
-import './components/components.jsx';
 import './screens/screens-extra.jsx';
 import './lib/ui-modal.jsx';
 import './lib/notify.jsx';
