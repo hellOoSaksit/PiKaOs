@@ -490,7 +490,7 @@ select.bf-input { cursor: pointer; }
 .lex-card:hover { transform: translateY(-2px); border-color: var(--bronze); }
 .lex-card.on { border-color: var(--gold-deep); box-shadow: 0 0 0 2px var(--gold-glow), var(--shadow-raised); }
 .lex-ic { width: 42px; height: 42px; flex: 0 0 42px; display: grid; place-items: center; font-size: 21px; border-radius: 10px;
-  background: var(--bg-2); border: 1px solid var(--line); }
+  background: var(--bg-2); border: 1px solid var(--line); color: var(--ink); }
 .lex-type { font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .05em; color: var(--amethyst);
   background: color-mix(in srgb, var(--amethyst) 12%, transparent); border: 1px solid color-mix(in srgb, var(--amethyst) 35%, transparent);
   padding: 2px 7px; border-radius: 999px; white-space: nowrap; }
