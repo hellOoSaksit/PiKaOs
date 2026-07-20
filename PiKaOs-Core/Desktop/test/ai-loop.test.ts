@@ -86,3 +86,20 @@ it('abort mid-run rejects and emits no done event', async () => {
   await expect(runLoop(USER, { ...OPTS, signal: ctl.signal }, d)).rejects.toThrow()
   expect(d.events.some(e => e.type === 'done')).toBe(false)
 })
+
+it('prepends a system message derived from the catalog before the first completion', async () => {
+  const d = deps()
+  await runLoop(USER, OPTS, d)
+  const firstTranscript = (d.provider.complete as any).mock.calls[0][0]
+  expect(firstTranscript[0].role).toBe('system')
+  expect(firstTranscript[0].content).toContain('pikaos.plugins.list')   // TOOL's name, from tools.list()
+  expect(firstTranscript[1]).toEqual({ role: 'user', content: 'go' })
+})
+
+it('a caller-supplied system message does not silence ours — ours comes first', async () => {
+  const d = deps()
+  await runLoop([{ role: 'system', content: 'be terse' }, ...USER], OPTS, d)
+  const t = (d.provider.complete as any).mock.calls[0][0]
+  expect(t.filter((m: any) => m.role === 'system')).toHaveLength(2)
+  expect(t[0].content).toContain('pikaos.plugins.list')
+})

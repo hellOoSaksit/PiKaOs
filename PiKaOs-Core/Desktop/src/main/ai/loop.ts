@@ -5,6 +5,7 @@
 //      only provider/network faults abort a run.
 import type { ChatMessage, LlmProvider } from './providers/types'
 import type { CatalogTool } from './toolClient'
+import { buildSystemPrompt } from './systemPrompt'
 
 export type AiEvent =
   | { type: 'step'; n: number }
@@ -28,7 +29,9 @@ export async function runLoop(
   const catalog = await deps.tools.list()
   const byName = new Map(catalog.map(t => [t.name, t]))
   const specs = catalog.map(t => ({ name: t.name, description: t.description, inputSchema: t.input_schema }))
-  const transcript: ChatMessage[] = [...messages]
+  // Ours goes first, even if the caller supplied one: the rules are not a suggestion the caller may
+  // override by speaking earlier.
+  const transcript: ChatMessage[] = [{ role: 'system', content: buildSystemPrompt(catalog) }, ...messages]
 
   for (let step = 1; step <= opts.maxSteps; step++) {
     deps.onEvent({ type: 'step', n: step })
