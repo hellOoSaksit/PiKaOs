@@ -476,8 +476,11 @@ select.bf-input { cursor: pointer; }
 .theme-swatch { height: 78px; position: relative; display: flex; align-items: flex-end; gap: 5px; padding: 12px; }
 .theme-swatch .sw-chip { width: 26px; height: 26px; border-radius: 6px; border: 1px solid rgba(0,0,0,.15); box-shadow: 0 1px 2px rgba(0,0,0,.2); }
 .theme-card-body { padding: 12px 14px; display: flex; align-items: center; gap: 9px; }
-.theme-card-body .tcb-name { font-family: var(--font-head); font-weight: 700; font-size: 14px; color: var(--ink); }
-.theme-card-body .tcb-en { font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); }
+/* tcb-name/tcb-en are reused by BOTH the theme cards (.theme-card-body) and the language/style
+   cards (.lex-card). The color was scoped to .theme-card-body only, so the lex-card copies inherited
+   the default (black) — invisible in dark mode. De-scoped so the classes own their colour everywhere. */
+.tcb-name { font-family: var(--font-head); font-weight: 700; font-size: 14px; color: var(--ink); }
+.tcb-en { font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); }
 .theme-card-check { margin-left: auto; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px;
   background: var(--gold-grad); color: #fff; border: 1px solid var(--gold-deep); }
 
