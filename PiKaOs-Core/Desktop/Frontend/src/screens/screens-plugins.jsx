@@ -6,7 +6,7 @@
    "restart" hint when the registry now differs from what this process mounted (plugin-lifecycle-ui §7). */
 import React, { useEffect, useState } from 'react';
 
-import { Button, Empty, HelpNote, PageHead, Panel, Segmented } from '../components/ui/index.js';
+import { Button, Empty, HelpNote, Modal, PageHead, Panel, Segmented } from '../components/ui/index.js';
 import { LocalMcp } from './secondary/LocalMcp.jsx';
 import * as api from '../lib/api.js';
 
@@ -86,42 +86,35 @@ function GitCredentialsPanel({ T, t, busy, onSave }) {
   );
 }
 
-function InstallPlanModal({ plan, target, T, busy, onConfirm, onCancel }) {
+/* Body of the install-confirmation dialog — rendered as content inside <Modal> (see the call site).
+   The overlay/title/footer chrome lives in the Modal primitive; this only lays out the plan detail. */
+function InstallPlanModal({ plan, target, T }) {
   const deps = (plan.to_install || []).filter(id => id !== plan.target);
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={onCancel}>
-      <div className="panel" style={{ maxWidth: 460, margin: 16 }} onClick={e => e.stopPropagation()}>
-        <div style={{ padding: 20 }}>
-          <h3 style={{ marginTop: 0 }}>{T('Install', 'ติดตั้ง')} “{plan.target}”</h3>
-          {deps.length > 0 && (
-            <>
-              <p style={{ color: 'var(--ink-2)' }}>{T('This feature also needs these plugins, which aren’t installed yet:', 'ฟีเจอร์นี้ต้องการปลั๊กอินเหล่านี้ที่ยังไม่ได้ติดตั้ง:')}</p>
-              <ul style={{ margin: '6px 0' }}>{deps.map(d => <li key={d} className="mono">{d}</li>)}</ul>
-            </>
-          )}
-          {plan.already_installed?.length > 0 && (
-            <p className="faint" style={{ fontSize: 12 }}>{T('Already installed (reused, not reinstalled): ', 'ติดตั้งแล้ว (ใช้ซ้ำ ไม่ลงซ้ำ): ')}{plan.already_installed.join(', ')}</p>
-          )}
-          {target?.permissionInfo?.length > 0 && (
-            <>
-              <p style={{ color: 'var(--ink-2)', marginTop: 12 }}>{T('This plugin will be granted:', 'ปลั๊กอินนี้จะได้รับสิทธิ์:')}</p>
-              <ul style={{ margin: '6px 0' }}>
-                {target.permissionInfo.map(pi => (
-                  <li key={pi.key}>
-                    <span className="mono">{pi.key}</span>
-                    {pi.rationale && <span className="faint"> — {pi.rationale}</span>}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-          <div className="row" style={{ gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
-            <Button kind="ghost" size="sm" onClick={onCancel}>{T('Cancel', 'ยกเลิก')}</Button>
-            <Button kind="gold" size="sm" icon="download" onClick={onConfirm}>{busy ? '…' : T('Install all', 'ติดตั้งทั้งหมด')}</Button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <>
+      {deps.length > 0 && (
+        <>
+          <p style={{ color: 'var(--ink-2)' }}>{T('This feature also needs these plugins, which aren’t installed yet:', 'ฟีเจอร์นี้ต้องการปลั๊กอินเหล่านี้ที่ยังไม่ได้ติดตั้ง:')}</p>
+          <ul style={{ margin: '6px 0' }}>{deps.map(d => <li key={d} className="mono">{d}</li>)}</ul>
+        </>
+      )}
+      {plan.already_installed?.length > 0 && (
+        <p className="faint" style={{ fontSize: 12 }}>{T('Already installed (reused, not reinstalled): ', 'ติดตั้งแล้ว (ใช้ซ้ำ ไม่ลงซ้ำ): ')}{plan.already_installed.join(', ')}</p>
+      )}
+      {target?.permissionInfo?.length > 0 && (
+        <>
+          <p style={{ color: 'var(--ink-2)', marginTop: 12 }}>{T('This plugin will be granted:', 'ปลั๊กอินนี้จะได้รับสิทธิ์:')}</p>
+          <ul style={{ margin: '6px 0' }}>
+            {target.permissionInfo.map(pi => (
+              <li key={pi.key}>
+                <span className="mono">{pi.key}</span>
+                {pi.rationale && <span className="faint"> — {pi.rationale}</span>}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </>
   );
 }
 
@@ -337,8 +330,16 @@ export function PluginsManager({ Sys, view = 'modules' }) {
         </>
       )}
 
-      {plan && <InstallPlanModal plan={plan} target={plugins.find(p => p.id === plan.target)}
-        T={T} busy={busy === plan.target} onConfirm={confirmInstall} onCancel={() => setPlan(null)} />}
+      {plan && (
+        <Modal open={!!plan} onClose={() => setPlan(null)} className="install-plan"
+          title={<>{T('Install', 'ติดตั้ง')} “{plan.target}”</>}
+          footer={<>
+            <Button kind="ghost" size="sm" onClick={() => setPlan(null)}>{T('Cancel', 'ยกเลิก')}</Button>
+            <Button kind="gold" size="sm" icon="download" onClick={confirmInstall}>{busy === plan.target ? '…' : T('Install all', 'ติดตั้งทั้งหมด')}</Button>
+          </>}>
+          <InstallPlanModal plan={plan} target={plugins.find(p => p.id === plan.target)} T={T} />
+        </Modal>
+      )}
     </div>
   );
 }
