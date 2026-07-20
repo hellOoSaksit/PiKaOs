@@ -62,6 +62,12 @@ export function registerCrashHandlers({ app, dialog, proc = process, log = conso
   proc.on('unhandledRejection', (reason: unknown) => {
     log(`[crash] unhandledRejection ${String(reason)}`)
   })
+
+  // Electron internal children (GPU/utility) — Chromium restarts them itself; MCP children are
+  // NOT this event (child_process.spawn, owned + surfaced by McpManager). Visibility only.
+  app.on('child-process-gone', (_e: unknown, details: { type?: string; reason?: string }) => {
+    log(`[crash] child-process-gone ${details?.type} ${details?.reason}`)
+  })
 }
 
 export interface CrashWindowLike {
