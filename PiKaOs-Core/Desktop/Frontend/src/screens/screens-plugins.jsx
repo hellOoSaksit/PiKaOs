@@ -6,8 +6,8 @@
    "restart" hint when the registry now differs from what this process mounted (plugin-lifecycle-ui §7). */
 import React, { useEffect, useState } from 'react';
 
-import { Btn, Empty, HelpNote, PageHead, Panel } from '../components/components.jsx';
-import { Segmented } from '../components/ui/index.js';
+import { Btn } from '../components/components.jsx';
+import { Empty, HelpNote, PageHead, Panel, Segmented } from '../components/ui/index.js';
 import { LocalMcp } from './secondary/LocalMcp.jsx';
 import * as api from '../lib/api.js';
 

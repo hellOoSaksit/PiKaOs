@@ -2,7 +2,8 @@
    connected server's identity (from /api/capabilities) + the installed-module inventory + a shortcut
    to Install. Replaces the game-era MyDashboard as the default landing and guard fallback. */
 import React from 'react';
-import { Panel, Btn, PageHead, Empty } from '../components/components.jsx';
+import { Btn } from '../components/components.jsx';
+import { Panel, PageHead, Empty } from '../components/ui';
 
 export function KernelHome({ Sys, caps, go }) {
   const t = Sys.t;

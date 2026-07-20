@@ -9,7 +9,7 @@
 import React from 'react';
 const { useState } = React;
 import { NavManagerPanel } from './screens-nav.jsx';
-import { PageHead } from '../components/components.jsx';
+import { PageHead } from '../components/ui';
 import { Icon } from '../components/ui/icons.jsx';
 
 /* A collapsible settings card. `count` and `onAdd` are optional: `onAdd` renders a ＋ in the header
