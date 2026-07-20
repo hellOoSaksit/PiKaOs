@@ -156,11 +156,12 @@
 .audit-target { font-weight: 600; color: var(--gold-bright); }
 .audit-time { font-size: 11px; white-space: nowrap; }
 
-/* ---- user form modal ---- */
-.userform { width: min(560px, 96vw); max-height: 92vh; overflow: auto; background: var(--bg-2); border: 1px solid var(--line);
-  border-radius: var(--radius-lg); box-shadow: var(--shadow-pop); display: flex; flex-direction: column; }
+/* ---- user form modal (renders inside the Modal primitive; sections own their padding) ---- */
+.pk-modal.userform-modal { width: min(560px, 96vw); max-height: 92vh; overflow: auto; padding: 0; }
+.pk-modal.userform-modal > .pk-modal-head { align-items: center; padding: 18px 22px; margin-bottom: 0; border-bottom: 1px solid var(--line); }
+.pk-modal.userform-modal > .foot { padding: 14px 22px; border-top: 1px solid var(--line); }
+.userform-title { display: flex; align-items: center; gap: 12px; }
 .userform-body { padding: 18px 22px; display: flex; flex-direction: column; gap: 14px; }
-.userform-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 22px; border-top: 1px solid var(--line); }
 .avatar-pick { display: flex; flex-wrap: wrap; gap: 7px; }
 .avatar-opt { width: 38px; height: 38px; border-radius: 9px; border: 1px solid var(--line); background: var(--bg-1); font-size: 18px; cursor: pointer; transition: all .14s; }
 .avatar-opt:hover { border-color: var(--gold-deep); }

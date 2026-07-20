@@ -195,8 +195,17 @@
   .pk-overlay.open { transition: opacity .15s ease, visibility 0s; }
   .pk-modal { transition: transform .35s var(--spring); }
 }
+.pk-modal-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 6px; }
+.pk-modal-head h3 { flex: 1; margin-bottom: 0; }
+.pk-modal-close {
+  flex: none; margin-left: auto; width: 28px; height: 28px; border-radius: var(--radius);
+  border: 1px solid var(--line); background: var(--bg-3); color: var(--ink-3);
+  font-size: 14px; line-height: 1; cursor: pointer;
+}
+.pk-modal-close:hover { color: var(--ink); border-color: var(--line-strong, var(--line)); }
 .pk-modal h3 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
 .pk-modal p { font-size: 13px; color: var(--ink-3); line-height: 1.6; margin-bottom: 18px; }
+.pk-modal.install-plan { width: min(460px, 100%); }
 .pk-modal .foot { display: flex; justify-content: flex-end; gap: 10px; }
 
 /* ============ Text formatting & highlight ============ */
