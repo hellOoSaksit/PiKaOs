@@ -466,7 +466,6 @@ function App() {
         notifications={notifs}
         // sequenced: an unsequenced reload races the mark and usually re-reads the pre-mark rows
         onNotificationsOpened={() => { markNotificationsRead().catch(() => {}).finally(loadNotifs); }}
-        chatThreads={[]}
       />
       <UIModalHost />
       <UILoadingHost />

@@ -3,6 +3,7 @@ import { UtilityBarButton } from './UtilityBarButton.jsx';
 import { PopoverPanel } from './PopoverPanel.jsx';
 import { Icon } from './icons.jsx';
 import Tooltip from './Tooltip.jsx';
+import { AiConsole } from './AiConsole.jsx';
 import { unreadCount } from '../../lib/notifications.js';
 
 // The bar's buttons size their own glyph (no CSS slot owns it), so `size` is explicit here.
@@ -12,11 +13,11 @@ const ICONS = {
   search: <Icon name="search" size={23} />,
   notifications: <Icon name="notifications" size={23} />,
   add: <Icon name="add" size={23} />,
-  chat: <Icon name="chat" size={23} />,
+  ai: <Icon name="ai" size={23} />,
 };
 
 /**
- * Global floating utility bar — nav/home/search/notifications/add/chat, plus the account control
+ * Global floating utility bar — nav/home/search/notifications/add/ai, plus the account control
  * when a plugin owns identity (`profile`; kernel-only Core passes null and the slot disappears).
  * Separate from the nested content-nav (data-nav.jsx/Sidebar in App.jsx),
  * which stays its own component per the shell/nav design (they're
@@ -24,18 +25,12 @@ const ICONS = {
  */
 export function BottomUtilityBar({
   t, route, onHome, onToggleNav, profile = null,
-  notifications = [], chatThreads = [], onSearch, onAdd, showLabels = false,
+  notifications = [], onSearch, onAdd, showLabels = false,
   onNotificationsOpened,
 }) {
   const [active, setActive] = useState(route === 'me' ? 'home' : null);
   const [openPop, setOpenPop] = useState(null);
   const [query, setQuery] = useState('');
-  // No `clearedNotif` twin for chat's latch: notifications now carry a server-side `read` flag, so
-  // opening the bell marks them read and the refetched rows report unread = 0 on their own. A local
-  // latch would only ever disagree with the server — and the one that used to live here latched `true`
-  // on first open and never reset, pinning the badge to 0 for the rest of the session. Chat keeps its
-  // latch because chat threads have no read state to ask about yet.
-  const [clearedChat, setClearedChat] = useState(false);
 
   const go = (tab, fn) => { setActive(tab); setOpenPop(null); fn && fn(); };
   const togglePop = (tab) => {
@@ -45,12 +40,10 @@ export function BottomUtilityBar({
       return next;
     });
     setActive(tab);
-    if (tab === 'chat') setClearedChat(true);
   };
   const closePop = () => setOpenPop(null);
 
   const notifCount = unreadCount(notifications);
-  const chatCount = clearedChat ? 0 : chatThreads.length;
 
   const submitSearch = (e) => {
     if (e.key !== 'Enter') return;
@@ -133,32 +126,21 @@ export function BottomUtilityBar({
           />
         </Tooltip>
 
-        <div style={{ position: 'relative' }}>
-          <Tooltip label={t('utilitybar.chat')}>
-            <UtilityBarButton
-              icon={ICONS.chat} title={t('utilitybar.chat')} label={t('utilitybar.chat')}
-              showLabel={showLabels} active={active === 'chat'} badge={chatCount}
-              onClick={() => togglePop('chat')}
-            />
-          </Tooltip>
-          <PopoverPanel open={openPop === 'chat'} onClose={closePop} anchor="right" width={320}>
-            <div className="pop-head">
-              <span className="pop-title">{t('utilitybar.chat.title')}</span>
-              <button type="button" className="pop-action">{t('utilitybar.chat.compose')}</button>
-            </div>
-            {chatThreads.length === 0
-              ? <div className="pop-empty">{t('utilitybar.chat.empty')}</div>
-              : <div style={{ maxHeight: 260, overflowY: 'auto' }}>
-                  {chatThreads.map((c) => (
-                    <div key={c.id} className="pop-head" style={{ borderBottom: '1px solid var(--line-soft)' }}>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>{c.title}</div>
-                      <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{c.time}</div>
-                    </div>
-                  ))}
-                </div>}
-            <button type="button" className="pop-foot">{t('utilitybar.chat.open')}</button>
-          </PopoverPanel>
-        </div>
+        {/* AI console — desktop only: the loop and the key vault live in Electron main */}
+        {window.pikaosDesktop?.isDesktop && (
+          <div style={{ position: 'relative' }}>
+            <Tooltip label={t('utilitybar.ai')}>
+              <UtilityBarButton
+                icon={ICONS.ai} title={t('utilitybar.ai')} label={t('utilitybar.ai')}
+                showLabel={showLabels} active={active === 'ai'}
+                onClick={() => togglePop('ai')}
+              />
+            </Tooltip>
+            <PopoverPanel open={openPop === 'ai'} onClose={closePop} anchor="right" width={360}>
+              <AiConsole t={t} open={openPop === 'ai'} onClose={closePop} />
+            </PopoverPanel>
+          </div>
+        )}
 
         {/* identity is a plugin's to own: no auth plugin, no account control (and no divider) */}
         {profile && <>
