@@ -53,9 +53,11 @@ export function registerCrashHandlers({ app, dialog, proc = process, log = conso
       defaultId: 0,
       cancelId: 0,   // Esc = the safe path (relaunch) — the process is unrecoverable either way
     }).then(({ response }) => {
+      // app.exit(0) skips before-quit (so stopAll() doesn't run) deliberately — the process is
+      // already in a fatal state and the relaunched instance re-establishes ownership.
       if (response === 0) { app.relaunch(); app.exit(0) }
       else app.exit(1)
-    })
+    }).catch(() => app.exit(1))   // no display / headless → the dialog itself rejects; die, don't hang
   })
 
   // Most rejections are non-fatal (a failed fetch inside a handler must not kill the app).
@@ -101,6 +103,9 @@ export function registerRendererCrashHandler(
     if (IGNORED_RENDER_REASONS.has(reason)) return
     log(`[crash] render-process-gone ${reason} exitCode=${details?.exitCode}`)
 
+    // A torn-down window can't be reloaded or shown a dialog against — bail before either.
+    if (win.isDestroyed()) return
+
     // The loop dialog owns the decision once it's up — a late crash (slow user) must not
     // reload the window out from under an open dialog whose .then() still targets it.
     if (dialogOpen) return
@@ -123,6 +128,6 @@ export function registerRendererCrashHandler(
       if (response === 0) { crashCount = 0; win.reload() }
       else if (response === 1) { crashCount = 0; win.loadURL(withRecoveryHash(win.webContents.getURL())) }
       else app.quit()
-    })
+    }).catch(() => { dialogOpen = false })   // rejected dialog must not leave dialogOpen stuck (freezes the handler)
   })
 }

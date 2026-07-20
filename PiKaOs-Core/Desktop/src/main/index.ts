@@ -82,7 +82,7 @@ app.whenReady().then(() => {
 
   // Instance lifecycle (crash spec §2.4): focus the running window on a second launch instead
   // of silently killing the new instance; stop every MCP child so none orphans on quit.
-  registerSingleInstanceFocus(app, () => (win.isDestroyed() ? null : win))
+  registerSingleInstanceFocus(app, () => BrowserWindow.getAllWindows()[0] ?? null)
   registerQuitCleanup(app, () => manager.stopAll())
 
   registerDevtoolsShortcut(win, app.isPackaged)

@@ -168,3 +168,34 @@ it('child-process-gone (Electron internal) is logged, nothing else', () => {
   expect(d.dialog.showMessageBox).not.toHaveBeenCalled()
   expect(d.app.exit).not.toHaveBeenCalled()
 })
+
+it('a rejected main-fatal dialog still exits — the fatal path never hangs', async () => {
+  const d = makeDeps(Promise.reject(new Error('no display')))
+  registerCrashHandlers(d as any)
+  d.proc.emit('uncaughtException', new Error('boom'))
+  await vi.waitFor(() => expect(d.app.exit).toHaveBeenCalledWith(1))
+})
+
+it('a rejected loop dialog resets dialogOpen so the handler is not frozen', async () => {
+  const d = makeDeps(Promise.reject(new Error('no display')))
+  const win = makeWin()
+  let t = 1000
+  registerRendererCrashHandler(win as any, { ...d, now: () => t } as any)
+  win.crash(); t += 1000; win.crash()                 // opens dialog #1, which rejects
+  expect(d.dialog.showMessageBox).toHaveBeenCalledTimes(1)
+  // A macrotask tick (not just one microtask) so the rejected promise's .then().catch() chain
+  // fully flushes before we rely on dialogOpen having been reset back to false.
+  await new Promise((r) => setTimeout(r, 0))
+  t += 1000; win.crash()                              // must be able to open dialog #2, not frozen
+  await vi.waitFor(() => expect(d.dialog.showMessageBox).toHaveBeenCalledTimes(2))
+})
+
+it('a crash on an already-destroyed window is a no-op', () => {
+  const d = makeDeps(new Promise(() => {}))
+  const win = makeWin()
+  win.isDestroyed = () => true
+  registerRendererCrashHandler(win as any, { ...d, now: () => 1000 } as any)
+  win.crash()
+  expect(win.reload).not.toHaveBeenCalled()
+  expect(d.dialog.showMessageBox).not.toHaveBeenCalled()
+})
