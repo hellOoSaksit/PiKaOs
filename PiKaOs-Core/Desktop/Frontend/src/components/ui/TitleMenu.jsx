@@ -17,6 +17,7 @@ export default function TitleMenu({ t, onSettings, onToggleSidebar, version }) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(null);   // id of the group whose submenu is showing
   const [about, setAbout] = useState(false);
+  const [reloading, setReloading] = useState(false);
   const isDev = !!(import.meta && import.meta.env && import.meta.env.DEV);
 
   const close = useCallback(() => { setOpen(false); setActive(null); }, []);
@@ -30,6 +31,10 @@ export default function TitleMenu({ t, onSettings, onToggleSidebar, version }) {
   const run = (fn) => () => { close(); fn && fn(); };
   // Same "drop the current server" behaviour as DisconnectButton — force the boot gate back to Connect.
   const disconnect = () => { try { sessionStorage.setItem(FORCE_CONNECT_KEY, '1'); } catch (e) { /* ignore */ } window.location.reload(); };
+  // Manual reload with a beat of visible feedback: spin the icon, then reload. window.location.reload()
+  // wipes the DOM instantly, so without the short hold the click never looks acknowledged (keepOpen keeps
+  // the submenu on screen so the spin is actually seen).
+  const reload = () => { if (reloading) return; setReloading(true); window.setTimeout(() => window.location.reload(), 500); };
 
   const groups = [
     { id: 'file', label: t('menu.file'), items: [
@@ -39,7 +44,7 @@ export default function TitleMenu({ t, onSettings, onToggleSidebar, version }) {
       ...(w?.quit ? [{ label: t('menu.exit'), on: () => w.quit() }] : []),
     ] },
     { id: 'view', label: t('menu.view'), items: [
-      { label: t('menu.reload'), on: () => window.location.reload() },
+      { label: t('menu.reload'), icon: 'refresh', spin: reloading, keepOpen: true, on: reload },
       { label: t('menu.zoomIn'), on: () => w?.zoom('in') },
       { label: t('menu.zoomOut'), on: () => w?.zoom('out') },
       { label: t('menu.zoomReset'), on: () => w?.zoom('reset') },
@@ -78,7 +83,11 @@ export default function TitleMenu({ t, onSettings, onToggleSidebar, version }) {
                   <div className="tb-submenu" role="menu">
                     {g.items.map((it, i) => it.sep
                       ? <div key={i} className="tb-menu-sep" />
-                      : <button key={i} type="button" role="menuitem" className="tb-menu-item" onClick={run(it.on)}>{it.label}</button>)}
+                      : <button key={i} type="button" role="menuitem" className="tb-menu-item"
+                          onClick={it.keepOpen ? it.on : run(it.on)}>
+                          {it.icon && <span className={'tb-menu-ico' + (it.spin ? ' is-spin' : '')}>{renderIcon(it.icon, { size: 15 })}</span>}
+                          <span>{it.label}</span>
+                        </button>)}
                   </div>
                 )}
               </div>

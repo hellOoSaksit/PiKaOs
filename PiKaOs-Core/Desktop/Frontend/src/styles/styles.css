@@ -350,10 +350,12 @@ body {
   border-radius: var(--radius-lg); box-shadow: var(--shadow-pop);
 }
 .tb-menu-item {
-  display: block; width: 100%; padding: 7px 10px; border: 0; background: transparent;
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; border: 0; background: transparent;
   color: var(--ink); font-size: 13px; border-radius: 8px; cursor: pointer; text-align: left; white-space: nowrap;
 }
 .tb-menu-item:hover { background: var(--bg-4); }
+.tb-menu-ico { display: inline-flex; flex: none; color: var(--ink-3); }
+.tb-menu-ico.is-spin { animation: spin .7s linear infinite; }   /* @keyframes spin — ui-kit.css */
 .tb-menu-sep { height: 1px; background: var(--line); margin: 5px 6px; }
 
 /* Rail is a desktop affordance only — below the drawer breakpoint shell-nav.js never sets it
