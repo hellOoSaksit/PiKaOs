@@ -7,8 +7,10 @@ import { focusables, nextTrapTarget } from './focus-trap.js';
  * footer is right-aligned (pass via `footer`). While open it traps Tab focus inside
  * the dialog and restores focus to the previously-focused element on close (a11y).
  * Reduced-motion is handled in CSS.
+ * Modal has no `Sys`/`t` in scope (Core primitive), so the ✕ button's accessible name
+ * must come from the caller via `closeLabel` — no hardcoded literal here (i18n hard rule).
  */
-export default function Modal({ open, onClose, title, children, footer, showClose = false, className = '' }) {
+export default function Modal({ open, onClose, title, children, footer, showClose = false, closeLabel, className = '' }) {
   const ref = useRef(null);
 
   // Escape closes; Tab/Shift+Tab is trapped inside the dialog.
@@ -39,7 +41,7 @@ export default function Modal({ open, onClose, title, children, footer, showClos
         {showClose && onClose
           ? <div className="pk-modal-head">
               {title && <h3>{title}</h3>}
-              <button type="button" className="pk-modal-close" onClick={onClose} aria-label="Close">✕</button>
+              <button type="button" className="pk-modal-close" onClick={onClose} aria-label={closeLabel || undefined}>✕</button>
             </div>
           : title && <h3>{title}</h3>}
         {typeof children === 'string' ? <p>{children}</p> : children}
