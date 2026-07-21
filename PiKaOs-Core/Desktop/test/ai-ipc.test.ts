@@ -66,6 +66,10 @@ it('ai:chat while a run is active rejects with busy', async () => {
   const { registerAiIpc } = await import('../src/main/ai/ipc')
   handlers.clear()
   registerAiIpc({ vault: vault as any, broker: { getAccessToken: async () => null } as any })
+  // ollama is keyless, so the first run clears the key guard and reaches the never-resolving
+  // runLoop — staying genuinely active. (A byo-key/cloud default would instead throw "no key set"
+  // before runLoop, leaving `first` an un-awaited rejection that fails the suite.)
+  await handlers.get('ai:setConfig')!(okEvent, { mode: 'byo-key', provider: 'ollama' })
   const first = handlers.get('ai:chat')!(okEvent, { messages: [{ role: 'user', content: 'a' }] })
   await expect(handlers.get('ai:chat')!(okEvent, { messages: [{ role: 'user', content: 'b' }] })).rejects.toThrow(/busy/)
   void first
