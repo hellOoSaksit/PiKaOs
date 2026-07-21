@@ -920,7 +920,7 @@
     "ai.send": "ส่ง",
     "ai.stop": "หยุด",
     "ai.input.placeholder": "พิมพ์ข้อความถึง AI…",
-    "ai.provider.custom": "กำหนดเอง (OpenAI-compatible)",
+    "ai.provider.custom": "กำหนดเอง",
     "ai.setup.title": "เชื่อมต่อ AI ของคุณ",
     "ai.setup.hint": "คีย์ API เก็บเข้ารหัสไว้ในเครื่องนี้เท่านั้น — ไม่ส่งขึ้นเซิร์ฟเวอร์",
     "ai.setup.baseUrlHint": "URL เต็มของ endpoint chat-completions บนเซิร์ฟเวอร์ในเครื่องคุณ",

@@ -983,7 +983,7 @@
     "ai.send": "Send",
     "ai.stop": "Stop",
     "ai.input.placeholder": "Message the AI…",
-    "ai.provider.custom": "Custom (OpenAI-compatible)",
+    "ai.provider.custom": "Custom",
     "ai.setup.title": "Connect your AI",
     "ai.setup.hint": "Your API key is stored encrypted on this machine only — it never reaches the server.",
     "ai.setup.baseUrlHint": "Full chat-completions URL of your local server.",
