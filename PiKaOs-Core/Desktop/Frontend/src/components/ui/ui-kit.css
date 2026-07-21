@@ -207,6 +207,19 @@
 .pk-modal-close:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--gold-glow); }
 .pk-modal h3 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
 .pk-modal p { font-size: 13px; color: var(--ink-3); line-height: 1.6; margin-bottom: 18px; }
+
+/* Install-plan modal — its permission list can be long; cap the height and scroll INSIDE the dialog so
+   the top can't bleed above the viewport and the bottom can't run under the floating utility bar. The
+   card is centred, so `100vh - 220px` leaves ~110px clear top AND bottom — enough to clear the floating
+   utility bar (~90px) with margin instead of the footer button colliding with it. */
+.pk-modal.install-plan { max-height: calc(100vh - 220px); overflow-y: auto; }
+.pk-modal.install-plan .perm-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.pk-modal.install-plan .perm-item {
+  display: flex; flex-direction: column; gap: 1px; padding: 7px 0; border-top: 1px solid var(--line);
+}
+.pk-modal.install-plan .perm-item:first-child { border-top: none; }
+.pk-modal.install-plan .perm-name { font-size: 13.5px; color: var(--ink); }
+.pk-modal.install-plan .perm-meta { font-size: 11px; color: var(--ink-3); }
 .pk-modal.install-plan { width: min(460px, 100%); }
 .pk-modal .foot { display: flex; justify-content: flex-end; gap: 10px; }
 
