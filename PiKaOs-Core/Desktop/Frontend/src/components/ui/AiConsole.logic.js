@@ -8,9 +8,16 @@ export function toChatMessages(log) {
 }
 
 // A BYO-key cloud provider with no stored key needs the setup form first. Ollama is keyless by
-// design, so it never "needs a key". admin mode never uses the local key path at all.
+// design, and custom's key is optional (a local server may require none), so neither ever
+// "needs a key". admin mode never uses the local key path at all.
 export function needsKey(cfg) {
-  return !!cfg && cfg.mode !== 'admin' && cfg.provider !== 'ollama' && !cfg.hasKey;
+  return !!cfg && cfg.mode !== 'admin' && cfg.provider !== 'ollama' && cfg.provider !== 'custom' && !cfg.hasKey;
+}
+
+// custom's endpoint is the full request URL and is mandatory (else the OpenAI adapter hits
+// api.openai.com). Only custom, only byo-key.
+export function needsBaseUrl(cfg) {
+  return !!cfg && cfg.mode !== 'admin' && cfg.provider === 'custom' && !cfg.baseUrl;
 }
 
 // admin + a CLOUD provider: resolveRuntime returns apiKey:null (keys live server-side) and a
@@ -27,7 +34,14 @@ export function adminCloudLimited(cfg) {
 export function resolveSurface(cfg, adminError = false) {
   if (!cfg) return 'loading';
   if (cfg.mode === 'admin') return adminError ? 'admin-unavailable' : 'admin';
-  return needsKey(cfg) ? 'setup' : 'chat';
+  return (needsKey(cfg) || needsBaseUrl(cfg)) ? 'setup' : 'chat';
+}
+
+// The setup form's save gate: custom needs its endpoint filled; a cloud provider needs its key.
+export function canSaveSetup(cfg, { keyDraft, baseUrlDraft }) {
+  if (!cfg) return false;
+  if (cfg.provider === 'custom') return !!baseUrlDraft && !!baseUrlDraft.trim();
+  return !!keyDraft && !!keyDraft.trim();
 }
 
 // Append the truncation note only when the loop stopped at the step limit. Pure so the exact

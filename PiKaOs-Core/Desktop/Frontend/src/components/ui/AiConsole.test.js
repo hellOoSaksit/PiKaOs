@@ -1,7 +1,7 @@
 import { it, expect, afterEach } from 'vitest';
 import { AiConsole } from './AiConsole.jsx';
 import {
-  toChatMessages, needsKey, adminCloudLimited, resolveSurface, assistantText,
+  toChatMessages, needsKey, needsBaseUrl, adminCloudLimited, resolveSurface, assistantText, canSaveSetup,
 } from './AiConsole.logic.js';
 
 /* This Frontend ships NO @testing-library/react and NO jsdom, and the plan forbids adding deps
@@ -59,4 +59,26 @@ it('resolveSurface picks the right surface per mode/key/adminError', () => {
 it('assistantText appends the truncation note only when the loop hit the step limit', () => {
   expect(assistantText({ text: 'ans', truncated: false }, '(stop)')).toBe('ans');
   expect(assistantText({ text: 'ans', truncated: true }, '(stop)')).toBe('ans (stop)');
+});
+
+// ---- 3. custom provider (byo-key, keyless-optional, endpoint-mandatory) ----
+it('needsBaseUrl only for a custom provider with no baseUrl (byo-key)', () => {
+  expect(needsBaseUrl({ mode: 'byo-key', provider: 'custom', baseUrl: null })).toBe(true);
+  expect(needsBaseUrl({ mode: 'byo-key', provider: 'custom', baseUrl: 'http://x/v1/chat/completions' })).toBe(false);
+  expect(needsBaseUrl({ mode: 'byo-key', provider: 'ollama', baseUrl: null })).toBe(false);
+  expect(needsBaseUrl({ mode: 'admin', provider: 'custom', baseUrl: null })).toBe(false);
+});
+
+it('resolveSurface sends custom-without-baseUrl to setup, custom-with-baseUrl (keyless) to chat', () => {
+  expect(resolveSurface({ mode: 'byo-key', provider: 'custom', baseUrl: null, hasKey: false })).toBe('setup');
+  expect(resolveSurface({ mode: 'byo-key', provider: 'custom', baseUrl: 'http://x/v1', hasKey: false })).toBe('chat');
+  expect(resolveSurface({ mode: 'byo-key', provider: 'ollama', hasKey: true })).toBe('chat');
+  expect(resolveSurface({ mode: 'byo-key', provider: 'anthropic', hasKey: false })).toBe('setup');
+});
+
+it('canSaveSetup: custom needs a baseUrl draft, a cloud provider needs a key draft', () => {
+  expect(canSaveSetup({ provider: 'custom' }, { keyDraft: '', baseUrlDraft: 'http://x/v1' })).toBe(true);
+  expect(canSaveSetup({ provider: 'custom' }, { keyDraft: '', baseUrlDraft: '  ' })).toBe(false);
+  expect(canSaveSetup({ provider: 'anthropic' }, { keyDraft: 'sk-x', baseUrlDraft: '' })).toBe(true);
+  expect(canSaveSetup({ provider: 'anthropic' }, { keyDraft: '  ', baseUrlDraft: '' })).toBe(false);
 });

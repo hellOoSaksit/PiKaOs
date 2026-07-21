@@ -13,7 +13,7 @@
    plain-callable for the house test idiom; all hooks live in AiConsoleInner. */
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  toChatMessages, adminCloudLimited, resolveSurface, assistantText,
+  toChatMessages, adminCloudLimited, resolveSurface, assistantText, canSaveSetup,
 } from './AiConsole.logic.js';
 
 export function AiConsole({ t, open, onClose }) {
@@ -25,6 +25,8 @@ export function AiConsole({ t, open, onClose }) {
 function AiConsoleInner({ t, bridge }) {
   const [cfg, setCfg] = useState(null);          // {mode, provider, model, baseUrl, maxSteps, hasKey}
   const [keyDraft, setKeyDraft] = useState('');
+  const [baseUrlDraft, setBaseUrlDraft] = useState('');
+  const [modelDraft, setModelDraft] = useState('');   // custom only, optional — vLLM needs it, LM Studio ignores it
   const [input, setInput] = useState('');
   const [log, setLog] = useState([]);            // [{role:'user'|'assistant', content}]
   const [busy, setBusy] = useState(false);
@@ -42,6 +44,11 @@ function AiConsoleInner({ t, bridge }) {
     return () => unsubscribe?.();
   }, [bridge, t]);
   useEffect(() => { logRef.current?.scrollTo(0, logRef.current.scrollHeight); }, [log]);
+  // Show an already-set model when the setup form re-enters for custom (e.g. baseUrl got cleared
+  // upstream); this field is not secret, so unlike keyDraft it's fine to prefill and display.
+  useEffect(() => {
+    if (cfg && cfg.provider === 'custom') setModelDraft(cfg.model || '');
+  }, [cfg?.provider, cfg?.model]);
 
   if (!cfg) return <div className="pop-empty">{t('ai.loading')}</div>;
 
@@ -53,6 +60,8 @@ function AiConsoleInner({ t, bridge }) {
     setCfg(await bridge.ai.getConfig());
   };
   const saveSetup = async () => {
+    if (cfg.provider === 'custom' && baseUrlDraft.trim()) { await bridge.ai.setConfig({ baseUrl: baseUrlDraft.trim() }); setBaseUrlDraft(''); }
+    if (cfg.provider === 'custom' && modelDraft.trim()) { await bridge.ai.setConfig({ model: modelDraft.trim() }); }
     if (keyDraft.trim()) { await bridge.ai.setKey(cfg.provider, keyDraft.trim()); setKeyDraft(''); }
     setCfg(await bridge.ai.getConfig());
   };
@@ -103,6 +112,7 @@ function AiConsoleInner({ t, bridge }) {
               <option value="ollama">Ollama</option>
               <option value="anthropic">Anthropic</option>
               <option value="openai">OpenAI</option>
+              <option value="custom">{t('ai.provider.custom')}</option>
             </select>
           )}
       </div>
@@ -121,11 +131,23 @@ function AiConsoleInner({ t, bridge }) {
       {surface === 'setup' && (
         <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ fontWeight: 600, fontSize: 13 }}>{t('ai.setup.title')}</div>
-          <div className="faint" style={{ fontSize: 11.5 }}>{t('ai.setup.hint')}</div>
+          {cfg.provider === 'custom' && (
+            <>
+              <div className="faint" style={{ fontSize: 11.5 }}>{t('ai.setup.baseUrlHint')}</div>
+              <input className="bf-input" type="text" placeholder={t('ai.setup.baseUrlPh')}
+                value={baseUrlDraft} onChange={(e) => setBaseUrlDraft(e.target.value)} data-no-lex />
+              <div className="faint" style={{ fontSize: 11.5 }}>{t('ai.setup.modelHint')}</div>
+              <input className="bf-input" type="text" placeholder={t('ai.setup.modelPh')}
+                value={modelDraft} onChange={(e) => setModelDraft(e.target.value)} data-no-lex />
+            </>
+          )}
+          <div className="faint" style={{ fontSize: 11.5 }}>
+            {cfg.provider === 'custom' ? t('ai.setup.keyOptional') : t('ai.setup.hint')}
+          </div>
           <input className="bf-input" type="password" placeholder={t('ai.setup.keyPh')}
             value={keyDraft} onChange={(e) => setKeyDraft(e.target.value)} />
           <button type="button" className="pop-foot" style={{ border: '1px solid var(--line)' }}
-            onClick={saveSetup} disabled={!keyDraft.trim()}>{t('ai.setup.save')}</button>
+            onClick={saveSetup} disabled={!canSaveSetup(cfg, { keyDraft, baseUrlDraft })}>{t('ai.setup.save')}</button>
         </div>
       )}
 
