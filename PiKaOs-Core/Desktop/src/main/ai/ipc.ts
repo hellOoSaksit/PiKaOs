@@ -16,7 +16,7 @@ import { OpenAiProvider } from './providers/openai'
 import { OllamaProvider } from './providers/ollama'
 import { ProviderAuthError, LlmProvider } from './providers/types'
 
-const Provider = z.enum(['anthropic', 'openai', 'ollama'])
+const Provider = z.enum(['anthropic', 'openai', 'ollama', 'custom'])
 const SetKey = z.strictObject({ provider: Provider, apiKey: z.string().min(1).max(4096) })
 const ClearKey = z.strictObject({ provider: Provider })
 const SetConfig = z.strictObject({
@@ -39,6 +39,7 @@ const PROVIDERS: Record<AiProviderName, () => LlmProvider> = {
   anthropic: () => new AnthropicProvider(),
   openai: () => new OpenAiProvider(),
   ollama: () => new OllamaProvider(),
+  custom: () => new OpenAiProvider(),   // local runtimes speak the OpenAI chat-completions shape
 }
 
 // Namespaced per provider — never a bare key — so a stored AI key can never collide with or be
@@ -127,7 +128,11 @@ export function registerAiIpc(deps: {
     try {
       const rt = await resolveRuntime(cfg, broker, getBackendConfig().apiBaseUrl, vault)
       // Only a local BYO key can be "missing"; admin keys live server-side (apiKey stays null).
-      if (cfg.mode === 'byo-key' && rt.provider !== 'ollama' && !rt.apiKey) throw new Error('no key set for provider')
+      // Keyless providers: ollama (local, keyless) and custom (local OpenAI-compatible; key optional).
+      const keyless = rt.provider === 'ollama' || rt.provider === 'custom'
+      if (cfg.mode === 'byo-key' && !keyless && !rt.apiKey) throw new Error('no key set for provider')
+      // custom's endpoint is the whole request URL; without it the OpenAI adapter would hit api.openai.com.
+      if (rt.provider === 'custom' && !rt.baseUrl) throw new Error('no endpoint set for custom provider')
       return await runLoop(
         messages.map(m => ({ role: m.role, content: m.content })) as any,
         { model: rt.model, apiKey: rt.apiKey, maxSteps: cfg.maxSteps, signal: active.signal, baseUrl: rt.baseUrl ?? undefined },

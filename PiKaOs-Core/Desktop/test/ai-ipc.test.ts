@@ -129,3 +129,20 @@ it('byo-key ollama needs no key and no vault read', async () => {
   expect(rt.apiKey).toBe(null)
   expect(v.get).not.toHaveBeenCalled()
 })
+
+it('accepts the custom provider in setConfig and getConfig reports it', async () => {
+  await handlers.get('ai:setConfig')!(okEvent, { provider: 'custom', baseUrl: 'http://localhost:1234/v1/chat/completions' })
+  const cfg = await handlers.get('ai:getConfig')!(okEvent)
+  expect(cfg.provider).toBe('custom')
+  expect(cfg.baseUrl).toBe('http://localhost:1234/v1/chat/completions')
+})
+
+it('resolveRuntime: custom byo-key returns the cfg baseUrl + (optional) vault key, no /llm/connections fetch', async () => {
+  const { resolveRuntime } = await import('../src/main/ai/ipc')
+  const fetchSpy = vi.fn()
+  vi.stubGlobal('fetch', fetchSpy)
+  const cfg = { mode: 'byo-key', provider: 'custom', model: 'local-model', baseUrl: 'http://127.0.0.1:1234/v1/chat/completions', maxSteps: 15 } as any
+  const rt = await resolveRuntime(cfg, { getAccessToken: async () => null } as any, 'http://x/api', { get: () => null } as any)
+  expect(rt).toEqual({ provider: 'custom', model: 'local-model', baseUrl: 'http://127.0.0.1:1234/v1/chat/completions', apiKey: null })
+  expect(fetchSpy).not.toHaveBeenCalled()
+})

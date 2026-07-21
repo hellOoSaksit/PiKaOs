@@ -4,7 +4,7 @@ import { app } from 'electron'
 import { join } from 'node:path'
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 
-export type AiProviderName = 'anthropic' | 'openai' | 'ollama'
+export type AiProviderName = 'anthropic' | 'openai' | 'ollama' | 'custom'
 export type AiMode = 'byo-key' | 'admin'
 // `baseUrl: null` = "let the adapter use its own default" (ollama.ts keeps 127.0.0.1:11434 as
 // that default; nothing else hardcodes an endpoint). `admin` mode overwrites it from the server.
@@ -17,6 +17,7 @@ export const DEFAULT_MODELS: Record<AiProviderName, string> = {
   anthropic: 'claude-sonnet-5',
   openai: 'gpt-5.1',
   ollama: 'llama3.3',
+  custom: '',   // no sensible default — the user names the model their local server serves
 }
 // Default = the keyless local runtime, so a fresh install can chat without a key or a server.
 const DEFAULT: AiConfig = { mode: 'byo-key', provider: 'ollama', model: DEFAULT_MODELS.ollama, baseUrl: null, maxSteps: 15 }
@@ -27,7 +28,7 @@ export function getAiConfig(): AiConfig {
   if (!existsSync(path())) return DEFAULT
   try {
     const p = JSON.parse(readFileSync(path(), 'utf8'))
-    if (p && (p.provider === 'anthropic' || p.provider === 'openai' || p.provider === 'ollama')
+    if (p && (p.provider === 'anthropic' || p.provider === 'openai' || p.provider === 'ollama' || p.provider === 'custom')
       && typeof p.model === 'string' && Number.isInteger(p.maxSteps)) {
       // Normalize forward-compat fields: an older ai.json (pre-mode/baseUrl) is a valid file that
       // simply degrades to the safe defaults for the new keys rather than being discarded.
