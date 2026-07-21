@@ -66,11 +66,11 @@ export async function resolveRuntime(
     const token = await broker.getAccessToken()
     const headers: Record<string, string> = { 'content-type': 'application/json' }
     if (token) headers.authorization = `Bearer ${token}`
-    const res = await fetch(`${apiBase}/llm/connections`, { headers })
+    const res = await fetch(`${apiBase}/ai/llm/connections`, { headers })
     if (res.status === 404 || res.status === 403) {
-      throw new AdminRuntimeError(`admin runtime unavailable (/llm/connections ${res.status}): AI plugin absent or missing llm.view`)
+      throw new AdminRuntimeError(`admin runtime unavailable (/ai/llm/connections ${res.status}): AI plugin absent or missing llm.view`)
     }
-    if (!res.ok) throw new AdminRuntimeError(`admin runtime unavailable (/llm/connections ${res.status})`)
+    if (!res.ok) throw new AdminRuntimeError(`admin runtime unavailable (/ai/llm/connections ${res.status})`)
     const body = (await res.json().catch(() => null)) as { connections?: Array<{ provider?: unknown; model?: unknown; base_url?: unknown }> } | null
     const first = body?.connections?.[0]
     if (!first || typeof first.provider !== 'string' || typeof first.model !== 'string') {
