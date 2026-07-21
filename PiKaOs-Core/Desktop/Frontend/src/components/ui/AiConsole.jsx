@@ -12,6 +12,8 @@
    The off-desktop / closed guard lives in this thin outer function BEFORE any hook, so it stays
    plain-callable for the house test idiom; all hooks live in AiConsoleInner. */
 import React, { useEffect, useRef, useState } from 'react';
+import { Select } from './Dropdown.jsx';
+import Segmented from './Segmented.jsx';
 import {
   toChatMessages, adminCloudLimited, resolveSurface, assistantText, canSaveSetup,
 } from './AiConsole.logic.js';
@@ -87,19 +89,6 @@ function AiConsoleInner({ t, bridge }) {
   };
   const stop = () => bridge.ai.stop();
 
-  const modeTab = (mode, label) => (
-    <button
-      type="button"
-      className={'ai-mode-tab' + (cfg.mode === mode ? ' active' : '')}
-      style={{
-        flex: 1, fontSize: 11.5, padding: '5px 0', cursor: 'pointer',
-        border: '1px solid var(--line)', background: cfg.mode === mode ? 'var(--line-soft)' : 'transparent',
-        fontWeight: cfg.mode === mode ? 600 : 400,
-      }}
-      onClick={() => setMode(mode)}
-    >{label}</button>
-  );
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 560, overflowY: 'auto' }}>
       <div className="pop-head">
@@ -107,18 +96,30 @@ function AiConsoleInner({ t, bridge }) {
         {cfg.mode === 'admin'
           ? <span className="mono faint" style={{ fontSize: 11 }}>{cfg.provider} · {cfg.model}</span>
           : (
-            <select className="bf-input" style={{ width: 'auto', fontSize: 12 }} value={cfg.provider}
-              onChange={(e) => pickProvider(e.target.value)} data-no-lex>
-              <option value="anthropic">Anthropic</option>
-              <option value="openai">OpenAI</option>
-              <option value="custom">{t('ai.provider.custom')}</option>
-            </select>
+            <span data-no-lex>
+              <Select
+                value={cfg.provider}
+                onChange={pickProvider}
+                minWidth={128}
+                options={[
+                  { value: 'anthropic', label: 'Anthropic' },
+                  { value: 'openai', label: 'OpenAI' },
+                  { value: 'custom', label: t('ai.provider.custom') },
+                ]}
+              />
+            </span>
           )}
       </div>
 
-      <div style={{ display: 'flex', gap: 6, padding: '8px 14px 0' }}>
-        {modeTab('byo-key', t('ai.mode.byoKey'))}
-        {modeTab('admin', t('ai.mode.admin'))}
+      <div style={{ padding: '8px 14px 0' }}>
+        <Segmented
+          value={cfg.mode}
+          onChange={setMode}
+          options={[
+            { value: 'byo-key', label: t('ai.mode.byoKey') },
+            { value: 'admin', label: t('ai.mode.admin') },
+          ]}
+        />
       </div>
 
       {surface === 'admin-unavailable' && (
