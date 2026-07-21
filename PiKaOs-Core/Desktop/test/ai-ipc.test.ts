@@ -82,7 +82,7 @@ afterEach(() => { vi.unstubAllGlobals() })
 const spyVault = () => ({ get: vi.fn(() => null), set: vi.fn(), delete: vi.fn() })
 const brokerWith = (token: string | null) => ({ getAccessToken: async () => token } as any)
 
-it('admin mode reads /llm/connections and never touches the vault', async () => {
+it('admin mode reads /ai/llm/connections and never touches the vault', async () => {
   const { resolveRuntime } = await import('../src/main/ai/ipc')
   const fetchMock = vi.fn(async () => ({
     ok: true, status: 200,
@@ -94,7 +94,7 @@ it('admin mode reads /llm/connections and never touches the vault', async () => 
   const rt = await resolveRuntime(cfg, brokerWith('tkn'), 'http://127.0.0.1:8000/api', v as any)
   expect(rt).toEqual({ provider: 'anthropic', model: 'claude-x', baseUrl: 'https://srv.example/v1', apiKey: null })
   expect(v.get).not.toHaveBeenCalled()                       // admin never reads the local vault
-  expect(fetchMock.mock.calls[0][0]).toContain('/llm/connections')
+  expect(fetchMock.mock.calls[0][0]).toContain('/ai/llm/connections')
 })
 
 it('admin mode surfaces a missing llm.view (403) as an error — no silent byo-key fallback', async () => {
@@ -108,7 +108,7 @@ it('admin mode surfaces a missing llm.view (403) as an error — no silent byo-k
   }
 })
 
-it('byo-key mode reads the vault and never calls /llm/connections', async () => {
+it('byo-key mode reads the vault and never calls /ai/llm/connections', async () => {
   const { resolveRuntime } = await import('../src/main/ai/ipc')
   const fetchMock = vi.fn(async () => { throw new Error('should not fetch') }) as any
   vi.stubGlobal('fetch', fetchMock)
@@ -137,7 +137,7 @@ it('accepts the custom provider in setConfig and getConfig reports it', async ()
   expect(cfg.baseUrl).toBe('http://localhost:1234/v1/chat/completions')
 })
 
-it('resolveRuntime: custom byo-key returns the cfg baseUrl + (optional) vault key, no /llm/connections fetch', async () => {
+it('resolveRuntime: custom byo-key returns the cfg baseUrl + (optional) vault key, no /ai/llm/connections fetch', async () => {
   const { resolveRuntime } = await import('../src/main/ai/ipc')
   const fetchSpy = vi.fn()
   vi.stubGlobal('fetch', fetchSpy)
