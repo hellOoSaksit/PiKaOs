@@ -19,8 +19,11 @@ export const DEFAULT_MODELS: Record<AiProviderName, string> = {
   ollama: 'llama3.3',
   custom: '',   // no sensible default — the user names the model their local server serves
 }
-// Default = the keyless local runtime, so a fresh install can chat without a key or a server.
-const DEFAULT: AiConfig = { mode: 'byo-key', provider: 'ollama', model: DEFAULT_MODELS.ollama, baseUrl: null, maxSteps: 15 }
+// Default provider for a fresh byo-key install. Ollama is no longer offered to a general user in the
+// picker (a self-run local model is reached via the `custom` OpenAI-compatible provider instead), so a
+// new user brings their own — a cloud key (anthropic) or a custom endpoint. `ollama` stays a valid
+// provider for admin-published connections, just not the general-user default.
+const DEFAULT: AiConfig = { mode: 'byo-key', provider: 'anthropic', model: DEFAULT_MODELS.anthropic, baseUrl: null, maxSteps: 15 }
 
 const path = () => join(app.getPath('userData'), 'ai.json')
 

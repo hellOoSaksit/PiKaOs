@@ -109,7 +109,6 @@ function AiConsoleInner({ t, bridge }) {
           : (
             <select className="bf-input" style={{ width: 'auto', fontSize: 12 }} value={cfg.provider}
               onChange={(e) => pickProvider(e.target.value)} data-no-lex>
-              <option value="ollama">Ollama</option>
               <option value="anthropic">Anthropic</option>
               <option value="openai">OpenAI</option>
               <option value="custom">{t('ai.provider.custom')}</option>
