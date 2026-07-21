@@ -101,7 +101,7 @@ function AiConsoleInner({ t, bridge }) {
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 420 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 560, overflowY: 'auto' }}>
       <div className="pop-head">
         <span className="pop-title">{t('ai.title')}</span>
         {cfg.mode === 'admin'
