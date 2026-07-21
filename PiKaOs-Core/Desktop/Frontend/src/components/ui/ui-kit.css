@@ -47,6 +47,8 @@
   font-size: 13.5px; font-weight: 500; color: var(--ink-2);
   border-radius: var(--radius-sm); padding: 9px 11px; cursor: pointer; border: none;
   background: none; width: 100%; font-family: var(--font-body); text-align: left;
+  /* dropdown items stay on one line — a wrapped 2–3 line item reads as broken */
+  white-space: nowrap;
   transition: background .12s ease, color .12s ease, transform .2s var(--spring);
 }
 .dd-item:hover { background: var(--bg-3); color: var(--ink); }
