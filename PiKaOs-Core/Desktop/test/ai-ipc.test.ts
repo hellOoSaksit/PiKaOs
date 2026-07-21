@@ -146,3 +146,34 @@ it('resolveRuntime: custom byo-key returns the cfg baseUrl + (optional) vault ke
   expect(rt).toEqual({ provider: 'custom', model: 'local-model', baseUrl: 'http://127.0.0.1:1234/v1/chat/completions', apiKey: null })
   expect(fetchSpy).not.toHaveBeenCalled()
 })
+
+// --- ai:chat custom-provider guards ---------------------------------------------------------
+// custom is the local OpenAI-compatible runtime: keyless (no "no key set" guard applies) but a
+// baseUrl is mandatory (it IS the whole request URL — without it the OpenAI adapter would silently
+// hit api.openai.com). Both branches live in the ai:chat handler itself, not resolveRuntime, so
+// they need coverage at the ai:chat entry point.
+
+it('ai:chat: custom provider with a baseUrl but no stored key reaches runLoop (keyless, not "no key set")', async () => {
+  vi.doMock('../src/main/ai/loop', () => ({ runLoop: vi.fn(async () => ({ text: 'ok', truncated: false })) }))
+  vi.resetModules()
+  const { registerAiIpc } = await import('../src/main/ai/ipc')
+  handlers.clear()
+  registerAiIpc({ vault: vault as any, broker: { getAccessToken: async () => null } as any })
+  await handlers.get('ai:setConfig')!(okEvent, { provider: 'custom', model: 'local-model', baseUrl: 'http://127.0.0.1:1234/v1/chat/completions' })
+  expect(vault.get('ai.custom.apiKey')).toBe(null)   // no ai:setKey call — genuinely keyless
+  const result = await handlers.get('ai:chat')!(okEvent, { messages: [{ role: 'user', content: 'hi' }] })
+  expect(result).toEqual({ text: 'ok', truncated: false })
+})
+
+it('ai:chat: custom provider without a baseUrl rejects with the endpoint error (before runLoop)', async () => {
+  vi.doMock('../src/main/ai/loop', () => ({ runLoop: vi.fn(async () => ({ text: 'unreachable', truncated: false })) }))
+  vi.resetModules()
+  const { registerAiIpc } = await import('../src/main/ai/ipc')
+  handlers.clear()
+  registerAiIpc({ vault: vault as any, broker: { getAccessToken: async () => null } as any })
+  await handlers.get('ai:setConfig')!(okEvent, { provider: 'custom' })
+  const cfg = await handlers.get('ai:getConfig')!(okEvent)
+  expect(cfg.baseUrl).toBe(null)   // never set — this is what triggers the guard
+  await expect(handlers.get('ai:chat')!(okEvent, { messages: [{ role: 'user', content: 'hi' }] }))
+    .rejects.toThrow(/endpoint/)
+})
