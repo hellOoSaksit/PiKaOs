@@ -104,11 +104,13 @@ function InstallPlanModal({ plan, target, T }) {
       {target?.permissionInfo?.length > 0 && (
         <>
           <p style={{ color: 'var(--ink-2)', marginTop: 12 }}>{T('This plugin will be granted:', 'ปลั๊กอินนี้จะได้รับสิทธิ์:')}</p>
-          <ul style={{ margin: '6px 0' }}>
+          <ul className="perm-list">
             {target.permissionInfo.map(pi => (
-              <li key={pi.key}>
-                <span className="mono">{pi.key}</span>
-                {pi.rationale && <span className="faint"> — {pi.rationale}</span>}
+              // human-readable name is the headline (localized); the raw permission key + any rationale
+              // ride below in small text so the tech is still visible but not the primary reading.
+              <li key={pi.key} className="perm-item">
+                <span className="perm-name">{T(pi.name, pi.name_th || pi.name)}</span>
+                <span className="perm-meta mono">{pi.key}{pi.rationale ? ` — ${pi.rationale}` : ''}</span>
               </li>
             ))}
           </ul>

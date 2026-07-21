@@ -112,6 +112,7 @@ def _view(reg: dict[str, dict], active: set[str]) -> list[PluginOut]:
             permissions=[p["key"] for p in mf.permissions],
             permissionInfo=[{"key": p["key"],
                              "name": p.get("name_en") or p["key"],
+                             "name_th": p.get("name_th") or "",
                              "rationale": p.get("rationale", "")} for p in mf.permissions],
             description=mf.description, icon=mf.icon,
             repoUrl=registry.repo_url_of(reg, pid),

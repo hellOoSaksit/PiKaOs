@@ -32,7 +32,9 @@ export default function Modal({ open, onClose, title, children, footer, showClos
   useEffect(() => {
     if (!open) return;
     const restore = document.activeElement;
-    focusables(ref.current)[0]?.focus();
+    // preventScroll: a tall scrollable modal (e.g. the install plan) must open at the TOP showing its
+    // title, not auto-scrolled down to whatever the first focusable (a footer button) is.
+    focusables(ref.current)[0]?.focus({ preventScroll: true });
     return () => { restore && restore.focus && restore.focus(); };
   }, [open]);
 
