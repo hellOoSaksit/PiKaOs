@@ -83,9 +83,9 @@ app.whenReady().then(() => {
   registerIpc({ vault, broker, registry, manager, recovery })
   registerAiIpc({ vault, broker, askConsent: confirmToolCall })
 
-  manager.on('status', (id: string, status: string) => {
+  manager.on('status', (id: string, status: string, lastError: string | null) => {
     for (const win of BrowserWindow.getAllWindows()) {
-      if (!win.isDestroyed()) win.webContents.send('mcp:status', id, status)
+      if (!win.isDestroyed()) win.webContents.send('mcp:status', id, status, lastError ?? null)
     }
   })
 

@@ -152,7 +152,7 @@ export function LocalMcp({ Sys }) {
       setStatuses(st || {});
       // onStatus only fetches tools on a fresh `ready` transition; a server that's ALREADY ready on
       // (re)mount never fires that, so pull its tools here too — otherwise the list shows empty until restart.
-      for (const [id, s] of Object.entries(st || {})) { if (s === 'ready') fetchTools(id); }
+      for (const [id, s] of Object.entries(st || {})) { if (s.status === 'ready') fetchTools(id); }
     } catch (e) { setErr(e.message || 'load failed'); }
   };
 
@@ -166,8 +166,8 @@ export function LocalMcp({ Sys }) {
   useEffect(() => {
     if (!isDesktop) return;
     load();
-    window.pikaosDesktop.mcp.onStatus((id, s) => {
-      setStatuses(prev => ({ ...prev, [id]: s }));
+    window.pikaosDesktop.mcp.onStatus((id, s, lastError) => {
+      setStatuses(prev => ({ ...prev, [id]: { status: s, lastError } }));
       if (s === 'ready') fetchTools(id);                       // pull the tool list the moment it's usable
       else if (s === 'stopped' || s === 'error') setToolsById(prev => ({ ...prev, [id]: [] }));
     });
@@ -213,7 +213,7 @@ export function LocalMcp({ Sys }) {
         ? <Empty icon="🔌" title={t('mcp.empty.title')} sub={t('mcp.empty.sub')} />
         : <div className="tool-list" style={{ marginTop: 12 }}>
             {servers.map(d => (
-              <McpRow key={d.id} d={d} status={statuses[d.id]} t={t} busy={busy === d.id}
+              <McpRow key={d.id} d={d} status={statuses[d.id]?.status} t={t} busy={busy === d.id}
                 tools={toolsById[d.id] || []} onStart={() => start(d.id)} onStop={() => stop(d.id)} />
             ))}
           </div>}
