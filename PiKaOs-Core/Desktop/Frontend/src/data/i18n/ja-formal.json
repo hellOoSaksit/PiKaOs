@@ -275,6 +275,24 @@
     "mcp.tools.none": "このサーバーはツールを公開していません",
     "mcp.tool.args.ph": "JSON 引数 — 例: {\"text\":\"hello\"}",
     "mcp.tool.call": "呼び出す",
-    "mcp.tool.badjson": "引数は有効な JSON でなければなりません"
+    "mcp.tool.badjson": "引数は有効な JSON でなければなりません",
+    "mcp.preset.title": "すぐに使えるサーバー",
+    "mcp.preset.install": "インストール",
+    "mcp.preset.installed": "インストール済み",
+    "mcp.preset.installStart": "インストールして起動",
+    "mcp.preset.cancel": "キャンセル",
+    "mcp.preset.custom.name": "カスタム",
+    "mcp.preset.custom.desc": "上級者向け — コマンドと引数を自分で入力します。",
+    "mcp.preset.filesystem.name": "フォルダー内のファイル",
+    "mcp.preset.filesystem.desc": "選択した 1 つのフォルダー内で AI がファイルを読み書きできるようにします。",
+    "mcp.preset.filesystem.param.folder": "アクセスを許可するフォルダーはどれですか？",
+    "mcp.preset.memory.name": "メモリ",
+    "mcp.preset.memory.desc": "会話をまたいで AI が情報を記憶できるようにします。",
+    "mcp.preset.sequential-thinking.name": "段階的思考",
+    "mcp.preset.sequential-thinking.desc": "AI が難しい問題を手順に分けて考えるのを助けます。",
+    "mcp.preset.everything.name": "テストサーバー",
+    "mcp.preset.everything.desc": "サンプルツールを備えたデモサーバーです。システムが正しく動作しているかの確認に使えます。",
+    "mcp.preset.secret.ph": "アクセストークンをここに貼り付けてください",
+    "mcp.preset.secret.help": "トークンの取得方法"
   }
 }
