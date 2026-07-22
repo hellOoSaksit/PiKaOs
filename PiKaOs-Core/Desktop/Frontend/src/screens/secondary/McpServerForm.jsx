@@ -31,10 +31,13 @@ export function McpServerForm({ t, busy, initial, onSubmit }) {
   const ok = id.trim().length > 0 && command.trim().length > 0;
   const submit = async () => {
     if (!ok) return;
-    await onSubmit({
+    const saved = await onSubmit({
       id: id.trim(), label: label.trim() || id.trim(), command: command.trim(),
       args: parseArgs(args), secretKey: secretKey.trim(), secretValue,
     });
+    // The caller reports a rejected save by returning false (it shows the error itself and resolves
+    // either way). Keep everything typed so the user can correct it instead of retyping the command.
+    if (saved === false) return;
     if (editing) { setSecretValue(''); return; }   // an edit keeps the fields; a fresh add clears them
     setId(''); setLabel(''); setCommand(''); setArgs(''); setSecretKey(''); setSecretValue('');
   };

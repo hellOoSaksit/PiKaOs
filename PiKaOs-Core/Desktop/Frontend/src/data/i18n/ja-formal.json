@@ -274,6 +274,7 @@
     "mcp.status.error": "エラー",
     "mcp.tools.title": "ツール",
     "mcp.tools.none": "このサーバーはツールを公開していません",
+    "mcp.tools.notready": "ツールは、サーバーが動作して一覧を返した時点でここに表示されます。",
     "mcp.tool.args.ph": "JSON 引数 — 例: {\"text\":\"hello\"}",
     "mcp.tool.call": "呼び出す",
     "mcp.tool.badjson": "引数は有効な JSON でなければなりません",

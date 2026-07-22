@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   toolFormFields, needsJsonMode, buildArgs, canCall,
   filterTools, presetToDef, resultText, errorKey,
+  statusMeta, isRunning, showToolSearch,
 } from './LocalMcp.logic.js';
 
 describe('toolFormFields', () => {
@@ -119,5 +120,33 @@ describe('errorKey', () => {
     expect(errorKey('handshake-timeout')).toBe('mcp.err.handshake-timeout');
     expect(errorKey('weird')).toBe('mcp.err.generic');
     expect(errorKey(null)).toBe('mcp.err.generic');
+  });
+});
+
+describe('statusMeta / isRunning', () => {
+  const ALL = ['ready', 'running', 'starting', 'stopped', 'error'];
+  it('every FSM status maps to a badge class, a label key and a hint key', () => {
+    for (const s of ALL) {
+      const m = statusMeta(s);
+      expect(m.cls).toBeTruthy();
+      expect(m.key).toBe(`mcp.status.${s}`);
+      expect(m.hint).toBe(`mcp.status.${s}.hint`);
+    }
+  });
+  it('an unknown status falls back to stopped, so a badge is never blank', () => {
+    expect(statusMeta(undefined)).toEqual(statusMeta('stopped'));
+    expect(statusMeta('nonsense')).toEqual(statusMeta('stopped'));
+  });
+  it('isRunning is true for exactly the running-ish statuses', () => {
+    expect(ALL.filter((s) => isRunning(s))).toEqual(['ready', 'running', 'starting']);
+    expect(isRunning(undefined)).toBe(false);
+  });
+});
+
+describe('showToolSearch', () => {
+  it('appears only once the list stops being scannable by eye', () => {
+    expect(showToolSearch(0)).toBe(false);
+    expect(showToolSearch(6)).toBe(false);
+    expect(showToolSearch(7)).toBe(true);
   });
 });

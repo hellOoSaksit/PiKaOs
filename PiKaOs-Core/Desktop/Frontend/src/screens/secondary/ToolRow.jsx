@@ -5,6 +5,8 @@
 
    No `components/ui` barrel import here — the barrel touches `window` at module scope, which
    breaks the node-environment component tests that import this file's parent (see LocalMcp.jsx). */
+import React from 'react';
+
 export function ToolRow({ tool }) {
   return (
     <div className="tool-row">

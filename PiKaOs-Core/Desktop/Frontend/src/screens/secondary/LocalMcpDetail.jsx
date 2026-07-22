@@ -15,27 +15,14 @@ import Button from '../../components/ui/Button.jsx';
 import HelpNote from '../../components/ui/HelpNote.jsx';
 import PageHead from '../../components/ui/PageHead.jsx';
 import Panel from '../../components/ui/Panel.jsx';
-import { filterTools, errorKey } from './LocalMcp.logic.js';
+import { filterTools, errorKey, statusMeta, isRunning, showToolSearch } from './LocalMcp.logic.js';
 import { McpServerForm } from './McpServerForm.jsx';
 import { ToolRow } from './ToolRow.jsx';
-
-/* Duplicated from LocalMcp.jsx on purpose: importing it back would close an ESM cycle
-   (LocalMcp -> LocalMcpDetail -> LocalMcp), which has already caused a real runtime bug here. */
-const STATUS = {
-  ready:    { cls: 'on',   key: 'mcp.status.ready',    hint: 'mcp.status.ready.hint' },
-  running:  { cls: 'info', key: 'mcp.status.running',  hint: 'mcp.status.running.hint' },
-  starting: { cls: 'info', key: 'mcp.status.starting', hint: 'mcp.status.starting.hint' },
-  stopped:  { cls: 'idle', key: 'mcp.status.stopped',  hint: 'mcp.status.stopped.hint' },
-  error:    { cls: 'warn', key: 'mcp.status.error',    hint: 'mcp.status.error.hint' },
-};
-const isRunning = (status) => status === 'running' || status === 'starting' || status === 'ready';
-// Below this many tools the list is scannable by eye and a search box is just one more control.
-const SEARCH_FROM = 6;
 
 /* Status badge + one plain-language line saying what that status means for the user. The badge
    always carries text, so the state never depends on colour alone. */
 export function StatusLine({ t, status, lastError }) {
-  const s = STATUS[status] || STATUS.stopped;
+  const s = statusMeta(status);
   const failed = status === 'error';
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
@@ -62,7 +49,7 @@ export function TechnicalDetails({ t, d }) {
   ];
   if (d.secretKeys?.length) rows.push([t('mcp.detail.secrets'), d.secretKeys.join(', ')]);
   return (
-    <details style={{ marginBottom: 14 }}>
+    <details open={false} style={{ marginBottom: 14 }}>
       <summary style={{ cursor: 'pointer', fontSize: 12.5 }}>{t('mcp.detail.tech')}</summary>
       <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 10px' }}>
         {rows.map(([label, value]) => (
@@ -76,6 +63,16 @@ export function TechnicalDetails({ t, d }) {
   );
 }
 
+/* The edit form's submit, as a factory so its close rule is testable without a renderer.
+   The parent catches its own errors into the banner and always RESOLVES, so awaiting it says
+   nothing about success — it reports that by returning false. Closing on a failed save would
+   throw away the command the user just typed, right when they need it to fix the error. */
+export const makeSaveEdit = (onEditSave, setEditing) => async ({ secretKey, secretValue, ...next }) => {
+  const ok = await onEditSave(next, secretKey, secretValue);
+  if (ok !== false) setEditing(false);
+  return ok;
+};
+
 export function LocalMcpDetail({ Sys, def, status, lastError, tools, busy, err,
   onBack, onStart, onStop, onDelete, onEditSave, onCallTool }) {
   const t = (Sys && typeof Sys.t === 'function') ? Sys.t : ((k) => k);
@@ -86,10 +83,7 @@ export function LocalMcpDetail({ Sys, def, status, lastError, tools, busy, err,
   const visible = filterTools(all, q);
   const ready = status === 'ready';
 
-  const saveEdit = async ({ secretKey, secretValue, ...next }) => {
-    await onEditSave(next, secretKey, secretValue);
-    setEditing(false);
-  };
+  const saveEdit = makeSaveEdit(onEditSave, setEditing);
 
   return (
     <div className="content-pad fade-in" data-no-lex>
@@ -116,11 +110,13 @@ export function LocalMcpDetail({ Sys, def, status, lastError, tools, busy, err,
       {editing && <McpServerForm t={t} busy={busy} initial={def} onSubmit={saveEdit} />}
 
       <Panel title={t('mcp.tools.title')} icon="tools">
-        {!ready && <div className="faint" style={{ fontSize: 12.5, lineHeight: 1.6 }}>{t((STATUS[status] || STATUS.stopped).hint)}</div>}
+        {/* Its own copy, not the status hint again: the status line above already said what the
+            server is doing; here the question is why there is no tool list yet. */}
+        {!ready && <div className="faint" style={{ fontSize: 12.5, lineHeight: 1.6 }}>{t('mcp.tools.notready')}</div>}
 
         {ready && all.length === 0 && <div className="faint" style={{ fontSize: 12.5 }}>{t('mcp.tools.none')}</div>}
 
-        {ready && all.length > SEARCH_FROM && (
+        {ready && showToolSearch(all.length) && (
           <input className="bf-input" style={{ width: '100%', marginBottom: 8 }} value={q}
             placeholder={t('mcp.detail.search.ph')} aria-label={t('mcp.detail.search.ph')}
             onChange={e => setQ(e.target.value)} />

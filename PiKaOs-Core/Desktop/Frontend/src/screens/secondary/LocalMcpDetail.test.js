@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { StatusLine, TechnicalDetails } from './LocalMcpDetail.jsx';
+import { StatusLine, TechnicalDetails, makeSaveEdit } from './LocalMcpDetail.jsx';
 
 const flat = (n, out = []) => {
   if (n == null || typeof n === 'boolean') return out;
@@ -15,12 +15,12 @@ const strings = (el) => flat(el).filter((n) => typeof n === 'string');
 
 describe('StatusLine', () => {
   it('shows the badge key + per-status hint', () => {
-    const texts = flat(StatusLine({ t, status: 'ready', lastError: null })).filter((n) => typeof n === 'string');
+    const texts = strings(StatusLine({ t, status: 'ready', lastError: null }));
     expect(texts).toContain('mcp.status.ready');
     expect(texts).toContain('mcp.status.ready.hint');
   });
   it('error shows the mapped reason instead of the generic hint', () => {
-    const texts = flat(StatusLine({ t, status: 'error', lastError: 'handshake-timeout' })).filter((n) => typeof n === 'string');
+    const texts = strings(StatusLine({ t, status: 'error', lastError: 'handshake-timeout' }));
     expect(texts).toContain('mcp.err.handshake-timeout');
   });
 
@@ -47,11 +47,15 @@ describe('StatusLine', () => {
 
 describe('TechnicalDetails', () => {
   it('renders command + args + env-var names, never secret values', () => {
-    const d = { id: 'x', label: 'X', command: 'npx', args: ['-y', 'pkg'], secretKeys: ['API_TOKEN'] };
-    const texts = flat(TechnicalDetails({ t, d })).filter((n) => typeof n === 'string');
-    expect(texts.join(' ')).toContain('npx');
-    expect(texts.join(' ')).toContain('-y pkg');
-    expect(texts.join(' ')).toContain('API_TOKEN');   // the NAME is fine; values never exist client-side
+    // The def carries a value here on purpose: the assertion below has to be able to fail if the
+    // panel ever starts rendering whatever it is handed.
+    const d = { id: 'x', label: 'X', command: 'npx', args: ['-y', 'pkg'],
+      secretKeys: ['API_TOKEN'], secretValue: 'sk-live-must-never-render' };
+    const out = strings(TechnicalDetails({ t, d })).join(' ');
+    expect(out).toContain('npx');
+    expect(out).toContain('-y pkg');
+    expect(out).toContain('API_TOKEN');   // the NAME is fine; values never exist client-side
+    expect(out).not.toContain('sk-live-must-never-render');
   });
 
   // --- beyond the brief ---
@@ -59,12 +63,34 @@ describe('TechnicalDetails', () => {
     const el = TechnicalDetails({ t, d: { id: 'x', command: 'npx', args: [] } });
     const details = flat(el).find((n) => n.type === 'details');
     expect(details).toBeTruthy();
-    expect(details.props.open).toBeFalsy();
+    expect(details.props.open).toBe(false);
     expect(flat(details).some((n) => n.type === 'summary')).toBe(true);
   });
   it('omits the secret section when the def declares no secret keys', () => {
     const texts = strings(TechnicalDetails({ t, d: { id: 'x', command: 'npx', args: [] } }));
     expect(texts).toContain('x');
     expect(texts).not.toContain('mcp.detail.secrets');
+  });
+});
+
+/* The edit form's close decision, lifted out of the component so it is testable without a renderer.
+   It matters because the parent swallows its own errors into a banner and always resolves. */
+describe('makeSaveEdit', () => {
+  const typed = { id: 'x', command: 'npx', args: ['-y', 'pkg'], secretKey: 'K', secretValue: 'v' };
+
+  it('closes the form once the save succeeded', async () => {
+    const editing = [];
+    await makeSaveEdit(async () => true, (v) => editing.push(v))(typed);
+    expect(editing).toEqual([false]);          // setEditing(false) === form closed
+  });
+  it('a failed save keeps the form open, so the typed command is not lost', async () => {
+    const editing = [];
+    await makeSaveEdit(async () => false, (v) => editing.push(v))(typed);
+    expect(editing).toEqual([]);
+  });
+  it('hands the parent a def without the secret fields, and the secret separately', async () => {
+    let got = null;
+    await makeSaveEdit(async (...args) => { got = args; return true; }, () => {})(typed);
+    expect(got).toEqual([{ id: 'x', command: 'npx', args: ['-y', 'pkg'] }, 'K', 'v']);
   });
 });
