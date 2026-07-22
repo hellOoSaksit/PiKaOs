@@ -92,13 +92,26 @@ export const statusMeta = (status) => STATUS[status] || STATUS.stopped;
 // "Stop" is offered from the moment the process exists, not only once the handshake lands.
 export const isRunning = (status) => status === 'running' || status === 'starting' || status === 'ready';
 
-/* Which stored def a save has to reap before it writes. The registry's `add` UPSERTS (it filters the
-   id out, then pushes), so an add whose id collides with an existing def is really a replace — and a
-   replace that skips the stop leaves the OLD child running under a def that now describes something
-   else. The edit path already knows its target (an edit may even rename the id); the add path has to
-   derive it. null = a genuinely new server, nothing to reap. */
-export const replaceTarget = (servers, id, replaceId) =>
-  replaceId ?? ((servers || []).some((s) => s.id === id) ? id : null);
+/* Which stored defs a save has to reap before it writes. The registry's `add` UPSERTS (it filters the
+   id out, then pushes) and never rejects a duplicate, so ANY write whose id collides with a stored def
+   is really a replace — and a replace that skips the stop leaves the OLD child running under a def that
+   now describes something else.
+   Two ids can be displaced at once, which is why this returns a set and not a single target: an edit
+   renaming server A onto server B's id removes A *and* upserts over B. [] = a genuinely new server. */
+export const replaceTargets = (servers, id, replaceId) =>
+  [...new Set([replaceId, (servers || []).some((s) => s.id === id) ? id : null].filter(Boolean))];
+
+/* The whole decision a save makes before it touches the bridge: what to reap, and whether the
+   replacement has to be restarted afterwards. Exported so the rule is pinned by a test rather than
+   only by reading the orchestration around it. A restart is owed if ANY displaced server was live. */
+export function savePlan(servers, statuses, id, replaceId) {
+  const targets = replaceTargets(servers, id, replaceId);
+  return { targets, wasRunning: targets.some((x) => isRunning((statuses || {})[x]?.status)) };
+}
+
+/* A failed save -> the banner to show, or null for "no banner, the save counts as landed". Only the
+   trailing restart can raise consent denial, and by then the def is already stored. */
+export const saveErrorNote = (e) => (isConsentDenied(e) ? null : { key: 'mcp.err.action.save', detail: e?.message || null });
 
 /* Declining the native consent dialog is a normal outcome, not a failure: the manager already puts
    the server back to `stopped`, so no error banner should appear. The main process throws
