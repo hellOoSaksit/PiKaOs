@@ -1,4 +1,4 @@
-import { it, expect, vi, describe } from 'vitest'
+import { it, expect, vi, describe, afterEach } from 'vitest'
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { mkdtempSync } from 'node:fs'; import { tmpdir } from 'node:os'; import { join } from 'node:path'
@@ -48,6 +48,9 @@ vi.mock('node:child_process', () => ({ spawn: vi.fn(() => fake) }))
 // (platform, env) parameters — letting one test force the win32/no-node branch without touching
 // manager.ts's two-arg call site or any other test's (real, passing) platform.
 let resolveOverride: { platform: NodeJS.Platform; env: Record<string, string | undefined> } | null = null
+// Reset centrally, not per-test try/finally — a later test that forgets to clean up (or throws
+// before its own finally runs) must never leak this override into the next test.
+afterEach(() => { resolveOverride = null })
 vi.mock('../src/main/mcp/spawn-resolver', async () => {
   const actual = await vi.importActual<typeof import('../src/main/mcp/spawn-resolver')>('../src/main/mcp/spawn-resolver')
   return {
@@ -168,23 +171,32 @@ describe('lastError', () => {
     expect(mgr.status('fs')).toBe('error')
     expect(mgr.statuses().fs).toEqual({ status: 'error', lastError: 'exited-early' })
 
-    // separately: a deliberate stop() must never be mistaken for a crash
+    // separately: a deliberate stop() must never be mistaken for a crash. kill() must actually emit
+    // 'exit' (like a real ChildProcess does once the OS reaps it) so this test drives manager.ts's
+    // real exit handler and its wasCurrent===false branch — not just stop()'s own terminal `set()`.
+    // Note: stop() unconditionally re-sets 'stopped' AFTER the synchronous exit-handler call inside
+    // kill(), so the final statuses() snapshot alone can't tell the branches apart — a sabotaged
+    // exit handler that calls fail(id,'exited-early') gets silently overwritten by that trailing
+    // set(). The events log below captures the intermediate emit, which is where the branch shows.
     fake = child()
+    fake.kill = vi.fn(() => fake.emit('exit'))
     const mgr2 = await mkManager(vi.fn().mockResolvedValue(true))
+    const events2: unknown[][] = []
+    mgr2.on('status', (...args: unknown[]) => events2.push(args))
     await mgr2.start('fs')
     await mgr2.stop('fs')
+    expect(fake.kill).toHaveBeenCalled()   // proves the exit handler actually ran (not just stop()'s own set())
+    expect(events2).not.toContainEqual(['fs', 'error', 'exited-early'])   // the wasCurrent===false branch must not treat a user stop as a crash
     expect(mgr2.statuses().fs).toEqual({ status: 'stopped', lastError: null })
   })
 
   it('npx on win32 without node on PATH -> error + node-missing, nothing spawned', async () => {
-    resolveOverride = { platform: 'win32', env: { PATH: 'C:\\nowhere' } }
-    try {
-      fake = child()
-      const { spawn } = await import('node:child_process'); (spawn as any).mockClear()
-      const mgr = await mkManager(vi.fn().mockResolvedValue(true))   // def.command === 'npx' (mkManager default)
-      await mgr.start('fs')
-      expect(spawn).not.toHaveBeenCalled()
-      expect(mgr.statuses().fs).toEqual({ status: 'error', lastError: 'node-missing' })
-    } finally { resolveOverride = null }
+    resolveOverride = { platform: 'win32', env: { PATH: 'C:\\nowhere' } }   // reset by the top-level afterEach
+    fake = child()
+    const { spawn } = await import('node:child_process'); (spawn as any).mockClear()
+    const mgr = await mkManager(vi.fn().mockResolvedValue(true))   // def.command === 'npx' (mkManager default)
+    await mgr.start('fs')
+    expect(spawn).not.toHaveBeenCalled()
+    expect(mgr.statuses().fs).toEqual({ status: 'error', lastError: 'node-missing' })
   })
 })
