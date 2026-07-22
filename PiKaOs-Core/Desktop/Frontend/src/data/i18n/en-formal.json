@@ -1037,7 +1037,7 @@
     "mcp.add.secretval.ph": "Secret value (optional)",
     "mcp.add.submit": "Add server",
     "mcp.empty.title": "No MCP servers registered",
-    "mcp.empty.sub": "Add one above to prove the runtime end-to-end.",
+    "mcp.empty.sub": "Pick one of the ready-made servers above to get started.",
     "mcp.row.start": "Start",
     "mcp.row.stop": "Stop",
     "mcp.status.ready": "Ready",
@@ -1067,6 +1067,22 @@
     "mcp.preset.everything.name": "Test server",
     "mcp.preset.everything.desc": "A demo server with sample tools — useful to check the system works.",
     "mcp.preset.secret.ph": "Paste the access token here",
-    "mcp.preset.secret.help": "How to get a token"
+    "mcp.preset.secret.help": "How to get a token",
+    "mcp.explain.title": "What is a local MCP server?",
+    "mcp.explain.body": "An MCP server is a small helper program that runs on this computer and gives the AI extra abilities — reading files in a folder you choose, remembering things between conversations, and more. Pick a ready-made server below and PiKaOs sets it up for you. The first time each one starts, you will be asked to allow it.",
+    "mcp.explain.hide": "Hide",
+    "mcp.explain.show": "What is this?",
+    "mcp.list.installed": "Your servers",
+    "mcp.list.tools": "{n} tools",
+    "mcp.list.open": "Open",
+    "mcp.err.node-missing": "Node.js is not installed on this computer — the ready-made servers need it. Install it from nodejs.org, then try again.",
+    "mcp.err.node-missing.link": "Download Node.js",
+    "mcp.err.spawn-failed": "PiKaOs could not start this server. Check the command and the arguments, then try again.",
+    "mcp.err.handshake-timeout": "The server started but did not answer in time. Try starting it again.",
+    "mcp.err.handshake-failed": "The server started but did not answer the way an MCP server should, so PiKaOs cannot use it.",
+    "mcp.err.exited-early": "The server stopped by itself right after starting. Its settings may be wrong.",
+    "mcp.err.generic": "Something went wrong with this server.",
+    "mcp.confirm.delete.title": "Remove this server?",
+    "mcp.confirm.delete.msg": "It will be stopped and removed from your list. You can install it again at any time."
   }
 }
