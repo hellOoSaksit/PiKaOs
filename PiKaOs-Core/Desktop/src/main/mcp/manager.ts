@@ -67,7 +67,7 @@ export class McpManager extends EventEmitter {
     child.on('error', () => this.set(id, 'error'))
     child.on('exit', () => {
       this.procs.delete(id); this.clients.delete(id); this.toolCache.delete(id)
-      this.set(id, 'stopped')
+      if (this.status(id) !== 'error') this.set(id, 'stopped')   // keep a handshake-error visible; still reap procs
     })
     // Some fakes/real spawns emit synchronously; if already alive, mark running.
     if (child.pid) this.set(id, 'running')
@@ -87,7 +87,10 @@ export class McpManager extends EventEmitter {
       this.set(id, 'ready')
     } catch {
       await client.close().catch(() => {})
-      if (this.procs.get(id) === child) this.set(id, 'error')
+      // Reap the child on handshake failure — otherwise a spawned-but-unhandshaken process leaks when the
+      // user retries Start (a new child overwrites the map entry, orphaning the old one). kill() on an
+      // already-dead child is a no-op, and the stopped-meanwhile guard means we never kill someone else's child.
+      if (this.procs.get(id) === child) { this.set(id, 'error'); child.kill() }
     }
   }
 
