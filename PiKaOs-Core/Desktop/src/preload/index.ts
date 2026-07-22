@@ -54,6 +54,7 @@ const api = {
     isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
     getBounds: () => ipcRenderer.invoke('window:getBounds'),
     move: (x: number, y: number) => ipcRenderer.send('window:move', x, y),
+    restoreForDrag: () => ipcRenderer.invoke('window:restoreForDrag'),
     setTitleBarOverlay: (colors: { color: string; symbolColor: string; bg?: string }) =>
       ipcRenderer.invoke('window:setTitleBarOverlay', colors),
     quit: () => ipcRenderer.invoke('window:quit'),
