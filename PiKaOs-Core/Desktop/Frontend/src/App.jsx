@@ -12,6 +12,7 @@ import { FirstRun } from './screens/FirstRun.jsx';
 import { KernelOnlyShell } from './screens/KernelOnlyShell.jsx';
 import { KernelHome } from './screens/KernelHome.jsx';
 import { PluginsManager } from './screens/screens-plugins.jsx';
+import { McpSkillHub } from './screens/secondary/McpSkillHub.jsx';
 import { ToolsManager } from './screens/screens-tools.jsx';
 import { useAuth } from './lib/auth.jsx';
 import { BottomUtilityBar } from './components/ui/BottomUtilityBar.jsx';
@@ -37,7 +38,7 @@ const ROUTE_META = {
   modules: { icon: "puzzle", title: "โมดูล / ปลั๊กอิน", en: "Modules / Plugins" },
   marketplace: { icon: "cart", title: "มาร์เก็ตเพลส", en: "Marketplace" },
   mypackages: { icon: "package", title: "แพ็กเกจของฉัน", en: "My Packages & Share" },
-  localmcp: { icon: "monitor", title: "Local MCP", en: "Local MCP" },
+  mcpskill: { icon: "link", title: "MCP และทักษะ", en: "MCP & Skills" },
   settings:{ icon: "settings", title: "ตั้งค่าระบบ", en: "Settings" },
   ...PLUGIN_ROUTE_META,   // plugin routes contribute their own topbar metadata (Phase 6 seam)
 };
@@ -438,7 +439,7 @@ function App() {
       case "modules": return guard("plugins.manage", <PluginsManager Sys={Sys} view="modules" />);
       case "marketplace": return guard("plugins.manage", <PluginsManager Sys={Sys} view="market" />);
       case "mypackages": return guard("plugins.manage", <PluginsManager Sys={Sys} view="mine" />);
-      // Local MCP moved into the Marketplace hub's "Local MCP" tab (desktop-only) — no standalone route.
+      case "mcpskill": return guard("mcp.manage", <McpSkillHub Sys={Sys} />);
       case "settings": return <Settings theme={theme} setTheme={setTheme} lex={lex} setLex={setLex} pickLanguage={pickLanguage} language={language} formal={formal} t={t} />;
       default: {
         // a route owned by an enabled plugin (Phase 6 seam) — else fall back to kernel Home.

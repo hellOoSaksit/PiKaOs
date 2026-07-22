@@ -8,10 +8,12 @@
 import { NAV } from './data.jsx';
 import { PLUGIN_NAV } from '../plugins/index.jsx';
 
-// v2: introduced the "Install" parent (Modules / Marketplace / My Packages) + made Tools a leaf +
-// moved Local MCP into the Marketplace hub. mergeWithDefault preserves a saved arrangement, so the
-// key is bumped to discard the old v1 layout and give everyone the new default structure.
-const NAV_KEY = "guildos-nav-v3";
+// v4: split the MCP tab set out of the Marketplace hub into its own top-level "MCP & Skills" item
+// (route mcpskill) and left Marketplace to mean the plugin store. mergeWithDefault preserves a saved
+// arrangement, so the key is bumped to discard the v3 layout and give everyone the new default
+// structure — this is a rearrangement, not an addition, and appending mcpskill to the end of a saved
+// group would have hidden the whole point of the change from the people who use the menu most.
+const NAV_KEY = "guildos-nav-v4";
 export const MAX_DEPTH = 3;                 // Main(0) -> Sub(1) -> Sub(2)
 
 /* ---- default config: a deep clone of the static NAV (route metadata lives in code) ----
