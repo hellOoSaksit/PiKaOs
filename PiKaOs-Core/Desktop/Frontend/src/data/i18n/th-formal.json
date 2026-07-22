@@ -986,6 +986,24 @@
     "mcp.tools.none": "เซิร์ฟเวอร์นี้ไม่มีเครื่องมือให้ใช้",
     "mcp.tool.args.ph": "อาร์กิวเมนต์ JSON — เช่น {\"text\":\"hello\"}",
     "mcp.tool.call": "เรียกใช้",
-    "mcp.tool.badjson": "อาร์กิวเมนต์ต้องเป็น JSON ที่ถูกต้อง"
+    "mcp.tool.badjson": "อาร์กิวเมนต์ต้องเป็น JSON ที่ถูกต้อง",
+    "mcp.preset.title": "เซิร์ฟเวอร์สำเร็จรูป",
+    "mcp.preset.install": "ติดตั้ง",
+    "mcp.preset.installed": "ติดตั้งแล้ว",
+    "mcp.preset.installStart": "ติดตั้งและเริ่มใช้งาน",
+    "mcp.preset.cancel": "ยกเลิก",
+    "mcp.preset.custom.name": "กำหนดเอง",
+    "mcp.preset.custom.desc": "สำหรับผู้ใช้ที่เชี่ยวชาญด้านเทคนิค — กรอกคำสั่งและอาร์กิวเมนต์ด้วยตัวเอง",
+    "mcp.preset.filesystem.name": "ไฟล์ในโฟลเดอร์",
+    "mcp.preset.filesystem.desc": "ให้ AI อ่าน/เขียนไฟล์เฉพาะในโฟลเดอร์ที่คุณเลือก",
+    "mcp.preset.filesystem.param.folder": "อนุญาตให้เข้าถึงโฟลเดอร์ไหน?",
+    "mcp.preset.memory.name": "หน่วยความจำ",
+    "mcp.preset.memory.desc": "ให้ AI จดจำข้อมูลข้ามการสนทนาได้",
+    "mcp.preset.sequential-thinking.name": "คิดแบบเป็นขั้นตอน",
+    "mcp.preset.sequential-thinking.desc": "ช่วยให้ AI แตกปัญหาที่ซับซ้อนออกเป็นขั้นตอนย่อย",
+    "mcp.preset.everything.name": "เซิร์ฟเวอร์ทดสอบ",
+    "mcp.preset.everything.desc": "เซิร์ฟเวอร์สาธิตพร้อมเครื่องมือตัวอย่าง ใช้ตรวจสอบว่าระบบทำงานได้จริง",
+    "mcp.preset.secret.ph": "วางโทเคนสำหรับเข้าถึงที่นี่",
+    "mcp.preset.secret.help": "วิธีขอรับโทเคน"
   }
 }
