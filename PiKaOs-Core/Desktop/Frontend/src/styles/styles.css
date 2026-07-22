@@ -295,7 +295,7 @@ body {
    title bar; pin it to the body instead (higher specificity than login.css `.auth-screen`). */
 .desktop-body > .auth-screen { position: absolute; z-index: auto; }
 .titlebar {
-  display: flex; align-items: center;
+  display: flex; align-items: stretch;
   height: var(--titlebar-h);
   /* --bg-1 = the app surface + the window backgroundColor + the OS min/max/close strip (WCO overlay),
      so the whole top row is one colour with the program instead of a distinct white bar. */
@@ -303,16 +303,25 @@ body {
   border-bottom: 1px solid var(--line);
   user-select: none;
 }
-.titlebar-tools { display: flex; align-items: center; gap: 2px; padding-left: 8px; }
+.titlebar-tools { display: flex; align-items: stretch; gap: 2px; padding-left: 8px; }
+/* The buttons must be as tall as the BAR, not as tall as they look: a 28px control centred in a 36px
+   bar leaves a 4px dead strip above and below that swallows clicks, and when the window is maximized
+   it also throws away the screen edge — the one target you can hit by slamming the mouse up without
+   aiming (Fitts's law). Tooltip wraps each button in a span.tip, so the stretch has to be handed all
+   the way down that chain. The 28px LOOK is preserved by padding + background-clip below. */
+.titlebar-tools > *, .titlebar-tools .tip, .tb-menu { display: flex; align-items: stretch; }
 /* Title-bar tools render through the shared Button primitive (icon-only), so they carry the physical
    `.btn`/`.btn-ghost` base. `.tb-btn` must stay FLAT (transparent, no 3D shadow, fixed 34×28) — scope
    it to `.btn.tb-btn` so it out-specifies `.btn*` regardless of stylesheet order, and null the base
    padding/shadow/transform it would otherwise inherit. */
 .btn.tb-btn {
-  width: 34px; height: 28px; padding: 0; display: grid; place-items: center;
-  border: 0; background: transparent; color: var(--ink-3); border-radius: 8px; cursor: pointer;
+  width: 34px; height: auto; align-self: stretch; display: grid; place-items: center;
+  /* Full-height hit box, 28px-tall paint: the padding is clickable but background-clip keeps the
+     hover fill off it, so the control reads exactly as it did before it grew. */
+  padding: 4px 0; background-clip: content-box;
+  border: 0; background-color: transparent; color: var(--ink-3); border-radius: 8px; cursor: pointer;
   box-shadow: none; transform: none;
-  transition: background .12s, color .12s;
+  transition: background-color .12s, color .12s;
 }
 /* Icons inside a button own their size from this slot (icons.jsx renders a viewBox-only svg with no
    width/height — "size comes from CSS where the slot owns it"). Before U1 buttons carried emoji glyphs;
@@ -320,7 +329,7 @@ body {
 .btn .ico { width: 18px; height: 18px; flex-shrink: 0; }
 .btn-sm .ico { width: 16px; height: 16px; }
 .btn.tb-btn > svg { width: 17px; height: 17px; }
-.btn.tb-btn:hover:not(:disabled) { background: var(--bg-4); color: var(--ink); box-shadow: none; transform: none; }
+.btn.tb-btn:hover:not(:disabled) { background-color: var(--bg-4); color: var(--ink); box-shadow: none; transform: none; }
 .btn.tb-btn:disabled { opacity: .4; cursor: default; }
 .titlebar-draghandle { flex: 1; align-self: stretch; }
 

@@ -7,11 +7,14 @@
    sees — same intent as the other admin config in this prototype. */
 import { NAV } from './data.jsx';
 import { PLUGIN_NAV } from '../plugins/index.jsx';
+import { mergeConfigs } from './data-nav.logic.js';
 
-// v2: introduced the "Install" parent (Modules / Marketplace / My Packages) + made Tools a leaf +
-// moved Local MCP into the Marketplace hub. mergeWithDefault preserves a saved arrangement, so the
-// key is bumped to discard the old v1 layout and give everyone the new default structure.
-const NAV_KEY = "guildos-nav-v3";
+// v4: split the MCP tab set out of the Marketplace hub into its own top-level "MCP & Skills" item
+// (route mcpskill) and left Marketplace to mean the plugin store. mergeWithDefault preserves a saved
+// arrangement, so the key is bumped to discard the v3 layout and give everyone the new default
+// structure — this is a rearrangement, not an addition, and appending mcpskill to the end of a saved
+// group would have hidden the whole point of the change from the people who use the menu most.
+const NAV_KEY = "guildos-nav-v4";
 export const MAX_DEPTH = 3;                 // Main(0) -> Sub(1) -> Sub(2)
 
 /* ---- default config: a deep clone of the static NAV (route metadata lives in code) ----
@@ -42,10 +45,6 @@ function defaultNav() {
 
 /* ---- helpers ---- */
 function _clone(cfg) { return JSON.parse(JSON.stringify(cfg)); }
-function collectIds(items, set = new Set()) {
-  for (const it of items || []) { set.add(it.id); collectIds(it.children, set); }
-  return set;
-}
 function _height(node) {                     // 1 for a leaf; +1 per nested level
   if (!node.children || !node.children.length) return 1;
   return 1 + Math.max(...node.children.map(_height));
@@ -69,36 +68,11 @@ function _locateInCfg(cfg, id) {
 
 /* ---- merge a saved config with the current default ----
    keep the user's order/nesting/hidden/label; refresh code-owned metadata (icon/perm/tag);
-   drop nodes whose route was removed; append new default routes so they stay reachable. */
+   drop nodes whose route was removed; insert new default routes at their designed position
+   (see mergeConfigs in data-nav.logic.js for the actual tree-walk — this is a thin wrapper
+   that supplies the live default tree, which the logic module cannot import for itself). */
 function mergeWithDefault(saved) {
-  const def = defaultNav();
-  if (!Array.isArray(saved) || !saved.length) return def;
-
-  const defIndex = {};
-  (function idx(items) { for (const it of items || []) { defIndex[it.id] = it; idx(it.children); } })(def.flatMap(g => g.items));
-
-  const prune = (items) => (items || [])
-    .filter(it => defIndex[it.id])           // drop removed routes
-    .map(it => {
-      const d = defIndex[it.id];
-      const out = { id: it.id, icon: d.icon };
-      if (d.perm) out.perm = d.perm;
-      if (d.tag) out.tag = d.tag;
-      if (d.desktopOnly) out.desktopOnly = true;
-      if (it.customLabel) out.customLabel = it.customLabel;   // the only label the user owns (rename)
-      if (it.hidden) out.hidden = true;
-      if (it.children) out.children = prune(it.children);
-      return out;
-    });
-
-  const merged = saved.map(g => ({ group: g.group, items: prune(g.items) }));
-  const present = collectIds(merged.flatMap(g => g.items));
-  for (const g of def) {
-    let mg = merged.find(m => m.group === g.group);
-    if (!mg) { mg = { group: g.group, items: [] }; merged.push(mg); }
-    for (const it of g.items) if (!present.has(it.id)) { mg.items.push(it); present.add(it.id); }
-  }
-  return merged;
+  return mergeConfigs(defaultNav(), saved);
 }
 
 /* ---- persistence (one global key) ---- */

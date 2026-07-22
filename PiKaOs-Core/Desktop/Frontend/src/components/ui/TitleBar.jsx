@@ -6,14 +6,16 @@ const desk = () => (typeof window !== 'undefined' ? window.pikaosDesktop : undef
 /** Functional title-bar toolbar (Window Controls Overlay draws min/max/close on the right).
  *  No CSS webkit drag region anywhere — it breaks click hit-testing on scaled Windows displays
  *  (Electron #7347). The window is dragged in JS via the empty handle instead. Desktop-only. */
-export default function TitleBar({ t, onSidebar, onSearch, onBack, onForward, canBack, canForward, onMenuSettings, version }) {
+export default function TitleBar({ t, onSidebar, onSearch, onBack, onForward, canBack, canForward, canSearch = true, onMenuSettings, version }) {
   const api = desk();
   if (!api?.isDesktop) return null;
 
   const onDragDown = (e) => {
     if (e.button !== 0) return;
-    const sx = e.screenX, sy = e.screenY;
-    api.window.getBounds().then((b) => {
+    let sx = e.screenX, sy = e.screenY;
+    Promise.all([api.window.getBounds(), api.window.isMaximized()]).then(([bounds, wasMax]) => {
+      let b = bounds;
+      let restoring = false;   // one restore per drag, and never twice concurrently
       const cleanup = () => {
         window.removeEventListener('mousemove', move);
         window.removeEventListener('mouseup', cleanup);
@@ -23,7 +25,20 @@ export default function TitleBar({ t, onSidebar, onSearch, onBack, onForward, ca
         // getBounds can resolve after a fast click's mouseup — without this the window sticks to
         // the cursor with no button held. ev.buttons is the live state, unlike the stale closure.
         if ((ev.buttons & 1) === 0) return cleanup();
-        api.window.move(b.x + (ev.screenX - sx), b.y + (ev.screenY - sy));
+        if (wasMax) {
+          // Deliberate travel only: a double-click jitters a pixel or two, and restoring on that
+          // would undo the maximize the second click is about to ask for.
+          if (restoring || Math.abs(ev.screenX - sx) + Math.abs(ev.screenY - sy) < 5) return;
+          restoring = true;
+          return api.window.restoreForDrag().then((nb) => {
+            wasMax = false;
+            // Re-anchor: the captured bounds described the maximized window and the cursor now sits
+            // somewhere else entirely on a smaller one.
+            if (nb) { b = nb; sx = ev.screenX; sy = ev.screenY; }
+          });
+        }
+        // the size rides along so main can re-assert it (setPosition drifts size on scaled displays)
+        api.window.move(b.x + (ev.screenX - sx), b.y + (ev.screenY - sy), b.width, b.height);
       };
       window.addEventListener('mousemove', move);
       window.addEventListener('mouseup', cleanup);
@@ -38,7 +53,7 @@ export default function TitleBar({ t, onSidebar, onSearch, onBack, onForward, ca
       <div className="titlebar-tools">
         <TitleMenu t={t} onSettings={onMenuSettings} onToggleSidebar={onSidebar} version={version} />
         <Button className="tb-btn" icon="sidebar" label={t('titlebar.sidebar')} onClick={onSidebar} />
-        <Button className="tb-btn" icon="search" label={t('titlebar.search')} onClick={onSearch} />
+        <Button className="tb-btn" icon="search" label={t('titlebar.search')} onClick={onSearch} disabled={!canSearch} />
         <Button className="tb-btn" icon="chevron-left" label={t('titlebar.back')} onClick={onBack} disabled={!canBack} />
         <Button className="tb-btn" icon="chevron-right" label={t('titlebar.forward')} onClick={onForward} disabled={!canForward} />
       </div>

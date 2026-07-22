@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { McpErrorToken } from '../main/mcp/manager'
 
 // Locked bridge shape (Task 10 spec) — every call delegates straight through to a guarded
 // ipcMain.handle in src/main/ipc.ts. No logic lives here; the renderer never touches Node/fs
@@ -21,10 +22,26 @@ const api = {
     start: (id: string) => ipcRenderer.invoke('mcp:start', id),
     stop: (id: string) => ipcRenderer.invoke('mcp:stop', id),
     statuses: () => ipcRenderer.invoke('mcp:statuses'),
-    onStatus: (cb: (id: string, s: string) => void) => ipcRenderer.on('mcp:status', (_e, id, s) => cb(id, s)),
+    onStatus: (cb: (id: string, s: string, lastError: McpErrorToken | null) => void) =>
+      ipcRenderer.on('mcp:status', (_e, id, s, le) => cb(id, s, le ?? null)),
+    tools: (id: string) => ipcRenderer.invoke('mcp:tools', id),
+    callTool: (id: string, name: string, args: Record<string, unknown>) => ipcRenderer.invoke('mcp:callTool', id, name, args),
   },
   secrets: {
     setForServer: (sid: string, key: string, value: string) => ipcRenderer.invoke('secrets:setForServer', sid, key, value),
+  },
+  ai: {
+    setKey: (provider: string, apiKey: string) => ipcRenderer.invoke('ai:setKey', { provider, apiKey }),
+    clearKey: (provider: string) => ipcRenderer.invoke('ai:clearKey', { provider }),
+    getConfig: () => ipcRenderer.invoke('ai:getConfig'),
+    setConfig: (c: any) => ipcRenderer.invoke('ai:setConfig', c),
+    chat: (messages: Array<{ role: string; content: string }>) => ipcRenderer.invoke('ai:chat', { messages }),
+    stop: () => ipcRenderer.invoke('ai:stop'),
+    onEvent: (cb: (ev: any) => void) => {
+      const listener = (_e: unknown, ev: any) => cb(ev)
+      ipcRenderer.on('ai:event', listener)
+      return () => ipcRenderer.removeListener('ai:event', listener)
+    },
   },
   recovery: {
     diagnose: () => ipcRenderer.invoke('recovery:diagnose'),
@@ -36,7 +53,9 @@ const api = {
     toggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),
     isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
     getBounds: () => ipcRenderer.invoke('window:getBounds'),
-    move: (x: number, y: number) => ipcRenderer.send('window:move', x, y),
+    // w/h = the size captured at drag start, re-asserted every move (DPI size-drift guard — ipc.ts)
+    move: (x: number, y: number, w: number, h: number) => ipcRenderer.send('window:move', x, y, w, h),
+    restoreForDrag: () => ipcRenderer.invoke('window:restoreForDrag'),
     setTitleBarOverlay: (colors: { color: string; symbolColor: string; bg?: string }) =>
       ipcRenderer.invoke('window:setTitleBarOverlay', colors),
     quit: () => ipcRenderer.invoke('window:quit'),

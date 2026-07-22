@@ -1,8 +1,10 @@
-import { ipcMain, IpcMainInvokeEvent, BrowserWindow, app } from 'electron'
+import { ipcMain, IpcMainInvokeEvent, BrowserWindow, app, screen } from 'electron'
+import { z } from 'zod'
 import type { SecretVault } from './vault'
 import type { SessionBroker } from './session-broker'
 import type { McpRegistry } from './mcp/registry'
 import type { McpManager } from './mcp/manager'
+import { parseServerDef } from './mcp/registry'
 import type { RecoveryService } from './recovery'
 import { getBackendConfig, setBackendConfig } from './config'
 
@@ -30,12 +32,20 @@ export function registerIpc(deps: { vault: SecretVault; broker: SessionBroker; r
   ipcMain.handle('auth:getAccessToken', guard(() => broker.getAccessToken()))
   ipcMain.handle('auth:logout', guard(() => broker.logout()))
 
+  // Renderer input is untrusted even behind okOrigin — every arg is shape-checked before it
+  // touches the registry/manager (rule 10). parseServerDef is the spawn()-reaching gate.
+  const mcpIdOf = (v: unknown) => z.string().min(1).max(64).parse(v)
+  const mcpNameOf = (v: unknown) => z.string().min(1).max(128).parse(v)
+  const mcpArgsOf = (v: unknown) => z.record(z.string(), z.unknown()).optional().parse(v) ?? {}   // zod v4: two args
+
   ipcMain.handle('mcp:list', guard(() => registry.list()))
-  ipcMain.handle('mcp:add', guard((_e, def) => registry.add(def))) // schema-validate def in impl
-  ipcMain.handle('mcp:remove', guard((_e, id) => registry.remove(id)))
-  ipcMain.handle('mcp:start', guard((_e, id) => manager.start(id)))
-  ipcMain.handle('mcp:stop', guard((_e, id) => manager.stop(id)))
+  ipcMain.handle('mcp:add', guard((_e, def) => registry.add(parseServerDef(def))))
+  ipcMain.handle('mcp:remove', guard((_e, id) => registry.remove(mcpIdOf(id))))
+  ipcMain.handle('mcp:start', guard((_e, id) => manager.start(mcpIdOf(id))))
+  ipcMain.handle('mcp:stop', guard((_e, id) => manager.stop(mcpIdOf(id))))
   ipcMain.handle('mcp:statuses', guard(() => manager.statuses()))
+  ipcMain.handle('mcp:tools', guard((_e, id) => manager.tools(mcpIdOf(id))))
+  ipcMain.handle('mcp:callTool', guard((_e, id, name, args) => manager.callTool(mcpIdOf(id), mcpNameOf(name), mcpArgsOf(args))))
 
   // Namespaced under `mcp.<sid>.<key>` — never a bare key — so a server def can never name and
   // receive a foreign vault secret (e.g. auth.refresh). (F1)
@@ -65,8 +75,43 @@ export function registerIpc(deps: { vault: SecretVault; broker: SessionBroker; r
   }))
   ipcMain.handle('window:isMaximized', guard((e) => BrowserWindow.fromWebContents(e.sender)?.isMaximized() ?? false))
   ipcMain.handle('window:getBounds', guard((e) => BrowserWindow.fromWebContents(e.sender)?.getBounds()))
-  // fire-and-forget for smooth JS window drag (avoids invoke round-trip per mousemove)
-  ipcMain.on('window:move', (e, x, y) => { if (okOrigin(e)) BrowserWindow.fromWebContents(e.sender)?.setPosition(Math.round(x), Math.round(y)) })
+  // Fire-and-forget for smooth JS window drag (avoids invoke round-trip per mousemove).
+  // setBounds with the caller's captured size, NEVER bare setPosition: on a scaled display Electron's
+  // DIP<->physical rounding drifts the size a little on every setPosition, and a drag issues one per
+  // mousemove — measured live at 150% scaling, 40 calls inflated the window by +34x+32. Re-asserting
+  // the same size each move gives the rounding nothing to accumulate on.
+  ipcMain.on('window:move', (e, x, y, w, h) => {
+    if (!okOrigin(e) || ![x, y, w, h].every(Number.isFinite)) return
+    BrowserWindow.fromWebContents(e.sender)?.setBounds({
+      x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(h),
+    })
+  })
+  /* Windows IGNORES setPosition while a window is maximized, so window:move alone made a maximized
+     window undraggable — a stray double-click on the drag handle stranded it with no way back down by
+     hand. Native behaviour is to restore and let the window follow the cursor, which needs the restore
+     and the reposition to happen together, before the next mousemove: the renderer's captured bounds
+     are the MAXIMIZED ones and are worthless the moment we unmaximize. Returns the post-move bounds so
+     the caller can re-anchor its drag; null when there was nothing to restore. */
+  ipcMain.handle('window:restoreForDrag', guard((e) => {
+    const w = BrowserWindow.fromWebContents(e.sender)
+    if (!w?.isMaximized()) return null
+    const max = w.getBounds()
+    const cur = screen.getCursorScreenPoint()
+    // Keep the grab point PROPORTIONAL horizontally (the title bar shrinks under the cursor) but
+    // absolute vertically, so the window lands exactly where the hand already is.
+    const ratio = Math.min(1, Math.max(0, (cur.x - max.x) / max.width))
+    const grabY = cur.y - max.y
+    w.unmaximize()
+    const b = w.getBounds()
+    const { workArea } = screen.getDisplayNearestPoint(cur)
+    const x = Math.round(cur.x - ratio * b.width)
+    // A maximized window's y is negative on Windows (invisible resize border), so the naive result can
+    // push the title bar off the top of the screen where it can never be grabbed again.
+    const y = Math.max(workArea.y, Math.round(cur.y - grabY))
+    // setBounds, not setPosition — same DPI size-drift trap as window:move above.
+    w.setBounds({ x, y, width: b.width, height: b.height })
+    return { x, y, width: b.width, height: b.height }
+  }))
   // Theme sync: the renderer sends its computed --bg-1/--ink-3 tokens (and --bg-1 again as bg) when the
   // theme changes so the OS-drawn overlay buttons AND the window fill match. Hex-only at the edge —
   // anything else is dropped, not sanitized.

@@ -6,8 +6,7 @@
    "restart" hint when the registry now differs from what this process mounted (plugin-lifecycle-ui §7). */
 import React, { useEffect, useState } from 'react';
 
-import { Button, Empty, HelpNote, Modal, PageHead, Panel, Segmented } from '../components/ui/index.js';
-import { LocalMcp } from './secondary/LocalMcp.jsx';
+import { Button, Empty, HelpNote, Modal, PageHead, Panel } from '../components/ui/index.js';
 import * as api from '../lib/api.js';
 
 const STATE_BADGE = {
@@ -104,11 +103,13 @@ function InstallPlanModal({ plan, target, T }) {
       {target?.permissionInfo?.length > 0 && (
         <>
           <p style={{ color: 'var(--ink-2)', marginTop: 12 }}>{T('This plugin will be granted:', 'ปลั๊กอินนี้จะได้รับสิทธิ์:')}</p>
-          <ul style={{ margin: '6px 0' }}>
+          <ul className="perm-list">
             {target.permissionInfo.map(pi => (
-              <li key={pi.key}>
-                <span className="mono">{pi.key}</span>
-                {pi.rationale && <span className="faint"> — {pi.rationale}</span>}
+              // human-readable name is the headline (localized); the raw permission key + any rationale
+              // ride below in small text so the tech is still visible but not the primary reading.
+              <li key={pi.key} className="perm-item">
+                <span className="perm-name">{T(pi.name, pi.name_th || pi.name)}</span>
+                <span className="perm-meta mono">{pi.key}{pi.rationale ? ` — ${pi.rationale}` : ''}</span>
               </li>
             ))}
           </ul>
@@ -136,10 +137,6 @@ export function PluginsManager({ Sys, view = 'modules' }) {
   const [gitRef, setGitRef] = useState('');
   const [allowHead, setAllowHead] = useState(false);
   const [updates, setUpdates] = useState({});      // { [pluginId]: { latestVersion, hasUpdate, tagMoved } }
-  // Marketplace hub tab. Local MCP controls the user's own machine → desktop-shell only, so it's
-  // absent on web and the default falls to the first web-visible tab. Hooks run unconditionally
-  // (this lives with the others, above the view-based early returns).
-  const [mktTab, setMktTab] = useState(window.pikaosDesktop?.isDesktop ? 'localmcp' : 'onlinemcp');
 
   // Sharing to the market lives in the Auth plugin (kernel is zero-DB — identity can't live in Core);
   // the Share affordance is gated on that plugin being installed + enabled (drafted, not built yet).
@@ -214,37 +211,16 @@ export function PluginsManager({ Sys, view = 'modules' }) {
     finally { setBusy(null); }
   };
 
-  // Marketplace — a 3-tab hub (Local MCP · Online MCP · Skills). Local MCP controls the user's own
-  // machine, so it's a desktop-shell-only tab (absent on web); the other two are placeholders this
-  // round. All copy comes from i18n keys (no hardcoded strings).
+  // Marketplace — the plugin store. The catalog endpoint doesn't exist yet, so this is an honest
+  // placeholder rather than a browsable-looking shell with nothing behind it. The MCP tab set that
+  // used to live here moved out to its own screen (secondary/McpSkillHub.jsx, route mcpskill).
   if (view === 'market') {
-    const isDesktop = !!window.pikaosDesktop?.isDesktop;
-    const tabs = [
-      ...(isDesktop ? [{ value: 'localmcp' }] : []),
-      { value: 'onlinemcp' },
-      { value: 'skills' },
-    ];
-    const active = tabs.find(x => x.value === mktTab) || tabs[0];
-    // Header + tab bar in one content-pad; the tab body renders as a SIBLING so LocalMcp's own
-    // content-pad (it brings its own chrome) doesn't nest and double the padding.
     return (
       <div className="fade-in" data-no-lex>
-        <div className="content-pad" style={{ paddingBottom: 0 }}>
+        <div className="content-pad">
           <PageHead kicker={t('mkt.kicker')} title={t('mkt.title')} desc={t('mkt.pagedesc')} />
-          <Segmented
-            options={tabs.map(x => ({ value: x.value, label: t('mkt.tab.' + x.value) }))}
-            value={active.value} onChange={setMktTab} />
-          <p className="faint" style={{ margin: '10px 2px 4px', fontSize: 13, lineHeight: 1.5 }}>
-            {t('mkt.tabdesc.' + active.value)}
-          </p>
+          <Empty icon="cart" title={t('mkt.soon', { name: t('mkt.title') })} />
         </div>
-        {active.value === 'localmcp' && <LocalMcp Sys={Sys} />}
-        {active.value === 'onlinemcp' && (
-          <div className="content-pad"><Empty icon="🌐" title={t('mkt.soon', { name: t('mkt.tab.onlinemcp') })} sub={t('mkt.tabdesc.onlinemcp')} /></div>
-        )}
-        {active.value === 'skills' && (
-          <div className="content-pad"><Empty icon="🧠" title={t('mkt.soon', { name: t('mkt.tab.skills') })} sub={t('mkt.tabdesc.skills')} /></div>
-        )}
       </div>
     );
   }
