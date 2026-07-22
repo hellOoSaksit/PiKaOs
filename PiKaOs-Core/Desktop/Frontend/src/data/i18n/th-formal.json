@@ -988,6 +988,7 @@
     "mcp.tools.notready": "รายการเครื่องมือจะแสดงที่นี่เมื่อเซิร์ฟเวอร์ทำงานและส่งรายการมาแล้ว",
     "mcp.tool.args.ph": "อาร์กิวเมนต์ JSON — เช่น {\"text\":\"hello\"}",
     "mcp.tool.call": "เรียกใช้",
+    "mcp.tool.calling": "กำลังเรียกใช้…",
     "mcp.tool.badjson": "อาร์กิวเมนต์ต้องเป็น JSON ที่ถูกต้อง",
     "mcp.toolform.jsonMode": "กรอกเป็น JSON แทน",
     "mcp.toolform.formMode": "กลับไปกรอกในแบบฟอร์ม",
