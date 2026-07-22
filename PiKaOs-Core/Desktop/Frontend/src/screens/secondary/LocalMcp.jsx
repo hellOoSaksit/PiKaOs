@@ -24,7 +24,7 @@ import Empty from '../../components/ui/Empty.jsx';
 import PageHead from '../../components/ui/PageHead.jsx';
 import Panel from '../../components/ui/Panel.jsx';
 import { MCP_PRESETS } from '../../data/mcpPresets.js';
-import { presetToDef, errorKey, statusMeta, isRunning, replaceTarget, isConsentDenied } from './LocalMcp.logic.js';
+import { presetToDef, errorKey, statusMeta, isRunning, savePlan, saveErrorNote, isConsentDenied } from './LocalMcp.logic.js';
 import { ActionErrorNote, LocalMcpDetail } from './LocalMcpDetail.jsx';
 import { McpServerForm } from './McpServerForm.jsx';
 
@@ -211,13 +211,12 @@ export function LocalMcp({ Sys }) {
     // mcp.remove drops the def WITHOUT reaping its child: an edit would otherwise leave the old command
     // still running under a def that says something else. Stop first, then restart the replacement —
     // which also re-triggers consent, since the command/args hash changed.
-    // The target is DERIVED, not taken on trust: only the edit path passes replaceId, but the add
-    // path can collide with a stored id too (registry.add upserts) — and that is a replace as well.
-    const target = replaceTarget(servers, id, replaceId);
-    const wasRunning = !!target && isRunning(statuses[target]?.status);
+    // The targets are DERIVED, not taken on trust: registry.add upserts, so an edit that renames one
+    // server onto another's id displaces BOTH — the renamed def and the def being overwritten.
+    const { targets, wasRunning } = savePlan(servers, statuses, id, replaceId);
     try {
-      if (target) {
-        if (wasRunning) await window.pikaosDesktop.mcp.stop(target);
+      for (const target of targets) {
+        if (isRunning(statuses[target]?.status)) await window.pikaosDesktop.mcp.stop(target);
         await window.pikaosDesktop.mcp.remove(target);
       }
       // Secret VALUE goes to the vault only — never into the server def (mcp.add), never logged.
@@ -228,10 +227,10 @@ export function LocalMcp({ Sys }) {
       if (wasRunning) await window.pikaosDesktop.mcp.start(id);
       return true;
     } catch (e) {
-      // Only the trailing restart can raise consent denial, and by then the def is already stored —
-      // a declined restart still means the save landed, so the form may close.
-      if (isConsentDenied(e)) return true;
-      setErr({ key: 'mcp.err.action.save', detail: e?.message || null });
+      // A declined restart still means the save landed, so the form may close (no banner).
+      const note = saveErrorNote(e);
+      if (!note) return true;
+      setErr(note);
       return false;
     }
     finally { setBusy(null); }
