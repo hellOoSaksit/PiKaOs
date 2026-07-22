@@ -234,6 +234,8 @@
     "titlebar.search": "検索",
     "titlebar.back": "戻る",
     "titlebar.forward": "進む",
+    "palette.placeholder": "メニューを検索…",
+    "palette.empty": "一致するメニューはありません",
     "menu.app": "メニュー",
     "menu.file": "ファイル",
     "menu.view": "表示",

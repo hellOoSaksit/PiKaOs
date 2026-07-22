@@ -948,6 +948,8 @@
     "titlebar.search": "ค้นหา",
     "titlebar.back": "ย้อนกลับ",
     "titlebar.forward": "ถัดไป",
+    "palette.placeholder": "ค้นหาเมนู…",
+    "palette.empty": "ไม่พบเมนูที่ตรง",
     "menu.app": "เมนู",
     "menu.file": "ไฟล์",
     "menu.view": "มุมมอง",
