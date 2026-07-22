@@ -21,7 +21,8 @@ const api = {
     start: (id: string) => ipcRenderer.invoke('mcp:start', id),
     stop: (id: string) => ipcRenderer.invoke('mcp:stop', id),
     statuses: () => ipcRenderer.invoke('mcp:statuses'),
-    onStatus: (cb: (id: string, s: string) => void) => ipcRenderer.on('mcp:status', (_e, id, s) => cb(id, s)),
+    onStatus: (cb: (id: string, s: string, lastError: string | null) => void) =>
+      ipcRenderer.on('mcp:status', (_e, id, s, le) => cb(id, s, le ?? null)),
     tools: (id: string) => ipcRenderer.invoke('mcp:tools', id),
     callTool: (id: string, name: string, args: Record<string, unknown>) => ipcRenderer.invoke('mcp:callTool', id, name, args),
   },
