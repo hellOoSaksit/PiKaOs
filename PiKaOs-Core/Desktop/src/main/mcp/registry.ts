@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { z } from 'zod'
 
 // Secret VALUES never live here — only bare key NAMES in `secretKeys` (resolved via vault at run time).
 export type McpServerDef = {
@@ -34,3 +35,19 @@ export class McpRegistry {
       .digest('hex')
   }
 }
+
+// Validated at the IPC edge (rule 10): an arbitrary renderer object must never reach spawn().
+// command/args execute verbatim after consent, so every field is shape- and size-bounded;
+// env/secret NAMES must be env-var shaped (values are free-form — consent hashes them anyway).
+// zod v4: strictObject (not the deprecated .strict()), and z.record takes BOTH key and value.
+const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/
+export const serverDefSchema = z.strictObject({
+  id: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/),
+  label: z.string().min(1).max(120),
+  command: z.string().min(1).max(1024),
+  args: z.array(z.string().max(4096)).max(64),
+  env: z.record(z.string().regex(ENV_NAME), z.string().max(32768)).optional(),
+  secretKeys: z.array(z.string().regex(ENV_NAME)).max(16).optional(),
+})
+
+export const parseServerDef = (raw: unknown): McpServerDef => serverDefSchema.parse(raw)
