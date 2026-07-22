@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { delimiter, join, dirname } from 'node:path'
+import { join, dirname } from 'node:path'
 
 // npx is a .cmd shim on Windows, and Node refuses to spawn .cmd/.bat without a shell
 // (BatBadBut fix). Rewriting to `node <npx-cli.js> ...` keeps the spawn shell-less —
@@ -30,8 +30,14 @@ export function resolveSpawn(
   return { command: node, args: [npxCli, ...args] }
 }
 
+// `;` literal, NOT path.delimiter: this lookup only runs on the win32 branch, so the
+// Windows delimiter is correct by construction — and hardcoding it keeps the function
+// deterministic when the suite emulates win32 on a Linux CI runner (the desktop CI job
+// runs on ubuntu-latest, where path.delimiter would be `:`).
+const WINDOWS_PATH_DELIMITER = ';'
+
 function findOnPath(exe: string, path: string): string | null {
-  for (const dir of path.split(delimiter)) {
+  for (const dir of path.split(WINDOWS_PATH_DELIMITER)) {
     if (!dir) continue
     const candidate = join(dir, exe)
     if (existsSync(candidate)) return candidate
