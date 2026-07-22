@@ -310,6 +310,21 @@
     "mcp.err.exited-early": "サーバーは起動直後に自ら停止しました。設定が正しくない可能性があります。",
     "mcp.err.generic": "このサーバーで問題が発生しました。",
     "mcp.confirm.delete.title": "このサーバーを削除しますか？",
-    "mcp.confirm.delete.msg": "サーバーは停止され、一覧から削除されます。いつでも再インストールできます。"
+    "mcp.confirm.delete.msg": "サーバーは停止され、一覧から削除されます。いつでも再インストールできます。",
+    "mcp.status.ready.hint": "このサーバーは動作中です。AI がツールを利用できます。",
+    "mcp.status.running.hint": "サーバーは起動しました。PiKaOs が応答を待っています。",
+    "mcp.status.starting.hint": "サーバーを起動しています。通常は数秒で完了します。",
+    "mcp.status.stopped.hint": "このサーバーは動作していません。AI にツールを使わせたいときに開始してください。",
+    "mcp.status.error.hint": "もう一度起動してみてください。それでも失敗する場合は、下の技術的な詳細を開いて設定をご確認ください。",
+    "mcp.detail.back": "すべてのサーバー",
+    "mcp.detail.tech": "技術的な詳細",
+    "mcp.detail.edit": "編集",
+    "mcp.detail.delete": "削除",
+    "mcp.detail.id": "サーバー ID",
+    "mcp.detail.cmd": "コマンド",
+    "mcp.detail.args": "引数",
+    "mcp.detail.secrets": "シークレットキー名",
+    "mcp.detail.search.ph": "ツールを検索",
+    "mcp.detail.search.none": "入力に一致するツールはありません。"
   }
 }
