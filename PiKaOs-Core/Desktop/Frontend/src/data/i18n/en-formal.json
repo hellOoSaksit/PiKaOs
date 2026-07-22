@@ -1048,6 +1048,7 @@
     "mcp.status.error": "Error",
     "mcp.tools.title": "Tools",
     "mcp.tools.none": "The server reported no tools.",
+    "mcp.tools.notready": "Tools are listed here once the server is running and has reported them.",
     "mcp.tool.args.ph": "JSON arguments — e.g. {\"text\":\"hello\"}",
     "mcp.tool.call": "Call",
     "mcp.tool.badjson": "Arguments must be valid JSON.",

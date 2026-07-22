@@ -76,3 +76,24 @@ export function resultText(result) {
 
 const KNOWN_ERROR_TOKENS = new Set(['node-missing', 'spawn-failed', 'handshake-timeout', 'handshake-failed', 'exited-early']);
 export const errorKey = (token) => (KNOWN_ERROR_TOKENS.has(token) ? `mcp.err.${token}` : 'mcp.err.generic');
+
+/* The manager FSM's statuses -> badge colour + copy. One table for the list row and the detail page:
+   a status added to the FSM is then described in exactly one place and the two views cannot drift
+   into showing different colours for the same state. `running` = the OS process is up,
+   `ready` = the MCP handshake succeeded. */
+const STATUS = {
+  ready:    { cls: 'on',   key: 'mcp.status.ready',    hint: 'mcp.status.ready.hint' },
+  running:  { cls: 'info', key: 'mcp.status.running',  hint: 'mcp.status.running.hint' },
+  starting: { cls: 'info', key: 'mcp.status.starting', hint: 'mcp.status.starting.hint' },
+  stopped:  { cls: 'idle', key: 'mcp.status.stopped',  hint: 'mcp.status.stopped.hint' },
+  error:    { cls: 'warn', key: 'mcp.status.error',    hint: 'mcp.status.error.hint' },
+};
+// Unknown/absent status reads as stopped so a badge always carries text, never colour alone.
+export const statusMeta = (status) => STATUS[status] || STATUS.stopped;
+
+// "Stop" is offered from the moment the process exists, not only once the handshake lands.
+export const isRunning = (status) => status === 'running' || status === 'starting' || status === 'ready';
+
+// Up to this many tools the list is scannable by eye and a search box is just one more control.
+const SEARCH_FROM = 6;
+export const showToolSearch = (toolCount) => toolCount > SEARCH_FROM;
