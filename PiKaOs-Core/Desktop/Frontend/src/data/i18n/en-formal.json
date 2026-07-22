@@ -1011,6 +1011,8 @@
     "titlebar.search": "Search",
     "titlebar.back": "Back",
     "titlebar.forward": "Forward",
+    "palette.placeholder": "Search menus…",
+    "palette.empty": "No matching menu",
     "menu.app": "Menu",
     "menu.file": "File",
     "menu.view": "View",
