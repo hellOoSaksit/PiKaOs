@@ -2,7 +2,8 @@
    `window.pikaosDesktop` bridge (Desktop/src/preload): install a ready-made server or register a
    custom one, start/stop it, and watch its status live. Opening a row switches to the per-server
    detail page (LocalMcpDetail.jsx). Pure helpers live in LocalMcp.logic.js, the catalog in
-   ../../data/mcpPresets.js. Renders nothing on web (no bridge there).
+   ../../data/mcpPresets.js, the raw command form in McpServerForm.jsx (the detail page reuses it).
+   Renders nothing on web (no bridge there).
 
    Status semantics (Desktop/src/main/mcp/manager.ts FSM): `running` = the OS process is up,
    `ready` = the MCP handshake (initialize + tools/list) actually succeeded. A status is delivered
@@ -26,6 +27,7 @@ import Panel from '../../components/ui/Panel.jsx';
 import { MCP_PRESETS } from '../../data/mcpPresets.js';
 import { presetToDef, errorKey } from './LocalMcp.logic.js';
 import { LocalMcpDetail } from './LocalMcpDetail.jsx';
+import { McpServerForm } from './McpServerForm.jsx';
 
 const STATUS_BADGE = {
   ready:    { cls: 'on',   key: 'mcp.status.ready' },
@@ -43,11 +45,6 @@ const CUSTOM = { id: 'custom', icon: '⚙️', params: [], secret: null };
 const EXPLAINER_KEY = 'mcp.explainer.collapsed';
 // Injected storage keeps this testable without a DOM; anything but the set flag means "show it".
 export const explainerCollapsed = (storage) => storage.getItem(EXPLAINER_KEY) === '1';
-
-// space- or comma-separated → array (matches how the sibling git-install form takes a tag string).
-function parseArgs(raw) {
-  return raw.split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
-}
 
 export function PresetCard({ t, preset, installed, onPick }) {
   return (
@@ -107,70 +104,36 @@ export function ServerRow({ t, d, status, lastError, toolCount, busy, onOpen, on
   );
 }
 
-// The raw command form — for people who know what they are registering.
-function AddServerForm({ t, busy, onSubmit }) {
-  const [id, setId] = useState('');
-  const [label, setLabel] = useState('');
-  const [command, setCommand] = useState('');
-  const [args, setArgs] = useState('');
-  const [secretKey, setSecretKey] = useState('');
-  const [secretValue, setSecretValue] = useState('');
-
-  const ok = id.trim().length > 0 && command.trim().length > 0;
-  const submit = async () => {
-    if (!ok) return;
-    await onSubmit({
-      id: id.trim(), label: label.trim() || id.trim(), command: command.trim(),
-      args: parseArgs(args), secretKey: secretKey.trim(), secretValue,
-    });
-    setId(''); setLabel(''); setCommand(''); setArgs(''); setSecretKey(''); setSecretValue('');
-  };
-
-  return (
-    <Panel title={t('mcp.preset.custom.name')} icon="tools">
-      <div className="faint" style={{ fontSize: 12, marginBottom: 6 }}>{t('mcp.add.help')}</div>
-      <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-        <input className="bf-input" style={{ flex: 1, minWidth: 140 }} placeholder={t('mcp.add.id.ph')}
-          value={id} onChange={e => setId(e.target.value)} />
-        <input className="bf-input" style={{ flex: 1, minWidth: 140 }} placeholder={t('mcp.add.label.ph')}
-          value={label} onChange={e => setLabel(e.target.value)} />
-      </div>
-      <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-        <input className="bf-input mono" style={{ flex: 1, minWidth: 120, fontSize: 12.5 }} placeholder={t('mcp.add.cmd.ph')}
-          value={command} onChange={e => setCommand(e.target.value)} />
-        <input className="bf-input mono" style={{ flex: 2, minWidth: 220, fontSize: 12.5 }} placeholder={t('mcp.add.args.ph')}
-          value={args} onChange={e => setArgs(e.target.value)} />
-      </div>
-      <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-        <input className="bf-input" style={{ flex: 1, minWidth: 140 }} placeholder={t('mcp.add.secretkey.ph')}
-          value={secretKey} onChange={e => setSecretKey(e.target.value)} />
-        <input className="bf-input" type="password" style={{ flex: 1, minWidth: 160 }} placeholder={t('mcp.add.secretval.ph')}
-          value={secretValue} onChange={e => setSecretValue(e.target.value)} autoComplete="new-password" />
-        <Button kind="gold" size="sm" disabled={!ok || busy} onClick={submit}>{busy ? '…' : t('mcp.add.submit')}</Button>
-      </div>
-    </Panel>
-  );
-}
-
 // One question per preset param, in plain language — no command line anywhere.
 function PresetInstallPanel({ t, preset, busy, onInstall, onCancel }) {
   const [values, setValues] = useState({});
   const [secretValue, setSecretValue] = useState('');
-  const filled = preset.params.every(p => (values[p.name] || '').trim().length > 0);
+  // A preset that declares a secret is unusable without it: the install would skip the vault write and
+  // the server would fail at start with nothing to explain it. So gate submit on the token too.
+  const filled = preset.params.every(p => (values[p.name] || '').trim().length > 0)
+    && (!preset.secret || secretValue.trim().length > 0);
+  const secretId = `mcp-secret-${preset.id}`;
 
   return (
     <Panel title={t(`mcp.preset.${preset.id}.name`)}>
       <div className="faint" style={{ fontSize: 12.5, marginBottom: 8, lineHeight: 1.5 }}>{t(`mcp.preset.${preset.id}.desc`)}</div>
       {preset.params.map(p => (
         <div key={p.name} style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 12.5, marginBottom: 4 }}>{t(`mcp.preset.${preset.id}.param.${p.name}`)}</div>
-          <input className="bf-input" style={{ width: '100%' }} value={values[p.name] || ''}
-            onChange={e => setValues(v => ({ ...v, [p.name]: e.target.value }))} />
+          <label htmlFor={`mcp-param-${preset.id}-${p.name}`} style={{ display: 'block', fontSize: 12.5, marginBottom: 4 }}>
+            {t(`mcp.preset.${preset.id}.param.${p.name}`)}
+          </label>
+          <input id={`mcp-param-${preset.id}-${p.name}`} className="bf-input" style={{ width: '100%' }}
+            value={values[p.name] || ''} onChange={e => setValues(v => ({ ...v, [p.name]: e.target.value }))} />
         </div>
       ))}
       {preset.secret && (
         <div style={{ marginBottom: 8 }}>
-          <input className="bf-input" type="password" style={{ width: '100%' }} autoComplete="new-password"
+          {/* A visible label, not just the placeholder — a placeholder disappears on focus and is not
+              reliably announced by screen readers. */}
+          <label htmlFor={secretId} style={{ display: 'block', fontSize: 12.5, marginBottom: 4 }}>
+            {t('mcp.preset.secret.label')}
+          </label>
+          <input id={secretId} className="bf-input" type="password" style={{ width: '100%' }} autoComplete="new-password"
             placeholder={t('mcp.preset.secret.ph')} value={secretValue} onChange={e => setSecretValue(e.target.value)} />
         </div>
       )}
@@ -235,13 +198,22 @@ export function LocalMcp({ Sys }) {
   // Add, or replace an existing def: the manager has no update op, so an edit is remove-then-add.
   const saveServer = async ({ id, label, command, args, secretKey, secretValue }, replaceId) => {
     setBusy('add'); setErr(null);
+    // The live processes (McpManager) and the stored defs (registry JSON) are separate stores, so
+    // mcp.remove drops the def WITHOUT reaping its child: an edit would otherwise leave the old command
+    // still running under a def that says something else. Stop first, then restart the replacement —
+    // which also re-triggers consent, since the command/args hash changed.
+    const wasRunning = !!replaceId && isRunning(statuses[replaceId]?.status);
     try {
-      if (replaceId) await window.pikaosDesktop.mcp.remove(replaceId);
+      if (replaceId) {
+        if (wasRunning) await window.pikaosDesktop.mcp.stop(replaceId);
+        await window.pikaosDesktop.mcp.remove(replaceId);
+      }
       // Secret VALUE goes to the vault only — never into the server def (mcp.add), never logged.
       if (secretKey && secretValue) await window.pikaosDesktop.secrets.setForServer(id, secretKey, secretValue);
       await window.pikaosDesktop.mcp.add({ id, label, command, args, secretKeys: secretKey ? [secretKey] : [] });
       setShowCustom(false);
       await load();
+      if (wasRunning) await window.pikaosDesktop.mcp.start(id);
     } catch (e) { setErr(e.message || 'add failed'); }
     finally { setBusy(null); }
   };
@@ -299,6 +271,7 @@ export function LocalMcp({ Sys }) {
       <LocalMcpDetail
         Sys={Sys} def={openDef} status={statuses[openDef.id]?.status} lastError={statuses[openDef.id]?.lastError}
         tools={toolsById[openDef.id] || []} busy={busy === openDef.id || busy === 'add'}
+        err={err}
         onBack={() => setView('list')}
         onStart={() => start(openDef.id)} onStop={() => stop(openDef.id)} onDelete={() => removeServer(openDef.id)}
         onEditSave={(def, secretKey, secretValue) => saveServer({ ...def, secretKey, secretValue }, openDef.id)}
@@ -339,7 +312,7 @@ export function LocalMcp({ Sys }) {
           onCancel={() => setInstallPreset(null)} />
       )}
 
-      {showCustom && <AddServerForm t={t} busy={busy === 'add'} onSubmit={saveServer} />}
+      {showCustom && <McpServerForm t={t} busy={busy === 'add'} onSubmit={saveServer} />}
 
       {servers.length === 0
         ? <Empty icon="🔌" title={t('mcp.empty.title')} sub={t('mcp.empty.sub')} />

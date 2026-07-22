@@ -31,13 +31,41 @@ describe('PresetCard', () => {
 
 describe('ServerRow', () => {
   const d = { id: 'fs', label: 'Files', command: 'npx', args: [] };
+  const row = (over = {}) => ServerRow({
+    t, d, status: 'ready', lastError: null, toolCount: 3, busy: false,
+    onOpen: () => {}, onStart: () => {}, onStop: () => {}, ...over,
+  });
+  const rowNode = (el) => flat(el).find((n) => n.props?.role === 'button' && n.props?.tabIndex === 0);
+  // the Start/Stop control's click-swallowing wrapper
+  const actionWrap = (el) => flat(el).find((n) => n.type === 'span' && typeof n.props?.onClick === 'function');
+
   it('renders label, status badge key, and is keyboard-openable (role=button)', () => {
-    const el = ServerRow({ t, d, status: 'ready', lastError: null, toolCount: 3, busy: false, onOpen: () => {}, onStart: () => {}, onStop: () => {} });
-    const nodes = flat(el);
-    expect(nodes.some((n) => n.props?.role === 'button' && n.props?.tabIndex === 0)).toBe(true);
-    const texts = nodes.filter((n) => typeof n === 'string');
+    const el = row();
+    expect(rowNode(el)).toBeTruthy();
+    const texts = flat(el).filter((n) => typeof n === 'string');
     expect(texts).toContain('Files');
     expect(texts).toContain('mcp.status.ready');
+  });
+  it('Enter on the row itself opens it', () => {
+    let opened = 0;
+    const node = rowNode(row({ onOpen: () => { opened += 1; } }));
+    const self = {};
+    node.props.onKeyDown({ key: 'Enter', target: self, currentTarget: self, preventDefault() {} });
+    expect(opened).toBe(1);
+  });
+  it('Enter on a child control does NOT open the row (target !== currentTarget guard)', () => {
+    let opened = 0;
+    const node = rowNode(row({ onOpen: () => { opened += 1; } }));
+    node.props.onKeyDown({ key: 'Enter', target: {}, currentTarget: {}, preventDefault() {} });
+    expect(opened).toBe(0);
+  });
+  it('clicking Start/Stop stops propagation so the row does not also open', () => {
+    let opened = 0;
+    const el = row({ onOpen: () => { opened += 1; } });
+    let stopped = 0;
+    actionWrap(el).props.onClick({ stopPropagation: () => { stopped += 1; } });
+    expect(stopped).toBe(1);
+    expect(opened).toBe(0);
   });
   it('error status surfaces the mapped reason key', () => {
     const el = ServerRow({ t, d, status: 'error', lastError: 'node-missing', toolCount: 0, busy: false, onOpen: () => {}, onStart: () => {}, onStop: () => {} });
