@@ -277,6 +277,7 @@
     "mcp.tools.notready": "ツールは、サーバーが動作して一覧を返した時点でここに表示されます。",
     "mcp.tool.args.ph": "JSON 引数 — 例: {\"text\":\"hello\"}",
     "mcp.tool.call": "呼び出す",
+    "mcp.tool.calling": "呼び出しています…",
     "mcp.tool.badjson": "引数は有効な JSON でなければなりません",
     "mcp.toolform.jsonMode": "JSON で入力する",
     "mcp.toolform.formMode": "フォームで入力する",

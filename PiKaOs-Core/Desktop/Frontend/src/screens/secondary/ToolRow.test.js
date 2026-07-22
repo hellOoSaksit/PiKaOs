@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { FieldInput, ResultPanel, parseJsonArgs, makeCall } from './ToolRow.jsx';
+import { readFileSync } from 'node:fs';
+import { FieldInput, ResultPanel, parseJsonArgs, makeCall, callBlocked } from './ToolRow.jsx';
 
 const flat = (n, out = []) => {
   if (n == null || typeof n === 'boolean') return out;
@@ -76,9 +77,15 @@ describe('ResultPanel', () => {
     expect(texts).toContain('Echo: hi');
     expect(texts).toContain('mcp.toolform.resultRaw');
   });
-  it('isError result carries warn styling', () => {
+  /* Asserting "some className contains 'warn'" once green-lit a class no stylesheet defined, so the
+     failure rendered in ordinary ink. Pin the exact kit pair AND that a rule for it exists. */
+  it('isError marks the result with a class combination the stylesheet actually defines', () => {
     const el = ResultPanel({ t, result: { isError: true, content: [{ type: 'text', text: 'boom' }] } });
-    expect(flat(el).some((n) => typeof n.props?.className === 'string' && n.props.className.includes('warn'))).toBe(true);
+    const marked = flat(el).filter((n) => n.props?.className === 'badge warn');
+    expect(marked).toHaveLength(1);
+    expect(strings(marked[0])).toContain('mcp.toolform.resultError');
+    const css = readFileSync(new URL('../../styles/styles.css', import.meta.url), 'utf8');
+    expect(css).toMatch(/^\.badge\.warn\s*\{/m);
   });
 
   // --- beyond the brief ---
@@ -125,6 +132,27 @@ describe('parseJsonArgs', () => {
     expect(parseJsonArgs('5').errorKey).toBe('mcp.tool.badjson');
     expect(parseJsonArgs('null').errorKey).toBe('mcp.tool.badjson');
     expect(parseJsonArgs('[1,2]').errorKey).toBe('mcp.tool.badjson');
+  });
+});
+
+/* The Call button's gate. Lifted out of the component so "a required field blocks the call" is
+   proven on the thing the button actually reads, not only on canCall underneath it. */
+describe('callBlocked', () => {
+  const fields = [{ name: 'text', type: 'string', required: true }, { name: 'n', type: 'number', required: false }];
+
+  it('a required field left empty blocks the call', () => {
+    expect(callBlocked({ busy: false, useJson: false, fields, values: {} })).toBe(true);
+    expect(callBlocked({ busy: false, useJson: false, fields, values: { text: '  ' } })).toBe(true);
+  });
+  it('a filled required field releases it', () => {
+    expect(callBlocked({ busy: false, useJson: false, fields, values: { text: 'hi' } })).toBe(false);
+  });
+  it('a call in flight blocks even a complete form', () => {
+    expect(callBlocked({ busy: true, useJson: false, fields, values: { text: 'hi' } })).toBe(true);
+  });
+  it('JSON mode is not field-gated — a half-typed object is judged at press time, not here', () => {
+    expect(callBlocked({ busy: false, useJson: true, fields, values: {} })).toBe(false);
+    expect(callBlocked({ busy: true, useJson: true, fields, values: {} })).toBe(true);
   });
 });
 
