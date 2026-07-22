@@ -150,6 +150,9 @@ export function LocalMcp({ Sys }) {
       const [list, st] = await Promise.all([window.pikaosDesktop.mcp.list(), window.pikaosDesktop.mcp.statuses()]);
       setServers(list || []);
       setStatuses(st || {});
+      // onStatus only fetches tools on a fresh `ready` transition; a server that's ALREADY ready on
+      // (re)mount never fires that, so pull its tools here too — otherwise the list shows empty until restart.
+      for (const [id, s] of Object.entries(st || {})) { if (s === 'ready') fetchTools(id); }
     } catch (e) { setErr(e.message || 'load failed'); }
   };
 
