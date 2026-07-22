@@ -247,6 +247,15 @@ function App() {
 
   const [navCfg, setNavCfg] = useState(() => loadNav());   // global sidebar arrangement (admin-set, shared)
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // Is some OTHER dialog already up? Every dialog in the app — Modal and the imperative
+  // lib/ui-modal.jsx hosts alike — renders an element carrying both `pk-overlay` and `open` while
+  // visible (Modal appends `open` only when its `open` prop is true, so the palette's own overlay
+  // never trips this while it is closed). Both palette entry points must check this before OPENING:
+  // without it, Ctrl+K (or the magnifier) stacks the palette's Modal on top of an already-open one —
+  // Modal's focus-on-open effect steals focus into the palette while the other dialog stays open
+  // underneath, and since each Modal registers its own independent Escape listener, one Escape then
+  // closes BOTH at once. Closing an already-open palette must stay unaffected by this guard.
+  const isDialogOpen = () => !!document.querySelector('.pk-overlay.open');
   const { rail: navRail, drawerOpen, toggle: toggleNav, closeDrawer } = useShellNav();
 
   const setTheme = (t) => { setThemeState(t); localStorage.setItem("guild-theme", t); };
@@ -290,7 +299,12 @@ function App() {
   useEffect(() => {
     if (!signedIn) return;
     const onKey = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPaletteOpen(o => !o); }
+      // Toggle, but only the CLOSE half is unconditional — opening on top of another dialog is the
+      // stacked-overlay failure mode isDialogOpen() exists to prevent (see its comment above).
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen(o => o ? false : !isDialogOpen());
+      }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -404,10 +418,11 @@ function App() {
     return (
       <div className="desktop-frame" data-maximized={winMax ? "" : undefined}>
         <TitleBar t={t}
-          onSidebar={toggleNav} onSearch={() => signedIn && setPaletteOpen(true)}
+          onSidebar={toggleNav} onSearch={() => signedIn && !isDialogOpen() && setPaletteOpen(true)}
           onBack={() => navGo(-1)} onForward={() => navGo(1)}
           canBack={histRef.current.idx > 0}
           canForward={histRef.current.idx < histRef.current.stack.length - 1}
+          canSearch={signedIn}
           onMenuSettings={() => go('toolsmgr')} version={caps?.version} />
         <div className="desktop-body">{body}</div>
       </div>

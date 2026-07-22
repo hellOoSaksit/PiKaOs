@@ -17,7 +17,9 @@ const NAVFIX = [
     { id: 'toolsmgr', icon: 'tools', perm: 'options.manage' },
     { id: 'install', icon: 'download', perm: 'plugins.manage', children: [
       { id: 'marketplace', icon: 'cart', perm: 'plugins.manage' },
-      { id: 'secretpage', icon: 'lock', perm: 'top.secret' },
+      { id: 'secretpage', icon: 'lock', perm: 'top.secret', children: [
+        { id: 'secretgrandchild', icon: 'view' },
+      ] },
     ] },
     { id: 'mcpskill', icon: 'link', perm: 'mcp.manage', desktopOnly: true },
     { id: 'settings', icon: 'settings' },
@@ -55,6 +57,15 @@ describe('buildIndex mirrors the sidebar', () => {
     const ids = build().map(e => e.id);
     expect(ids).not.toContain('ghost');
     expect(ids).not.toContain('ghostchild');
+  });
+  it('pruning is not just a root-level rule — a visible parent with an invisible (perm-denied) ' +
+     'child still drops that child\'s own children, even though the grandchild is itself visible', () => {
+    const ids = build().map(e => e.id);
+    expect(ids).toContain('install');              // the top-level parent stays visible
+    expect(ids).not.toContain('secretpage');        // perm-denied middle node is pruned
+    expect(ids).not.toContain('secretgrandchild');  // its subtree goes with it, one level further down
+    // sanity: with the perm granted, the whole chain (including the grandchild) reappears
+    expect(build({ can: canAll }).map(e => e.id)).toContain('secretgrandchild');
   });
   it('desktopOnly honours the isDesktop flag', () => {
     expect(build().map(e => e.id)).toContain('mcpskill');
