@@ -25,18 +25,9 @@ import HelpNote from '../../components/ui/HelpNote.jsx';
 import PageHead from '../../components/ui/PageHead.jsx';
 import Panel from '../../components/ui/Panel.jsx';
 import { MCP_PRESETS } from '../../data/mcpPresets.js';
-import { presetToDef, errorKey } from './LocalMcp.logic.js';
+import { presetToDef, errorKey, statusMeta, isRunning } from './LocalMcp.logic.js';
 import { LocalMcpDetail } from './LocalMcpDetail.jsx';
 import { McpServerForm } from './McpServerForm.jsx';
-
-const STATUS_BADGE = {
-  ready:    { cls: 'on',   key: 'mcp.status.ready' },
-  running:  { cls: 'info', key: 'mcp.status.running' },   // process up, handshake not confirmed yet
-  starting: { cls: 'info', key: 'mcp.status.starting' },
-  stopped:  { cls: 'idle', key: 'mcp.status.stopped' },
-  error:    { cls: 'warn', key: 'mcp.status.error' },
-};
-const isRunning = (status) => status === 'running' || status === 'starting' || status === 'ready';
 
 // Gallery-only pseudo-preset: the escape hatch to the raw command form. Its copy already lives
 // under the same mcp.preset.<id>.* keys, so it renders through PresetCard unchanged.
@@ -63,7 +54,7 @@ export function PresetCard({ t, preset, installed, onPick }) {
 }
 
 export function ServerRow({ t, d, status, lastError, toolCount, busy, onOpen, onStart, onStop }) {
-  const sb = STATUS_BADGE[status] || STATUS_BADGE.stopped;
+  const sb = statusMeta(status);
   // The row itself is the "open" affordance, so the Start/Stop control has to swallow its click.
   const keepInRow = (e) => e.stopPropagation();
   return (
@@ -195,7 +186,10 @@ export function LocalMcp({ Sys }) {
     setCollapsed(next);
   };
 
-  // Add, or replace an existing def: the manager has no update op, so an edit is remove-then-add.
+  /* Add, or replace an existing def: the manager has no update op, so an edit is remove-then-add.
+     Returns whether the save landed. Failures are shown as a banner rather than thrown, so the
+     forms above cannot tell success from failure by awaiting — they read this flag to decide
+     whether to clear or close, and keep the user's input when it says false. */
   const saveServer = async ({ id, label, command, args, secretKey, secretValue }, replaceId) => {
     setBusy('add'); setErr(null);
     // The live processes (McpManager) and the stored defs (registry JSON) are separate stores, so
@@ -214,7 +208,8 @@ export function LocalMcp({ Sys }) {
       setShowCustom(false);
       await load();
       if (wasRunning) await window.pikaosDesktop.mcp.start(id);
-    } catch (e) { setErr(e.message || 'add failed'); }
+      return true;
+    } catch (e) { setErr(e.message || 'add failed'); return false; }
     finally { setBusy(null); }
   };
 
