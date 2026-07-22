@@ -219,7 +219,7 @@ export function PluginsManager({ Sys, view = 'modules' }) {
       <div className="fade-in" data-no-lex>
         <div className="content-pad">
           <PageHead kicker={t('mkt.kicker')} title={t('mkt.title')} desc={t('mkt.pagedesc')} />
-          <Empty icon="cart" title={t('mkt.soon', { name: t('mkt.title') })} sub={t('mkt.pagedesc')} />
+          <Empty icon="cart" title={t('mkt.soon', { name: t('mkt.title') })} />
         </div>
       </div>
     );
