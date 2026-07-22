@@ -1,6 +1,6 @@
 import React from 'react';
 import { renderIcon } from './icons.jsx';
-import Tooltip from './Tooltip.jsx';
+import Button from './Button.jsx';
 import Modal from './Modal.jsx';
 import { FORCE_CONNECT_KEY } from '../../AppBoot.jsx';
 
@@ -60,12 +60,13 @@ export default function TitleMenu({ t, onSettings, onToggleSidebar, version }) {
 
   return (
     <div className="tb-menu">
-      <Tooltip label={t('menu.app')}>
-        <button type="button" className="tb-btn" aria-label={t('menu.app')} aria-haspopup="menu" aria-expanded={open}
-          onClick={() => (open ? close() : setOpen(true))}>
-          {renderIcon('menu')}
-        </button>
-      </Tooltip>
+      {/* Through the Button primitive, not a raw <button>: every title-bar rule is scoped to
+          `.btn.tb-btn`, so a hand-rolled button matched NONE of them — it rendered at 16×6px with the
+          browser's default chrome and a collapsed icon (icons.jsx emits a viewBox-only svg that takes
+          its size from the `.btn` slot). Button also supplies the tooltip and aria-label. */}
+      <Button className="tb-btn" icon="menu" label={t('menu.app')}
+        aria-haspopup="menu" aria-expanded={open}
+        onClick={() => (open ? close() : setOpen(true))} />
 
       {open && (
         <>
