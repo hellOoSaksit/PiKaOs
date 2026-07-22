@@ -1,9 +1,19 @@
 import { it, expect, vi } from 'vitest'
 import { EventEmitter } from 'node:events'
+import { PassThrough } from 'node:stream'
 import { mkdtempSync } from 'node:fs'; import { tmpdir } from 'node:os'; import { join } from 'node:path'
 
-// pid present ⇒ manager marks it running (the real 'spawn' event doesn't fire on an EventEmitter fake — review F3)
-const child = () => Object.assign(new EventEmitter(), { pid: 123, stdin: {}, stdout: new EventEmitter(), stderr: new EventEmitter(), kill: vi.fn() })
+// pid present ⇒ manager marks it running (the real 'spawn' event doesn't fire on an EventEmitter
+// fake — review F3). PassThrough pipes swallow the handshake silently: no reply ever comes, so
+// status stays 'running' — exactly the "process up, protocol unconfirmed" state. stdin is a real
+// writable so transport.send() doesn't reject synchronously (which would flip status to 'error'
+// before the assertion).
+// exitCode/signalCode null = live process (a real ChildProcess reports null until it exits); the
+// PassThrough child never exits, so waitExit(stopGraceMs) times out and stop()/stopAll() reach kill().
+const child = () => Object.assign(new EventEmitter(), {
+  pid: 123, exitCode: null, signalCode: null,
+  stdin: new PassThrough(), stdout: new PassThrough(), stderr: new EventEmitter(), kill: vi.fn(),
+})
 let fake: any
 vi.mock('node:child_process', () => ({ spawn: vi.fn(() => fake) }))
 
@@ -15,7 +25,7 @@ const mkManager = async (confirm: any, secretKeys = ['FS_TOKEN'], defs?: Array<{
   if (defs) { for (const def of defs) reg.add(def) }
   else reg.add({ id: 'fs', label: 'FS', command: 'npx', args: ['-y', '@x/fs'], secretKeys })
   const vault = { get: (k: string) => (k === 'mcp.fs.FS_TOKEN' ? 'SECRET' : k === 'auth.refresh' ? 'RT_LEAK' : null), set: vi.fn(), delete: vi.fn(), isAvailable: () => true } as any
-  return new McpManager(reg, vault, confirm, join(dir, 'approvals.json'))
+  return new McpManager(reg, vault, confirm, join(dir, 'approvals.json'), 50, 50)
 }
 
 it('prompts consent on first start, injects secret as env, reports running', async () => {
