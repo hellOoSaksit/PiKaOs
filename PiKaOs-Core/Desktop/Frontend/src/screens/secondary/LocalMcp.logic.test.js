@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
-  toolFormFields, needsJsonMode, buildArgs, canCall,
+  toolFormFields, buildArgs, canCall,
   filterTools, presetToDef, resultText, errorKey,
-  statusMeta, isRunning, showToolSearch,
+  statusMeta, isRunning, showToolSearch, replaceTarget, isConsentDenied,
 } from './LocalMcp.logic.js';
 
 describe('toolFormFields', () => {
@@ -42,10 +42,30 @@ describe('toolFormFields', () => {
   });
 });
 
-describe('needsJsonMode', () => {
-  it('is the null-check over toolFormFields', () => {
-    expect(needsJsonMode(undefined)).toBe(true);
-    expect(needsJsonMode({ type: 'object', properties: { s: { type: 'string' } } })).toBe(false);
+describe('replaceTarget', () => {
+  const servers = [{ id: 'fs' }, { id: 'memory' }];
+  it('a brand-new id replaces nothing', () => {
+    expect(replaceTarget(servers, 'weather', undefined)).toBe(null);
+    expect(replaceTarget([], 'fs', undefined)).toBe(null);
+  });
+  it('an ADD whose id collides with a stored def is a replace (registry.add upserts)', () => {
+    expect(replaceTarget(servers, 'fs', undefined)).toBe('fs');
+  });
+  it('an edit keeps its own target, even when it renames the id', () => {
+    expect(replaceTarget(servers, 'files', 'fs')).toBe('fs');
+    expect(replaceTarget(servers, 'fs', 'fs')).toBe('fs');
+  });
+});
+
+describe('isConsentDenied', () => {
+  it('matches the marker inside the message Electron IPC wraps it in', () => {
+    expect(isConsentDenied(new Error('consent denied'))).toBe(true);
+    expect(isConsentDenied(new Error("Error invoking remote method 'mcp:start': Error: consent denied"))).toBe(true);
+  });
+  it('is false for any other failure, and for a message-less throw', () => {
+    expect(isConsentDenied(new Error('spawn ENOENT'))).toBe(false);
+    expect(isConsentDenied(undefined)).toBe(false);
+    expect(isConsentDenied({})).toBe(false);
   });
 });
 

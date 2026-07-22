@@ -19,6 +19,22 @@ import { filterTools, errorKey, statusMeta, isRunning, showToolSearch } from './
 import { McpServerForm } from './McpServerForm.jsx';
 import { ToolRow } from './ToolRow.jsx';
 
+/* The banner for a failed action, shared with the list page. `err` is { key, detail }: the localized
+   sentence is what the user reads, and the raw text — an Electron-serialized, English, technical
+   message — stays available underneath for a bug report instead of BEING the message.
+
+   It lives in this file rather than in LocalMcp.jsx because LocalMcp already imports this module;
+   the other direction would close an ESM cycle. */
+export function ActionErrorNote({ t, err }) {
+  if (!err) return null;
+  return (
+    <HelpNote>
+      <div>{t(err.key)}</div>
+      {err.detail && <div className="faint mono" style={{ fontSize: 11, marginTop: 4, wordBreak: 'break-word' }}>{err.detail}</div>}
+    </HelpNote>
+  );
+}
+
 /* Status badge + one plain-language line saying what that status means for the user. The badge
    always carries text, so the state never depends on colour alone. */
 export function StatusLine({ t, status, lastError }) {
@@ -101,7 +117,7 @@ export function LocalMcpDetail({ Sys, def, status, lastError, tools, busy, err,
           <Button kind="danger" size="sm" icon="delete" disabled={busy} onClick={onDelete}>{t('mcp.detail.delete')}</Button>
         </>} />
 
-      {err && <HelpNote>{t('mcp.err.prefix')}{err}</HelpNote>}
+      <ActionErrorNote t={t} err={err} />
 
       <StatusLine t={t} status={status} lastError={lastError} />
       <TechnicalDetails t={t} d={def} />

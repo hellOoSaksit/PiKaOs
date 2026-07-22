@@ -163,6 +163,32 @@ describe('lastError', () => {
     expect(mgr.statuses().fs).toEqual({ status: 'ready', lastError: null })
   })
 
+  // set() carries whatever lastError is on record, and declining consent ends in `stopped` — so if
+  // the token were only wiped AFTER the gate, a denial would report stopped WITH a stale reason.
+  it('declining consent reports stopped with no stale lastError from the previous failure', async () => {
+    const { McpManager } = await import('../src/main/mcp/manager')
+    const { McpRegistry } = await import('../src/main/mcp/registry')
+    const dir = mkdtempSync(join(tmpdir(), 'm-'))
+    const reg = new McpRegistry(join(dir, 'mcp.json'))
+    reg.add({ id: 'fs', label: 'FS', command: 'npx', args: ['-y', '@x/fs'], secretKeys: [] })
+    const vault = { get: () => null, set: vi.fn(), delete: vi.fn(), isAvailable: () => true } as any
+    const confirm = vi.fn().mockResolvedValueOnce(true).mockResolvedValue(false)
+    const mgr = new McpManager(reg, vault, confirm, join(dir, 'approvals.json'), 50, 50)
+
+    fake = child()                       // never answers -> handshake-timeout
+    await mgr.start('fs')
+    await untilStatus(mgr, 'fs', 'error')
+    expect(mgr.statuses().fs.lastError).toBe('handshake-timeout')
+
+    // Editing the def changes the consent hash, so the gate is asked again — this time denied.
+    reg.add({ id: 'fs', label: 'FS', command: 'npx', args: ['-y', '@x/fs', '--edited'], secretKeys: [] })
+    const events: unknown[][] = []
+    mgr.on('status', (...args: unknown[]) => events.push(args))
+    await expect(mgr.start('fs')).rejects.toThrow()
+    expect(events.at(-1)).toEqual(['fs', 'stopped', null])
+    expect(mgr.statuses().fs).toEqual({ status: 'stopped', lastError: null })
+  })
+
   it('unexpected child exit before ready -> error + exited-early (user stop still reports stopped)', async () => {
     fake = child()
     const mgr = await mkManager(vi.fn().mockResolvedValue(true))

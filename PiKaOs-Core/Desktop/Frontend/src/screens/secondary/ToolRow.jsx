@@ -30,7 +30,7 @@ export function FieldInput({ t, field, value, onChange }) {
   const labelId = `${id}-label`;
   const helpId = field.description ? `${id}-help` : undefined;
   const mark = field.required
-    ? <span className="req" style={{ marginLeft: 4, fontSize: 11 }}>{t('mcp.toolform.required')}</span>
+    ? <span style={{ marginLeft: 4, fontSize: 11 }}>{t('mcp.toolform.required')}</span>
     : null;
   const help = field.description
     ? <div id={helpId} className="faint" style={{ fontSize: 11.5, marginTop: 3, lineHeight: 1.5 }}>{field.description}</div>
@@ -39,7 +39,7 @@ export function FieldInput({ t, field, value, onChange }) {
   if (field.type === 'boolean') {
     // Switch renders its own <label> around the checkbox, so the name is associated for free.
     return (
-      <div className="tool-arg" style={{ marginBottom: 10 }}>
+      <div style={{ marginBottom: 10 }}>
         <Switch checked={!!value} onChange={onChange} aria-describedby={helpId}
           label={<span style={{ fontSize: 12.5, marginLeft: 8 }}>{field.name}{mark}</span>} />
         {help}
@@ -51,7 +51,7 @@ export function FieldInput({ t, field, value, onChange }) {
     // Select's trigger is a <button>, which htmlFor cannot address — a labelled group is the
     // association that actually reaches it. (A raw select element is banned in screens by CI.)
     return (
-      <div className="tool-arg" role="group" aria-labelledby={labelId} style={{ marginBottom: 10 }}>
+      <div role="group" aria-labelledby={labelId} style={{ marginBottom: 10 }}>
         <div id={labelId} style={LABEL}>{field.name}{mark}</div>
         <Select options={field.enumValues} value={value ?? ''} onChange={onChange}
           block placeholder={t('mcp.toolform.choose')} />
@@ -61,7 +61,7 @@ export function FieldInput({ t, field, value, onChange }) {
   }
 
   return (
-    <div className="tool-arg" style={{ marginBottom: 10 }}>
+    <div style={{ marginBottom: 10 }}>
       <label htmlFor={id} style={LABEL}>{field.name}{mark}</label>
       <input id={id} className="bf-input" style={{ width: '100%' }} aria-describedby={helpId}
         type={field.type === 'number' ? 'number' : 'text'}
