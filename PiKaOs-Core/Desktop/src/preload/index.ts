@@ -22,6 +22,8 @@ const api = {
     stop: (id: string) => ipcRenderer.invoke('mcp:stop', id),
     statuses: () => ipcRenderer.invoke('mcp:statuses'),
     onStatus: (cb: (id: string, s: string) => void) => ipcRenderer.on('mcp:status', (_e, id, s) => cb(id, s)),
+    tools: (id: string) => ipcRenderer.invoke('mcp:tools', id),
+    callTool: (id: string, name: string, args: Record<string, unknown>) => ipcRenderer.invoke('mcp:callTool', id, name, args),
   },
   secrets: {
     setForServer: (sid: string, key: string, value: string) => ipcRenderer.invoke('secrets:setForServer', sid, key, value),

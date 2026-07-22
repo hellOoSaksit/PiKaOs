@@ -1,8 +1,10 @@
 import { ipcMain, IpcMainInvokeEvent, BrowserWindow, app } from 'electron'
+import { z } from 'zod'
 import type { SecretVault } from './vault'
 import type { SessionBroker } from './session-broker'
 import type { McpRegistry } from './mcp/registry'
 import type { McpManager } from './mcp/manager'
+import { parseServerDef } from './mcp/registry'
 import type { RecoveryService } from './recovery'
 import { getBackendConfig, setBackendConfig } from './config'
 
@@ -30,12 +32,20 @@ export function registerIpc(deps: { vault: SecretVault; broker: SessionBroker; r
   ipcMain.handle('auth:getAccessToken', guard(() => broker.getAccessToken()))
   ipcMain.handle('auth:logout', guard(() => broker.logout()))
 
+  // Renderer input is untrusted even behind okOrigin — every arg is shape-checked before it
+  // touches the registry/manager (rule 10). parseServerDef is the spawn()-reaching gate.
+  const mcpIdOf = (v: unknown) => z.string().min(1).max(64).parse(v)
+  const mcpNameOf = (v: unknown) => z.string().min(1).max(128).parse(v)
+  const mcpArgsOf = (v: unknown) => z.record(z.string(), z.unknown()).optional().parse(v) ?? {}   // zod v4: two args
+
   ipcMain.handle('mcp:list', guard(() => registry.list()))
-  ipcMain.handle('mcp:add', guard((_e, def) => registry.add(def))) // schema-validate def in impl
-  ipcMain.handle('mcp:remove', guard((_e, id) => registry.remove(id)))
-  ipcMain.handle('mcp:start', guard((_e, id) => manager.start(id)))
-  ipcMain.handle('mcp:stop', guard((_e, id) => manager.stop(id)))
+  ipcMain.handle('mcp:add', guard((_e, def) => registry.add(parseServerDef(def))))
+  ipcMain.handle('mcp:remove', guard((_e, id) => registry.remove(mcpIdOf(id))))
+  ipcMain.handle('mcp:start', guard((_e, id) => manager.start(mcpIdOf(id))))
+  ipcMain.handle('mcp:stop', guard((_e, id) => manager.stop(mcpIdOf(id))))
   ipcMain.handle('mcp:statuses', guard(() => manager.statuses()))
+  ipcMain.handle('mcp:tools', guard((_e, id) => manager.tools(mcpIdOf(id))))
+  ipcMain.handle('mcp:callTool', guard((_e, id, name, args) => manager.callTool(mcpIdOf(id), mcpNameOf(name), mcpArgsOf(args))))
 
   // Namespaced under `mcp.<sid>.<key>` — never a bare key — so a server def can never name and
   // receive a foreign vault secret (e.g. auth.refresh). (F1)
