@@ -15,7 +15,8 @@ const { useEffect, useState } = React;
 import Button from '../../components/ui/Button.jsx';
 import Switch from '../../components/ui/Switch.jsx';
 import Select from '../../components/ui/Dropdown.jsx';
-import { toolFormFields, needsJsonMode, buildArgs, canCall, resultText } from './LocalMcp.logic.js';
+import HelpNote from '../../components/ui/HelpNote.jsx';
+import { toolFormFields, buildArgs, canCall, resultText } from './LocalMcp.logic.js';
 
 const LABEL = { display: 'block', fontSize: 12.5, marginBottom: 4 };
 const PRE = { margin: 0, fontSize: 11.5, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' };
@@ -79,10 +80,14 @@ export function ResultPanel({ t, result }) {
   const failed = !!result.isError;
   return (
     <div style={{ marginTop: 10 }}>
-      <div className="faint" style={{ fontSize: 11.5, marginBottom: 4 }}>
-        {t(failed ? 'mcp.toolform.resultError' : 'mcp.toolform.result')}
+      {/* `badge warn` is the kit's error treatment (styles.css `.badge.warn`); a bare `warn` class
+          matches no rule at all, so the failure would render in the ordinary ink colour. */}
+      <div style={{ marginBottom: 4 }}>
+        {failed
+          ? <span className="badge warn">{t('mcp.toolform.resultError')}</span>
+          : <span className="faint" style={{ fontSize: 11.5 }}>{t('mcp.toolform.result')}</span>}
       </div>
-      <pre className={'tool-result mono' + (failed ? ' warn' : '')} style={PRE}>{text === null ? raw : text}</pre>
+      <pre className="mono" style={PRE}>{text === null ? raw : text}</pre>
       {text !== null && (
         <details style={{ marginTop: 6 }}>
           <summary style={{ cursor: 'pointer', fontSize: 11.5 }}>{t('mcp.toolform.resultRaw')}</summary>
@@ -125,9 +130,16 @@ export const makeCall = ({ onCall, t, setBusy, setResult, setError }) => async (
   }
 };
 
+/* Whether the Call button is inert, out of the component so the gate is provable. JSON mode is NOT
+   field-gated: a half-typed object can only be judged by parseJsonArgs, at press time. */
+export const callBlocked = ({ busy, useJson, fields, values }) =>
+  busy || (!useJson && !canCall(fields, values));
+
 export function ToolRow({ t, tool, open, onToggle, onCall }) {
+  // toolFormFields returns null exactly when the schema is too complex for a flat form, which is
+  // the same condition as "JSON is forced" — one call, so the two can never disagree.
   const fields = toolFormFields(tool.inputSchema);
-  const forcedJson = needsJsonMode(tool.inputSchema);
+  const forcedJson = fields === null;
   const [jsonMode, setJsonMode] = useState(false);
   const [values, setValues] = useState({});
   const [argsText, setArgsText] = useState('');
@@ -139,7 +151,7 @@ export function ToolRow({ t, tool, open, onToggle, onCall }) {
   // Re-opening a row starts a fresh attempt: a stale answer or error read as this run's.
   useEffect(() => {
     if (!open) return;
-    setValues({}); setArgsText(''); setResult(null); setError(null);
+    setValues({}); setArgsText(''); setResult(null); setError(null); setBusy(false);
   }, [open]);
 
   const run = makeCall({ onCall, t, setBusy, setResult, setError });
@@ -150,7 +162,7 @@ export function ToolRow({ t, tool, open, onToggle, onCall }) {
     return run(parsed.args);
   };
 
-  const blocked = busy || (!useJson && !canCall(fields, values));
+  const blocked = callBlocked({ busy, useJson, fields, values });
 
   return (
     <div className="tool-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
@@ -192,10 +204,13 @@ export function ToolRow({ t, tool, open, onToggle, onCall }) {
           ))}
 
           <div className="row" style={{ gap: 8, marginTop: 8 }}>
-            <Button kind="gold" size="sm" disabled={blocked} onClick={call}>{busy ? '…' : t('mcp.tool.call')}</Button>
+            {/* Button owns the in-flight state: swapping the label for an ellipsis would leave the
+                button unnamed to a screen reader while the call runs. */}
+            <Button kind="gold" size="sm" disabled={blocked} onClick={call}
+              loading={busy} loadingLabel={t('mcp.tool.calling')}>{t('mcp.tool.call')}</Button>
           </div>
 
-          {error && <div className="warn" style={{ fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>{error}</div>}
+          {error && <HelpNote>{error}</HelpNote>}
           {result && <ResultPanel t={t} result={result} />}
         </div>
       )}

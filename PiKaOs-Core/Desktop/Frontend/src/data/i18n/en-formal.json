@@ -1051,6 +1051,7 @@
     "mcp.tools.notready": "Tools are listed here once the server is running and has reported them.",
     "mcp.tool.args.ph": "JSON arguments — e.g. {\"text\":\"hello\"}",
     "mcp.tool.call": "Call",
+    "mcp.tool.calling": "Calling…",
     "mcp.tool.badjson": "Arguments must be valid JSON.",
     "mcp.toolform.jsonMode": "Fill in as JSON",
     "mcp.toolform.formMode": "Fill in the form",
