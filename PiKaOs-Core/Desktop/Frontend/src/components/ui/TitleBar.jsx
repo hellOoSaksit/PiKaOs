@@ -12,8 +12,10 @@ export default function TitleBar({ t, onSidebar, onSearch, onBack, onForward, ca
 
   const onDragDown = (e) => {
     if (e.button !== 0) return;
-    const sx = e.screenX, sy = e.screenY;
-    api.window.getBounds().then((b) => {
+    let sx = e.screenX, sy = e.screenY;
+    Promise.all([api.window.getBounds(), api.window.isMaximized()]).then(([bounds, wasMax]) => {
+      let b = bounds;
+      let restoring = false;   // one restore per drag, and never twice concurrently
       const cleanup = () => {
         window.removeEventListener('mousemove', move);
         window.removeEventListener('mouseup', cleanup);
@@ -23,6 +25,18 @@ export default function TitleBar({ t, onSidebar, onSearch, onBack, onForward, ca
         // getBounds can resolve after a fast click's mouseup — without this the window sticks to
         // the cursor with no button held. ev.buttons is the live state, unlike the stale closure.
         if ((ev.buttons & 1) === 0) return cleanup();
+        if (wasMax) {
+          // Deliberate travel only: a double-click jitters a pixel or two, and restoring on that
+          // would undo the maximize the second click is about to ask for.
+          if (restoring || Math.abs(ev.screenX - sx) + Math.abs(ev.screenY - sy) < 5) return;
+          restoring = true;
+          return api.window.restoreForDrag().then((nb) => {
+            wasMax = false;
+            // Re-anchor: the captured bounds described the maximized window and the cursor now sits
+            // somewhere else entirely on a smaller one.
+            if (nb) { b = nb; sx = ev.screenX; sy = ev.screenY; }
+          });
+        }
         api.window.move(b.x + (ev.screenX - sx), b.y + (ev.screenY - sy));
       };
       window.addEventListener('mousemove', move);

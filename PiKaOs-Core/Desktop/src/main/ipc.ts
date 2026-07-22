@@ -1,4 +1,4 @@
-import { ipcMain, IpcMainInvokeEvent, BrowserWindow, app } from 'electron'
+import { ipcMain, IpcMainInvokeEvent, BrowserWindow, app, screen } from 'electron'
 import { z } from 'zod'
 import type { SecretVault } from './vault'
 import type { SessionBroker } from './session-broker'
@@ -77,6 +77,31 @@ export function registerIpc(deps: { vault: SecretVault; broker: SessionBroker; r
   ipcMain.handle('window:getBounds', guard((e) => BrowserWindow.fromWebContents(e.sender)?.getBounds()))
   // fire-and-forget for smooth JS window drag (avoids invoke round-trip per mousemove)
   ipcMain.on('window:move', (e, x, y) => { if (okOrigin(e)) BrowserWindow.fromWebContents(e.sender)?.setPosition(Math.round(x), Math.round(y)) })
+  /* Windows IGNORES setPosition while a window is maximized, so window:move alone made a maximized
+     window undraggable — a stray double-click on the drag handle stranded it with no way back down by
+     hand. Native behaviour is to restore and let the window follow the cursor, which needs the restore
+     and the reposition to happen together, before the next mousemove: the renderer's captured bounds
+     are the MAXIMIZED ones and are worthless the moment we unmaximize. Returns the post-move bounds so
+     the caller can re-anchor its drag; null when there was nothing to restore. */
+  ipcMain.handle('window:restoreForDrag', guard((e) => {
+    const w = BrowserWindow.fromWebContents(e.sender)
+    if (!w?.isMaximized()) return null
+    const max = w.getBounds()
+    const cur = screen.getCursorScreenPoint()
+    // Keep the grab point PROPORTIONAL horizontally (the title bar shrinks under the cursor) but
+    // absolute vertically, so the window lands exactly where the hand already is.
+    const ratio = Math.min(1, Math.max(0, (cur.x - max.x) / max.width))
+    const grabY = cur.y - max.y
+    w.unmaximize()
+    const b = w.getBounds()
+    const { workArea } = screen.getDisplayNearestPoint(cur)
+    const x = Math.round(cur.x - ratio * b.width)
+    // A maximized window's y is negative on Windows (invisible resize border), so the naive result can
+    // push the title bar off the top of the screen where it can never be grabbed again.
+    const y = Math.max(workArea.y, Math.round(cur.y - grabY))
+    w.setPosition(x, y)
+    return { x, y, width: b.width, height: b.height }
+  }))
   // Theme sync: the renderer sends its computed --bg-1/--ink-3 tokens (and --bg-1 again as bg) when the
   // theme changes so the OS-drawn overlay buttons AND the window fill match. Hex-only at the edge —
   // anything else is dropped, not sanitized.

@@ -13,12 +13,19 @@ const fakeWin = {
 // test can flip to a packaged build. vi.hoisted lets the (hoisted) electron mock reference it.
 const mockApp = vi.hoisted(() => ({ isPackaged: false, quit: vi.fn() }))
 
+// Cursor + display geometry for the restore-on-drag maths. Mutable so a test can park the cursor.
+const mockScreen = vi.hoisted(() => ({
+  getCursorScreenPoint: vi.fn(() => ({ x: 0, y: 0 })),
+  getDisplayNearestPoint: vi.fn(() => ({ workArea: { x: 0, y: 0, width: 1920, height: 1040 } })),
+}))
+
 vi.mock('electron', () => ({
   ipcMain: {
     handle: (ch: string, fn: any) => { handlers[ch] = fn },
     on: (ch: string, fn: any) => { listeners[ch] = fn },
   },
   BrowserWindow: { fromWebContents: vi.fn(() => fakeWin) },
+  screen: mockScreen,
   app: mockApp,
 }))
 
@@ -30,6 +37,12 @@ beforeEach(async () => {
   for (const k of Object.keys(listeners)) delete listeners[k]
   Object.values(fakeWin).forEach((f: any) => f.mockClear?.())
   Object.values(fakeWc).forEach((f) => f.mockClear())
+  // mockClear leaves queued *Once values and overrides behind — restore the defaults these tests
+  // assume, or one test's maximized window leaks into the next.
+  fakeWin.isMaximized.mockReset().mockReturnValue(false)
+  fakeWin.getBounds.mockReset().mockReturnValue({ x: 100, y: 50, width: 800, height: 600 })
+  mockScreen.getCursorScreenPoint.mockReset().mockReturnValue({ x: 0, y: 0 })
+  mockScreen.getDisplayNearestPoint.mockReset().mockReturnValue({ workArea: { x: 0, y: 0, width: 1920, height: 1040 } })
   mockApp.isPackaged = false
   mockApp.quit.mockClear()
   const { registerIpc } = await import('../src/main/ipc')
@@ -80,6 +93,54 @@ it('window:move sets the position for a same-origin sender and ignores foreign o
   const evil = { senderFrame: { url: 'https://evil.com/' }, sender: {} } as any
   listeners['window:move'](evil, 9, 9)
   expect(fakeWin.setPosition).not.toHaveBeenCalled()
+})
+
+/* Dragging a MAXIMIZED window used to do nothing at all: window:move calls setPosition, which Windows
+   ignores while a window is maximized. Combined with double-click-to-maximize on the full-width drag
+   handle, a stray double-click left the window stuck maximized with no way to pull it back down by
+   hand. Native Windows restores the window and lets it follow the cursor — that is what this verb does. */
+it('window:restoreForDrag restores a maximized window under the cursor and reports the new bounds', () => {
+  // maximized across a 1920-wide display, with Windows' invisible -7px overhang
+  fakeWin.isMaximized.mockReturnValue(true)
+  fakeWin.getBounds
+    .mockReturnValueOnce({ x: -7, y: -7, width: 1934, height: 1054 })   // before unmaximize
+    .mockReturnValueOnce({ x: 53, y: 82, width: 1000, height: 700 })    // restored size
+  // cursor sits three-quarters across the title bar, 25px below the window top
+  mockScreen.getCursorScreenPoint.mockReturnValue({ x: 1443, y: 18 })
+
+  const out = handlers['window:restoreForDrag'](appEvent)
+
+  expect(fakeWin.unmaximize).toHaveBeenCalled()
+  // same PROPORTIONAL grab point: 0.75 across the restored 1000px width => cursor.x - 750
+  expect(fakeWin.setPosition).toHaveBeenCalledWith(693, 0)
+  // the caller re-anchors its drag on these, so they must be the post-move bounds
+  expect(out).toEqual({ x: 693, y: 0, width: 1000, height: 700 })
+})
+
+it('window:restoreForDrag never lifts the title bar above the work area', () => {
+  fakeWin.isMaximized.mockReturnValue(true)
+  fakeWin.getBounds
+    .mockReturnValueOnce({ x: 0, y: -7, width: 1920, height: 1054 })
+    .mockReturnValueOnce({ x: 0, y: 0, width: 800, height: 600 })
+  mockScreen.getCursorScreenPoint.mockReturnValue({ x: 960, y: 2 })   // grabY = 9 => y would be -7
+  mockScreen.getDisplayNearestPoint.mockReturnValue({ workArea: { x: 0, y: 40, width: 1920, height: 1000 } })
+
+  handlers['window:restoreForDrag'](appEvent)
+
+  expect(fakeWin.setPosition).toHaveBeenCalledWith(expect.any(Number), 40)   // clamped to workArea.y
+})
+
+it('window:restoreForDrag is a no-op on a window that is not maximized', () => {
+  fakeWin.isMaximized.mockReturnValue(false)
+  expect(handlers['window:restoreForDrag'](appEvent)).toBeNull()
+  expect(fakeWin.unmaximize).not.toHaveBeenCalled()
+  expect(fakeWin.setPosition).not.toHaveBeenCalled()
+})
+
+it('window:restoreForDrag rejects a foreign-origin sender', () => {
+  const evil = { senderFrame: { url: 'https://evil.com/' }, sender: {} } as any
+  expect(() => handlers['window:restoreForDrag'](evil)).toThrow('forbidden sender')
+  expect(fakeWin.unmaximize).not.toHaveBeenCalled()
 })
 
 it('window:toggleDevTools opens DevTools in dev but is a no-op in a packaged build', () => {
