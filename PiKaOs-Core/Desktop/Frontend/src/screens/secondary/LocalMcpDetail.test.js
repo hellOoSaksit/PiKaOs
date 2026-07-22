@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { StatusLine, TechnicalDetails, makeSaveEdit } from './LocalMcpDetail.jsx';
+import { ActionErrorNote, StatusLine, TechnicalDetails, makeSaveEdit } from './LocalMcpDetail.jsx';
 
 const flat = (n, out = []) => {
   if (n == null || typeof n === 'boolean') return out;
@@ -12,6 +12,28 @@ const flat = (n, out = []) => {
 };
 const t = (k) => k;
 const strings = (el) => flat(el).filter((n) => typeof n === 'string');
+
+/* The single rendering point for every action error on BOTH mcp screens, so its contract is worth
+   pinning here: localized sentence for the user, raw technical text only as a secondary line. */
+describe('ActionErrorNote', () => {
+  // the secondary line carrying the raw, untranslated message
+  const detailNode = (el) => flat(el).find((n) => typeof n?.props?.className === 'string' && n.props.className.includes('mono'));
+
+  it('renders the localized key, with the raw detail underneath', () => {
+    const el = ActionErrorNote({ t, err: { key: 'mcp.err.action.save', detail: 'EACCES' } });
+    expect(strings(el)).toContain('mcp.err.action.save');
+    expect(detailNode(el)).toBeTruthy();
+    expect(strings(el)).toContain('EACCES');
+  });
+  it('omits the technical line entirely when there is no raw detail', () => {
+    const el = ActionErrorNote({ t, err: { key: 'mcp.err.action.stop', detail: null } });
+    expect(strings(el)).toEqual(['mcp.err.action.stop']);
+    expect(detailNode(el)).toBeUndefined();     // no empty box, not just no text
+  });
+  it('renders nothing when there is no error', () => {
+    expect(ActionErrorNote({ t, err: null })).toBe(null);
+  });
+});
 
 describe('StatusLine', () => {
   it('shows the badge key + per-status hint', () => {

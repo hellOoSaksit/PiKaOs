@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   toolFormFields, buildArgs, canCall,
   filterTools, presetToDef, resultText, errorKey,
-  statusMeta, isRunning, showToolSearch, replaceTarget, isConsentDenied,
+  statusMeta, isRunning, showToolSearch, replaceTargets, savePlan, saveErrorNote, isConsentDenied,
 } from './LocalMcp.logic.js';
 
 describe('toolFormFields', () => {
@@ -42,18 +42,55 @@ describe('toolFormFields', () => {
   });
 });
 
-describe('replaceTarget', () => {
+describe('replaceTargets', () => {
   const servers = [{ id: 'fs' }, { id: 'memory' }];
   it('a brand-new id replaces nothing', () => {
-    expect(replaceTarget(servers, 'weather', undefined)).toBe(null);
-    expect(replaceTarget([], 'fs', undefined)).toBe(null);
+    expect(replaceTargets(servers, 'weather', undefined)).toEqual([]);
+    expect(replaceTargets([], 'fs', undefined)).toEqual([]);
   });
   it('an ADD whose id collides with a stored def is a replace (registry.add upserts)', () => {
-    expect(replaceTarget(servers, 'fs', undefined)).toBe('fs');
+    expect(replaceTargets(servers, 'fs', undefined)).toEqual(['fs']);
   });
   it('an edit keeps its own target, even when it renames the id', () => {
-    expect(replaceTarget(servers, 'files', 'fs')).toBe('fs');
-    expect(replaceTarget(servers, 'fs', 'fs')).toBe('fs');
+    expect(replaceTargets(servers, 'files', 'fs')).toEqual(['fs']);
+  });
+  it('an edit that does not rename yields that id once, not twice', () => {
+    expect(replaceTargets(servers, 'fs', 'fs')).toEqual(['fs']);
+  });
+  /* The bug: the id field stays editable while editing, so renaming `fs` onto the live `memory`
+     both drops `fs` AND upserts over `memory` — reaping only `fs` leaves memory's child running
+     the old command under a def that now describes fs. */
+  it('renaming one server onto another live id displaces BOTH', () => {
+    expect(replaceTargets(servers, 'memory', 'fs').sort()).toEqual(['fs', 'memory']);
+  });
+});
+
+describe('savePlan', () => {
+  const servers = [{ id: 'fs' }, { id: 'memory' }];
+  const statuses = { fs: { status: 'stopped' }, memory: { status: 'ready' } };
+  it('a new server reaps nothing and owes no restart', () => {
+    expect(savePlan(servers, statuses, 'weather', undefined)).toEqual({ targets: [], wasRunning: false });
+  });
+  it('a restart is owed when ANY displaced server was live, not just the edited one', () => {
+    const plan = savePlan(servers, statuses, 'memory', 'fs');
+    expect(plan.targets.sort()).toEqual(['fs', 'memory']);
+    expect(plan.wasRunning).toBe(true);          // `fs` was stopped; `memory` was ready
+  });
+  it('no restart when every displaced server was already stopped', () => {
+    expect(savePlan(servers, statuses, 'fs', 'fs')).toEqual({ targets: ['fs'], wasRunning: false });
+  });
+  it('tolerates a missing status map (first render, before statuses load)', () => {
+    expect(savePlan(servers, undefined, 'fs', undefined)).toEqual({ targets: ['fs'], wasRunning: false });
+  });
+});
+
+describe('saveErrorNote', () => {
+  it('a declined consent dialog raises no banner — the def is already stored', () => {
+    expect(saveErrorNote(new Error("Error invoking remote method 'mcp:start': Error: consent denied"))).toBe(null);
+  });
+  it('any other failure becomes the localized save banner, raw text kept underneath', () => {
+    expect(saveErrorNote(new Error('EACCES'))).toEqual({ key: 'mcp.err.action.save', detail: 'EACCES' });
+    expect(saveErrorNote({})).toEqual({ key: 'mcp.err.action.save', detail: null });
   });
 });
 
