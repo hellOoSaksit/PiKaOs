@@ -1049,6 +1049,24 @@
     "mcp.tools.none": "The server reported no tools.",
     "mcp.tool.args.ph": "JSON arguments — e.g. {\"text\":\"hello\"}",
     "mcp.tool.call": "Call",
-    "mcp.tool.badjson": "Arguments must be valid JSON."
+    "mcp.tool.badjson": "Arguments must be valid JSON.",
+    "mcp.preset.title": "Ready-made servers",
+    "mcp.preset.install": "Install",
+    "mcp.preset.installed": "Installed",
+    "mcp.preset.installStart": "Install and start",
+    "mcp.preset.cancel": "Cancel",
+    "mcp.preset.custom.name": "Custom",
+    "mcp.preset.custom.desc": "For technical users — enter the command and arguments yourself.",
+    "mcp.preset.filesystem.name": "Files in a folder",
+    "mcp.preset.filesystem.desc": "Lets the AI read and write files inside one folder you choose.",
+    "mcp.preset.filesystem.param.folder": "Which folder may it access?",
+    "mcp.preset.memory.name": "Memory",
+    "mcp.preset.memory.desc": "Lets the AI remember facts between conversations.",
+    "mcp.preset.sequential-thinking.name": "Step-by-step thinking",
+    "mcp.preset.sequential-thinking.desc": "Helps the AI break hard problems into steps.",
+    "mcp.preset.everything.name": "Test server",
+    "mcp.preset.everything.desc": "A demo server with sample tools — useful to check the system works.",
+    "mcp.preset.secret.ph": "Paste the access token here",
+    "mcp.preset.secret.help": "How to get a token"
   }
 }
