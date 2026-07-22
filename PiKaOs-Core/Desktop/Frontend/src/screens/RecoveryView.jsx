@@ -69,7 +69,7 @@ export function RecoveryView({ t, onBack }) {
         window.pikaosDesktop.mcp.statuses(),
       ]);
       setItems(diag);
-      setMcp((Array.isArray(defs) ? defs : []).map((d) => ({ ...d, status: statuses?.[d.id] ?? 'stopped' })));
+      setMcp((Array.isArray(defs) ? defs : []).map((d) => ({ ...d, status: statuses?.[d.id]?.status ?? 'stopped' })));
     } catch (e) { setError(t('recovery.failed')); }
     setLocal(countLocalItems(window.localStorage));
   }, [t]);

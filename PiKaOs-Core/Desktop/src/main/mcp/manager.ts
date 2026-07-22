@@ -4,6 +4,7 @@ import { EventEmitter } from 'node:events'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import type { Tool } from '@modelcontextprotocol/sdk/types.js'
 import { ChildProcessTransport } from './transport'
+import { resolveSpawn, NodeMissingError } from './spawn-resolver'
 import type { McpRegistry, McpServerDef } from './registry'
 import type { SecretVault } from '../vault'
 
@@ -33,6 +34,8 @@ export class McpManager extends EventEmitter {
   private state = new Map<string, McpStatus>()
   private clients = new Map<string, Client>()
   private toolCache = new Map<string, Tool[]>()
+  // Sanitized reason tokens only (never raw stderr/stack) — see the Error tokens union below.
+  private lastErrors = new Map<string, string>()
   constructor(private registry: McpRegistry, private vault: SecretVault,
               private confirm: (def: McpServerDef, hash: string) => Promise<boolean>,
               private approvalStorePath: string,
@@ -41,10 +44,16 @@ export class McpManager extends EventEmitter {
 
   private approvals(): string[] { return existsSync(this.approvalStorePath) ? JSON.parse(readFileSync(this.approvalStorePath, 'utf8')) : [] }
   private approve(hash: string) { const a = this.approvals(); if (!a.includes(hash)) { a.push(hash); writeFileSync(this.approvalStorePath, JSON.stringify(a)) } }
-  private set(id: string, s: McpStatus) { this.state.set(id, s); this.emit('status', id, s) }
+  private set(id: string, s: McpStatus) { this.state.set(id, s); this.emit('status', id, s, this.lastErrors.get(id) ?? null) }
+  // Sets the error status AND records why, in one call — every failure path goes through this so
+  // status and lastError can never drift apart.
+  private fail(id: string, token: string) { this.lastErrors.set(id, token); this.set(id, 'error') }
 
   status(id: string) { return this.state.get(id) ?? 'stopped' }
-  statuses() { return Object.fromEntries(this.registry.list().map(d => [d.id, this.status(d.id)])) }
+  statuses() {
+    return Object.fromEntries(this.registry.list().map(d =>
+      [d.id, { status: this.status(d.id), lastError: this.lastErrors.get(d.id) ?? null }]))
+  }
   tools(id: string): Tool[] { return this.toolCache.get(id) ?? [] }
 
   async start(id: string) {
@@ -55,19 +64,31 @@ export class McpManager extends EventEmitter {
       if (!ok) { this.set(id, 'stopped'); throw new Error('consent denied') }
       this.approve(hash)
     }
+    this.lastErrors.delete(id)   // a fresh start wipes the stale reason, even if the last attempt errored
     this.set(id, 'starting')
+    // Rewrites npx to a shell-less `node npx-cli.js` on Windows (BatBadBut) — never touches the
+    // stored def, so the consent hash/dialog text above is unaffected by this platform quirk.
+    let plan
+    try { plan = resolveSpawn(def.command, def.args) }
+    catch (e) {
+      this.fail(id, e instanceof NodeMissingError ? 'node-missing' : 'spawn-failed')
+      return
+    }
     // Secrets resolve ONLY under this server's namespace — a def can never name a foreign vault
     // key (e.g. auth.refresh) and receive it. (F1)
     const secrets: Record<string, string> = {}
     for (const name of def.secretKeys ?? []) { const v = this.vault.get(`mcp.${def.id}.${name}`); if (v) secrets[name] = v }
     const env = { PATH: process.env.PATH, ...(def.env ?? {}), ...secrets }
-    const child = spawn(def.command, def.args, { stdio: ['pipe', 'pipe', 'pipe'], env })
+    const child = spawn(plan.command, plan.args, { stdio: ['pipe', 'pipe', 'pipe'], env })
     this.procs.set(id, child)
     child.on('spawn', () => this.set(id, 'running'))
-    child.on('error', () => this.set(id, 'error'))
+    child.on('error', () => this.fail(id, 'spawn-failed'))
     child.on('exit', () => {
+      const wasCurrent = this.procs.get(id) === child
       this.procs.delete(id); this.clients.delete(id); this.toolCache.delete(id)
-      if (this.status(id) !== 'error') this.set(id, 'stopped')   // keep a handshake-error visible; still reap procs
+      if (this.status(id) === 'error') return          // a handshake/spawn reason is richer — keep it
+      if (wasCurrent) this.fail(id, 'exited-early')     // died on its own, before OR after ready
+      else this.set(id, 'stopped')                      // user-initiated stop()
     })
     // Some fakes/real spawns emit synchronously; if already alive, mark running.
     if (child.pid) this.set(id, 'running')
@@ -85,12 +106,15 @@ export class McpManager extends EventEmitter {
       this.clients.set(id, client)
       this.toolCache.set(id, tools)
       this.set(id, 'ready')
-    } catch {
+    } catch (e) {
       await client.close().catch(() => {})
       // Reap the child on handshake failure — otherwise a spawned-but-unhandshaken process leaks when the
       // user retries Start (a new child overwrites the map entry, orphaning the old one). kill() on an
       // already-dead child is a no-op, and the stopped-meanwhile guard means we never kill someone else's child.
-      if (this.procs.get(id) === child) { this.set(id, 'error'); child.kill() }
+      if (this.procs.get(id) === child) {
+        this.fail(id, e instanceof Error && e.message === 'mcp handshake timeout' ? 'handshake-timeout' : 'handshake-failed')
+        child.kill()
+      }
     }
   }
 
@@ -110,6 +134,7 @@ export class McpManager extends EventEmitter {
       const exited = await waitExit(child, this.stopGraceMs)
       if (!exited) child.kill()                   // …kill only if the server doesn't exit on its own
     }
+    this.lastErrors.delete(id)   // a deliberate stop is not an error state
     this.set(id, 'stopped')
   }
 
