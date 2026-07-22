@@ -1084,6 +1084,21 @@
     "mcp.err.exited-early": "The server stopped by itself right after starting. Its settings may be wrong.",
     "mcp.err.generic": "Something went wrong with this server.",
     "mcp.confirm.delete.title": "Remove this server?",
-    "mcp.confirm.delete.msg": "It will be stopped and removed from your list. You can install it again at any time."
+    "mcp.confirm.delete.msg": "It will be stopped and removed from your list. You can install it again at any time.",
+    "mcp.status.ready.hint": "This server is running and the AI can use its tools.",
+    "mcp.status.running.hint": "The server has started. PiKaOs is waiting for it to answer.",
+    "mcp.status.starting.hint": "Starting the server. This usually takes a few seconds.",
+    "mcp.status.stopped.hint": "This server is not running. Start it when you want the AI to use its tools.",
+    "mcp.status.error.hint": "Try starting it again. If it keeps failing, open the technical details below and check its settings.",
+    "mcp.detail.back": "All servers",
+    "mcp.detail.tech": "Technical details",
+    "mcp.detail.edit": "Edit",
+    "mcp.detail.delete": "Remove",
+    "mcp.detail.id": "Server id",
+    "mcp.detail.cmd": "Command",
+    "mcp.detail.args": "Arguments",
+    "mcp.detail.secrets": "Secret keys",
+    "mcp.detail.search.ph": "Search tools",
+    "mcp.detail.search.none": "No tool matches what you typed."
   }
 }
