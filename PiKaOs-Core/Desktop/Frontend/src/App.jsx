@@ -23,6 +23,8 @@ import { UILoadingHost, UIModalHost } from './lib/ui-modal.jsx';
 import { makeT, DEFAULT_LANG, DEFAULT_STYLE, packById, defaultPack, defaultPackForLang, LEX_PACKS } from './lib/i18n.jsx';
 import { renderPluginRoute, renderPluginProfile, renderPluginBootstrap, PLUGIN_ROUTE_META, PLUGIN_ROUTE_OWNERS } from './plugins/index.jsx';
 import { authoritativePluginIds, filterPluginNav } from './lib/plugin-gate.js';
+import { CommandPalette } from './components/ui/CommandPalette.jsx';
+import { isNavVisible } from './components/ui/CommandPalette.logic.js';
 
 // ชุดเริ่มต้นตอนเปิดแอป = master ของ i18n (English + Formal — มาจาก flag isDefault* ในไฟล์ ไม่ hardcode)
 const I18N_DEFAULT_PACK = (LEX_PACKS.find(p => p.lang === DEFAULT_LANG && p.styleKey === DEFAULT_STYLE) || defaultPack() || {}).id || "english_pro";
@@ -58,8 +60,7 @@ function navContains(node, route) {
    In the rail there is no room for a label, so a row is just its icon: the label becomes the
    tooltip, and a parent's children are unreachable until the rail widens — clicking one widens it. */
 function NavNode({ node, depth, route, go, t, can, navOpen, setNavOpen, rail, onExpandShell }) {
-  const kids = (node.children || []).filter(c => !c.hidden && (!c.perm || (can && can(c.perm)))
-    && (!c.desktopOnly || window.pikaosDesktop?.isDesktop));
+  const kids = (node.children || []).filter(c => isNavVisible(c, can, !!window.pikaosDesktop?.isDesktop));
   const hasKids = kids.length > 0;
   const branchActive = kids.some(c => navContains(c, route));
   const isOpen = branchActive || (node.id in navOpen ? navOpen[node.id] : route === node.id);
@@ -124,7 +125,10 @@ function Sidebar({ route, go, t, can, nav, openMode, rail, onToggle }) {
       </div>
       <nav className="nav">
         {(nav || NAV).map(g => {
-          const items = g.items.filter(it => !it.hidden && (!it.perm || (can && can(it.perm))));
+          // isNavVisible is the ONE visibility rule (shared with the palette). This also closes the
+          // old asymmetry where top-level items ignored desktopOnly — no current item carries the
+          // flag at top level, so nothing visible changes today.
+          const items = g.items.filter(it => isNavVisible(it, can, !!window.pikaosDesktop?.isDesktop));
           if (items.length === 0) return null;
           return (
             <div className="nav-group" key={g.group}>
@@ -242,6 +246,7 @@ function App() {
   const lastByLang = React.useRef({});
 
   const [navCfg, setNavCfg] = useState(() => loadNav());   // global sidebar arrangement (admin-set, shared)
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const { rail: navRail, drawerOpen, toggle: toggleNav, closeDrawer } = useShellNav();
 
   const setTheme = (t) => { setThemeState(t); localStorage.setItem("guild-theme", t); };
@@ -279,6 +284,16 @@ function App() {
     let alive = true;
     getNavConfig().then(r => { if (alive && r && r.value) setNavCfg(mergeWithDefault(r.value)); }).catch(() => {});
     return () => { alive = false; };
+  }, [signedIn]);
+  // Ctrl+K (Cmd+K on mac) toggles the menu palette — the convention users already know from the
+  // browser/editor world. Gated on signedIn: pre-login there is no nav to search.
+  useEffect(() => {
+    if (!signedIn) return;
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPaletteOpen(o => !o); }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
   }, [signedIn]);
   // per-user prefs (theme, lexicon) — load this user's saved values on sign-in (so they follow the
   // user across devices), then persist any change. localStorage stays only as an instant-render cache.
@@ -337,7 +352,6 @@ function App() {
     const h = histRef.current;
     if (h.stack[h.idx] !== r) { h.stack = h.stack.slice(0, h.idx + 1); h.stack.push(r); h.idx = h.stack.length - 1; bumpHist(x => x + 1); }
     document.querySelector(".content")?.scrollTo(0, 0);
-    if (r === "search") { const h = window.uiLoading && window.uiLoading({ title: "กำลังเชื่อมต่อคลังความรู้…", message: "ผู้ควบคุมกลาง Recall" }); setTimeout(() => h && h.close(), 820); }
   };
   window.__guildGo = go;
 
@@ -390,7 +404,7 @@ function App() {
     return (
       <div className="desktop-frame" data-maximized={winMax ? "" : undefined}>
         <TitleBar t={t}
-          onSidebar={toggleNav} onSearch={() => go('search')}
+          onSidebar={toggleNav} onSearch={() => signedIn && setPaletteOpen(true)}
           onBack={() => navGo(-1)} onForward={() => navGo(1)}
           canBack={histRef.current.idx > 0}
           canForward={histRef.current.idx < histRef.current.stack.length - 1}
@@ -449,12 +463,15 @@ function App() {
     }
   })();
 
+  // one filtered tree for both consumers — the sidebar renders it, the palette searches it
+  const visibleNav = filterPluginNav(navCfg, PLUGIN_ROUTE_OWNERS, activePlugins);
+
   return withChrome(
     <ToastProvider>
     <div className="app" key={lex}
       data-nav={navRail ? "rail" : "full"} data-drawer={drawerOpen ? "open" : undefined}>
       <Sidebar route={route} go={go} t={t} can={can} openMode={openMode}
-        nav={filterPluginNav(navCfg, PLUGIN_ROUTE_OWNERS, activePlugins)}
+        nav={visibleNav}
         rail={navRail} onToggle={toggleNav} />
       <div className="nav-scrim" onClick={closeDrawer} />
       <div className="main">
@@ -468,6 +485,8 @@ function App() {
         // sequenced: an unsequenced reload races the mark and usually re-reads the pre-mark rows
         onNotificationsOpened={() => { markNotificationsRead().catch(() => {}).finally(loadNotifs); }}
       />
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)}
+        nav={visibleNav} t={t} can={can} go={go} />
       <UIModalHost />
       <UILoadingHost />
     </div>
