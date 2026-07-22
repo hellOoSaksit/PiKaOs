@@ -6,7 +6,7 @@ const fakeWc = { toggleDevTools: vi.fn(), getZoomLevel: vi.fn(() => 0), setZoomL
 const fakeWin = {
   maximize: vi.fn(), unmaximize: vi.fn(),
   isMaximized: vi.fn(() => false), getBounds: vi.fn(() => ({ x: 100, y: 50, width: 800, height: 600 })),
-  setPosition: vi.fn(), setTitleBarOverlay: vi.fn(),
+  setPosition: vi.fn(), setBounds: vi.fn(), setTitleBarOverlay: vi.fn(),
   setFullScreen: vi.fn(), isFullScreen: vi.fn(() => false), webContents: fakeWc,
 }
 // `app` is captured at ipc.ts import time — isPackaged gates DevTools, quit ends the app. Mutable so a
@@ -86,12 +86,26 @@ it('window:getBounds returns the sender window bounds', () => {
   expect(handlers['window:getBounds'](appEvent)).toMatchObject({ x: 100, y: 50 })
 })
 
-it('window:move sets the position for a same-origin sender and ignores foreign ones', () => {
-  listeners['window:move'](appEvent, 250, 175)
-  expect(fakeWin.setPosition).toHaveBeenCalledWith(250, 175)
-  fakeWin.setPosition.mockClear()
+/* setPosition drifts the SIZE on scaled displays (Electron DIP<->physical rounding, measured live at
+   150%: 40 calls grew the window +34x+32) — a JS drag calls it per mousemove, so dragging visibly
+   inflated the window. The drag must re-assert its captured size through setBounds every move. */
+it('window:move re-asserts the drag-start size via setBounds — never bare setPosition', () => {
+  listeners['window:move'](appEvent, 250, 175, 800, 600)
+  expect(fakeWin.setBounds).toHaveBeenCalledWith({ x: 250, y: 175, width: 800, height: 600 })
+  expect(fakeWin.setPosition).not.toHaveBeenCalled()
+})
+
+it('window:move rounds fractional coordinates and sizes', () => {
+  listeners['window:move'](appEvent, 250.4, 175.6, 800.2, 599.8)
+  expect(fakeWin.setBounds).toHaveBeenCalledWith({ x: 250, y: 176, width: 800, height: 600 })
+})
+
+it('window:move ignores a foreign-origin sender and non-finite input', () => {
   const evil = { senderFrame: { url: 'https://evil.com/' }, sender: {} } as any
-  listeners['window:move'](evil, 9, 9)
+  listeners['window:move'](evil, 9, 9, 800, 600)
+  listeners['window:move'](appEvent, NaN, 5, 800, 600)
+  listeners['window:move'](appEvent, 5, 5, Infinity, 600)
+  expect(fakeWin.setBounds).not.toHaveBeenCalled()
   expect(fakeWin.setPosition).not.toHaveBeenCalled()
 })
 
@@ -111,8 +125,9 @@ it('window:restoreForDrag restores a maximized window under the cursor and repor
   const out = handlers['window:restoreForDrag'](appEvent)
 
   expect(fakeWin.unmaximize).toHaveBeenCalled()
-  // same PROPORTIONAL grab point: 0.75 across the restored 1000px width => cursor.x - 750
-  expect(fakeWin.setPosition).toHaveBeenCalledWith(693, 0)
+  // same PROPORTIONAL grab point: 0.75 across the restored 1000px width => cursor.x - 750.
+  // setBounds with the restored size, not setPosition — see the size-drift note on window:move.
+  expect(fakeWin.setBounds).toHaveBeenCalledWith({ x: 693, y: 0, width: 1000, height: 700 })
   // the caller re-anchors its drag on these, so they must be the post-move bounds
   expect(out).toEqual({ x: 693, y: 0, width: 1000, height: 700 })
 })
@@ -127,14 +142,14 @@ it('window:restoreForDrag never lifts the title bar above the work area', () => 
 
   handlers['window:restoreForDrag'](appEvent)
 
-  expect(fakeWin.setPosition).toHaveBeenCalledWith(expect.any(Number), 40)   // clamped to workArea.y
+  expect(fakeWin.setBounds).toHaveBeenCalledWith(expect.objectContaining({ y: 40 }))   // clamped to workArea.y
 })
 
 it('window:restoreForDrag is a no-op on a window that is not maximized', () => {
   fakeWin.isMaximized.mockReturnValue(false)
   expect(handlers['window:restoreForDrag'](appEvent)).toBeNull()
   expect(fakeWin.unmaximize).not.toHaveBeenCalled()
-  expect(fakeWin.setPosition).not.toHaveBeenCalled()
+  expect(fakeWin.setBounds).not.toHaveBeenCalled()
 })
 
 it('window:restoreForDrag rejects a foreign-origin sender', () => {

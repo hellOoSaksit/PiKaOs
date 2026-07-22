@@ -53,7 +53,8 @@ const api = {
     toggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),
     isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
     getBounds: () => ipcRenderer.invoke('window:getBounds'),
-    move: (x: number, y: number) => ipcRenderer.send('window:move', x, y),
+    // w/h = the size captured at drag start, re-asserted every move (DPI size-drift guard — ipc.ts)
+    move: (x: number, y: number, w: number, h: number) => ipcRenderer.send('window:move', x, y, w, h),
     restoreForDrag: () => ipcRenderer.invoke('window:restoreForDrag'),
     setTitleBarOverlay: (colors: { color: string; symbolColor: string; bg?: string }) =>
       ipcRenderer.invoke('window:setTitleBarOverlay', colors),

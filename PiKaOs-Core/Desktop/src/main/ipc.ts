@@ -75,8 +75,17 @@ export function registerIpc(deps: { vault: SecretVault; broker: SessionBroker; r
   }))
   ipcMain.handle('window:isMaximized', guard((e) => BrowserWindow.fromWebContents(e.sender)?.isMaximized() ?? false))
   ipcMain.handle('window:getBounds', guard((e) => BrowserWindow.fromWebContents(e.sender)?.getBounds()))
-  // fire-and-forget for smooth JS window drag (avoids invoke round-trip per mousemove)
-  ipcMain.on('window:move', (e, x, y) => { if (okOrigin(e)) BrowserWindow.fromWebContents(e.sender)?.setPosition(Math.round(x), Math.round(y)) })
+  // Fire-and-forget for smooth JS window drag (avoids invoke round-trip per mousemove).
+  // setBounds with the caller's captured size, NEVER bare setPosition: on a scaled display Electron's
+  // DIP<->physical rounding drifts the size a little on every setPosition, and a drag issues one per
+  // mousemove — measured live at 150% scaling, 40 calls inflated the window by +34x+32. Re-asserting
+  // the same size each move gives the rounding nothing to accumulate on.
+  ipcMain.on('window:move', (e, x, y, w, h) => {
+    if (!okOrigin(e) || ![x, y, w, h].every(Number.isFinite)) return
+    BrowserWindow.fromWebContents(e.sender)?.setBounds({
+      x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(h),
+    })
+  })
   /* Windows IGNORES setPosition while a window is maximized, so window:move alone made a maximized
      window undraggable — a stray double-click on the drag handle stranded it with no way back down by
      hand. Native behaviour is to restore and let the window follow the cursor, which needs the restore
@@ -99,7 +108,8 @@ export function registerIpc(deps: { vault: SecretVault; broker: SessionBroker; r
     // A maximized window's y is negative on Windows (invisible resize border), so the naive result can
     // push the title bar off the top of the screen where it can never be grabbed again.
     const y = Math.max(workArea.y, Math.round(cur.y - grabY))
-    w.setPosition(x, y)
+    // setBounds, not setPosition — same DPI size-drift trap as window:move above.
+    w.setBounds({ x, y, width: b.width, height: b.height })
     return { x, y, width: b.width, height: b.height }
   }))
   // Theme sync: the renderer sends its computed --bg-1/--ink-3 tokens (and --bg-1 again as bg) when the
