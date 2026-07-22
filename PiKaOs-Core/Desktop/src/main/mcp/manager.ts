@@ -64,12 +64,15 @@ export class McpManager extends EventEmitter {
   async start(id: string) {
     const def = this.registry.get(id); if (!def) throw new Error(`unknown mcp ${id}`)
     const hash = this.registry.hash(def)
+    // Wiped BEFORE the consent gate: declining consent ends in `stopped`, and set() carries whatever
+    // lastError is on record — so a stale token from a previous failure would ride out on a state
+    // that is not an error at all.
+    this.lastErrors.delete(id)
     if (!this.approvals().includes(hash)) {
       const ok = await this.confirm(def, hash)
       if (!ok) { this.set(id, 'stopped'); throw new Error('consent denied') }
       this.approve(hash)
     }
-    this.lastErrors.delete(id)   // a fresh start wipes the stale reason, even if the last attempt errored
     this.set(id, 'starting')
     // Rewrites npx to a shell-less `node npx-cli.js` on Windows (BatBadBut) — never touches the
     // stored def, so the consent hash/dialog text above is unaffected by this platform quirk.

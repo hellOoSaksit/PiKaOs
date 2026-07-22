@@ -21,12 +21,11 @@ import React from 'react';
 const { useEffect, useState } = React;
 import Button from '../../components/ui/Button.jsx';
 import Empty from '../../components/ui/Empty.jsx';
-import HelpNote from '../../components/ui/HelpNote.jsx';
 import PageHead from '../../components/ui/PageHead.jsx';
 import Panel from '../../components/ui/Panel.jsx';
 import { MCP_PRESETS } from '../../data/mcpPresets.js';
-import { presetToDef, errorKey, statusMeta, isRunning } from './LocalMcp.logic.js';
-import { LocalMcpDetail } from './LocalMcpDetail.jsx';
+import { presetToDef, errorKey, statusMeta, isRunning, replaceTarget, isConsentDenied } from './LocalMcp.logic.js';
+import { ActionErrorNote, LocalMcpDetail } from './LocalMcpDetail.jsx';
 import { McpServerForm } from './McpServerForm.jsx';
 
 // Gallery-only pseudo-preset: the escape hatch to the raw command form. Its copy already lives
@@ -37,17 +36,29 @@ const EXPLAINER_KEY = 'mcp.explainer.collapsed';
 // Injected storage keeps this testable without a DOM; anything but the set flag means "show it".
 export const explainerCollapsed = (storage) => storage.getItem(EXPLAINER_KEY) === '1';
 
-export function PresetCard({ t, preset, installed, onPick }) {
+export function PresetCard({ t, preset, installed, onPick, onOpen }) {
+  // An installed card is the way back to that server's page — otherwise the only way in is to hunt
+  // for its row further down. Same open affordance as ServerRow, keyboard included; an installed
+  // card has no nested control, so no click-swallowing is needed.
+  const open = installed && onOpen
+    ? {
+        role: 'button', tabIndex: 0, onClick: onOpen,
+        onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } },
+      }
+    : {};
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 10, borderRadius: 10,
-      border: '1px solid var(--line-soft)', background: 'var(--bg-3)' }}>
+    <div {...open} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 10, borderRadius: 10,
+      border: '1px solid var(--line-soft)', background: 'var(--bg-3)', cursor: open.onClick ? 'pointer' : undefined }}>
       <div className="row" style={{ gap: 8 }}>
         <span style={{ fontSize: 18 }}>{preset.icon}</span>
         <span style={{ fontWeight: 600, fontSize: 13.5 }}>{t(`mcp.preset.${preset.id}.name`)}</span>
       </div>
       <div className="faint" style={{ fontSize: 12, lineHeight: 1.5, flex: 1 }}>{t(`mcp.preset.${preset.id}.desc`)}</div>
       {installed
-        ? <span className="badge on" style={{ alignSelf: 'flex-start' }} data-no-lex>{t('mcp.preset.installed')}</span>
+        ? <div className="row" style={{ gap: 8 }}>
+            <span className="badge on" data-no-lex>{t('mcp.preset.installed')}</span>
+            <span className="faint" style={{ fontSize: 11.5 }}>{t('mcp.list.open')} ›</span>
+          </div>
         : <div><Button kind="gold" size="sm" onClick={onPick}>{t('mcp.preset.install')}</Button></div>}
     </div>
   );
@@ -146,7 +157,7 @@ export function LocalMcp({ Sys }) {
   const [statuses, setStatuses] = useState({});      // id → { status, lastError }
   const [toolsById, setToolsById] = useState({});    // id → Tool[], fetched when a server is ready
   const [busy, setBusy] = useState(null);            // 'add' | server id | null
-  const [err, setErr] = useState(null);
+  const [err, setErr] = useState(null);              // { key, detail } — localized sentence + raw text
   const [installPreset, setInstallPreset] = useState(null);
   const [showCustom, setShowCustom] = useState(false);
   const [collapsed, setCollapsed] = useState(() => explainerCollapsed(window.localStorage));
@@ -160,7 +171,7 @@ export function LocalMcp({ Sys }) {
       // onStatus only fetches tools on a fresh `ready` transition; a server that's ALREADY ready on
       // (re)mount never fires that, so pull its tools here too — otherwise the list shows empty until restart.
       for (const [id, s] of Object.entries(st || {})) { if (s.status === 'ready') fetchTools(id); }
-    } catch (e) { setErr(e.message || 'load failed'); }
+    } catch (e) { setErr({ key: 'mcp.err.action.load', detail: e?.message || null }); }
   };
 
   const fetchTools = async (id) => {
@@ -180,6 +191,10 @@ export function LocalMcp({ Sys }) {
     });
   }, [isDesktop]);
 
+  // A banner belongs to the view that raised it; without this a failure on the list page is still
+  // sitting there when the user opens a server (and vice versa).
+  useEffect(() => { setErr(null); }, [view]);
+
   const toggleExplainer = () => {
     const next = !collapsed;
     window.localStorage.setItem(EXPLAINER_KEY, next ? '1' : '0');
@@ -196,11 +211,14 @@ export function LocalMcp({ Sys }) {
     // mcp.remove drops the def WITHOUT reaping its child: an edit would otherwise leave the old command
     // still running under a def that says something else. Stop first, then restart the replacement —
     // which also re-triggers consent, since the command/args hash changed.
-    const wasRunning = !!replaceId && isRunning(statuses[replaceId]?.status);
+    // The target is DERIVED, not taken on trust: only the edit path passes replaceId, but the add
+    // path can collide with a stored id too (registry.add upserts) — and that is a replace as well.
+    const target = replaceTarget(servers, id, replaceId);
+    const wasRunning = !!target && isRunning(statuses[target]?.status);
     try {
-      if (replaceId) {
-        if (wasRunning) await window.pikaosDesktop.mcp.stop(replaceId);
-        await window.pikaosDesktop.mcp.remove(replaceId);
+      if (target) {
+        if (wasRunning) await window.pikaosDesktop.mcp.stop(target);
+        await window.pikaosDesktop.mcp.remove(target);
       }
       // Secret VALUE goes to the vault only — never into the server def (mcp.add), never logged.
       if (secretKey && secretValue) await window.pikaosDesktop.secrets.setForServer(id, secretKey, secretValue);
@@ -209,7 +227,13 @@ export function LocalMcp({ Sys }) {
       await load();
       if (wasRunning) await window.pikaosDesktop.mcp.start(id);
       return true;
-    } catch (e) { setErr(e.message || 'add failed'); return false; }
+    } catch (e) {
+      // Only the trailing restart can raise consent denial, and by then the def is already stored —
+      // a declined restart still means the save landed, so the form may close.
+      if (isConsentDenied(e)) return true;
+      setErr({ key: 'mcp.err.action.save', detail: e?.message || null });
+      return false;
+    }
     finally { setBusy(null); }
   };
 
@@ -223,20 +247,24 @@ export function LocalMcp({ Sys }) {
       await load();                                  // the detail page needs the def before it opens
       setView(preset.id);
       await window.pikaosDesktop.mcp.start(preset.id);   // consent → ready progresses in front of the user
-    } catch (e) { setErr(e.message || 'install failed'); }
+    } catch (e) {
+      // Declining consent on the trailing start is not a failed install — the def is stored and the
+      // FSM already put the server back to `stopped`, which the detail page shows on its own.
+      if (!isConsentDenied(e)) setErr({ key: 'mcp.err.action.install', detail: e?.message || null });
+    }
     finally { setBusy(null); }
   };
 
   const start = async (id) => {
     setBusy(id); setErr(null);
     try { await window.pikaosDesktop.mcp.start(id); }
-    catch (e) { setErr(e.message || 'start failed'); }
+    catch (e) { if (!isConsentDenied(e)) setErr({ key: 'mcp.err.action.start', detail: e?.message || null }); }
     finally { setBusy(null); }
   };
   const stop = async (id) => {
     setBusy(id); setErr(null);
     try { await window.pikaosDesktop.mcp.stop(id); }
-    catch (e) { setErr(e.message || 'stop failed'); }
+    catch (e) { setErr({ key: 'mcp.err.action.stop', detail: e?.message || null }); }
     finally { setBusy(null); }
   };
 
@@ -249,7 +277,7 @@ export function LocalMcp({ Sys }) {
       await window.pikaosDesktop.mcp.remove(id);
       setView('list');
       await load();
-    } catch (e) { setErr(e.message || 'remove failed'); }
+    } catch (e) { setErr({ key: 'mcp.err.action.remove', detail: e?.message || null }); }
     finally { setBusy(null); }
   };
 
@@ -283,7 +311,7 @@ export function LocalMcp({ Sys }) {
           <Button kind="ghost" size="sm" icon="refresh" onClick={load}>{t('mcp.refresh')}</Button>
         </>} />
 
-      {err && <HelpNote>{t('mcp.err.prefix')}{err}</HelpNote>}
+      <ActionErrorNote t={t} err={err} />
 
       {!collapsed && (
         <Panel title={t('mcp.explain.title')} icon="help"
@@ -295,7 +323,8 @@ export function LocalMcp({ Sys }) {
       <Panel title={t('mcp.preset.title')} icon="package">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 10 }}>
           {MCP_PRESETS.map(p => (
-            <PresetCard key={p.id} t={t} preset={p} installed={servers.some(s => s.id === p.id)} onPick={() => pickPreset(p)} />
+            <PresetCard key={p.id} t={t} preset={p} installed={servers.some(s => s.id === p.id)}
+              onPick={() => pickPreset(p)} onOpen={() => setView(p.id)} />
           ))}
           <PresetCard t={t} preset={CUSTOM} installed={false} onPick={() => pickPreset(CUSTOM)} />
         </div>

@@ -21,8 +21,6 @@ export function toolFormFields(inputSchema) {
   return fields;
 }
 
-export const needsJsonMode = (inputSchema) => toolFormFields(inputSchema) === null;
-
 // Form values -> the args object actually sent. Empty optionals are OMITTED (never ""),
 // numbers are real numbers, an empty form is {} (the manager expects an object, not null).
 export function buildArgs(fields, values) {
@@ -93,6 +91,21 @@ export const statusMeta = (status) => STATUS[status] || STATUS.stopped;
 
 // "Stop" is offered from the moment the process exists, not only once the handshake lands.
 export const isRunning = (status) => status === 'running' || status === 'starting' || status === 'ready';
+
+/* Which stored def a save has to reap before it writes. The registry's `add` UPSERTS (it filters the
+   id out, then pushes), so an add whose id collides with an existing def is really a replace — and a
+   replace that skips the stop leaves the OLD child running under a def that now describes something
+   else. The edit path already knows its target (an edit may even rename the id); the add path has to
+   derive it. null = a genuinely new server, nothing to reap. */
+export const replaceTarget = (servers, id, replaceId) =>
+  replaceId ?? ((servers || []).some((s) => s.id === id) ? id : null);
+
+/* Declining the native consent dialog is a normal outcome, not a failure: the manager already puts
+   the server back to `stopped`, so no error banner should appear. The main process throws
+   Error('consent denied'), but Electron's IPC re-wraps it ("Error invoking remote method
+   'mcp:start': Error: consent denied"), so the marker is matched as a SUBSTRING — comparing the
+   whole message would only work in-process. */
+export const isConsentDenied = (e) => typeof e?.message === 'string' && e.message.includes('consent denied');
 
 // Up to this many tools the list is scannable by eye and a search box is just one more control.
 const SEARCH_FROM = 6;
