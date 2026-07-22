@@ -22,10 +22,24 @@ describe('PresetCard', () => {
     expect(texts).toContain('mcp.preset.install');
   });
   it('shows installed state (no install button) when already registered', () => {
-    const el = PresetCard({ t, preset, installed: true, onPick: () => {} });
+    const el = PresetCard({ t, preset, installed: true, onPick: () => {}, onOpen: () => {} });
     const texts = flat(el).filter((n) => typeof n === 'string');
     expect(texts).toContain('mcp.preset.installed');
     expect(texts).not.toContain('mcp.preset.install');
+  });
+  it('an installed card opens its detail page — by click and by keyboard', () => {
+    let opened = 0;
+    const el = PresetCard({ t, preset, installed: true, onPick: () => {}, onOpen: () => { opened += 1; } });
+    expect(el.props.role).toBe('button');
+    expect(el.props.tabIndex).toBe(0);
+    el.props.onClick();
+    el.props.onKeyDown({ key: 'Enter', preventDefault() {} });
+    expect(opened).toBe(2);
+  });
+  it('a not-installed card is not a button (its Install action is)', () => {
+    const el = PresetCard({ t, preset, installed: false, onPick: () => {}, onOpen: () => {} });
+    expect(el.props.role).toBeUndefined();
+    expect(el.props.onClick).toBeUndefined();
   });
 });
 
@@ -45,6 +59,14 @@ describe('ServerRow', () => {
     const texts = flat(el).filter((n) => typeof n === 'string');
     expect(texts).toContain('Files');
     expect(texts).toContain('mcp.status.ready');
+  });
+  // The headline interaction of the redesign: the row IS the link to the server's page.
+  it('clicking the row opens it', () => {
+    let opened = 0;
+    const node = rowNode(row({ onOpen: () => { opened += 1; } }));
+    expect(typeof node.props.onClick).toBe('function');
+    node.props.onClick();
+    expect(opened).toBe(1);
   });
   it('Enter on the row itself opens it', () => {
     let opened = 0;
