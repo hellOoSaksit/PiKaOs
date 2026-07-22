@@ -12,6 +12,11 @@ import type { SecretVault } from '../vault'
 // The FSM must not lie — a pid alone never shows as usable in the UI.
 export type McpStatus = 'stopped' | 'starting' | 'running' | 'ready' | 'error'
 
+// The token type is a literal union, not `string` — the generic-errors rule is what keeps a raw
+// stderr line or an exception message from ever reaching the renderer, and the type system is
+// where that gets enforced.
+export type McpErrorToken = 'node-missing' | 'spawn-failed' | 'handshake-timeout' | 'handshake-failed' | 'exited-early'
+
 // Bound each handshake step; unref() so a pending handshake never holds the process (or vitest) open.
 const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
   new Promise((resolve, reject) => {
@@ -34,8 +39,8 @@ export class McpManager extends EventEmitter {
   private state = new Map<string, McpStatus>()
   private clients = new Map<string, Client>()
   private toolCache = new Map<string, Tool[]>()
-  // Sanitized reason tokens only (never raw stderr/stack) — see the Error tokens union below.
-  private lastErrors = new Map<string, string>()
+  // Sanitized reason tokens only (never raw stderr/stack) — see McpErrorToken above.
+  private lastErrors = new Map<string, McpErrorToken>()
   constructor(private registry: McpRegistry, private vault: SecretVault,
               private confirm: (def: McpServerDef, hash: string) => Promise<boolean>,
               private approvalStorePath: string,
@@ -47,10 +52,10 @@ export class McpManager extends EventEmitter {
   private set(id: string, s: McpStatus) { this.state.set(id, s); this.emit('status', id, s, this.lastErrors.get(id) ?? null) }
   // Sets the error status AND records why, in one call — every failure path goes through this so
   // status and lastError can never drift apart.
-  private fail(id: string, token: string) { this.lastErrors.set(id, token); this.set(id, 'error') }
+  private fail(id: string, token: McpErrorToken) { this.lastErrors.set(id, token); this.set(id, 'error') }
 
   status(id: string) { return this.state.get(id) ?? 'stopped' }
-  statuses() {
+  statuses(): Record<string, { status: McpStatus; lastError: McpErrorToken | null }> {
     return Object.fromEntries(this.registry.list().map(d =>
       [d.id, { status: this.status(d.id), lastError: this.lastErrors.get(d.id) ?? null }]))
   }
