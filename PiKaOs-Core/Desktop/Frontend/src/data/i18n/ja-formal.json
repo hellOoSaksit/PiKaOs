@@ -263,7 +263,7 @@
     "mcp.add.secretval.ph": "シークレット値（任意）",
     "mcp.add.submit": "サーバーを追加",
     "mcp.empty.title": "登録済みの MCP サーバーはありません",
-    "mcp.empty.sub": "上のフォームから追加して、動作をエンドツーエンドで確認できます",
+    "mcp.empty.sub": "上のすぐに使えるサーバーから 1 つ選んで始めてください",
     "mcp.row.start": "開始",
     "mcp.row.stop": "停止",
     "mcp.status.ready": "準備完了",
@@ -293,6 +293,22 @@
     "mcp.preset.everything.name": "テストサーバー",
     "mcp.preset.everything.desc": "サンプルツールを備えたデモサーバーです。システムが正しく動作しているかの確認に使えます。",
     "mcp.preset.secret.ph": "アクセストークンをここに貼り付けてください",
-    "mcp.preset.secret.help": "トークンの取得方法"
+    "mcp.preset.secret.help": "トークンの取得方法",
+    "mcp.explain.title": "ローカル MCP サーバーとは何ですか？",
+    "mcp.explain.body": "MCP サーバーは、このコンピューター上で動作する小さな補助プログラムです。選んだフォルダー内のファイルを読み書きする、会話をまたいで記憶するなど、AI にできることを増やします。下のすぐに使えるサーバーを選ぶと、PiKaOs が設定を行います。各サーバーの初回起動時には、許可を求めます。",
+    "mcp.explain.hide": "隠す",
+    "mcp.explain.show": "これは何ですか？",
+    "mcp.list.installed": "あなたのサーバー",
+    "mcp.list.tools": "ツール {n} 個",
+    "mcp.list.open": "開く",
+    "mcp.err.node-missing": "このコンピューターに Node.js がインストールされていません。すぐに使えるサーバーには Node.js が必要です。nodejs.org からインストールしてから、もう一度お試しください。",
+    "mcp.err.node-missing.link": "Node.js をダウンロード",
+    "mcp.err.spawn-failed": "PiKaOs はこのサーバーを起動できませんでした。コマンドと引数を確認してから、もう一度お試しください。",
+    "mcp.err.handshake-timeout": "サーバーは起動しましたが、時間内に応答しませんでした。もう一度起動してみてください。",
+    "mcp.err.handshake-failed": "サーバーは起動しましたが、MCP サーバーとしての応答が返らなかったため、PiKaOs では利用できません。",
+    "mcp.err.exited-early": "サーバーは起動直後に自ら停止しました。設定が正しくない可能性があります。",
+    "mcp.err.generic": "このサーバーで問題が発生しました。",
+    "mcp.confirm.delete.title": "このサーバーを削除しますか？",
+    "mcp.confirm.delete.msg": "サーバーは停止され、一覧から削除されます。いつでも再インストールできます。"
   }
 }
