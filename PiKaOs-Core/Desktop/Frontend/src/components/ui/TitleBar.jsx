@@ -37,7 +37,8 @@ export default function TitleBar({ t, onSidebar, onSearch, onBack, onForward, ca
             if (nb) { b = nb; sx = ev.screenX; sy = ev.screenY; }
           });
         }
-        api.window.move(b.x + (ev.screenX - sx), b.y + (ev.screenY - sy));
+        // the size rides along so main can re-assert it (setPosition drifts size on scaled displays)
+        api.window.move(b.x + (ev.screenX - sx), b.y + (ev.screenY - sy), b.width, b.height);
       };
       window.addEventListener('mousemove', move);
       window.addEventListener('mouseup', cleanup);
