@@ -2,7 +2,7 @@
 
 Every plugin's routes already mount into one app, so reflecting that app exposes Core's and every
 plugin's surface with no plugin-side code. Two filters gate it, both deny-by-default: the operator's
-allowlist (a RESERVED settings key — widening it is `plugins.manage` authority) and the caller's own
+allowlist (a RESERVED settings key — widening it is `mcp.manage` authority) and the caller's own
 permissions.
 
 `call` **re-enters the ASGI app** rather than invoking the endpoint function. That is the load-bearing
@@ -20,7 +20,15 @@ from httpx import ASGITransport, AsyncClient
 
 from .. import audit, identity, mcp_catalog
 from ..identity import UserLike, get_current_user, require_perm
-from ..schemas import McpAllowlistIn, McpAllowlistOut, McpCallIn, McpCallOut, McpToolsOut
+from ..schemas import (
+    McpAllowlistIn,
+    McpAllowlistOut,
+    McpCallIn,
+    McpCallOut,
+    McpCatalogOut,
+    McpCatalogToolOut,
+    McpToolsOut,
+)
 
 router = APIRouter(prefix="/api/mcp", tags=["mcp"])
 log = logging.getLogger("pikaos.mcp")
@@ -95,16 +103,34 @@ async def call_tool(body: McpCallIn, request: Request,
 
 
 @router.get("/allowlist", response_model=McpAllowlistOut)
-async def get_allowlist(user: UserLike = Depends(require_perm("plugins.manage"))) -> McpAllowlistOut:
+async def get_allowlist(user: UserLike = Depends(require_perm("mcp.manage"))) -> McpAllowlistOut:
     """The allowlist names the whole surface an external AI can reach — not general-audience config."""
     return McpAllowlistOut(entries=mcp_catalog.read_allowlist())
 
 
 @router.put("/allowlist", response_model=McpAllowlistOut)
 async def put_allowlist(body: McpAllowlistIn,
-                        user: UserLike = Depends(require_perm("plugins.manage"))) -> McpAllowlistOut:
-    """Widening what an external AI may invoke is the same authority as installing a plugin — never
-    `options.manage` (git_installer.py K4)."""
+                        user: UserLike = Depends(require_perm("mcp.manage"))) -> McpAllowlistOut:
+    """Widening what an external AI may invoke is its own authority, distinct from installing a plugin —
+    never `options.manage` (git_installer.py K4)."""
     entries = mcp_catalog.write_allowlist(body.entries)
     audit.log(audit.actor_of(user), "mcp.allowlist", "", {"count": len(entries)})
     return McpAllowlistOut(entries=entries)
+
+
+@router.get("/catalog", response_model=McpCatalogOut)
+async def get_catalog(request: Request,
+                      _: UserLike = Depends(require_perm("mcp.manage"))) -> McpCatalogOut:
+    """The operator's CANDIDATE view: every ai_safe tool, granted or not. Distinct from `/tools`,
+    the runtime view (allowlist ∩ caller perms), which must never widen to show ungranted tools."""
+    allowlist = mcp_catalog.read_allowlist()
+    tools = mcp_catalog.build_catalog(request.app)
+    names = {t.name for t in tools}
+    return McpCatalogOut(
+        tools=[McpCatalogToolOut(
+            name=t.name, description=t.description, effect=t.effect,
+            permission=t.permission, method=t.method, path=t.path,
+            granted=t.name in allowlist,
+        ) for t in tools],
+        orphans=sorted(n for n in allowlist if n not in names),
+    )
