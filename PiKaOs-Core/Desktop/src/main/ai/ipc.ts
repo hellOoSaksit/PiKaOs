@@ -91,8 +91,17 @@ export async function resolveRuntime(
   return { provider: cfg.provider, model: cfg.model, baseUrl: cfg.baseUrl, apiKey }
 }
 
-// Async so a synchronous throw (origin reject, zod parse failure) surfaces as a REJECTED promise
-// to the renderer's invoke() — not a raw throw that would escape the handle() dispatcher.
+// Kept as its own async copy rather than importing the shared sync `guard` from ../ipc (E2b final-
+// fix-wave item 7): in production the difference is moot — Electron's own ipcMain.handle wraps every
+// handler so a synchronous throw becomes a rejected Promise for the renderer's invoke() regardless of
+// which guard runs. But ai-ipc.test.ts (unlike gateway-ipc.test.ts, which drives GatewayService
+// directly and never calls a registered handler at all) exercises this module by calling the function
+// registered with a HAND-ROLLED `ipcMain: { handle: (ch, fn) => handlers.set(ch, fn) }` fake and then
+// invoking `handlers.get(ch)!(event, payload)` straight — bypassing the real dispatcher's wrapping
+// entirely. Against that fake, a synchronous throw here (an origin rejection, a zod parse failure)
+// would blow up the `expect(...).rejects.toThrow()` call itself rather than produce a rejected
+// Promise to assert against. Being async is what makes that guarantee true independent of which
+// dispatcher (real or faked) ends up calling it — so this stays a deliberate duplicate, not drift.
 const guard = (fn: (e: IpcMainInvokeEvent, ...a: any[]) => any) =>
   async (e: IpcMainInvokeEvent, ...a: any[]) => { if (!okOrigin(e)) throw new Error('forbidden sender'); return fn(e, ...a) }
 
