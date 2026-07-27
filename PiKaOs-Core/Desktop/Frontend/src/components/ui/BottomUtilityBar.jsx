@@ -45,8 +45,13 @@ export function BottomUtilityBar({
 
   const notifCount = unreadCount(notifications);
 
+  // Enter hands the query to the command palette (App wires onSearch to it) and this box is done:
+  // the palette is a modal, so leaving the popover open would strand its click-catching overlay
+  // underneath, and a query kept here would reappear next time the box is opened.
   const submitSearch = (e) => {
     if (e.key !== 'Enter') return;
+    setOpenPop(null);
+    setQuery('');
     onSearch && onSearch(query);
   };
 
@@ -83,7 +88,7 @@ export function BottomUtilityBar({
             <div className="pop-search-field">
               <input
                 type="text" autoFocus value={query}
-                placeholder={t('utilitybar.search.placeholder')}
+                placeholder={t('palette.placeholder')}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={submitSearch}
               />

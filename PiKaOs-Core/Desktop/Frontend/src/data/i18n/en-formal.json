@@ -994,7 +994,6 @@
     "api.del": "Delete",
     "utilitybar.home": "Home",
     "utilitybar.search": "Search",
-    "utilitybar.search.placeholder": "Search agents, tasks, files...",
     "utilitybar.notifications": "Notifications",
     "utilitybar.notifications.title": "Notifications",
     "utilitybar.notifications.readAll": "Mark all read",
