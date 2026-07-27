@@ -135,8 +135,34 @@ export async function startPipe(opts: PipeOpts) {
     // dropped connection, which is all it is entitled to know.
     mcp.oninitialized = () => {
       clearTimeout(deadline)
-      const name = mcp.getClientVersion()?.name ?? 'unknown client'
+      const name = mcp.getClientVersion()?.name
+      // A missing/blank name is not "a client we don't have a label for" — it is unpairable. The
+      // SDK fires oninitialized (and this whole flow) even for a client that skipped clientInfo
+      // entirely, and inventing 'unknown client' here used to paper over that: the FIRST such client
+      // got a pairing dialog for that literal string, an operator clicking Allow persisted it to
+      // gateway-clients.json, and from then on `gate.allow('unknown client')` short-circuits true for
+      // *every* anonymous connection — no dialog, full catalog, no way to tell them apart. Reject
+      // before ever calling pairClient(), so no dialog is shown and no name is ever persisted.
+      if (!name || !name.trim()) {
+        rejectPaired(new Error('pairing denied'))
+        forceClose(sock)
+        return
+      }
       opts.pairClient(name).then(ok => {
+        // The socket may have closed while the operator's dialog was still open — its 'close'
+        // listener above has already deleted it from every map (pairedName included) by the time we
+        // get here. Re-inserting into pairedName for a destroyed socket would retain it for the life
+        // of the pipe (nothing else ever removes it) and let a later disconnect(name) force-close a
+        // socket that is already gone. Bail before touching any of the maps.
+        //
+        // This is also the structural version of an argument that today holds only by luck: a revoke
+        // landing in the gap between oninitialized firing and this .then() running would leave a
+        // revoked client paired and serving. It is unreachable in practice only because that gap is a
+        // single microtask for an already-approved client (gate.allow() resolves synchronously off
+        // its cached list), while a revoke arrives over IPC — a macrotask — so it can never land
+        // inside that microtask window. The check below does not close that gap; it only stops a
+        // dead socket from being resurrected in the maps once the .then() does run.
+        if (sock.destroyed) return
         if (ok) {
           pairedName.set(sock, name)
           resolvePaired()
@@ -157,6 +183,16 @@ export async function startPipe(opts: PipeOpts) {
     }, () => forceClose(sock))
   }
 
+  // Shared by the returned close() and by the chmodSync failure path below — a server this function
+  // is about to fail out of must be torn down exactly the same way one closed normally would be.
+  const closeAll = () => new Promise<void>((resolve) => {
+    for (const s of pending) forceClose(s)
+    pending.clear()
+    for (const s of live) forceClose(s)
+    live.clear()
+    server.close(() => resolve())
+  })
+
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject)
     server.listen(opts.handshake.pipe, () => { server.off('error', reject); resolve() })
@@ -164,7 +200,21 @@ export async function startPipe(opts: PipeOpts) {
   // Windows names pipes with their own ACL model; POSIX sockets inherit the umask, which typically
   // leaves them world-connectable. Tightened to the owner only, after listen (the path must exist
   // first) and on POSIX only (chmodSync on a Windows pipe path throws — it isn't a filesystem node).
-  if (process.platform !== 'win32') chmodSync(opts.handshake.pipe, 0o600)
+  if (process.platform !== 'win32') {
+    try {
+      chmodSync(opts.handshake.pipe, 0o600)
+    } catch (err) {
+      // chmodSync runs AFTER server.listen() already resolved, so a throw here (EPERM, a filesystem
+      // that rejects chmod, the path reaped in between) would otherwise leave startPipe() rejecting
+      // while the server keeps right on accepting — listening, token-valid, and unreachable, because
+      // GatewayService never assigns the rejected promise to `this.pipe` and so has nothing to call
+      // setEnabled(false) against. That is exactly the orphaned-pipe class this whole queue exists to
+      // prevent (see gateway/ipc.ts's `queue` comment) — so a failed permission tightening must take
+      // the server down with it, not leave it running unprotected.
+      await closeAll()
+      throw err
+    }
+  }
 
   return {
     connections: () => live.size,
@@ -174,12 +224,6 @@ export async function startPipe(opts: PipeOpts) {
     disconnect: (name: string) => {
       for (const [sock, paired] of pairedName) if (paired === name) forceClose(sock)
     },
-    close: () => new Promise<void>((resolve) => {
-      for (const s of pending) forceClose(s)
-      pending.clear()
-      for (const s of live) forceClose(s)
-      live.clear()
-      server.close(() => resolve())
-    }),
+    close: closeAll,
   }
 }
