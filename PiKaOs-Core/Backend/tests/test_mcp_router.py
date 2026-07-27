@@ -217,11 +217,12 @@ def test_the_real_core_app_reflects_a_non_empty_catalog_and_exposes_nothing_by_d
     assert mcp_catalog.allowed_tools(real_app) == []        # deny by default, on the real app
 
 
-def test_the_real_kernel_catalog_is_exactly_the_one_route_that_opted_in():
-    """The whole prohibition in one assertion. A kernel-only Core reflects 11 guarded routes; only ONE
-    ever reaches an AI — a non-secret read. Settings writes are no longer ai_safe (G1). This list grows
-    ONLY by a deliberate `ai_safe=True`, so a new mutating route cannot join it by accident — which is
-    the property a deny-list of forbidden permissions could not give (it missed `llm.manage`).
+def test_the_real_kernel_catalog_is_exactly_the_routes_that_opted_in():
+    """The whole prohibition in one assertion. A kernel-only Core reflects a handful of guarded routes;
+    the set below is the curated AI-reachable surface, and every entry in it is a deliberate security
+    decision, not a test fix. Settings writes are still not ai_safe (G1). This set grows ONLY by a
+    deliberate `ai_safe=True`, so a new mutating route cannot join it by accident — which is the property
+    a deny-list of forbidden permissions could not give (it missed `llm.manage`).
 
     The _SELF_PREFIX lesson: only reflecting the REAL app catches this class of regression."""
     from app.main import app as real_app
@@ -231,6 +232,7 @@ def test_the_real_kernel_catalog_is_exactly_the_one_route_that_opted_in():
 
     assert {(t.method, t.path) for t in tools} == {
         ("GET", "/api/storage/status"),          # read: non-secret config + reachability
+        ("GET", "/api/audit"),                   # read: the audit trail (E2a curated surface)
     }
     # `POST /api/storage/test` shares `infra.manage` with the status read and is NOT marked — proof
     # the gate is the marker on the route, never the permission it happens to enforce.
@@ -258,7 +260,7 @@ def test_no_ai_safe_route_can_reach_code_execution_or_the_filesystem():
             offenders.append(f"{module.__name__} imports {hit.group(1)} (route {op.path})")
 
     # A canary that inspects nothing always passes. Pin the count to the routes that opted in.
-    assert checked == 1, f"expected 1 ai_safe route to inspect, found {checked}"
+    assert checked == 2, f"expected 2 ai_safe routes to inspect, found {checked}"
     assert offenders == [], "ai_safe routes must not live beside code-execution machinery: " + "; ".join(offenders)
 
 
