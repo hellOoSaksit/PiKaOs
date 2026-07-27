@@ -171,14 +171,14 @@ async def test_call_requires_authentication(app, state_dir, monkeypatch):
     assert r.status_code == 401
 
 
-async def test_writing_the_allowlist_needs_plugins_manage(app, state_dir, monkeypatch):
+async def test_writing_the_allowlist_needs_mcp_manage(app, state_dir, monkeypatch):
     _grant(monkeypatch, {"options.manage"})            # the weaker permission must not suffice
     async with _client(app) as c:
         r = await c.put("/api/mcp/allowlist", headers={"Authorization": "Bearer t"},
                         json={"entries": {"pikaos.knowledge.search": {}}})
     assert r.status_code == 403
 
-    _grant(monkeypatch, {"plugins.manage"})
+    _grant(monkeypatch, {"mcp.manage"})
     async with _client(app) as c:
         r = await c.put("/api/mcp/allowlist", headers={"Authorization": "Bearer t"},
                         json={"entries": {"pikaos.knowledge.search": {}}})
@@ -188,7 +188,7 @@ async def test_writing_the_allowlist_needs_plugins_manage(app, state_dir, monkey
 
 async def test_allowlist_write_lands_in_audit_trail(app, state_dir, monkeypatch):
     from app.core import audit
-    _grant(monkeypatch, {"plugins.manage"})
+    _grant(monkeypatch, {"mcp.manage"})
     async with _client(app) as c:
         r = await c.put("/api/mcp/allowlist", headers={"Authorization": "Bearer t"},
                         json={"entries": {"pikaos.knowledge.search": {}}})
@@ -197,7 +197,7 @@ async def test_allowlist_write_lands_in_audit_trail(app, state_dir, monkeypatch)
     assert rows and rows[0]["detail"] == {"count": 1}
 
 
-async def test_reading_the_allowlist_needs_plugins_manage(app, state_dir, monkeypatch):
+async def test_reading_the_allowlist_needs_mcp_manage(app, state_dir, monkeypatch):
     """The allowlist names the whole reachable surface — it is not general-audience config."""
     _grant(monkeypatch, {"options.manage"})
     async with _client(app) as c:
@@ -260,3 +260,60 @@ def test_no_ai_safe_route_can_reach_code_execution_or_the_filesystem():
     # A canary that inspects nothing always passes. Pin the count to the routes that opted in.
     assert checked == 1, f"expected 1 ai_safe route to inspect, found {checked}"
     assert offenders == [], "ai_safe routes must not live beside code-execution machinery: " + "; ".join(offenders)
+
+
+# ---------------------------------------------------------------- E2a: catalog + perm move
+
+async def test_allowlist_requires_mcp_manage_not_plugins_manage(app, state_dir, monkeypatch):
+    """The perm moved plugins.manage -> mcp.manage. Both directions pinned."""
+    _grant(monkeypatch, {"plugins.manage"})          # old perm alone: refused
+    async with _client(app) as client:
+        r = await client.get("/api/mcp/allowlist", headers={"Authorization": "Bearer t"})
+        assert r.status_code == 403
+        r = await client.put("/api/mcp/allowlist", json={"entries": {}},
+                             headers={"Authorization": "Bearer t"})
+        assert r.status_code == 403
+
+    _grant(monkeypatch, {"mcp.manage"})              # new perm: allowed
+    async with _client(app) as client:
+        r = await client.get("/api/mcp/allowlist", headers={"Authorization": "Bearer t"})
+        assert r.status_code == 200
+        r = await client.put("/api/mcp/allowlist", json={"entries": {}},
+                             headers={"Authorization": "Bearer t"})
+        assert r.status_code == 200
+
+
+async def test_catalog_requires_mcp_manage(app, state_dir, monkeypatch):
+    _grant(monkeypatch, set())
+    async with _client(app) as client:
+        r = await client.get("/api/mcp/catalog", headers={"Authorization": "Bearer t"})
+        assert r.status_code == 403
+
+
+async def test_catalog_lists_candidates_with_granted_flag(app, state_dir, monkeypatch):
+    """/catalog is the operator's view: every ai_safe tool appears, granted mirrors the allowlist."""
+    _grant(monkeypatch, {"mcp.manage"})
+    tool_name = mcp_catalog.build_catalog(app)[0].name   # the fake knowledge search tool
+    async with _client(app) as client:
+        r = await client.get("/api/mcp/catalog", headers={"Authorization": "Bearer t"})
+        assert r.status_code == 200
+        tools = {t["name"]: t for t in r.json()["tools"]}
+        assert tools[tool_name]["granted"] is False
+        assert set(tools[tool_name]) == {"name", "description", "effect", "permission",
+                                         "method", "path", "granted"}
+
+        await client.put("/api/mcp/allowlist", json={"entries": {tool_name: {}}},
+                         headers={"Authorization": "Bearer t"})
+        r = await client.get("/api/mcp/catalog", headers={"Authorization": "Bearer t"})
+        assert {t["name"]: t["granted"] for t in r.json()["tools"]}[tool_name] is True
+
+
+async def test_catalog_reports_orphans(app, state_dir, monkeypatch):
+    """A granted name no longer in the catalog (plugin uninstalled) is an orphan, not a live row."""
+    _grant(monkeypatch, {"mcp.manage"})
+    async with _client(app) as client:
+        await client.put("/api/mcp/allowlist", json={"entries": {"ghost.tool": {}}},
+                         headers={"Authorization": "Bearer t"})
+        r = await client.get("/api/mcp/catalog", headers={"Authorization": "Bearer t"})
+        assert r.json()["orphans"] == ["ghost.tool"]
+        assert "ghost.tool" not in {t["name"] for t in r.json()["tools"]}

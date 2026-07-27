@@ -185,3 +185,20 @@ class McpAllowlistIn(BaseModel):
 
 class McpAllowlistOut(BaseModel):
     entries: dict[str, dict]
+
+
+# Operator's CANDIDATE view (/api/mcp/catalog) — every ai_safe tool, granted or not. Distinct from
+# McpToolsOut, the runtime view (allowlist ∩ caller perms) an AI client actually receives.
+class McpCatalogToolOut(BaseModel):
+    name: str
+    description: str
+    effect: str            # read | idempotent_write | side_effect
+    permission: str
+    method: str
+    path: str
+    granted: bool
+
+
+class McpCatalogOut(BaseModel):
+    tools: list[McpCatalogToolOut]
+    orphans: list[str]     # granted names that left the catalog (e.g. plugin uninstalled)
