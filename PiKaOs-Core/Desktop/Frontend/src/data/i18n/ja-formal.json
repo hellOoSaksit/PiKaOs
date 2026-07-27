@@ -84,6 +84,7 @@
     "mcpacl.effect.side_effect": "操作の実行",
     "mcpacl.group.core": "コア",
     "mcpacl.orphan": "既に存在しません — 保存時に削除されます",
+    "mcpacl.orphan.title": "存在しないツール",
     "mcpacl.empty": "AI に対して安全と設定されたツールはまだありません。",
     "mcpacl.error": "ツールカタログを読み込めませんでした。",
     "mcpacl.retry": "再試行",

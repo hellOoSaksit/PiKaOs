@@ -301,6 +301,13 @@ def test_forbidden_core_surface_never_enters_the_catalog():
         "/api/storage/test", "/api/settings/nav",
         "/api/mcp/tools", "/api/mcp/call", "/api/mcp/allowlist", "/api/mcp/catalog",
     }
+    # A renamed or replaced route (`{plugin_id}` -> `{pid}`, a per-key settings writer swapping in for
+    # `/api/settings/nav`) makes its FORBIDDEN entry a dead string: `leaked` stays empty not because the
+    # route is excluded, but because it no longer exists to match against. This feature's whole safety
+    # story rests on the leak assertion below, so pin that every forbidden path still names a real route.
+    all_paths = {op.path for op in mcp_catalog._iter_routes(real_app)}
+    assert FORBIDDEN <= all_paths, f"FORBIDDEN names paths that no longer exist: {FORBIDDEN - all_paths}"
+
     leaked = FORBIDDEN & catalog_paths
     assert not leaked, f"forbidden routes leaked into the MCP catalog: {leaked}"
 
