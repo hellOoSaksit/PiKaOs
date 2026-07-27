@@ -89,6 +89,20 @@ it('a rejected callTool is surfaced as a generic tool error, not the thrown faul
   expect(result.content[0].text).not.toContain('500')
 })
 
+it('a rejected consent is surfaced as a generic tool error, not the thrown fault text', async () => {
+  // makeConsent (src/main/consent/gate.ts) does an unguarded writeFileSync after an approval; if that
+  // throws (disk full, permission denied, path gone) the message contains the real approvals-file path.
+  const consent = vi.fn().mockRejectedValue(
+    new Error("EACCES: permission denied, open 'C:\\Users\\pika\\AppData\\Roaming\\PiKaOs\\mcp-approvals.json'")
+  )
+  const c = await client({ listTools: async () => [TOOL('t', 'side_effect')], callTool: vi.fn(), consent })
+  const { result } = await c.send('tools/call', { name: 't', arguments: {} })
+  expect(result.isError).toBe(true)
+  expect(result.content[0].text).not.toContain('mcp-approvals.json')
+  expect(result.content[0].text).not.toContain('AppData')
+  expect(result.content[0].text).not.toContain('EACCES')
+})
+
 it('a rejected inner listTools during tools/call is surfaced as a generic tool error', async () => {
   const listTools = vi.fn().mockRejectedValue(new Error('mcp/tools 500'))
   const c = await client({ listTools, callTool: vi.fn(), consent: vi.fn() })
