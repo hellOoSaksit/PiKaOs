@@ -79,7 +79,13 @@ export default function McpGatewayPanel({ Sys }) {
   const copy = async () => {
     if (!config) return;   // nothing to copy while there is no snippet
     try {
-      await navigator.clipboard.writeText(config);
+      // Copy happens in the main process over gateway:copyConfig, not navigator.clipboard.writeText
+      // here: measured live in a packaged build, that call rejected even from this secure app://
+      // context, because Chromium's Clipboard API separately needs document focus + a granted
+      // clipboard-write permission that this app never configured. Electron's clipboard module (main
+      // process) needs neither — see gateway/ipc.ts's writeToClipboard comment for the full story.
+      const ok = await api.copyConfig();
+      if (!ok) { setError(true); return; }   // disabled mid-flight, or no snippet — told, not silent
       setError(false);
       setCopied(true);
       clearTimeout(copiedTimer.current);

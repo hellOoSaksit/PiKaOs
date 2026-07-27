@@ -31,6 +31,10 @@ const api = {
     status: () => ipcRenderer.invoke('gateway:status'),
     setEnabled: (enabled: boolean) => ipcRenderer.invoke('gateway:setEnabled', { enabled }),
     config: () => ipcRenderer.invoke('gateway:config'),
+    // Copies the SAME snippet config() returns — done in main via Electron's clipboard module, not
+    // navigator.clipboard here (see gateway/ipc.ts's writeToClipboard comment for why). Resolves
+    // false when the gateway is disabled/has no snippet; the panel treats that as a failure to copy.
+    copyConfig: () => ipcRenderer.invoke('gateway:copyConfig'),
     clients: () => ipcRenderer.invoke('gateway:clients'),
     revoke: (name: string) => ipcRenderer.invoke('gateway:revoke', { name }),
     onStatus: (cb: (s: { enabled: boolean; connections: number }) => void) => {

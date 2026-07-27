@@ -15,6 +15,9 @@ const service = (over: any = {}) => new GatewayService({
   consent: async () => true,
   pairClient: async () => true,
   onStatus: () => {},
+  // The real electron.clipboard module isn't importable under vitest — a no-op default stands in
+  // here; the tests that care about clipboard behaviour override it explicitly.
+  writeToClipboard: () => {},
   ...over,
 })
 
@@ -59,4 +62,27 @@ it('revoke drops a paired client', async () => {
   expect(s.clients()).toEqual([])
   s.revoke('nobody')            // revoking an unknown client is a no-op, not a throw
   await s.setEnabled(false)
+})
+
+it('copyConfig writes the same snippet config() renders, via the injected clipboard, and never the token', async () => {
+  const writeToClipboard = vi.fn()
+  const s = service({ writeToClipboard })
+  await s.setEnabled(true)
+  const snippet = s.config()
+  expect(s.copyConfig()).toBe(true)
+  expect(writeToClipboard).toHaveBeenCalledTimes(1)
+  expect(writeToClipboard).toHaveBeenCalledWith(snippet)
+  expect(writeToClipboard.mock.calls[0][0]).not.toMatch(/[0-9a-f]{64}/)
+  await s.setEnabled(false)
+})
+
+it('copyConfig refuses while disabled — no clipboard write, not even the word "null"', async () => {
+  const writeToClipboard = vi.fn()
+  const s = service({ writeToClipboard })
+  expect(s.copyConfig()).toBe(false)             // never enabled yet
+  expect(writeToClipboard).not.toHaveBeenCalled()
+  await s.setEnabled(true)
+  await s.setEnabled(false)
+  expect(s.copyConfig()).toBe(false)             // switched back off — stale snippet must not copy
+  expect(writeToClipboard).not.toHaveBeenCalled()
 })
