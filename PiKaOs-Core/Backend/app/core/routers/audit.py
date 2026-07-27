@@ -1,5 +1,6 @@
 """Audit read API (audit-notifications v2 spec §1) — behind the identity catalog's `audit.view`.
-Read-only; NOT ai_safe (the trail names every admin action — operator eyes only)."""
+Read-only and ai_safe: an AI granted `audit.view` via the operator's MCP allowlist can read the trail
+(actor names become visible to it once granted — an explicit E2a privacy decision, not an oversight)."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
@@ -12,5 +13,5 @@ router = APIRouter(prefix="/api/audit", tags=["audit"])
 
 @router.get("")
 async def read_audit(limit: int = 100, action: str | None = None, actor: str | None = None,
-                     _: UserLike = Depends(require_perm("audit.view"))) -> list[dict]:
+                     _: UserLike = Depends(require_perm("audit.view", ai_safe=True))) -> list[dict]:
     return audit.read(limit=min(max(limit, 1), 500), action=action, actor=actor)

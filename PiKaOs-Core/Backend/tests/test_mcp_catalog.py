@@ -274,3 +274,32 @@ def test_the_mcp_routes_never_reflect_themselves(state_dir):
     # …and allowlisting one by name changes nothing, because it was never in the catalog.
     mcp_catalog.write_allowlist({"pikaos.mcp.put_allowlist": {}})
     assert mcp_catalog.allowed_tools(real_app) == []
+
+
+# ---------------------------------------------------------------- E2a: the curated surface
+
+
+def test_audit_read_is_in_the_real_catalog():
+    from app.main import app as real_app
+    tools = {(t.method, t.path): t for t in build_catalog(real_app)}
+    audit = tools.get(("GET", "/api/audit"))
+    assert audit is not None
+    assert audit.permission == "audit.view"
+    assert audit.effect == EFFECT_READ
+
+
+def test_forbidden_core_surface_never_enters_the_catalog():
+    """THE tripwire. If someone marks ai_safe on any of these, this list is the loud failure.
+    Widening it is a security decision, not a test fix — see the E2a spec's exclusion table."""
+    from app.main import app as real_app
+    catalog_paths = {t.path for t in build_catalog(real_app)}
+    FORBIDDEN = {
+        "/api/plugins/{plugin_id}/install", "/api/plugins/install-from-git",
+        "/api/plugins/{plugin_id}/update", "/api/plugins/{plugin_id}/enable",
+        "/api/plugins/{plugin_id}/disable", "/api/plugins/{plugin_id}",
+        "/api/plugins/{plugin_id}/purge", "/api/plugins/git-credentials/{host}",
+        "/api/storage/test", "/api/settings/nav",
+        "/api/mcp/tools", "/api/mcp/call", "/api/mcp/allowlist", "/api/mcp/catalog",
+    }
+    leaked = FORBIDDEN & catalog_paths
+    assert not leaked, f"forbidden routes leaked into the MCP catalog: {leaked}"

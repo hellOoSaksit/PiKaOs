@@ -63,8 +63,8 @@ _EFFECTS = frozenset(EFFECT_BY_METHOD.values())
 
 # The operator's explicit opt-in list, in its own kernel local-JSON file (the kernel keeps no tables of
 # its own). `{tool_name: {"effect": <override>}}` — presence is the grant; the value only tunes it.
-# Widening what an external AI may invoke is `plugins.manage` authority, never `options.manage`: the only
-# writer is `write_allowlist`, behind the plugins.manage-gated /api/mcp/allowlist route. Living in its own
+# Widening what an external AI may invoke is `mcp.manage` authority, never `options.manage`: the only
+# writer is `write_allowlist`, behind the mcp.manage-gated /api/mcp/allowlist route. Living in its own
 # file (never the shared `app_settings` blob) is what keeps the settings API structurally unable to name it.
 ALLOWLIST_KEY = "mcp_allowlist"
 
@@ -239,7 +239,7 @@ def read_allowlist() -> dict[str, dict]:
 
 
 def write_allowlist(entries: dict[str, dict]) -> dict[str, dict]:
-    """Replace the allowlist wholesale. Callers are guarded by `plugins.manage` (routers/mcp.py)."""
+    """Replace the allowlist wholesale. Callers are guarded by `mcp.manage` (routers/mcp.py)."""
     normalized = {name: (entry if isinstance(entry, dict) else {}) for name, entry in entries.items()}
     kernel_state.write_json(ALLOWLIST_KEY, normalized)
     return normalized
