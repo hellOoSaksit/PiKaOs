@@ -19,7 +19,9 @@ export const okOrigin = (e: IpcMainInvokeEvent) => {
   } catch { return false }
 }
 
-const guard = (fn: (e: IpcMainInvokeEvent, ...a: any[]) => any) =>
+// Shared by every ipc.ts in main/ (gateway/ipc.ts, ai/ipc.ts) — one origin check, not a copy per
+// module that could quietly drift.
+export const guard = (fn: (e: IpcMainInvokeEvent, ...a: any[]) => any) =>
   (e: IpcMainInvokeEvent, ...a: any[]) => { if (!okOrigin(e)) throw new Error('forbidden sender'); return fn(e, ...a) }
 
 export function registerIpc(deps: { vault: SecretVault; broker: SessionBroker; registry: McpRegistry; manager: McpManager; recovery: RecoveryService }) {

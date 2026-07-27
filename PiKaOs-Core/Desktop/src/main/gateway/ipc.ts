@@ -1,7 +1,7 @@
-import { ipcMain, IpcMainInvokeEvent } from 'electron'
+import { ipcMain } from 'electron'
 import { join } from 'node:path'
 import { z } from 'zod'
-import { okOrigin } from '../ipc'
+import { guard } from '../ipc'
 import { writeHandshake, configSnippet } from './handshake'
 import { makeClientGate } from './clients'
 import { createGatewayServer } from './server'
@@ -65,10 +65,11 @@ export class GatewayService {
       this.handshakePath = path
       this.pipe = await startPipe({
         handshake,
-        makeServer: () => createGatewayServer({
+        makeServer: (requirePaired) => createGatewayServer({
           listTools: () => this.deps.toolClient.list(),
           callTool: (name, args) => this.deps.toolClient.call(name, args),
           consent: this.deps.consent,
+          requirePaired,
         }),
         pairClient: (name) => this.gate.allow(name),
         onConnectionsChanged: (n) => { this.connections = n; this.push() },
@@ -91,13 +92,13 @@ export class GatewayService {
     return this.pipe ? configSnippet(this.deps.execPath, this.deps.shimPath, this.handshakePath) : null
   }
   clients(): string[] { return this.gate.list() }
-  revoke(name: string) { this.gate.revoke(name) }
+  // Fix 2: revoking a client that is CURRENTLY connected must end that connection too — otherwise
+  // the operator sees the row vanish from the approved-clients table while the live socket keeps
+  // right on serving tools, which is a revocation that only half happened.
+  revoke(name: string) { this.gate.revoke(name); this.pipe?.disconnect(name) }
 
   private push() { this.deps.onStatus(this.status()) }
 }
-
-const guard = (fn: (e: IpcMainInvokeEvent, ...a: any[]) => any) =>
-  async (e: IpcMainInvokeEvent, ...a: any[]) => { if (!okOrigin(e)) throw new Error('forbidden sender'); return fn(e, ...a) }
 
 const Enabled = z.strictObject({ enabled: z.boolean() })
 const ClientName = z.strictObject({ name: z.string().min(1).max(200) })

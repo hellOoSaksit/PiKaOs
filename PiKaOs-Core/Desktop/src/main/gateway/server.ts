@@ -7,6 +7,11 @@ export type GatewayDeps = {
   listTools: () => Promise<CatalogTool[]>
   callTool: (name: string, args: Record<string, unknown>) => Promise<{ status: number; result: unknown }>
   consent: (tool: CatalogTool) => Promise<boolean>
+  // Resolves once pipe.ts's pairing dialog has allowed this connection, rejects on denial or a
+  // stalled handshake. Awaited before EITHER handler below touches `deps` — the SDK does not refuse
+  // requests before `notifications/initialized` on its own (verified against 1.29.0's
+  // Protocol._onrequest, which dispatches straight to the handler map), so this is the only gate.
+  requirePaired: () => Promise<void>
 }
 
 // The external face of the gateway. It owns NO authorization: listTools is /api/mcp/tools (already
@@ -16,6 +21,10 @@ export function createGatewayServer(deps: GatewayDeps): Server {
   const server = new Server(GATEWAY_SERVER_INFO, { capabilities: GATEWAY_CAPABILITIES })
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
+    // A rejection here means the connection is already being torn down by pipe.ts's forceClose —
+    // by the time this throw reaches the SDK's own error-response path, the transport's underlying
+    // socket is already unwritable, so nothing crosses the wire (rule 10).
+    await deps.requirePaired()
     let tools: CatalogTool[]
     try {
       tools = await deps.listTools()
@@ -33,6 +42,8 @@ export function createGatewayServer(deps: GatewayDeps): Server {
   })
 
   server.setRequestHandler(CallToolRequestSchema, async (req) => {
+    // Same gate as ListTools, before the catalog or consent or the backend are touched at all.
+    await deps.requirePaired()
     const name = req.params.name
     const args = (req.params.arguments ?? {}) as Record<string, unknown>
     // Resolved from the same list the client was given, so effect class comes from the catalog and
