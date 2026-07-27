@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { writeFileSync, readFileSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
+import { SHIM_FLAG } from '../shim-mode'
 
 export type Handshake = { pipe: string; token: string }
 
@@ -56,15 +57,19 @@ export function readHandshake(path: string): Handshake {
   return { pipe: raw.pipe, token: raw.token }
 }
 
-export function configSnippet(execPath: string, shimPath: string, handshakePath: string): string {
+// `shimPath` dropped from the signature: there is no second file to point at any more. Claude
+// Desktop spawns the packaged APP BINARY itself and the flag tells that same process to run the
+// shim instead of opening a window (see the argv branch in main/index.ts). ELECTRON_RUN_AS_NODE
+// is gone too — electron-builder.yml turns the runAsNode fuse OFF (spec §9 hardening), so in a
+// packaged build that env var is silently ignored and the binary boots the GUI instead of plain
+// Node, leaving Claude Desktop talking to a process that never speaks MCP. The flag works because
+// it is read by the SAME binary Claude Desktop already spawned, fuse or no fuse.
+export function configSnippet(execPath: string, handshakePath: string): string {
   return JSON.stringify({
     mcpServers: {
       pikaos: {
         command: execPath,
-        args: [shimPath, '--handshake', handshakePath],
-        // Makes the Electron binary behave as plain Node, so no Node install is required and the
-        // shim can never be a different version from the app that serves it.
-        env: { ELECTRON_RUN_AS_NODE: '1' },
+        args: [SHIM_FLAG, '--handshake', handshakePath],
       },
     },
   }, null, 2)

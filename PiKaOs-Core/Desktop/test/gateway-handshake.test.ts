@@ -3,6 +3,7 @@ import { mkdtempSync, statSync, readFileSync, chmodSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { writeHandshake, readHandshake, configSnippet } from '../src/main/gateway/handshake'
+import { SHIM_FLAG } from '../src/main/shim-mode'
 
 let dir: string
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'gw-')) })
@@ -47,12 +48,13 @@ it('readHandshake throws its own error on a file containing JSON null, not a raw
   expect(() => readHandshake(path)).toThrow('gateway handshake file is malformed')
 })
 
-it('configSnippet is valid JSON naming the pikaos server, ELECTRON_RUN_AS_NODE, and the handshake path — and never the token', () => {
+it('configSnippet is valid JSON naming the pikaos server, the shim flag, and the handshake path — and never the token or ELECTRON_RUN_AS_NODE', () => {
   const { handshake, path } = writeHandshake(dir)
-  const snippet = JSON.parse(configSnippet('C:\\app\\PiKaOs.exe', 'C:\\app\\pikaos-mcp.js', path))
+  const snippet = JSON.parse(configSnippet('C:\\app\\PiKaOs.exe', path))
   const entry = snippet.mcpServers.pikaos
   expect(entry.command).toBe('C:\\app\\PiKaOs.exe')
-  expect(entry.args).toEqual(['C:\\app\\pikaos-mcp.js', '--handshake', path])
-  expect(entry.env.ELECTRON_RUN_AS_NODE).toBe('1')
+  expect(entry.args).toEqual([SHIM_FLAG, '--handshake', path])
+  expect(entry.env).toBeUndefined()
   expect(JSON.stringify(snippet)).not.toContain(handshake.token)
+  expect(JSON.stringify(snippet)).not.toContain('ELECTRON_RUN_AS_NODE')
 })

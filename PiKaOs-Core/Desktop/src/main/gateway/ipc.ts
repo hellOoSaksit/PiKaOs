@@ -13,7 +13,6 @@ export type GatewayStatus = { enabled: boolean; connections: number }
 export type GatewayDepsIn = {
   userDataDir: string
   execPath: string
-  shimPath: string
   toolClient: Pick<ToolClient, 'list' | 'call'>
   consent: (tool: CatalogTool) => Promise<boolean>
   pairClient: (clientName: string) => Promise<boolean>
@@ -89,7 +88,7 @@ export class GatewayService {
   // plausible-looking config that silently can't connect. The renderer (Task 8) only shows the
   // snippet while the gateway is enabled, so this is a signal it already needs to check for.
   config(): string | null {
-    return this.pipe ? configSnippet(this.deps.execPath, this.deps.shimPath, this.handshakePath) : null
+    return this.pipe ? configSnippet(this.deps.execPath, this.handshakePath) : null
   }
   clients(): string[] { return this.gate.list() }
   // Fix 2: revoking a client that is CURRENTLY connected must end that connection too — otherwise

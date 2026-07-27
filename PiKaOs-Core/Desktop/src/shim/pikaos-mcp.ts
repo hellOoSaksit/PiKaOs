@@ -37,23 +37,31 @@ function socketLink(handshakePath: string): Promise<Link> {
   })
 }
 
-const i = process.argv.indexOf('--handshake')
-const handshakePath = i >= 0 ? process.argv[i + 1] : ''
-if (!handshakePath) { process.stderr.write('pikaos-mcp: --handshake <path> is required\n'); process.exit(2) }
+// Wires the shim to stdio + the local pipe, given the argv the process was started with. Extracted
+// into a function (this file used to run this at import time as its own build entry, spawned as
+// plain Node) so the packaged app can run it in-process from the argv branch in main/index.ts
+// instead of shipping a second compiled entry point that could drift from that wiring — see the
+// electron-builder.yml runAsNode fuse note there for why a separate Node-spawned entry no longer
+// works in a packaged build.
+export function runShim(argv: string[]): void {
+  const i = argv.indexOf('--handshake')
+  const handshakePath = i >= 0 ? argv[i + 1] : ''
+  if (!handshakePath) { process.stderr.write('pikaos-mcp: --handshake <path> is required\n'); process.exit(2) }
 
-const shim = new Shim(
-  (m) => process.stdout.write(serializeMessage(m)),
-  () => socketLink(handshakePath),
-)
-const buffer = new ReadBuffer()
-process.stdin.on('data', (chunk: Buffer) => {
-  buffer.append(chunk)
-  for (;;) {
-    let m: JSONRPCMessage | null
-    try { m = buffer.readMessage() } catch { return }
-    if (!m) break
-    shim.fromClient(m)
-  }
-})
-process.stdin.on('close', () => process.exit(0))   // the client killed us; leave nothing running
-shim.start()
+  const shim = new Shim(
+    (m) => process.stdout.write(serializeMessage(m)),
+    () => socketLink(handshakePath),
+  )
+  const buffer = new ReadBuffer()
+  process.stdin.on('data', (chunk: Buffer) => {
+    buffer.append(chunk)
+    for (;;) {
+      let m: JSONRPCMessage | null
+      try { m = buffer.readMessage() } catch { return }
+      if (!m) break
+      shim.fromClient(m)
+    }
+  })
+  process.stdin.on('close', () => process.exit(0))   // the client killed us; leave nothing running
+  shim.start()
+}

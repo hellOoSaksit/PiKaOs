@@ -3,6 +3,7 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { GatewayService } from '../src/main/gateway/ipc'
+import { SHIM_FLAG } from '../src/main/shim-mode'
 
 let dir: string
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'gwi-')) })
@@ -10,7 +11,6 @@ beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'gwi-')) })
 const service = (over: any = {}) => new GatewayService({
   userDataDir: dir,
   execPath: '/app/PiKaOs',
-  shimPath: '/app/pikaos-mcp.js',
   toolClient: { list: async () => [], call: async () => ({ status: 200, result: null }) } as any,
   consent: async () => true,
   pairClient: async () => true,
@@ -34,11 +34,11 @@ it('pushes status whenever enablement changes', async () => {
   expect(onStatus).toHaveBeenCalledWith({ enabled: false, connections: 0 })
 })
 
-it('config() names the shim and the handshake path and never leaks the token', async () => {
+it('config() names the shim flag and the handshake path and never leaks the token', async () => {
   const s = service()
   await s.setEnabled(true)
   const snippet = JSON.parse(s.config())
-  expect(snippet.mcpServers.pikaos.args[0]).toBe('/app/pikaos-mcp.js')
+  expect(snippet.mcpServers.pikaos.args[0]).toBe(SHIM_FLAG)
   expect(snippet.mcpServers.pikaos.args[2]).toMatch(/gateway\.json$/)
   expect(s.config()).not.toMatch(/[0-9a-f]{64}/)
   await s.setEnabled(false)
