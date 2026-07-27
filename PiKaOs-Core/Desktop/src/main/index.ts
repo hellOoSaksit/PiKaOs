@@ -143,7 +143,10 @@ app.whenReady().then(() => {
   // fire-and-forget from Electron's perspective; process exit remains the real backstop for the pipe
   // handle. That's acceptable here — this fix only makes the two teardowns run and finish together
   // when the event loop does get to turn before exit, instead of silently only running one of them.
-  registerQuitCleanup(app, () => Promise.all([gateway.setEnabled(false), manager.stopAll()]).then(() => undefined))
+  // .catch(() => {}) because lifecycle.ts's registerQuitCleanup dispatches this via `void` — a
+  // rejection here would otherwise become an unhandled rejection at quit instead of just being a
+  // best-effort teardown that didn't fully finish.
+  registerQuitCleanup(app, () => Promise.all([gateway.setEnabled(false), manager.stopAll()]).then(() => undefined).catch(() => {}))
 
   registerDevtoolsShortcut(win, app.isPackaged)
   registerZoomShortcuts(win)
