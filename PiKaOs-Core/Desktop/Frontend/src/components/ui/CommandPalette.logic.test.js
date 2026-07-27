@@ -7,7 +7,7 @@
    3. Ranking is deterministic: display-label prefix > any-term prefix > label contains >
       term contains; ties keep sidebar order. */
 import { describe, it, expect } from 'vitest';
-import { isNavVisible, buildIndex, searchIndex } from './CommandPalette.logic.js';
+import { isNavVisible, buildIndex, searchIndex, nextPaletteState } from './CommandPalette.logic.js';
 import en from '../../data/i18n/en-formal.json';
 import th from '../../data/i18n/th-formal.json';
 import ja from '../../data/i18n/ja-formal.json';
@@ -117,6 +117,30 @@ describe('ranking', () => {
   });
   it('matching is case-insensitive', () => {
     expect(searchIndex(build(), 'MARKET').map(e => e.id)).toEqual(['marketplace']);
+  });
+});
+
+describe('nextPaletteState — the one open/close rule for all three entry points', () => {
+  it('Ctrl+K on a closed palette opens it with an empty query', () => {
+    expect(nextPaletteState(null, { toggle: true })).toBe('');
+  });
+  it('Ctrl+K on an open palette closes it', () => {
+    expect(nextPaletteState('mar', { toggle: true })).toBe(null);
+  });
+  it('the utility-bar search box opens the palette pre-filled with what was typed', () => {
+    expect(nextPaletteState(null, { query: 'mar' })).toBe('mar');
+  });
+  it('never opens on top of another dialog — neither entry point', () => {
+    expect(nextPaletteState(null, { toggle: true, dialogOpen: true })).toBe(null);
+    expect(nextPaletteState(null, { query: 'mar', dialogOpen: true })).toBe(null);
+  });
+  it('closing is never blocked by the palette\'s own overlay counting as a dialog', () => {
+    expect(nextPaletteState('mar', { toggle: true, dialogOpen: true })).toBe(null);
+  });
+  it('a later open never inherits the previous query', () => {
+    const opened = nextPaletteState(null, { query: 'mar' });
+    const closed = nextPaletteState(opened, { toggle: true });
+    expect(nextPaletteState(closed, { toggle: true })).toBe('');
   });
 });
 

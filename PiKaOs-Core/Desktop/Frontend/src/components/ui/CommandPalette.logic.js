@@ -13,6 +13,18 @@ export function isNavVisible(item, can, isDesktop) {
   return true;
 }
 
+/* The palette's open state is ONE nullable query string: null = closed, '' or text = open with
+   that prefilled query. Folding "is it open" and "what did the user already type" into a single
+   value is what makes a stale query impossible — every open names its own query, so the
+   utility-bar box can hand one over while Ctrl+K and the magnifier always start empty.
+   `dialogOpen` = some OTHER dialog is up (see App.jsx's isDialogOpen): opening would stack a
+   second overlay, so it is refused — but never a close, since the palette's own overlay is what
+   that check would be seeing. `toggle` marks Ctrl+K, the only entry point that also closes. */
+export function nextPaletteState(current, { query = '', toggle = false, dialogOpen = false } = {}) {
+  if (current !== null) return toggle ? null : current;
+  return dialogOpen ? null : query;
+}
+
 /* nav   = [{ group, items }] — the plugin-filtered tree the sidebar renders.
    packs = the full I18N_PACKS registry { lang: { lexicon: translations } }. Every value of
            `nav.<id>` in ANY pack is a matchable term — this is what lets an English query find a

@@ -11,11 +11,13 @@ import { renderIcon } from './icons.jsx';
 import { I18N_PACKS } from '../../lib/i18n.jsx';
 import { buildIndex, searchIndex } from './CommandPalette.logic.js';
 
-export function CommandPalette({ open, onClose, nav, t, can, go }) {
+export function CommandPalette({ open, onClose, initialQuery = '', nav, t, can, go }) {
   const [q, setQ] = useState('');
   const [active, setActive] = useState(0);
-  // fresh query every open — a palette that remembers last session's filter reads as broken
-  useEffect(() => { if (open) { setQ(''); setActive(0); } }, [open]);
+  // Every open re-seeds the query — a palette that remembers last session's filter reads as broken.
+  // The seed is the caller's, so the utility-bar box can hand over what the user already typed
+  // there; Ctrl+K and the magnifier pass nothing and land empty.
+  useEffect(() => { if (open) { setQ(initialQuery); setActive(0); } }, [open, initialQuery]);
 
   const index = useMemo(() => buildIndex(nav, {
     packs: I18N_PACKS,
