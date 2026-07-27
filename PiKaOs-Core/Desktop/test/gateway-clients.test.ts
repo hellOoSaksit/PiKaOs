@@ -40,6 +40,24 @@ it('a denial is NOT persisted — a fresh instance asks again', async () => {
   expect(ask2).toHaveBeenCalledTimes(1)
 })
 
+it('two concurrent allow() calls for the same unknown client only ask once', async () => {
+  const p = join(dir, 'c.json')
+  let resolveAsk!: (v: boolean) => void
+  const askPromise = new Promise<boolean>(resolve => { resolveAsk = resolve })
+  const ask = vi.fn().mockReturnValue(askPromise)
+  const gate = makeClientGate(p, ask)
+
+  // Neither call awaits before the other starts — both must observe the same in-flight ask.
+  const call1 = gate.allow('Claude')
+  const call2 = gate.allow('Claude')
+  resolveAsk(true)
+  const [r1, r2] = await Promise.all([call1, call2])
+
+  expect(r1).toBe(true)
+  expect(r2).toBe(true)
+  expect(ask).toHaveBeenCalledTimes(1)
+})
+
 it('revoke removes the client so the next connection asks again', async () => {
   const ask = vi.fn().mockResolvedValue(true)
   const gate = makeClientGate(join(dir, 'c.json'), ask)
