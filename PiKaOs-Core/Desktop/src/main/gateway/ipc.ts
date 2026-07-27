@@ -17,6 +17,16 @@ export type GatewayDepsIn = {
   consent: (tool: CatalogTool) => Promise<boolean>
   pairClient: (clientName: string) => Promise<boolean>
   onStatus: (s: GatewayStatus) => void
+  // Electron's clipboard.writeText, injected rather than imported at module scope. MEASURED live in a
+  // packaged build: the panel's old `navigator.clipboard.writeText(config)` rejected even though
+  // app://pikaos is registered `secure: true` (protocol.ts) — so a missing secure context was not the
+  // gap. Chromium's Clipboard API separately requires the document to be focused AND the clipboard-write
+  // permission to be granted, and Electron's own permission handler was never configured for either
+  // here. clipboard.writeText needs none of that: no focus check, no permission prompt, no secure
+  // context. Do NOT "modernise" this back to navigator.clipboard — that is the exact regression this
+  // fixes. Injected (not `import { clipboard } from 'electron'` at the top of this file) so
+  // gateway-ipc.test.ts can run under vitest, which has no Electron runtime to import.
+  writeToClipboard: (text: string) => void
 }
 
 /**
@@ -90,6 +100,18 @@ export class GatewayService {
   config(): string | null {
     return this.pipe ? configSnippet(this.deps.execPath, this.handshakePath) : null
   }
+  // Copies the exact same string config() hands the renderer for display — never a second build
+  // path — so there is nothing here that could drift from what the operator is looking at, and
+  // nothing to leak: config() is paths only (execPath + handshake path), never the token (see the
+  // "never leaks the token" test on config()). Returns false instead of writing the literal word
+  // "null", an empty string, or a stale snippet when the gateway is disabled — the caller (the
+  // renderer's failure banner) must hear "this did not happen", not silently see nothing occur.
+  copyConfig(): boolean {
+    const snippet = this.config()
+    if (!snippet) return false
+    this.deps.writeToClipboard(snippet)
+    return true
+  }
   clients(): string[] { return this.gate.list() }
   // Fix 2: revoking a client that is CURRENTLY connected must end that connection too — otherwise
   // the operator sees the row vanish from the approved-clients table while the live socket keeps
@@ -106,6 +128,9 @@ export function registerGatewayIpc(service: GatewayService) {
   ipcMain.handle('gateway:status', guard(() => service.status()))
   ipcMain.handle('gateway:setEnabled', guard((_e, raw) => service.setEnabled(Enabled.parse(raw).enabled)))
   ipcMain.handle('gateway:config', guard(() => service.config()))
+  // No payload — nothing here is renderer-supplied, so there is nothing for a zod schema to check
+  // (matches gateway:status/gateway:config/gateway:clients above, none of which take input either).
+  ipcMain.handle('gateway:copyConfig', guard(() => service.copyConfig()))
   ipcMain.handle('gateway:clients', guard(() => service.clients()))
   ipcMain.handle('gateway:revoke', guard((_e, raw) => service.revoke(ClientName.parse(raw).name)))
 }

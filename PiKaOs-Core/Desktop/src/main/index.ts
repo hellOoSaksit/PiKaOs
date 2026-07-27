@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, Menu, session } from 'electron'
+import { app, BrowserWindow, dialog, Menu, session, clipboard } from 'electron'
 import { join } from 'node:path'
 import { registerAppProtocol } from './protocol'
 import { removeAppMenu, registerDevtoolsShortcut, registerZoomShortcuts, forwardMaximizeState } from './chrome'
@@ -181,6 +181,7 @@ function runMain(): void {
       // The SAME gate the AI Console uses, deliberately: two copies would let approval semantics drift.
       consent: makeConsent(join(userDataDir, 'ai-approvals.json'), confirmToolCall),
       pairClient: confirmClientPairing,
+      writeToClipboard: (text: string) => clipboard.writeText(text),
       onStatus: (s: GatewayStatus) => {
         for (const win of BrowserWindow.getAllWindows()) {
           if (!win.isDestroyed()) win.webContents.send('gateway:status', s)
