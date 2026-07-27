@@ -41,11 +41,22 @@ export function createGatewayServer(deps: GatewayDeps): Server {
     try {
       catalog = await deps.listTools()
     } catch {
+      // Re-fetched here (not cached from tools/list) so the effect class is always current; a failure
+      // is a tool result like every other fault on this path, never an uncaught rejection.
       return err('could not reach the tool catalog')
     }
     const tool = catalog.find(t => t.name === name)
     if (!tool) return err('unknown tool')
-    if (!(await deps.consent(tool))) return err('the operator declined this call')
+    let consented: boolean
+    try {
+      consented = await deps.consent(tool)
+    } catch {
+      // makeConsent (consent/gate.ts) persists an approval with a bare writeFileSync; if that throws
+      // (disk full, permission denied, path gone) the message carries the real approvals-file path —
+      // same fault class as the two catches below, sanitize it the same way.
+      return err('could not record consent for this call')
+    }
+    if (!consented) return err('the operator declined this call')
     let called: { status: number; result: unknown }
     try {
       called = await deps.callTool(name, args)
