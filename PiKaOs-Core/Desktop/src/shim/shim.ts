@@ -23,7 +23,13 @@ export class Shim {
   private link: Link | null = null
   private initReq: JSONRPCMessage | null = null
   private initNote: JSONRPCMessage | null = null
+  // Guards the one reply the shim itself provoked (the replayed `initialize` on connect/reconnect) —
+  // narrow window, cleared on first match; see the comment on its use in dial() for why a bare id
+  // match is safe here despite JSON-RPC replies carrying no method.
   private swallowId: string | number | null = null
+  // ids the shim forwarded to main and is still waiting on. A request in this set that has no
+  // answer when the link drops must be failed rather than left to hang forever.
+  private inFlight = new Set<string | number>()
   private delay = RETRY_MIN_MS
 
   constructor(
@@ -34,13 +40,23 @@ export class Shim {
   start() { void this.dial() }
 
   fromClient(msg: JSONRPCMessage) {
-    if (this.link) return this.link.send(msg)
     const m = msg as JSONRPCMessage & { method?: string; id?: string | number; params?: any }
+
+    // `initialize` / `notifications/initialized` must be captured no matter what the link state
+    // is — a reconnect (or a connect that raced the client's first message) needs the exact
+    // handshake the client already completed in order to replay it to a fresh main-side session.
     if (m.method === 'initialize') {
       this.initReq = msg
+      if (this.link) return this.forward(m)
+      // Offline: answer the handshake ourselves so the client never sees a hang.
       return this.write({ jsonrpc: '2.0', id: m.id!, result: cannedInitializeResult(m.params) } as any)
     }
-    if (m.method === 'notifications/initialized') { this.initNote = msg; return }
+    if (m.method === 'notifications/initialized') {
+      this.initNote = msg
+      if (this.link) this.link.send(msg)
+      return
+    }
+    if (this.link) return this.forward(m)
     if (m.method === 'tools/list') {
       return this.write({ jsonrpc: '2.0', id: m.id!, result: { tools: [] } } as any)
     }
@@ -48,6 +64,13 @@ export class Shim {
       // -32001 is the SDK's server-error band; the text is the only thing the user can act on.
       this.write({ jsonrpc: '2.0', id: m.id, error: { code: -32001, message: OFFLINE_MESSAGE } } as any)
     }
+  }
+
+  // Forward a client message to main, remembering its id (if any) so a link drop before the
+  // answer arrives can be turned into an error instead of an abandoned request.
+  private forward(m: JSONRPCMessage & { id?: string | number }) {
+    if (m.id !== undefined) this.inFlight.add(m.id)
+    this.link!.send(m)
   }
 
   private async dial() {
@@ -60,10 +83,12 @@ export class Shim {
         // Main answers the replayed initialize too; the client already has an answer, and two
         // replies to one id would corrupt its request table.
         if (this.swallowId !== null && id === this.swallowId) { this.swallowId = null; return }
+        if (id !== undefined) this.inFlight.delete(id)
         this.write(m)
       })
       link.onClose(() => {
         this.link = null
+        this.failInFlight()   // main will never answer these now — say so instead of hanging the client
         this.announce()      // the list is empty again — say so rather than let it go stale
         // Backed off like any other retry (not fired immediately): a flapping pipe must not turn
         // into a tight reconnect loop, and every reconnect re-announces, so a bare close→retry with
@@ -91,5 +116,14 @@ export class Shim {
   private announce() {
     if (!this.initReq) return
     this.write({ jsonrpc: '2.0', method: 'notifications/tools/list_changed' } as any)
+  }
+
+  // A request forwarded to main has nowhere else to get an answer once the link is gone — error
+  // it the same way the offline path would, rather than leave the client's id hanging forever.
+  private failInFlight() {
+    for (const id of this.inFlight) {
+      this.write({ jsonrpc: '2.0', id, error: { code: -32001, message: OFFLINE_MESSAGE } } as any)
+    }
+    this.inFlight.clear()
   }
 }
