@@ -29,6 +29,16 @@ export class GatewayService {
   private handshakePath = ''
   private connections = 0
   private gate: ReturnType<typeof makeClientGate>
+  // Every setEnabled() call is threaded through this chain so the guard-then-assign below runs
+  // atomically with respect to concurrent invocations (finding 1 of the E2b Task 7 review). Without
+  // it, two overlapping setEnabled(true) calls — a double IPC invoke before the renderer disables its
+  // toggle, or a retry — both read `this.pipe` as null and each start their own pipe; whichever
+  // resolves last wins the assignment and the OTHER is orphaned: still listening, still holding a
+  // valid token, and unreachable by setEnabled(false) forever, since that only closes whatever
+  // `this.pipe` currently points at. Same in-flight-promise idea as makeClientGate.allow() in
+  // clients.ts, generalized to "one operation in flight at a time" — there is only one gateway, not
+  // one slot per client name — so a second caller awaits the first's outcome instead of racing it.
+  private queue: Promise<unknown> = Promise.resolve()
 
   // `gate` is built in the BODY, not as a field initializer: with ES2022 class fields the
   // initializers run before parameter properties are assigned, so `this.deps` would be undefined.
@@ -38,7 +48,16 @@ export class GatewayService {
 
   status(): GatewayStatus { return { enabled: !!this.pipe, connections: this.connections } }
 
-  async setEnabled(on: boolean): Promise<GatewayStatus> {
+  setEnabled(on: boolean): Promise<GatewayStatus> {
+    const run = this.queue.then(() => this.applyEnabled(on))
+    // The chain must keep moving even if this call's own apply rejects — a failed enable must not
+    // wedge every setEnabled() queued after it. The rejection itself still reaches THIS call's caller
+    // via `run`, which is returned below untouched.
+    this.queue = run.catch(() => {})
+    return run
+  }
+
+  private async applyEnabled(on: boolean): Promise<GatewayStatus> {
     if (on && !this.pipe) {
       // A fresh token every time it is switched on, not only at launch: turning it off is a
       // revocation, and a revoked token must never work again.
@@ -63,7 +82,14 @@ export class GatewayService {
     return this.status()
   }
 
-  config(): string { return configSnippet(this.deps.execPath, this.deps.shimPath, this.handshakePath) }
+  // null while disabled (never enabled yet, or switched back off): a snippet built from an empty
+  // handshake path would look valid but could never work (finding 2). Returning null forces every
+  // caller to handle "no snippet exists yet" explicitly instead of handing the operator a
+  // plausible-looking config that silently can't connect. The renderer (Task 8) only shows the
+  // snippet while the gateway is enabled, so this is a signal it already needs to check for.
+  config(): string | null {
+    return this.pipe ? configSnippet(this.deps.execPath, this.deps.shimPath, this.handshakePath) : null
+  }
   clients(): string[] { return this.gate.list() }
   revoke(name: string) { this.gate.revoke(name) }
 
