@@ -16,6 +16,10 @@ import { registerSingleInstanceFocus, registerQuitCleanup } from './lifecycle'
 import { registerAiIpc } from './ai/ipc'
 import type { McpServerDef } from './mcp/registry'
 import type { CatalogTool } from './ai/toolClient'
+import { GatewayService, registerGatewayIpc } from './gateway/ipc'
+import type { GatewayStatus } from './gateway/ipc'
+import { ToolClient } from './ai/toolClient'
+import { makeConsent } from './consent/gate'
 
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) app.quit()
@@ -64,6 +68,21 @@ async function confirmToolCall(tool: CatalogTool): Promise<boolean> {
   return response === 1
 }
 
+// Pairing an EXTERNAL MCP client. The name is what the client claims about itself, so the copy must
+// not imply it was verified — the defence is that this dialog appears at all when the user did not
+// ask for it.
+async function confirmClientPairing(clientName: string): Promise<boolean> {
+  const { response } = await dialog.showMessageBox({
+    type: 'warning',
+    buttons: ['Cancel', 'Allow'],
+    defaultId: 0, cancelId: 0,
+    message: `Allow "${clientName}" to use PiKaOs tools?`,
+    detail: 'This program says it is "' + clientName + '"; that name is not verified.\n'
+      + 'It will be able to call every tool you granted on the AI Access screen, as you.',
+  })
+  return response === 1
+}
+
 app.whenReady().then(() => {
   registerAppProtocol(distDir)
 
@@ -84,6 +103,22 @@ app.whenReady().then(() => {
   registerIpc({ vault, broker, registry, manager, recovery })
   registerAiIpc({ vault, broker, askConsent: confirmToolCall })
 
+  const gateway = new GatewayService({
+    userDataDir,
+    execPath: process.execPath,
+    shimPath: join(__dirname, 'pikaos-mcp.js'),   // emitted beside index.js by electron.vite.config.ts
+    toolClient: new ToolClient(() => broker.getAccessToken(), () => getBackendConfig().apiBaseUrl),
+    // The SAME gate the AI Console uses, deliberately: two copies would let approval semantics drift.
+    consent: makeConsent(join(userDataDir, 'ai-approvals.json'), confirmToolCall),
+    pairClient: confirmClientPairing,
+    onStatus: (s: GatewayStatus) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) win.webContents.send('gateway:status', s)
+      }
+    },
+  })
+  registerGatewayIpc(gateway)
+
   manager.on('status', (id: string, status: string, lastError: McpErrorToken | null) => {
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) win.webContents.send('mcp:status', id, status, lastError ?? null)
@@ -101,7 +136,7 @@ app.whenReady().then(() => {
   // Instance lifecycle (crash spec §2.4): focus the running window on a second launch instead
   // of silently killing the new instance; stop every MCP child so none orphans on quit.
   registerSingleInstanceFocus(app, () => BrowserWindow.getAllWindows()[0] ?? null)
-  registerQuitCleanup(app, () => manager.stopAll())
+  registerQuitCleanup(app, () => { void gateway.setEnabled(false); return manager.stopAll() })
 
   registerDevtoolsShortcut(win, app.isPackaged)
   registerZoomShortcuts(win)
