@@ -175,6 +175,32 @@ it('ends the connection when initialize is never followed by notifications/initi
   sock.destroy()
 })
 
+// E2b final-fix-wave item 2: a client that never sends clientInfo.name (or sends a blank one) used
+// to pair as the literal string 'unknown client' — a name any later anonymous connection also
+// matches, once one such client has been Allowed once and the operator's answer persisted under that
+// shared label. `oninitialized` must now reject a blank name before ever calling pairClient(), so no
+// dialog fires and nothing is ever written to gateway-clients.json for it. Same shape as the
+// "pairing is denied" test above — the initialize/initialized round trip is consumed by the SDK
+// Client's own transport, so a truly silent rejection leaves the raw socket listener nothing to see.
+it('rejects a client whose clientInfo.name is blank, without ever asking to pair it', async () => {
+  const pairClient = vi.fn(async () => true)
+  const { handshake } = await start({ pairClient })
+  const sock = createConnection(handshake.pipe)
+  await new Promise(r => sock.once('connect', r))
+  sock.write(handshake.token + '\n')
+
+  const transport = new StreamTransport(sock, sock)
+  const client = new Client({ name: '   ', version: '0.0.1' })
+  await client.connect(transport)
+
+  const chunks: Buffer[] = []
+  sock.on('data', (c) => chunks.push(c))
+  await new Promise(r => sock.once('close', r))
+  expect(pairClient).not.toHaveBeenCalled()
+  expect(Buffer.concat(chunks).toString()).toBe('')
+  sock.destroy()
+})
+
 // E2b final-review Fix 2: revoking a currently-connected client must end its connection, not just
 // edit gateway-clients.json out from under it.
 //
