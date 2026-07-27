@@ -43,13 +43,18 @@ function socketLink(handshakePath: string): Promise<Link> {
 // instead of shipping a second compiled entry point that could drift from that wiring — see the
 // electron-builder.yml runAsNode fuse note there for why a separate Node-spawned entry no longer
 // works in a packaged build.
-export function runShim(argv: string[]): void {
+//
+// `writeOut` is the frame sink — the ONLY thing allowed to reach the client's actual stdout.
+// index.ts's shim branch repoints process.stdout.write at stderr (so nothing else in the process can
+// corrupt a JSON-RPC frame) and passes in the real, pre-captured write function here. Defaults to a
+// plain process.stdout.write for callers (tests) that never touched that redirection.
+export function runShim(argv: string[], writeOut: (chunk: string) => void = (s) => { process.stdout.write(s) }): void {
   const i = argv.indexOf('--handshake')
   const handshakePath = i >= 0 ? argv[i + 1] : ''
   if (!handshakePath) { process.stderr.write('pikaos-mcp: --handshake <path> is required\n'); process.exit(2) }
 
   const shim = new Shim(
-    (m) => process.stdout.write(serializeMessage(m)),
+    (m) => writeOut(serializeMessage(m)),
     () => socketLink(handshakePath),
   )
   const buffer = new ReadBuffer()
