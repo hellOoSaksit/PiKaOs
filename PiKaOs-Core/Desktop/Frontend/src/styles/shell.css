@@ -19,6 +19,10 @@
   position: fixed; inset: 0; z-index: 40;
 }
 
+/* The utility bar's own footprint (22px bottom offset + 60px tall) plus a 12px gap. Anything that
+   must float clear of the bar reads this one number instead of guessing at it. */
+:root { --ub-clearance: 94px; }
+
 .utility-bar {
   position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
   z-index: 42;
