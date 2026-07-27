@@ -39,7 +39,6 @@ beforeEach(() => {
 const service = () => new GatewayService({
   userDataDir: dir,
   execPath: '/app/PiKaOs',
-  shimPath: '/app/pikaos-mcp.js',
   toolClient: { list: async () => [], call: async () => ({ status: 200, result: null }) } as any,
   consent: async () => true,
   pairClient: async () => true,
