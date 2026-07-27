@@ -1,5 +1,5 @@
 import { it, expect, beforeEach } from 'vitest'
-import { mkdtempSync, statSync, readFileSync } from 'node:fs'
+import { mkdtempSync, statSync, readFileSync, chmodSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { writeHandshake, readHandshake, configSnippet } from '../src/main/gateway/handshake'
@@ -31,6 +31,20 @@ it('the file is not group- or world-readable on posix', () => {
   if (process.platform === 'win32') return
   const { path } = writeHandshake(dir)
   expect(statSync(path).mode & 0o077).toBe(0)
+})
+
+it('re-tightens permissions on overwrite even if the existing file was left group/world-readable', () => {
+  if (process.platform === 'win32') return
+  const { path } = writeHandshake(dir)
+  chmodSync(path, 0o644) // simulate a loose file left by an older build / manual chmod / backup tool
+  writeHandshake(dir)    // second write to the same path — this is the overwrite path
+  expect(statSync(path).mode & 0o077).toBe(0)
+})
+
+it('readHandshake throws its own error on a file containing JSON null, not a raw TypeError', () => {
+  const { path } = writeHandshake(dir)
+  require('node:fs').writeFileSync(path, 'null')
+  expect(() => readHandshake(path)).toThrow('gateway handshake file is malformed')
 })
 
 it('configSnippet is valid JSON naming the pikaos server, ELECTRON_RUN_AS_NODE, and the handshake path — and never the token', () => {
