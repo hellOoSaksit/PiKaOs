@@ -468,7 +468,7 @@ function App() {
       case "modules": return guard("plugins.manage", <PluginsManager Sys={Sys} view="modules" />);
       case "marketplace": return guard("plugins.manage", <PluginsManager Sys={Sys} view="market" />);
       case "mypackages": return guard("plugins.manage", <PluginsManager Sys={Sys} view="mine" />);
-      case "mcpskill": return guard("mcp.manage", <McpSkillHub Sys={Sys} />);
+      case "mcpskill": return guard("mcp.manage", <McpSkillHub Sys={Sys} activePlugins={activePlugins} />);
       case "settings": return <Settings theme={theme} setTheme={setTheme} lex={lex} setLex={setLex} pickLanguage={pickLanguage} language={language} formal={formal} t={t} />;
       default: {
         // a route owned by an enabled plugin (Phase 6 seam) — else fall back to kernel Home.

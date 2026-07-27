@@ -12,8 +12,9 @@ import Empty from '../../components/ui/Empty.jsx';
 import PageHead from '../../components/ui/PageHead.jsx';
 import Segmented from '../../components/ui/Segmented.jsx';
 import { LocalMcp } from './LocalMcp.jsx';
+import { McpAllowlist } from './McpAllowlist.jsx';
 
-export function McpSkillHub({ Sys }) {
+export function McpSkillHub({ Sys, activePlugins }) {
   const { t } = Sys;
   const isDesktop = !!window.pikaosDesktop?.isDesktop;
   const [tab, setTab] = useState(isDesktop ? 'localmcp' : 'onlinemcp');
@@ -21,6 +22,7 @@ export function McpSkillHub({ Sys }) {
     ...(isDesktop ? [{ value: 'localmcp' }] : []),
     { value: 'onlinemcp' },
     { value: 'skills' },
+    { value: 'allowlist' },
   ];
   const active = tabs.find(x => x.value === tab) || tabs[0];
   // Header + tab bar in one content-pad; the tab body renders as a SIBLING so LocalMcp's own
@@ -43,6 +45,7 @@ export function McpSkillHub({ Sys }) {
       {active.value === 'skills' && (
         <div className="content-pad"><Empty icon="🧠" title={t('mcpskill.soon', { name: t('mcpskill.tab.skills') })} sub={t('mcpskill.tabdesc.skills')} /></div>
       )}
+      {active.value === 'allowlist' && <McpAllowlist Sys={Sys} activePlugins={activePlugins} />}
     </div>
   );
 }
