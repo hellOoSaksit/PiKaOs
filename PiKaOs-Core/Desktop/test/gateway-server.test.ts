@@ -79,3 +79,30 @@ it('an unknown tool is an error, and a 4xx from the backend is surfaced as a too
   expect((await c.send('tools/call', { name: 'nope', arguments: {} })).result.isError).toBe(true)
   expect((await c.send('tools/call', { name: 't', arguments: {} })).result.isError).toBe(true)
 })
+
+it('a rejected callTool is surfaced as a generic tool error, not the thrown fault text', async () => {
+  const callTool = vi.fn().mockRejectedValue(new Error('mcp/call 500'))
+  const c = await client({ listTools: async () => [TOOL('t')], callTool, consent: async () => true })
+  const { result } = await c.send('tools/call', { name: 't', arguments: {} })
+  expect(result.isError).toBe(true)
+  expect(result.content[0].text).not.toContain('mcp/call')
+  expect(result.content[0].text).not.toContain('500')
+})
+
+it('a rejected inner listTools during tools/call is surfaced as a generic tool error', async () => {
+  const listTools = vi.fn().mockRejectedValue(new Error('mcp/tools 500'))
+  const c = await client({ listTools, callTool: vi.fn(), consent: vi.fn() })
+  const { result } = await c.send('tools/call', { name: 't', arguments: {} })
+  expect(result.isError).toBe(true)
+  expect(result.content[0].text).not.toContain('mcp/tools')
+  expect(result.content[0].text).not.toContain('500')
+})
+
+it('a rejected listTools during tools/list surfaces a sanitized protocol error', async () => {
+  const listTools = vi.fn().mockRejectedValue(new Error('mcp/tools 500'))
+  const c = await client({ listTools, callTool: vi.fn(), consent: vi.fn() })
+  const response = await c.send('tools/list', {})
+  expect(response.error).toBeDefined()
+  expect(response.error.message).not.toContain('mcp/tools')
+  expect(response.error.message).not.toContain('500')
+})

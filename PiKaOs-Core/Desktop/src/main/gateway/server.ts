@@ -15,24 +15,49 @@ export type GatewayDeps = {
 export function createGatewayServer(deps: GatewayDeps): Server {
   const server = new Server(GATEWAY_SERVER_INFO, { capabilities: GATEWAY_CAPABILITIES })
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: (await deps.listTools()).map(t => ({
-      name: t.name, description: t.description, inputSchema: t.input_schema,
-    })),
-  }))
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    let tools: CatalogTool[]
+    try {
+      tools = await deps.listTools()
+    } catch {
+      // ListToolsResult has no isError slot (unlike CallToolResult below) — a listing failure has to
+      // surface as a JSON-RPC protocol error. The SDK forwards a thrown message verbatim (rule 10:
+      // no internal paths/status), so rethrow sanitized instead of letting listTools()'s fault through.
+      throw new Error('failed to list tools')
+    }
+    return {
+      tools: tools.map(t => ({
+        name: t.name, description: t.description, inputSchema: t.input_schema,
+      })),
+    }
+  })
 
   server.setRequestHandler(CallToolRequestSchema, async (req) => {
     const name = req.params.name
     const args = (req.params.arguments ?? {}) as Record<string, unknown>
     // Resolved from the same list the client was given, so effect class comes from the catalog and
     // is never re-derived here (E1 classifies pessimistically; second-guessing it loses that).
-    const tool = (await deps.listTools()).find(t => t.name === name)
+    let catalog: CatalogTool[]
+    try {
+      catalog = await deps.listTools()
+    } catch {
+      return err('could not reach the tool catalog')
+    }
+    const tool = catalog.find(t => t.name === name)
     if (!tool) return err('unknown tool')
     if (!(await deps.consent(tool))) return err('the operator declined this call')
-    const { status, result } = await deps.callTool(name, args)
+    let called: { status: number; result: unknown }
+    try {
+      called = await deps.callTool(name, args)
+    } catch {
+      // ToolClient.call only throws on 5xx (a fault, not data for the model) — surface it the same
+      // way every other failure path here does: a tool result, never an uncaught rejection (that
+      // would become a protocol error carrying the fault's message, e.g. "mcp/call 500", verbatim).
+      return err('the backend failed to execute this call')
+    }
     return {
-      isError: status >= 400,
-      content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+      isError: called.status >= 400,
+      content: [{ type: 'text' as const, text: JSON.stringify(called.result) }],
     }
   })
 
