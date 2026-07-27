@@ -3,19 +3,23 @@ import { ReadBuffer, serializeMessage } from '@modelcontextprotocol/sdk/shared/s
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js'
 
-// The SDK's StdioClientTransport spawns the child itself — but OUR spawn is where the consent
-// gate + vault namespacing live (manager.ts), so this transport attaches to an already-spawned
-// child instead. Framing is the SDK's (ReadBuffer/serializeMessage), never hand-rolled.
-export class ChildProcessTransport implements Transport {
+// Attaches to streams SOMEONE ELSE owns — a child's stdio, or a pipe socket the gateway accepted.
+// The SDK's own transports spawn or connect for you, but our side is where the consent gate, the
+// vault and the token check live, so ownership has to stay out here. Framing is the SDK's
+// (ReadBuffer/serializeMessage), never hand-rolled.
+export class StreamTransport implements Transport {
   onclose?: () => void
   onerror?: (error: Error) => void
   onmessage?: (message: JSONRPCMessage) => void
   private buffer = new ReadBuffer()
 
-  constructor(private child: ChildProcess) {}
+  constructor(
+    protected readable: NodeJS.ReadableStream | null | undefined,
+    protected writable: NodeJS.WritableStream | null | undefined,
+  ) {}
 
   async start(): Promise<void> {
-    this.child.stdout?.on('data', (chunk: Buffer) => {
+    this.readable?.on('data', (chunk: Buffer) => {
       this.buffer.append(chunk)
       for (;;) {
         let msg: JSONRPCMessage | null
@@ -24,22 +28,33 @@ export class ChildProcessTransport implements Transport {
         this.onmessage?.(msg)
       }
     })
-    this.child.on('exit', () => this.onclose?.())
-    this.child.on('error', (e) => this.onerror?.(e))
   }
 
   send(message: JSONRPCMessage): Promise<void> {
     return new Promise((resolve, reject) => {
-      const stdin = this.child.stdin
-      if (!stdin || !stdin.writable) return reject(new Error('mcp child stdin not writable'))
-      if (stdin.write(serializeMessage(message))) resolve()
-      else stdin.once('drain', () => resolve())
+      const w = this.writable
+      if (!w || !(w as NodeJS.WritableStream & { writable?: boolean }).writable) {
+        return reject(new Error('mcp stream not writable'))
+      }
+      if (w.write(serializeMessage(message))) resolve()
+      else w.once('drain', () => resolve())
     })
   }
 
-  // Closing the protocol never kills the child — process lifecycle belongs to McpManager.stop().
+  // Closing the protocol never kills what produced the streams — process and socket lifecycle
+  // belong to McpManager.stop() and to the pipe server respectively.
   async close(): Promise<void> {
     this.buffer.clear()
     this.onclose?.()
+  }
+}
+
+export class ChildProcessTransport extends StreamTransport {
+  constructor(private child: ChildProcess) { super(child.stdout, child.stdin) }
+
+  async start(): Promise<void> {
+    await super.start()
+    this.child.on('exit', () => this.onclose?.())
+    this.child.on('error', (e) => this.onerror?.(e))
   }
 }
