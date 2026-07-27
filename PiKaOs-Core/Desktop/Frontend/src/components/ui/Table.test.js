@@ -21,3 +21,12 @@ it('uses a column render() over the raw value when given', () => {
   });
   expect(flat(el).some(n => n === '42%')).toBe(true);
 });
+
+it('tags each row with data-row-id so a jump-to-row feature can find it again', () => {
+  const el = Table({
+    columns: [{ key: 'name', header: 'Name' }],
+    rows: [{ id: 'tool.a', name: 'A' }, { name: 'B' }],   // second row has no id → falls back to index
+  });
+  const trs = flat(el).filter(n => n.props?.className === 'utable-tr');
+  expect(trs.map(n => n.props['data-row-id'])).toEqual(['tool.a', 1]);
+});

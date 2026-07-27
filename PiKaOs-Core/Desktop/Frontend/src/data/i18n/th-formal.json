@@ -341,6 +341,7 @@
     "mcpacl.details.hide": "ซ่อนรายละเอียด",
     "mcpacl.details.added": "อนุญาตเพิ่ม",
     "mcpacl.details.removed": "ยกเลิกสิทธิ์",
+    "mcpacl.details.jump": "ไปที่ {tool}",
     "open.owner": "เจ้าของระบบ",
     "open.badge": "เซิร์ฟเวอร์แบบเปิด — ไม่ต้องเข้าสู่ระบบ",
     "nav.collapse": "ย่อแถบเมนู",

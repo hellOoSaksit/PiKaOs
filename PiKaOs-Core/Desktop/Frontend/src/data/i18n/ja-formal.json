@@ -96,6 +96,7 @@
     "mcpacl.details.hide": "詳細を隠す",
     "mcpacl.details.added": "新たに許可",
     "mcpacl.details.removed": "権限を取り消し",
+    "mcpacl.details.jump": "{tool} へ移動",
     "open.owner": "オーナー",
     "open.badge": "オープンサーバー — サインイン不要",
     "nav.collapse": "サイドバーを折りたたむ",

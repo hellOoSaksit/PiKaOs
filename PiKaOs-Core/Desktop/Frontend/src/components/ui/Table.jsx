@@ -3,7 +3,8 @@
  * columns: [{ key, header, render?, className? }] — className rides both the
  * header and the cell <span> (the grid items), so column-scoped CSS like the
  * .uc-* widths / responsive column-hiding keeps working. render(row) overrides
- * the raw row[key]. Row key = row.id ?? index.
+ * the raw row[key]. Row key = row.id ?? index — also exposed as `data-row-id` on the
+ * row div so code outside the table (e.g. a "jump to this row" action) can find it again.
  */
 export default function Table({ columns, rows, onRowClick, rowClassName }) {
   return (
@@ -13,6 +14,7 @@ export default function Table({ columns, rows, onRowClick, rowClassName }) {
       </div>
       {rows.map((row, i) => (
         <div key={row.id ?? i}
+          data-row-id={row.id ?? i}
           className={'utable-tr' + (rowClassName ? ' ' + rowClassName(row) : '')}
           onClick={onRowClick ? () => onRowClick(row) : undefined}>
           {columns.map((c) => <span key={c.key} className={c.className}>{c.render ? c.render(row) : row[c.key]}</span>)}

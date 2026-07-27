@@ -3,7 +3,7 @@
    SaveBar — the PUT is wholesale anyway, and one audit row per decision beats ten.
    Per-file imports on purpose (see McpSkillHub.jsx's header note). */
 import React from 'react';
-const { useEffect, useMemo, useState, useCallback } = React;
+const { useEffect, useMemo, useRef, useState, useCallback } = React;
 import Badge from '../../components/ui/Badge.jsx';
 import Empty from '../../components/ui/Empty.jsx';
 import Panel from '../../components/ui/Panel.jsx';
@@ -15,16 +15,26 @@ import { raw } from '../../lib/api.js';
 import { groupByOwner, diffGrants, toEntries, describeChanges } from './McpAllowlist.logic.js';
 
 /* One labelled group inside the SaveBar's expandable details region — renders only when it has
-   entries, so an all-additions or all-removals batch doesn't show empty headings. */
-function DetailGroup({ heading, items }) {
+   entries, so an all-additions or all-removals batch doesn't show empty headings. Each entry is a
+   jump button (onJump) rather than static text — the operator reviewing a pending batch can hop
+   straight to the row it refers to. */
+function DetailGroup({ heading, items, t, onJump }) {
   if (!items.length) return null;
   return (
     <div className="pk-savebar-details-group">
       <p className="pk-savebar-details-heading">{heading}</p>
-      {items.map(item => <div key={item.name} className="pk-savebar-details-item">{item.label}</div>)}
+      {items.map(item => (
+        <button key={item.name} type="button" className="pk-savebar-jump" onClick={() => onJump(item.name)}>
+          {t('mcpacl.details.jump', { tool: item.label })}
+        </button>
+      ))}
     </div>
   );
 }
+
+/* How long the flash ring stays on a jumped-to row — kept in one place so the CSS animation
+   duration (ui-kit.css `.utable-tr.flash`) and this cleanup timer never drift apart. */
+const FLASH_MS = 1200;
 
 const EFFECT_VARIANT = { read: 'st-done', idempotent_write: 'st-active', side_effect: 'pr-high' };
 
@@ -36,6 +46,14 @@ export function McpAllowlist({ Sys, activePlugins }) {
   const [entries, setEntries] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
+  // name -> pending "remove the flash class" timeout, so unmounting mid-flash (or re-jumping to
+  // the same row before its flash finished) never leaves a stray setTimeout writing to a node
+  // React has already thrown away.
+  const flashTimers = useRef(new Map());
+  useEffect(() => () => {
+    for (const id of flashTimers.current.values()) clearTimeout(id);
+    flashTimers.current.clear();
+  }, []);
 
   const load = useCallback(async () => {
     setState(s => ({ ...s, loading: true, error: false }));
@@ -66,6 +84,28 @@ export function McpAllowlist({ Sys, activePlugins }) {
       return next;
     });
   };
+
+  // Jump from a pending-change entry to its table row: scroll it into view, flash it, and hand
+  // keyboard focus to its switch. `name` may not have a live row (an orphan the operator already
+  // saved away in another tab, say) — querySelector returning null is a silent no-op, not a bug.
+  const jumpToRow = useCallback((name) => {
+    const row = document.querySelector(`[data-row-id="${CSS.escape(name)}"]`);
+    if (!row) return;
+    row.scrollIntoView({
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      block: 'center',
+    });
+    // Re-jumping to a row still mid-flash: cancel the older cleanup first so it can't remove the
+    // class the new flash just added out from under it.
+    const pending = flashTimers.current.get(name);
+    if (pending) clearTimeout(pending);
+    row.classList.add('flash');
+    flashTimers.current.set(name, setTimeout(() => {
+      row.classList.remove('flash');
+      flashTimers.current.delete(name);
+    }, FLASH_MS));
+    row.querySelector('input')?.focus({ preventScroll: true });   // orphan rows have no switch — skip
+  }, []);
 
   const save = async () => {
     setSaving(true); setSaveFailed(false);
@@ -128,9 +168,9 @@ export function McpAllowlist({ Sys, activePlugins }) {
         onCancel={() => setGranted(new Set(initialGranted))}
         details={changes.total > 0 ? (
           <>
-            <DetailGroup heading={t('mcpacl.details.added')} items={changes.added} />
-            <DetailGroup heading={t('mcpacl.details.removed')} items={changes.removed} />
-            <DetailGroup heading={t('mcpacl.orphan.title')} items={changes.orphans} />
+            <DetailGroup heading={t('mcpacl.details.added')} items={changes.added} t={t} onJump={jumpToRow} />
+            <DetailGroup heading={t('mcpacl.details.removed')} items={changes.removed} t={t} onJump={jumpToRow} />
+            <DetailGroup heading={t('mcpacl.orphan.title')} items={changes.orphans} t={t} onJump={jumpToRow} />
           </>
         ) : null}
         detailsLabel={t('mcpacl.details.show')} detailsHideLabel={t('mcpacl.details.hide')} />
