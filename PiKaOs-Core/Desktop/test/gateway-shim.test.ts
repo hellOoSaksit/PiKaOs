@@ -47,7 +47,9 @@ it('the canned initialize result equals what a real gateway Server answers', asy
   // The one weak point of the thin-shim design: two initialize answers must agree. Compare the
   // shim's canned result against the real SDK Server over an in-memory stream pair.
   const toServer = new PassThrough(), fromServer = new PassThrough()
-  const server = createGatewayServer({ listTools: async () => [], callTool: vi.fn(), consent: async () => true })
+  const server = createGatewayServer({
+    listTools: async () => [], callTool: vi.fn(), consent: async () => true, requirePaired: async () => {},
+  })
   await server.connect(new StreamTransport(toServer, fromServer))
   const answer = new Promise<any>(r => fromServer.once('data', (c: Buffer) => r(JSON.parse(c.toString()))))
   toServer.write(JSON.stringify(INIT) + '\n')
@@ -118,6 +120,31 @@ it('captures initialize even when the link is already connected, then replays it
   } finally {
     vi.useRealTimers()
   }
+})
+
+// Fix 3: `initialize` is the one message the shim otherwise always answers locally (see the two
+// disconnected-state tests above). When the link IS up (the steady state — PiKaOs already running),
+// the client's initialize is forwarded and its id lands in inFlight like any other request. If the
+// link drops before main answers it, failInFlight() used to error it with the same offline message
+// as every other pending request — but an MCP client whose `initialize` fails marks the server
+// failed and never retries, wedging the connection until the user restarts Claude Desktop. It must
+// get the shim's own canned result instead, exactly as if it had arrived while offline.
+it('answers a client initialize itself if the link drops before main replies (not the offline error)', async () => {
+  const out: any[] = []
+  const L = link()
+  const shim = new Shim((m) => out.push(m), async () => L.api)
+  shim.start()
+  await new Promise(r => setImmediate(r))   // link attaches before the client ever speaks
+
+  shim.fromClient(INIT)   // link is already up, so this is forwarded (not answered locally)
+  expect(L.sent.some((m: any) => m.method === 'initialize' && m.id === 1)).toBe(true)
+
+  L.drop()   // main never got to answer
+  await new Promise(r => setImmediate(r))
+
+  const answer = out.find((m: any) => m.id === 1)
+  expect(answer?.result).toEqual(cannedInitializeResult(INIT.params))
+  expect(answer?.error).toBeUndefined()
 })
 
 it('errors an in-flight request when the link drops before main answers it', async () => {

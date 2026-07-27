@@ -81,8 +81,11 @@ export class Shim {
       link.onMessage((m) => {
         const id = (m as any).id
         // Main answers the replayed initialize too; the client already has an answer, and two
-        // replies to one id would corrupt its request table.
-        if (this.swallowId !== null && id === this.swallowId) { this.swallowId = null; return }
+        // replies to one id would corrupt its request table. Also require this to actually be a
+        // response ('result' or 'error' present) — a bare id match is a request/notification
+        // coincidence away from swallowing something that was never main's reply to the replay.
+        const isResponse = 'result' in (m as any) || 'error' in (m as any)
+        if (this.swallowId !== null && id === this.swallowId && isResponse) { this.swallowId = null; return }
         if (id !== undefined) this.inFlight.delete(id)
         this.write(m)
       })
@@ -120,9 +123,20 @@ export class Shim {
 
   // A request forwarded to main has nowhere else to get an answer once the link is gone — error
   // it the same way the offline path would, rather than leave the client's id hanging forever.
+  //
+  // `initialize` is the one exception: it is the request the client's OWN retry logic depends on
+  // (an MCP client whose initialize fails marks the server failed and never retries), and it is
+  // also the one request the shim always has a good local answer for regardless of link state — so
+  // if the outstanding id is the client's own initialize (forwarded while the link was up, per
+  // fromClient()), answer it the same way the fully-offline path does instead of erroring it.
   private failInFlight() {
+    const initId = (this.initReq as (JSONRPCMessage & { id?: string | number }) | null)?.id
     for (const id of this.inFlight) {
-      this.write({ jsonrpc: '2.0', id, error: { code: -32001, message: OFFLINE_MESSAGE } } as any)
+      if (initId !== undefined && id === initId) {
+        this.write({ jsonrpc: '2.0', id, result: cannedInitializeResult((this.initReq as any).params) } as any)
+      } else {
+        this.write({ jsonrpc: '2.0', id, error: { code: -32001, message: OFFLINE_MESSAGE } } as any)
+      }
     }
     this.inFlight.clear()
   }
