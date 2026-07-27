@@ -417,6 +417,7 @@
     "mcpgw.clients.empty": "No client has been approved yet.",
     "mcpgw.clients.revoke": "Revoke",
     "mcpgw.unverified": "A client's name is what it says about itself. Approve one only when you started it yourself.",
+    "mcpgw.error": "That didn't go through. Please try again.",
     "open.owner": "Owner",
     "open.badge": "Open server — no sign-in",
     "nav.collapse": "Collapse sidebar",

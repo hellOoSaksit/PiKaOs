@@ -2,7 +2,7 @@
    is behind it. Desktop shell only: every control here goes through window.pikaosDesktop.gateway,
    so on the web build there is nothing to talk to and the panel must not render at all. */
 import React from 'react';
-const { useCallback, useEffect, useState } = React;
+const { useCallback, useEffect, useRef, useState } = React;
 import Panel from '../../components/ui/Panel.jsx';
 import Switch from '../../components/ui/Switch.jsx';
 import Table from '../../components/ui/Table.jsx';
@@ -18,17 +18,29 @@ export default function McpGatewayPanel({ Sys }) {
   const [config, setConfig] = useState(null);
   const [clients, setClients] = useState([]);
   const [copied, setCopied] = useState(false);
+  // One shared failure surface for every call that crosses into the main process (copy, toggle,
+  // revoke, refresh). Kept generic on purpose (rule 10): it tells the operator the action did not
+  // take effect, never what threw, so a path or stack can't leak through it.
+  const [error, setError] = useState(false);
+  const copiedTimer = useRef(null);
 
   const refresh = useCallback(async () => {
     if (!api) return;
-    setClients(await api.clients());
+    let failed = false;
+    try {
+      setClients(await api.clients());
+    } catch {
+      failed = true;
+    }
     // config() resolves null whenever the gateway isn't actually serving a working snippet. Treat
     // a rejected call the same way — no snippet is safer than showing a stale or broken one.
     try {
       setConfig(await api.config());
     } catch {
       setConfig(null);
+      failed = true;
     }
+    setError(failed);
   }, [api]);
 
   useEffect(() => {
@@ -39,16 +51,42 @@ export default function McpGatewayPanel({ Sys }) {
     return api.onStatus(setStatus);
   }, [api, refresh]);
 
+  // The "Copied" flip-back is a timer outside React's render cycle; clear it on unmount so it
+  // never fires setState against a panel that is already gone.
+  useEffect(() => () => { if (copiedTimer.current) clearTimeout(copiedTimer.current); }, []);
+
   if (!api) return null;
 
-  const toggle = async (on) => { setStatus(await api.setEnabled(on)); refresh(); };
+  const toggle = async (on) => {
+    try {
+      setStatus(await api.setEnabled(on));
+      setError(false);
+    } catch {
+      setError(true);
+      return; // nothing changed on the main-process side — a refresh would only re-show the same state
+    }
+    refresh();
+  };
   const copy = async () => {
     if (!config) return;   // nothing to copy while there is no snippet
-    await navigator.clipboard.writeText(config);
-    setCopied(true);
-    setTimeout(() => setCopied(false), COPIED_MS);
+    try {
+      await navigator.clipboard.writeText(config);
+      setError(false);
+      setCopied(true);
+      copiedTimer.current = setTimeout(() => setCopied(false), COPIED_MS);
+    } catch {
+      setError(true);
+    }
   };
-  const revoke = async (name) => { await api.revoke(name); refresh(); };
+  const revoke = async (name) => {
+    try {
+      await api.revoke(name);
+      setError(false);
+      refresh();
+    } catch {
+      setError(true);
+    }
+  };
 
   const label = !status.enabled ? t('mcpgw.status.off')
     : status.connections === 0 ? t('mcpgw.status.waiting')
@@ -66,6 +104,7 @@ export default function McpGatewayPanel({ Sys }) {
     <Panel title={t('mcpgw.title')} right={<span className="faint">{label}</span>}>
       <Switch checked={status.enabled} onChange={toggle} label={t('mcpgw.enable')} />
       <p className="faint" style={{ fontSize: 12 }}>{t('mcpgw.unverified')}</p>
+      {error && <p className="form-alert error">{t('mcpgw.error')}</p>}
       {status.enabled && (
         <>
           {/* config is null right after enabling (before the pipe is up) or on a failed fetch —
