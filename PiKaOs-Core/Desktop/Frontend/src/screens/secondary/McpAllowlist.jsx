@@ -24,8 +24,8 @@ function DetailGroup({ heading, items, t, onJump }) {
     <div className="pk-savebar-details-group">
       <p className="pk-savebar-details-heading">{heading}</p>
       {items.map(item => (
-        <button key={item.name} type="button" className="pk-savebar-jump" onClick={() => onJump(item.name)}>
-          {t('mcpacl.details.jump', { tool: item.label })}
+        <button key={item.name} type="button" className="pk-savebar-jump" onClick={() => onJump(item.name)} aria-label={t('mcpacl.details.jump', { tool: item.label })}>
+          {item.label}
         </button>
       ))}
     </div>
