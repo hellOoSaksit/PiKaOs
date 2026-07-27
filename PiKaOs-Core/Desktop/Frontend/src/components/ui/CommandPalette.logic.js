@@ -13,16 +13,14 @@ export function isNavVisible(item, can, isDesktop) {
   return true;
 }
 
-/* The palette's open state is ONE nullable query string: null = closed, '' or text = open with
-   that prefilled query. Folding "is it open" and "what did the user already type" into a single
-   value is what makes a stale query impossible — every open names its own query, so the
-   utility-bar box can hand one over while Ctrl+K and the magnifier always start empty.
-   `dialogOpen` = some OTHER dialog is up (see App.jsx's isDialogOpen): opening would stack a
-   second overlay, so it is refused — but never a close, since the palette's own overlay is what
-   that check would be seeing. `toggle` marks Ctrl+K, the only entry point that also closes. */
-export function nextPaletteState(current, { query = '', toggle = false, dialogOpen = false } = {}) {
-  if (current !== null) return toggle ? null : current;
-  return dialogOpen ? null : query;
+/* The one open/close rule, shared by every entry point that reaches the palette (Ctrl+K, the
+   title-bar magnifier, the utility bar's search button) so a future fourth one cannot forget the
+   guard. `dialogOpen` = some OTHER dialog is up (see App.jsx's isDialogOpen): opening would stack
+   a second overlay, so it is refused — never a close, since the palette's own overlay is what that
+   check would be seeing. `toggle` marks Ctrl+K, the only entry point that also closes. */
+export function nextPaletteState(open, { toggle = false, dialogOpen = false } = {}) {
+  if (open) return !toggle;
+  return !dialogOpen;
 }
 
 /* nav   = [{ group, items }] — the plugin-filtered tree the sidebar renders.

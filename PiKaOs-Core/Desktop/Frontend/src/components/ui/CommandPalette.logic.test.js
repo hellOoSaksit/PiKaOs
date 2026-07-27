@@ -121,26 +121,22 @@ describe('ranking', () => {
 });
 
 describe('nextPaletteState — the one open/close rule for all three entry points', () => {
-  it('Ctrl+K on a closed palette opens it with an empty query', () => {
-    expect(nextPaletteState(null, { toggle: true })).toBe('');
+  it('Ctrl+K opens a closed palette', () => {
+    expect(nextPaletteState(false, { toggle: true })).toBe(true);
   });
-  it('Ctrl+K on an open palette closes it', () => {
-    expect(nextPaletteState('mar', { toggle: true })).toBe(null);
+  it('Ctrl+K closes an open one — it is the only entry point that toggles', () => {
+    expect(nextPaletteState(true, { toggle: true })).toBe(false);
   });
-  it('the utility-bar search box opens the palette pre-filled with what was typed', () => {
-    expect(nextPaletteState(null, { query: 'mar' })).toBe('mar');
+  it('the magnifier and the utility-bar button only ever open', () => {
+    expect(nextPaletteState(false, {})).toBe(true);
+    expect(nextPaletteState(true, {})).toBe(true);
   });
-  it('never opens on top of another dialog — neither entry point', () => {
-    expect(nextPaletteState(null, { toggle: true, dialogOpen: true })).toBe(null);
-    expect(nextPaletteState(null, { query: 'mar', dialogOpen: true })).toBe(null);
+  it('never opens on top of another dialog — no entry point', () => {
+    expect(nextPaletteState(false, { toggle: true, dialogOpen: true })).toBe(false);
+    expect(nextPaletteState(false, { dialogOpen: true })).toBe(false);
   });
   it('closing is never blocked by the palette\'s own overlay counting as a dialog', () => {
-    expect(nextPaletteState('mar', { toggle: true, dialogOpen: true })).toBe(null);
-  });
-  it('a later open never inherits the previous query', () => {
-    const opened = nextPaletteState(null, { query: 'mar' });
-    const closed = nextPaletteState(opened, { toggle: true });
-    expect(nextPaletteState(closed, { toggle: true })).toBe('');
+    expect(nextPaletteState(true, { toggle: true, dialogOpen: true })).toBe(false);
   });
 });
 

@@ -30,7 +30,6 @@ export function BottomUtilityBar({
 }) {
   const [active, setActive] = useState(route === 'me' ? 'home' : null);
   const [openPop, setOpenPop] = useState(null);
-  const [query, setQuery] = useState('');
 
   const go = (tab, fn) => { setActive(tab); setOpenPop(null); fn && fn(); };
   const togglePop = (tab) => {
@@ -45,16 +44,6 @@ export function BottomUtilityBar({
 
   const notifCount = unreadCount(notifications);
 
-  // Enter hands the query to the command palette (App wires onSearch to it) and this box is done:
-  // the palette is a modal, so leaving the popover open would strand its click-catching overlay
-  // underneath, and a query kept here would reappear next time the box is opened.
-  const submitSearch = (e) => {
-    if (e.key !== 'Enter') return;
-    setOpenPop(null);
-    setQuery('');
-    onSearch && onSearch(query);
-  };
-
   return (
     <>
       {openPop && <div className="utility-bar-overlay" onClick={closePop} />}
@@ -62,7 +51,7 @@ export function BottomUtilityBar({
         {/* the sidebar's other control: narrows/widens it on desktop, opens the drawer on mobile */}
         <Tooltip label={t('utilitybar.nav')}>
           <UtilityBarButton
-            icon={ICONS.nav} title={t('utilitybar.nav')} label={t('utilitybar.nav')}
+            icon={ICONS.nav} label={t('utilitybar.nav')}
             showLabel={showLabels}
             onClick={() => { setOpenPop(null); onToggleNav && onToggleNav(); }}
           />
@@ -70,36 +59,26 @@ export function BottomUtilityBar({
 
         <Tooltip label={t('utilitybar.home')}>
           <UtilityBarButton
-            icon={ICONS.home} title={t('utilitybar.home')} label={t('utilitybar.home')}
+            icon={ICONS.home} label={t('utilitybar.home')}
             showLabel={showLabels} active={active === 'home'}
             onClick={() => go('home', onHome)}
           />
         </Tooltip>
 
-        <div style={{ position: 'relative' }}>
-          <Tooltip label={t('utilitybar.search')}>
-            <UtilityBarButton
-              icon={ICONS.search} title={t('utilitybar.search')} label={t('utilitybar.search')}
-              showLabel={showLabels} active={active === 'search'}
-              onClick={() => togglePop('search')}
-            />
-          </Tooltip>
-          <PopoverPanel open={openPop === 'search'} onClose={closePop} anchor="left" width={300}>
-            <div className="pop-search-field">
-              <input
-                type="text" autoFocus value={query}
-                placeholder={t('palette.placeholder')}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={submitSearch}
-              />
-            </div>
-          </PopoverPanel>
-        </div>
+        {/* no popover of its own: search IS the command palette (Ctrl+K), so a box here would be a
+            second search UI answering from the same index */}
+        <Tooltip label={t('utilitybar.search')}>
+          <UtilityBarButton
+            icon={ICONS.search} label={t('utilitybar.search')}
+            showLabel={showLabels}
+            onClick={() => { setOpenPop(null); onSearch && onSearch(); }}
+          />
+        </Tooltip>
 
         <div style={{ position: 'relative' }}>
           <Tooltip label={t('utilitybar.notifications')}>
             <UtilityBarButton
-              icon={ICONS.notifications} title={t('utilitybar.notifications')} label={t('utilitybar.notifications')}
+              icon={ICONS.notifications} label={t('utilitybar.notifications')}
               showLabel={showLabels} active={active === 'notifications'} badge={notifCount}
               onClick={() => togglePop('notifications')}
             />
@@ -125,7 +104,7 @@ export function BottomUtilityBar({
 
         <Tooltip label={t('utilitybar.add.title')}>
           <UtilityBarButton
-            icon={ICONS.add} title={t('utilitybar.add.title')} label={t('utilitybar.add')}
+            icon={ICONS.add} label={t('utilitybar.add')}
             showLabel={showLabels} active={active === 'add'}
             onClick={() => go('add', onAdd)}
           />
@@ -136,7 +115,7 @@ export function BottomUtilityBar({
           <div style={{ position: 'relative' }}>
             <Tooltip label={t('utilitybar.ai')}>
               <UtilityBarButton
-                icon={ICONS.ai} title={t('utilitybar.ai')} label={t('utilitybar.ai')}
+                icon={ICONS.ai} label={t('utilitybar.ai')}
                 showLabel={showLabels} active={active === 'ai'}
                 onClick={() => togglePop('ai')}
               />

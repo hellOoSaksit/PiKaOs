@@ -246,8 +246,7 @@ function App() {
   const lastByLang = React.useRef({});
 
   const [navCfg, setNavCfg] = useState(() => loadNav());   // global sidebar arrangement (admin-set, shared)
-  // null = closed; a string = open, prefilled with it (nextPaletteState owns the transitions)
-  const [palette, setPalette] = useState(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   // Is some OTHER dialog already up? Every dialog in the app — Modal and the imperative
   // lib/ui-modal.jsx hosts alike — renders an element carrying both `pk-overlay` and `open` while
   // visible (Modal appends `open` only when its `open` prop is true, so the palette's own overlay
@@ -257,7 +256,7 @@ function App() {
   // dialog stays open underneath, and since each Modal registers its own independent Escape
   // listener, one Escape then closes BOTH at once. Closing must stay unaffected by this guard.
   const isDialogOpen = () => !!document.querySelector('.pk-overlay.open');
-  const openPalette = (query) => setPalette(p => nextPaletteState(p, { query, dialogOpen: isDialogOpen() }));
+  const openPalette = () => setPaletteOpen(o => nextPaletteState(o, { dialogOpen: isDialogOpen() }));
   const { rail: navRail, drawerOpen, toggle: toggleNav, closeDrawer } = useShellNav();
 
   const setTheme = (t) => { setThemeState(t); localStorage.setItem("guild-theme", t); };
@@ -305,7 +304,7 @@ function App() {
       // stacked-overlay failure mode isDialogOpen() exists to prevent (see its comment above).
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setPalette(p => nextPaletteState(p, { toggle: true, dialogOpen: isDialogOpen() }));
+        setPaletteOpen(o => nextPaletteState(o, { toggle: true, dialogOpen: isDialogOpen() }));
       }
     };
     document.addEventListener('keydown', onKey);
@@ -499,13 +498,12 @@ function App() {
         t={t} route={route} onHome={() => go("home")} onToggleNav={toggleNav}
         profile={renderPluginProfile({ t, me, onSignOut: auth.logout }, activePlugins)}
         notifications={notifs}
-        // the bar's search box is a shortcut INTO the palette, not a second search: whatever was
-        // typed there opens the palette prefilled, so one index answers every search in the app
+        // the bar's magnifier opens the same palette as Ctrl+K — one search UI for the whole app
         onSearch={openPalette}
         // sequenced: an unsequenced reload races the mark and usually re-reads the pre-mark rows
         onNotificationsOpened={() => { markNotificationsRead().catch(() => {}).finally(loadNotifs); }}
       />
-      <CommandPalette open={palette !== null} onClose={() => setPalette(null)} initialQuery={palette || ''}
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)}
         nav={visibleNav} t={t} can={can} go={go} />
       <UIModalHost />
       <UILoadingHost />
