@@ -115,13 +115,3 @@
   font-family: var(--font-display); font-weight: 600; font-size: 12.5px;
   color: var(--gold-bright); cursor: pointer; background: none; border: none; width: 100%;
 }
-.pop-search-field {
-  display: flex; align-items: center; gap: 9px;
-  padding: 9px 12px; margin: 14px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-3); border: 1px solid var(--line);
-}
-.pop-search-field input {
-  flex: 1; border: none; background: transparent; outline: none;
-  font-family: var(--font-body); font-size: 13.5px; color: var(--ink);
-}
