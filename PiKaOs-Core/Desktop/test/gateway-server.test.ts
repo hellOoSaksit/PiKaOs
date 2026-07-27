@@ -10,7 +10,11 @@ const TOOL = (name: string, effect: CatalogTool['effect'] = 'read'): CatalogTool
 // Drive the gateway the way a real client does — over a transport, completing the handshake first.
 // Reaching into the SDK's private handler map would test the same behaviour, but a rename inside
 // the SDK would then break these tests in a way that says nothing about our code.
-async function client(deps: GatewayDeps) {
+//
+// requirePaired defaults to an already-resolved gate: pairing itself is pipe.ts's job (see
+// gateway-pipe.test.ts), so most tests here should behave exactly as if pairing had already
+// succeeded. Tests that care about the gate pass their own controllable requirePaired.
+async function client(deps: Partial<GatewayDeps>) {
   const toServer = new PassThrough(), fromServer = new PassThrough()
   const replies = new Map<number, (v: any) => void>()
   let buf = ''
@@ -23,7 +27,13 @@ async function client(deps: GatewayDeps) {
       if (msg.id !== undefined) replies.get(msg.id)?.(msg)
     }
   })
-  await createGatewayServer(deps).connect(new StreamTransport(toServer, fromServer))
+  const full: GatewayDeps = {
+    listTools: deps.listTools ?? (async () => []),
+    callTool: deps.callTool ?? vi.fn(),
+    consent: deps.consent ?? vi.fn(),
+    requirePaired: deps.requirePaired ?? (async () => {}),
+  }
+  await createGatewayServer(full).connect(new StreamTransport(toServer, fromServer))
 
   let id = 0
   const send = (method: string, params: unknown) => new Promise<any>(res => {
@@ -119,4 +129,38 @@ it('a rejected listTools during tools/list surfaces a sanitized protocol error',
   expect(response.error).toBeDefined()
   expect(response.error.message).not.toContain('mcp/tools')
   expect(response.error.message).not.toContain('500')
+})
+
+// E2b final-review Fix 1: pairing must gate every request, not just be a side effect of the
+// initialized notification. These two tests pin that requirePaired() is awaited BEFORE deps is
+// touched at all — the end-to-end "no data leaks while pairing is pending" proof lives at the pipe
+// level (gateway-pipe.test.ts), since only pipe.ts owns the real socket to assert nothing was
+// written to.
+it('tools/list waits for requirePaired before touching the catalog', async () => {
+  const listTools = vi.fn().mockResolvedValue([])
+  let releasePaired!: () => void
+  const requirePaired = () => new Promise<void>(res => { releasePaired = res })
+  const c = await client({ listTools, requirePaired })
+  const pending = c.send('tools/list', {})
+  await new Promise(r => setImmediate(r))
+  expect(listTools).not.toHaveBeenCalled()
+  releasePaired()
+  const { result } = await pending
+  expect(result.tools).toEqual([])
+  expect(listTools).toHaveBeenCalledTimes(1)
+})
+
+it('tools/call waits for requirePaired before touching the catalog or the backend', async () => {
+  const listTools = vi.fn().mockResolvedValue([TOOL('t')])
+  const callTool = vi.fn().mockResolvedValue({ status: 200, result: {} })
+  let releasePaired!: () => void
+  const requirePaired = () => new Promise<void>(res => { releasePaired = res })
+  const c = await client({ listTools, callTool, consent: async () => true, requirePaired })
+  const pending = c.send('tools/call', { name: 't', arguments: {} })
+  await new Promise(r => setImmediate(r))
+  expect(listTools).not.toHaveBeenCalled()
+  expect(callTool).not.toHaveBeenCalled()
+  releasePaired()
+  await pending
+  expect(callTool).toHaveBeenCalledTimes(1)
 })

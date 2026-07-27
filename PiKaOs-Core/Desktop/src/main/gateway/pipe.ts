@@ -1,4 +1,5 @@
 import { createServer, Socket } from 'node:net'
+import { chmodSync } from 'node:fs'
 import { timingSafeEqual } from 'node:crypto'
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StreamTransport } from '../mcp/transport'
@@ -12,6 +13,13 @@ const MAX_TOKEN_LINE = 512   // a token line is 65 bytes; anything larger is not
 // handshake-timeout pattern — see manager.ts's withTimeout/handshakeTimeoutMs).
 const PRE_HANDSHAKE_TIMEOUT_MS = 5_000
 
+// `initialize` and `notifications/initialized` are two writes a conforming client issues back to
+// back; this bounds the gap between them. It does NOT bound how long pairClient() itself takes —
+// the operator may take any amount of time to click the dialog — only the handshake step that has
+// to happen before pairing can even start. A socket that completes `initialize` and then goes quiet
+// (deliberately or not) would otherwise sit forever holding a live, unpaired MCP server.
+const PAIRING_TIMEOUT_MS = 5_000
+
 // Length-independent comparison, so a wrong token never leaks how much of it was right.
 const sameToken = (a: string, b: string) => {
   const x = Buffer.from(a), y = Buffer.from(b)
@@ -20,9 +28,12 @@ const sameToken = (a: string, b: string) => {
 
 export type PipeOpts = {
   handshake: Handshake
-  makeServer: () => Server
+  makeServer: (requirePaired: () => Promise<void>) => Server
   pairClient: (clientName: string) => Promise<boolean>
   onConnectionsChanged: (n: number) => void
+  // Overridable only by tests (a real handshake round-trip is effectively instant); production
+  // always gets PAIRING_TIMEOUT_MS.
+  pairingTimeoutMs?: number
 }
 
 export async function startPipe(opts: PipeOpts) {
@@ -35,6 +46,10 @@ export async function startPipe(opts: PipeOpts) {
   // Sockets whose MCP side is attached, keyed here rather than closed over per-connection so every
   // forced-destroy path below — including close() — can route through it uniformly.
   const attached = new Map<Socket, Server>()
+  // The clientInfo name a socket was paired under, once pairing succeeds. Doubles as Fix 2's
+  // client→socket mapping (disconnect() below) and as the record `changed()` re-fires against when
+  // pairing completes — one map serving both "who is this" and "tell the panel something changed".
+  const pairedName = new Map<Socket, string>()
   const changed = () => opts.onConnectionsChanged(live.size)
 
   // The one place that ends a socket. A rejected token, a timed-out handshake, a denied pairing, and
@@ -87,17 +102,53 @@ export async function startPipe(opts: PipeOpts) {
   const accept = (sock: Socket, rest: Buffer) => {
     live.add(sock)
     changed()
-    const mcp = opts.makeServer()
+
+    // The pairing gate every request handler awaits before touching `deps` (server.ts). Resolved on
+    // an allowed pairing; rejected on a denial or a stalled handshake — either way forceClose() below
+    // has already ended the socket by the time anything downstream observes the rejection, so a
+    // rejection here never turns into a reply on the wire (rule 10). Swallowed with a no-op .catch
+    // so a socket that never issues a single request doesn't leave this dangling as an unhandled
+    // rejection.
+    let resolvePaired!: () => void
+    let rejectPaired!: (e: unknown) => void
+    const paired = new Promise<void>((res, rej) => { resolvePaired = res; rejectPaired = rej })
+    paired.catch(() => {})
+
+    // Covers only the initialize→initialized gap (see PAIRING_TIMEOUT_MS) — cleared the moment
+    // oninitialized fires, whether or not pairClient() itself has answered yet.
+    const deadline = setTimeout(() => {
+      rejectPaired(new Error('handshake stalled'))
+      forceClose(sock)
+    }, opts.pairingTimeoutMs ?? PAIRING_TIMEOUT_MS)
+    if (typeof deadline.unref === 'function') deadline.unref()
+
+    const mcp = opts.makeServer(() => paired)
     attached.set(sock, mcp)
-    sock.once('close', () => { live.delete(sock); attached.delete(sock); changed() })
+    sock.once('close', () => {
+      clearTimeout(deadline)
+      live.delete(sock); attached.delete(sock); pairedName.delete(sock); changed()
+    })
 
     const transport = new StreamTransport(sock, sock)
     // Pairing keys off clientInfo, which only exists once initialize has been handled — so it is
     // checked here rather than at connect time. A denial closes the socket; the client sees a
     // dropped connection, which is all it is entitled to know.
     mcp.oninitialized = () => {
+      clearTimeout(deadline)
       const name = mcp.getClientVersion()?.name ?? 'unknown client'
-      opts.pairClient(name).then(ok => { if (!ok) forceClose(sock) }, () => forceClose(sock))
+      opts.pairClient(name).then(ok => {
+        if (ok) {
+          pairedName.set(sock, name)
+          resolvePaired()
+          // The approved-clients list just changed (clients.ts persisted the name) even though the
+          // live connection COUNT did not — re-emit so the panel's status listener knows to refresh
+          // the table (Fix 4: stale approved-clients table), not just react to a literal count change.
+          changed()
+        } else {
+          rejectPaired(new Error('pairing denied'))
+          forceClose(sock)
+        }
+      }, () => { rejectPaired(new Error('pairing denied')); forceClose(sock) })
     }
     mcp.connect(transport).then(() => {
       // Anything that arrived in the same chunk as the token still has to reach the protocol.
@@ -110,9 +161,19 @@ export async function startPipe(opts: PipeOpts) {
     server.once('error', reject)
     server.listen(opts.handshake.pipe, () => { server.off('error', reject); resolve() })
   })
+  // Windows names pipes with their own ACL model; POSIX sockets inherit the umask, which typically
+  // leaves them world-connectable. Tightened to the owner only, after listen (the path must exist
+  // first) and on POSIX only (chmodSync on a Windows pipe path throws — it isn't a filesystem node).
+  if (process.platform !== 'win32') chmodSync(opts.handshake.pipe, 0o600)
 
   return {
     connections: () => live.size,
+    // Fix 2: an operator revoking a client that is CURRENTLY connected must end that connection, not
+    // just edit it out of gateway-clients.json — otherwise the panel shows a revocation that didn't
+    // actually happen. Reuses the same pairedName map Fix 1 populates on a successful pairing.
+    disconnect: (name: string) => {
+      for (const [sock, paired] of pairedName) if (paired === name) forceClose(sock)
+    },
     close: () => new Promise<void>((resolve) => {
       for (const s of pending) forceClose(s)
       pending.clear()

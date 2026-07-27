@@ -20,7 +20,9 @@ const start = async (over: Partial<Parameters<typeof startPipe>[0]> = {}) => {
   const handshake = { pipe: pipeName(), token: 'a'.repeat(64) }
   const gw = await startPipe({
     handshake,
-    makeServer: () => createGatewayServer({ listTools: async () => [], callTool: vi.fn(), consent: async () => true }),
+    makeServer: (requirePaired) => createGatewayServer({
+      listTools: async () => [], callTool: vi.fn(), consent: async () => true, requirePaired,
+    }),
     pairClient: async () => true,
     onConnectionsChanged: () => {},
     ...over,
@@ -112,4 +114,94 @@ it('destroys a connection whose pairing is denied, with no reason on the wire', 
   await new Promise(r => sock.once('close', r))
   expect(Buffer.concat(chunks).toString()).toBe('')
   sock.destroy()
+})
+
+// E2b final-review Fix 1 (the CRITICAL finding): pairing used to be a side effect of
+// `oninitialized`, never awaited by the request handlers — a client that never sends
+// notifications/initialized kept its ListTools/CallTool handlers live and answering forever, and a
+// client that raced initialize→initialized→tools/list in one write got served before the operator's
+// dialog even opened. These two tests pin the fix: requirePaired() must gate every request.
+it('does not serve the catalog while pairing is pending', async () => {
+  let resolvePairing!: (ok: boolean) => void
+  const pairClient = vi.fn(() => new Promise<boolean>(res => { resolvePairing = res }))
+  const { handshake } = await start({ pairClient })
+  const sock = createConnection(handshake.pipe)
+  await new Promise(r => sock.once('connect', r))
+  sock.write(handshake.token + '\n')
+
+  const transport = new StreamTransport(sock, sock)
+  const client = new Client({ name: 'pending-test-client', version: '0.0.1' })
+  // initialize/initialized complete independently of pairing (pairing starts only once
+  // oninitialized fires), so this resolves even though pairClient() is deliberately left pending.
+  await client.connect(transport)
+
+  const chunks: Buffer[] = []
+  sock.on('data', (c) => chunks.push(c))
+  const listPromise = client.listTools()
+
+  const raced = await Promise.race([
+    listPromise.then(() => 'resolved' as const),
+    new Promise<'still-pending'>(r => setTimeout(() => r('still-pending'), 200)),
+  ])
+  expect(raced).toBe('still-pending')
+  expect(Buffer.concat(chunks).toString()).toBe('')   // nothing crossed the wire while pairing hangs
+
+  resolvePairing(true)   // let the connection wind down cleanly instead of leaking a pending promise
+  await listPromise
+  sock.destroy()
+})
+
+it('ends the connection when initialize is never followed by notifications/initialized', async () => {
+  const pairClient = vi.fn(async () => true)
+  // The real deadline (PRE_HANDSHAKE_TIMEOUT_MS's post-token sibling) is generous on purpose for a
+  // real client; shortened here so the test doesn't sit around waiting for it.
+  const { handshake } = await start({ pairClient, pairingTimeoutMs: 50 })
+  const sock = createConnection(handshake.pipe)
+  await new Promise(r => sock.once('connect', r))
+  sock.write(handshake.token + '\n')
+  sock.write(JSON.stringify({
+    jsonrpc: '2.0', id: 1, method: 'initialize',
+    params: { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'silent-client', version: '1' } },
+  }) + '\n')
+  // Deliberately never sent: notifications/initialized.
+  sock.write(JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }) + '\n')
+
+  const chunks: Buffer[] = []
+  sock.on('data', (c) => chunks.push(c))
+  await new Promise(r => sock.once('close', r))
+
+  expect(pairClient).not.toHaveBeenCalled()      // oninitialized never fired — nothing was ever asked
+  expect(Buffer.concat(chunks).toString()).not.toContain('"id":2')   // no tools/list reply, ever
+  sock.destroy()
+})
+
+// E2b final-review Fix 2: revoking a currently-connected client must end its connection, not just
+// edit gateway-clients.json out from under it.
+//
+// client.connect() resolves once the SDK has SENT notifications/initialized, not once the gateway
+// has received it, run pairClient(), and recorded the name in pairedName — that is a real extra
+// round trip over the pipe (server must also process+respond to initialize first). A fixed number
+// of setImmediate() ticks proved flaky on Windows named pipes (the round trip can take longer than
+// one tick), so this waits on the actual pairClient() call instead of guessing how many ticks the
+// underlying transport needs.
+it('disconnect(name) closes a live connection paired under that name', async () => {
+  let onPairClientCalled!: () => void
+  const pairedCall = new Promise<void>(res => { onPairClientCalled = res })
+  const pairClient = vi.fn(async (_name: string) => { onPairClientCalled(); return true })
+  const { handshake, gw } = await start({ pairClient })
+  const sock = createConnection(handshake.pipe)
+  await new Promise(r => sock.once('connect', r))
+  sock.write(handshake.token + '\n')
+
+  const transport = new StreamTransport(sock, sock)
+  const client = new Client({ name: 'revoke-test-client', version: '0.0.1' })
+  await client.connect(transport)
+  await pairedCall
+  // pairClient() resolving true and pairedName actually recording the name both happen in the same
+  // .then() continuation right after pairClient()'s own promise settles — one more tick for that.
+  await new Promise(r => setImmediate(r))
+
+  const closed = new Promise<void>(r => sock.once('close', r))
+  gw.disconnect('revoke-test-client')
+  await closed
 })
