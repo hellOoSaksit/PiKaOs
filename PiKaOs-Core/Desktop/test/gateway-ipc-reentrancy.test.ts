@@ -13,13 +13,21 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const { fakePipes, startPipeMock } = vi.hoisted(() => {
-  const fakePipes: Array<{ closed: boolean }> = []
+  const fakePipes: Array<{ closed: boolean; disconnect: (name: string) => void }> = []
   const startPipeMock = vi.fn(async () => {
-    const record = { closed: false }
+    // Real startPipe() also returns disconnect() (Fix 2's revoke wiring) — omitting it here is
+    // exactly the gap the E2b final-review flagged: gateway/ipc.ts's revoke() calls
+    // `this.pipe?.disconnect(name)`, and without this key on the fake, deleting that call would
+    // still leave every test in this suite green. Kept as its own spy (not shared) per fake pipe so
+    // the "revoke calls disconnect" test below can assert against exactly the instance the service
+    // is holding.
+    const disconnect = vi.fn()
+    const record = { closed: false, disconnect }
     fakePipes.push(record)
     return {
       connections: () => 0,
       close: async () => { record.closed = true },
+      disconnect,
     }
   })
   return { fakePipes, startPipeMock }
@@ -81,4 +89,20 @@ it('setEnabled(false) arriving while an enable is still in flight still closes t
   expect(fakePipes).toHaveLength(1)
   expect(fakePipes[0].closed).toBe(true)
   expect(s.status()).toEqual({ enabled: false, connections: 0 })
+})
+
+// Item 6 of the E2b final fix wave: `GatewayService.revoke → this.pipe?.disconnect(name)` (gateway/
+// ipc.ts) had no coverage at all — the existing "revoke drops a paired client" test in
+// gateway-ipc.test.ts revokes against a pipe with no connection, and this suite's own fake used to
+// have no `disconnect` key, so deleting the `this.pipe?.disconnect(name)` line left every test here
+// green too. Assert the wiring directly against the fake pipe's spy.
+it('revoke() forwards to the pipe\'s disconnect(name), not just the client store', async () => {
+  const s = service()
+  await s.setEnabled(true)
+  expect(fakePipes).toHaveLength(1)
+
+  s.revoke('Claude Desktop')
+
+  expect(fakePipes[0].disconnect).toHaveBeenCalledWith('Claude Desktop')
+  await s.setEnabled(false)
 })
