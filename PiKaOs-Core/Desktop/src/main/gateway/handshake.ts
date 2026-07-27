@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { writeFileSync, readFileSync } from 'node:fs'
+import { writeFileSync, readFileSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 
 export type Handshake = { pipe: string; token: string }
@@ -18,15 +18,25 @@ export function writeHandshake(userDataDir: string): { handshake: Handshake; pat
     token: randomBytes(32).toString('hex'),
   }
   const path = join(userDataDir, FILE)
-  // mode on the open() call, not a later chmod — a chmod leaves a window where the file exists
-  // with the default mode and the token is already in it.
+  // POSIX open() only applies `mode` when it CREATES the file — on an overwrite of an
+  // existing path the mode argument is silently ignored and the file keeps whatever
+  // permissions it already had. gateway.json is written to the same path on every
+  // launch, so every write after the first is an overwrite. Unlinking first forces the
+  // write down the create path every time, so 0o600 always takes effect — even if the
+  // file was left group/world-readable by an older build, a manual chmod, or a backup
+  // tool, and even though the new content is a fresh token.
+  try {
+    unlinkSync(path)
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException)?.code !== 'ENOENT') throw err
+  }
   writeFileSync(path, JSON.stringify(handshake), { mode: 0o600 })
   return { handshake, path }
 }
 
 export function readHandshake(path: string): Handshake {
-  const raw = JSON.parse(readFileSync(path, 'utf8')) as Partial<Handshake>
-  if (typeof raw.pipe !== 'string' || typeof raw.token !== 'string') {
+  const raw = JSON.parse(readFileSync(path, 'utf8')) as Partial<Handshake> | null
+  if (raw === null || typeof raw !== 'object' || typeof raw.pipe !== 'string' || typeof raw.token !== 'string') {
     throw new Error('gateway handshake file is malformed')
   }
   return { pipe: raw.pipe, token: raw.token }
