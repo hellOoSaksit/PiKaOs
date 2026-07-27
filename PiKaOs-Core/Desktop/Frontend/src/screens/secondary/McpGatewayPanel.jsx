@@ -45,7 +45,12 @@ export default function McpGatewayPanel({ Sys }) {
 
   useEffect(() => {
     if (!api) return undefined;
-    api.status().then(setStatus);
+    api.status()
+      .then(s => {
+        setStatus(s);
+        setError(false);
+      })
+      .catch(() => setError(true));
     refresh();
     // Connections change without any action on this screen, so the panel listens rather than polls.
     return api.onStatus(setStatus);
@@ -73,6 +78,7 @@ export default function McpGatewayPanel({ Sys }) {
       await navigator.clipboard.writeText(config);
       setError(false);
       setCopied(true);
+      clearTimeout(copiedTimer.current);
       copiedTimer.current = setTimeout(() => setCopied(false), COPIED_MS);
     } catch {
       setError(true);
