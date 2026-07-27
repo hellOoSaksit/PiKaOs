@@ -53,7 +53,11 @@ export default function McpGatewayPanel({ Sys }) {
       .catch(() => setError(true));
     refresh();
     // Connections change without any action on this screen, so the panel listens rather than polls.
-    return api.onStatus(setStatus);
+    // Pairing (Allow/Deny) is decided in a native dialog the renderer has no other visibility into —
+    // main re-emits a status push once a pairing resolves (pipe.ts's accept(), Fix 4) specifically so
+    // this refetches clients() here instead of the approved-clients table staying stale until the
+    // operator navigates away and back.
+    return api.onStatus((s) => { setStatus(s); refresh(); });
   }, [api, refresh]);
 
   // The "Copied" flip-back is a timer outside React's render cycle; clear it on unmount so it
