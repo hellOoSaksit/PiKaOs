@@ -19,15 +19,29 @@ export class StreamTransport implements Transport {
   ) {}
 
   async start(): Promise<void> {
-    this.readable?.on('data', (chunk: Buffer) => {
-      this.buffer.append(chunk)
-      for (;;) {
-        let msg: JSONRPCMessage | null
-        try { msg = this.buffer.readMessage() } catch (e) { this.onerror?.(e as Error); break }
-        if (!msg) break
-        this.onmessage?.(msg)
-      }
-    })
+    this.readable?.on('data', (chunk: Buffer) => this.ingest(chunk))
+  }
+
+  // Feeds bytes that were already read off the underlying stream by someone else BEFORE this
+  // transport's own 'data' listener was attached — e.g. gateway/pipe.ts's accept() consumes the
+  // pre-handshake token line by hand, and whatever arrived in the SAME chunk as that line still has
+  // to reach the protocol. Goes through the exact same ReadBuffer/onmessage pipeline a live 'data'
+  // event would, instead of synthesizing a fake stream event (`sock.emit('data', ...)`) on a socket
+  // the transport doesn't otherwise touch — a real 'data' event carries backpressure/flow-control
+  // semantics that a synthetic one does not, so this is the legitimate way to hand over already-read
+  // bytes, not a workaround.
+  ingestBuffered(chunk: Buffer): void {
+    this.ingest(chunk)
+  }
+
+  private ingest(chunk: Buffer): void {
+    this.buffer.append(chunk)
+    for (;;) {
+      let msg: JSONRPCMessage | null
+      try { msg = this.buffer.readMessage() } catch (e) { this.onerror?.(e as Error); break }
+      if (!msg) break
+      this.onmessage?.(msg)
+    }
   }
 
   send(message: JSONRPCMessage): Promise<void> {

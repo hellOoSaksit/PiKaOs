@@ -130,12 +130,40 @@ export async function startPipe(opts: PipeOpts) {
     })
 
     const transport = new StreamTransport(sock, sock)
+
+    // Captures clientInfo.name straight off the raw `initialize` request, synchronously, the instant
+    // the transport parses it off the wire — set BEFORE mcp.connect() so Protocol.connect() chains
+    // onto it (the SDK preserves whatever transport.onmessage was already set and calls it first,
+    // before its own request/notification dispatch runs).
+    //
+    // This exists because mcp.getClientVersion() is NOT safe to read from oninitialized: in the
+    // SDK (1.29.0), the `initialize` REQUEST is answered through Protocol._onrequest's promise chain
+    // (one extra microtask hop, for its task-augmentation check, before the handler that sets
+    // clientVersion ever runs), while `notifications/initialized` runs through _onnotification's
+    // chain (one fewer hop). Those two chains only race when both messages are dispatched in the
+    // SAME synchronous batch — i.e. the SAME 'data' chunk — and this is EXACTLY the shim's real write
+    // pattern (Shim.dial() in src/shim/shim.ts sends the stored initialize and
+    // notifications/initialized back-to-back with no round trip in between, unlike a spec-driven
+    // client that awaits the initialize response first). When that race lands the wrong way,
+    // oninitialized fires before _oninitialize has set clientVersion, getClientVersion() reads
+    // undefined, and the real client gets misclassified as a blank-clientInfo.name client below —
+    // silently force-closed, no dialog, no reply, ever. Do NOT "simplify" this back to
+    // mcp.getClientVersion() — that is precisely the live-UAT regression this capture fixes.
+    //
+    // Reading the field directly off the parsed message sidesteps the race entirely: it runs in wire
+    // order, synchronously, never through either scheduled promise chain.
+    let clientName: string | undefined
+    transport.onmessage = (msg) => {
+      const m = msg as { method?: string; params?: { clientInfo?: { name?: string } } }
+      if (m.method === 'initialize') clientName = m.params?.clientInfo?.name
+    }
+
     // Pairing keys off clientInfo, which only exists once initialize has been handled — so it is
     // checked here rather than at connect time. A denial closes the socket; the client sees a
     // dropped connection, which is all it is entitled to know.
     mcp.oninitialized = () => {
       clearTimeout(deadline)
-      const name = mcp.getClientVersion()?.name
+      const name = clientName
       // A missing/blank name is not "a client we don't have a label for" — it is unpairable. The
       // SDK fires oninitialized (and this whole flow) even for a client that skipped clientInfo
       // entirely, and inventing 'unknown client' here used to paper over that: the FIRST such client
@@ -177,8 +205,12 @@ export async function startPipe(opts: PipeOpts) {
       }, () => { rejectPaired(new Error('pairing denied')); forceClose(sock) })
     }
     mcp.connect(transport).then(() => {
-      // Anything that arrived in the same chunk as the token still has to reach the protocol.
-      if (rest.length) sock.emit('data', rest)
+      // Anything that arrived in the same chunk as the token still has to reach the protocol — fed
+      // straight into the transport's own ReadBuffer/onmessage pipeline (ingestBuffered), not
+      // synthesized as a socket 'data' event. This IS the shim's actual write pattern (token line +
+      // initialize + notifications/initialized landing in one chunk — see the onmessage comment
+      // above), so it is exercised on every real connection, not a rare edge case.
+      if (rest.length) transport.ingestBuffered(rest)
       sock.resume()
     }, () => forceClose(sock))
   }
