@@ -392,6 +392,7 @@
     "mcpacl.effect.side_effect": "Action",
     "mcpacl.group.core": "Core",
     "mcpacl.orphan": "No longer exists — will be removed on save",
+    "mcpacl.orphan.title": "Removed tools",
     "mcpacl.empty": "No tools are marked safe for AI yet.",
     "mcpacl.error": "Could not load the tool catalog.",
     "mcpacl.retry": "Retry",

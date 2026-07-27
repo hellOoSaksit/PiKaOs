@@ -36,7 +36,7 @@ export function McpAllowlist({ Sys, activePlugins }) {
       setEntries(acl.entries);
       setSaveFailed(false);
     } catch {
-      setState({ loading: true /* keep skeleton */, error: true, tools: [], orphans: [] });
+      setState({ loading: false, error: true, tools: [], orphans: [] });
     }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -45,11 +45,14 @@ export function McpAllowlist({ Sys, activePlugins }) {
   const groups = useMemo(() => groupByOwner(state.tools, pluginIds), [state.tools, pluginIds]);
   const diff = useMemo(() => diffGrants(initialGranted, [...granted]), [initialGranted, granted]);
 
-  const toggle = (name, on) => setGranted(prev => {
-    const next = new Set(prev);
-    if (on) next.add(name); else next.delete(name);
-    return next;
-  });
+  const toggle = (name, on) => {
+    setSaveFailed(false);   // a fresh edit supersedes any stale "save failed" banner
+    setGranted(prev => {
+      const next = new Set(prev);
+      if (on) next.add(name); else next.delete(name);
+      return next;
+    });
+  };
 
   const save = async () => {
     setSaving(true); setSaveFailed(false);
@@ -76,7 +79,7 @@ export function McpAllowlist({ Sys, activePlugins }) {
 
   const columns = [
     { key: 'tool', header: t('mcpacl.col.tool'), render: (r) => (
-        <span><strong>{r.method} {r.path}</strong>
+        <span><strong>{[r.method, r.path].filter(Boolean).join(' ')}</strong>
           {r.description ? <span className="faint" style={{ display: 'block', fontSize: 12 }}>{r.description}</span> : null}
           {r.orphan ? <span className="faint" style={{ display: 'block', fontSize: 12 }}>{t('mcpacl.orphan')}</span> : null}
         </span>) },
@@ -96,12 +99,16 @@ export function McpAllowlist({ Sys, activePlugins }) {
         </Panel>
       ))}
       {state.orphans.length > 0 && (
-        <Panel title={t('mcpacl.orphan')}>
+        <Panel title={t('mcpacl.orphan.title')}>
           <Table columns={columns}
             rows={state.orphans.map(n => ({ id: n, name: n, method: '', path: n, orphan: true }))} />
         </Panel>
       )}
-      <SaveBar count={diff.count}
+      {/* Orphans never enter `granted` (there's nothing to grant), so diff.count alone would stay 0
+          and hide the SaveBar even though save() drops them server-side on every save — the operator
+          would be told about a cleanup ("will be removed on save") the screen never let them trigger.
+          Count them toward the bar's visibility/count while diff.count keeps sizing the label itself. */}
+      <SaveBar count={diff.count + state.orphans.length}
         label={saveFailed ? t('mcpacl.savefail') : (diff.count + ' · ' + t('mcpacl.unsaved'))}
         saveLabel={saving ? '…' : t('mcpacl.save')} cancelLabel={t('mcpacl.cancel')}
         onSave={saving ? undefined : save}
