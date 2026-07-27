@@ -136,7 +136,14 @@ app.whenReady().then(() => {
   // Instance lifecycle (crash spec §2.4): focus the running window on a second launch instead
   // of silently killing the new instance; stop every MCP child so none orphans on quit.
   registerSingleInstanceFocus(app, () => BrowserWindow.getAllWindows()[0] ?? null)
-  registerQuitCleanup(app, () => { void gateway.setEnabled(false); return manager.stopAll() })
+  // Both awaited so the returned promise doesn't settle until the gateway's pipe (an async
+  // net.Server.close, unlike MCP children's synchronous kill()) AND every MCP child have actually
+  // torn down — the previous `void gateway.setEnabled(false)` dropped the gateway half entirely.
+  // registerQuitCleanup still dispatches this via `void` (lifecycle.ts), so the whole thing stays
+  // fire-and-forget from Electron's perspective; process exit remains the real backstop for the pipe
+  // handle. That's acceptable here — this fix only makes the two teardowns run and finish together
+  // when the event loop does get to turn before exit, instead of silently only running one of them.
+  registerQuitCleanup(app, () => Promise.all([gateway.setEnabled(false), manager.stopAll()]).then(() => undefined))
 
   registerDevtoolsShortcut(win, app.isPackaged)
   registerZoomShortcuts(win)

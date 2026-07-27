@@ -44,6 +44,15 @@ it('config() names the shim and the handshake path and never leaks the token', a
   await s.setEnabled(false)
 })
 
+it('config() is null while disabled — never a snippet built from an empty handshake path', async () => {
+  const s = service()
+  expect(s.config()).toBeNull()             // never enabled yet
+  await s.setEnabled(true)
+  expect(s.config()).not.toBeNull()
+  await s.setEnabled(false)
+  expect(s.config()).toBeNull()              // switched back off — the old snippet must not linger
+})
+
 it('revoke drops a paired client', async () => {
   const s = service()
   await s.setEnabled(true)
