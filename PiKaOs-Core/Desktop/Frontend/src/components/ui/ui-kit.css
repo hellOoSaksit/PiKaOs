@@ -652,3 +652,22 @@ mark.hl-amethyst { background: color-mix(in srgb, var(--amethyst) 18%, transpare
 .pk-savebar-details-heading { color: var(--ink-3); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin: 0 0 4px; }
 .pk-savebar-details-item { font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); line-height: 1.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (prefers-reduced-motion: reduce) { .pk-popout { transition: opacity .2s; } .pk-popout.show { transform: translate(-50%, 0); } }
+
+/* Jump-to-row: a savebar detail entry (.pk-savebar-jump) that scrolls the table and calls
+   attention to the target with a brief gold-glow ring (.utable-tr.flash). The .utable-tr rules
+   themselves live in styles/rbac.css — this modifier stays with the feature that triggers it. */
+.pk-savebar-jump {
+  display: block; width: 100%; text-align: left; background: none; border: none; padding: 2px 4px;
+  border-radius: var(--radius-sm); cursor: pointer; font-family: var(--font-mono); font-size: 12px;
+  color: var(--ink-2); line-height: 1.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: color .14s, background .14s;
+}
+.pk-savebar-jump:hover { color: var(--gold-bright); background: var(--bg-3); text-decoration: underline; }
+.pk-savebar-jump:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--gold-glow); }
+@keyframes row-flash { from { box-shadow: inset 0 0 0 2px var(--gold-bright), 0 0 0 4px var(--gold-glow); background: var(--bg-3); } to { box-shadow: inset 0 0 0 2px transparent, 0 0 0 4px transparent; background: transparent; } }
+.utable-tr.flash { animation: row-flash 1.2s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  /* No animation under reduced motion — a static tint that clears via the animation's own
+     forwards-less end state would still be motion, so drop to a plain timed class instead. */
+  .utable-tr.flash { animation: none; background: var(--bg-3); box-shadow: inset 0 0 0 2px var(--gold-bright); }
+}

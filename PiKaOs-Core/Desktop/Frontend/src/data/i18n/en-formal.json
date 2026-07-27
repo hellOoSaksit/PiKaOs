@@ -404,6 +404,7 @@
     "mcpacl.details.hide": "Hide details",
     "mcpacl.details.added": "Newly allowed",
     "mcpacl.details.removed": "Revoked",
+    "mcpacl.details.jump": "Go to {tool}",
     "open.owner": "Owner",
     "open.badge": "Open server — no sign-in",
     "nav.collapse": "Collapse sidebar",
