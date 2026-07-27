@@ -27,6 +27,18 @@ const api = {
     tools: (id: string) => ipcRenderer.invoke('mcp:tools', id),
     callTool: (id: string, name: string, args: Record<string, unknown>) => ipcRenderer.invoke('mcp:callTool', id, name, args),
   },
+  gateway: {
+    status: () => ipcRenderer.invoke('gateway:status'),
+    setEnabled: (enabled: boolean) => ipcRenderer.invoke('gateway:setEnabled', { enabled }),
+    config: () => ipcRenderer.invoke('gateway:config'),
+    clients: () => ipcRenderer.invoke('gateway:clients'),
+    revoke: (name: string) => ipcRenderer.invoke('gateway:revoke', { name }),
+    onStatus: (cb: (s: { enabled: boolean; connections: number }) => void) => {
+      const listener = (_e: unknown, s: any) => cb(s)
+      ipcRenderer.on('gateway:status', listener)
+      return () => ipcRenderer.removeListener('gateway:status', listener)
+    },
+  },
   secrets: {
     setForServer: (sid: string, key: string, value: string) => ipcRenderer.invoke('secrets:setForServer', sid, key, value),
   },
