@@ -2,7 +2,7 @@
    sort, grant diffing, and — the one that matters — toEntries PRESERVES existing entry
    objects, so a future per-entry effect override survives an unrelated toggle+save. */
 import { describe, it, expect } from 'vitest';
-import { ownerOf, groupByOwner, diffGrants, toEntries } from './McpAllowlist.logic.js';
+import { ownerOf, groupByOwner, diffGrants, toEntries, describeChanges } from './McpAllowlist.logic.js';
 
 const T = (method, path, extra = {}) => ({
   name: `${method.toLowerCase()}_${path.replace(/^\/api\//, '').replace(/[/{}]+/g, '_')}`,
@@ -52,5 +52,36 @@ describe('toEntries', () => {
   it('keeps the existing entry object for surviving names (effect overrides survive)', () => {
     const initial = { keep: { effect: 'read' }, drop: {} };
     expect(toEntries(['keep', 'add'], initial)).toEqual({ keep: { effect: 'read' }, add: {} });
+  });
+});
+
+describe('describeChanges', () => {
+  const tools = [
+    T('GET', '/api/knowledge/search'), // name: get_knowledge_search
+    T('POST', '/api/knowledge/answer'), // name: post_knowledge_answer
+  ];
+
+  it('resolves a known tool name to its "METHOD /path" label', () => {
+    const diff = { added: ['get_knowledge_search'], removed: [], count: 1 };
+    const out = describeChanges(diff, [], tools);
+    expect(out.added).toEqual([{ name: 'get_knowledge_search', label: 'GET /api/knowledge/search' }]);
+  });
+
+  it('falls back to the bare name for a tool that has left the catalog', () => {
+    const diff = { added: [], removed: ['ghost_tool'], count: 1 };
+    const out = describeChanges(diff, [], tools);
+    expect(out.removed).toEqual([{ name: 'ghost_tool', label: 'ghost_tool' }]);
+  });
+
+  it('empty input yields empty lists and total 0', () => {
+    const out = describeChanges({ added: [], removed: [], count: 0 }, [], []);
+    expect(out).toEqual({ added: [], removed: [], orphans: [], total: 0 });
+  });
+
+  it('total counts added, removed, and orphans together', () => {
+    const diff = { added: ['get_knowledge_search'], removed: ['post_knowledge_answer'], count: 2 };
+    const out = describeChanges(diff, ['orphan_tool'], tools);
+    expect(out.total).toBe(3);
+    expect(out.orphans).toEqual([{ name: 'orphan_tool', label: 'orphan_tool' }]);
   });
 });

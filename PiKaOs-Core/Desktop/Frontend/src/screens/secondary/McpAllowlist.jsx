@@ -12,7 +12,19 @@ import Spinner from '../../components/ui/Spinner.jsx';
 import Switch from '../../components/ui/Switch.jsx';
 import Table from '../../components/ui/Table.jsx';
 import { raw } from '../../lib/api.js';
-import { groupByOwner, diffGrants, toEntries } from './McpAllowlist.logic.js';
+import { groupByOwner, diffGrants, toEntries, describeChanges } from './McpAllowlist.logic.js';
+
+/* One labelled group inside the SaveBar's expandable details region — renders only when it has
+   entries, so an all-additions or all-removals batch doesn't show empty headings. */
+function DetailGroup({ heading, items }) {
+  if (!items.length) return null;
+  return (
+    <div className="pk-savebar-details-group">
+      <p className="pk-savebar-details-heading">{heading}</p>
+      {items.map(item => <div key={item.name} className="pk-savebar-details-item">{item.label}</div>)}
+    </div>
+  );
+}
 
 const EFFECT_VARIANT = { read: 'st-done', idempotent_write: 'st-active', side_effect: 'pr-high' };
 
@@ -44,6 +56,7 @@ export function McpAllowlist({ Sys, activePlugins }) {
   const pluginIds = useMemo(() => new Set(activePlugins || []), [activePlugins]);
   const groups = useMemo(() => groupByOwner(state.tools, pluginIds), [state.tools, pluginIds]);
   const diff = useMemo(() => diffGrants(initialGranted, [...granted]), [initialGranted, granted]);
+  const changes = useMemo(() => describeChanges(diff, state.orphans, state.tools), [diff, state.orphans, state.tools]);
 
   const toggle = (name, on) => {
     setSaveFailed(false);   // a fresh edit supersedes any stale "save failed" banner
@@ -112,7 +125,15 @@ export function McpAllowlist({ Sys, activePlugins }) {
         label={saveFailed ? t('mcpacl.savefail') : (diff.count + ' · ' + t('mcpacl.unsaved'))}
         saveLabel={saving ? '…' : t('mcpacl.save')} cancelLabel={t('mcpacl.cancel')}
         onSave={saving ? undefined : save}
-        onCancel={() => setGranted(new Set(initialGranted))} />
+        onCancel={() => setGranted(new Set(initialGranted))}
+        details={changes.total > 0 ? (
+          <>
+            <DetailGroup heading={t('mcpacl.details.added')} items={changes.added} />
+            <DetailGroup heading={t('mcpacl.details.removed')} items={changes.removed} />
+            <DetailGroup heading={t('mcpacl.orphan.title')} items={changes.orphans} />
+          </>
+        ) : null}
+        detailsLabel={t('mcpacl.details.show')} detailsHideLabel={t('mcpacl.details.hide')} />
     </div>
   );
 }
