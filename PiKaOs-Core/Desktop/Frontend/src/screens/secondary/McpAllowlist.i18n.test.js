@@ -4,7 +4,8 @@ import th from '../../data/i18n/th-formal.json';
 import ja from '../../data/i18n/ja-formal.json';
 
 const keys = (p) => Object.keys(p.translations ?? p)
-  .filter(k => k.startsWith('mcpacl.') || k === 'mcpskill.tab.allowlist' || k === 'mcpskill.tabdesc.allowlist')
+  .filter(k => k.startsWith('mcpacl.') || k.startsWith('mcpgw.')
+    || k === 'mcpskill.tab.allowlist' || k === 'mcpskill.tabdesc.allowlist')
   .sort();
 
 describe('mcpacl.* i18n parity', () => {
@@ -13,5 +14,15 @@ describe('mcpacl.* i18n parity', () => {
     expect(base.length).toBeGreaterThan(10);
     expect(keys(th)).toEqual(base);
     expect(keys(ja)).toEqual(base);
+  });
+
+  it('the gateway panel keys exist in every pack', () => {
+    const need = ['mcpgw.title', 'mcpgw.enable', 'mcpgw.status.off', 'mcpgw.status.waiting',
+      'mcpgw.status.connected', 'mcpgw.config.title', 'mcpgw.config.copy', 'mcpgw.config.copied',
+      'mcpgw.clients.title', 'mcpgw.clients.empty', 'mcpgw.clients.revoke', 'mcpgw.unverified'];
+    for (const pack of [en, th, ja]) {
+      const table = pack.translations ?? pack;
+      for (const k of need) expect(table[k], `${k} missing`).toBeTruthy();
+    }
   });
 });

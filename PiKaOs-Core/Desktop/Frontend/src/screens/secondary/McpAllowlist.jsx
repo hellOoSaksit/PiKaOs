@@ -11,6 +11,7 @@ import SaveBar from '../../components/ui/SaveBar.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 import Switch from '../../components/ui/Switch.jsx';
 import Table from '../../components/ui/Table.jsx';
+import McpGatewayPanel from './McpGatewayPanel.jsx';
 import { raw } from '../../lib/api.js';
 import { groupByOwner, diffGrants, toEntries, describeChanges } from './McpAllowlist.logic.js';
 
@@ -127,7 +128,10 @@ export function McpAllowlist({ Sys, activePlugins }) {
   );
   if (state.loading) return <div className="content-pad"><Spinner /></div>;
   if (!state.tools.length && !state.orphans.length) return (
-    <div className="content-pad"><Empty icon="lock" title={t('mcpacl.empty')} /></div>
+    <div className="content-pad">
+      <McpGatewayPanel Sys={Sys} />
+      <Empty icon="lock" title={t('mcpacl.empty')} />
+    </div>
   );
 
   const columns = [
@@ -146,6 +150,7 @@ export function McpAllowlist({ Sys, activePlugins }) {
 
   return (
     <div className="content-pad">
+      <McpGatewayPanel Sys={Sys} />
       {groups.map(g => (
         <Panel key={g.owner} title={g.owner === 'core' ? t('mcpacl.group.core') : g.owner}>
           <Table columns={columns} rows={g.tools.map(x => ({ ...x, id: x.name }))} />
