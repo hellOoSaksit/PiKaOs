@@ -303,3 +303,49 @@ def test_forbidden_core_surface_never_enters_the_catalog():
     }
     leaked = FORBIDDEN & catalog_paths
     assert not leaked, f"forbidden routes leaked into the MCP catalog: {leaked}"
+
+
+def test_knowledge_view_routes_shape_enters_catalog_writes_stay_out(state_dir):
+    """Mirrors PiKaOs-Plugin-Knowledge/backend/router.py's guard shapes after E2a: the four
+    view routes are ai_safe, the three writes are not. If the real router drifts from this
+    fixture, the live UAT (plan Task 8) is the net."""
+    app = FastAPI()
+    kb = APIRouter(prefix="/api/knowledge")
+
+    @kb.get("/search", summary="Search")
+    async def search(q: str = "", _=Depends(require_perm("knowledge.view", ai_safe=True))):
+        return {}
+
+    @kb.post("/answer", summary="Answer")
+    async def answer(_=Depends(require_perm("knowledge.view", ai_safe=True))):
+        return {}
+
+    @kb.get("/docs", summary="List docs")
+    async def docs(_=Depends(require_perm("knowledge.view", ai_safe=True))):
+        return {}
+
+    @kb.get("/docs/{doc_id}", summary="Get doc")
+    async def doc(doc_id: str, _=Depends(require_perm("knowledge.view", ai_safe=True))):
+        return {}
+
+    @kb.post("/docs", summary="Upload")
+    async def upload(_=Depends(require_perm("knowledge.manage"))):
+        return {}
+
+    @kb.post("/reindex", summary="Reindex")
+    async def reindex(_=Depends(require_perm("knowledge.manage"))):
+        return {}
+
+    @kb.delete("/docs/{doc_id}", summary="Delete doc")
+    async def delete_doc(doc_id: str, _=Depends(require_perm("knowledge.delete"))):
+        return {}
+
+    app.include_router(kb)
+    tools = {(t.method, t.path): t for t in build_catalog(app)}
+    assert set(tools) == {
+        ("GET", "/api/knowledge/search"), ("POST", "/api/knowledge/answer"),
+        ("GET", "/api/knowledge/docs"), ("GET", "/api/knowledge/docs/{doc_id}"),
+    }
+    assert all(t.permission == "knowledge.view" for t in tools.values())
+    assert tools[("POST", "/api/knowledge/answer")].effect == EFFECT_SIDE_EFFECT  # pessimistic POST rule stands
+    assert tools[("GET", "/api/knowledge/search")].effect == EFFECT_READ
