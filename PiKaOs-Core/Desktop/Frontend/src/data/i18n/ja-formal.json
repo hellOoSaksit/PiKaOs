@@ -109,6 +109,7 @@
     "mcpgw.clients.empty": "承認済みのクライアントはまだありません。",
     "mcpgw.clients.revoke": "取り消す",
     "mcpgw.unverified": "クライアント名は自己申告であり検証されていません。自分で起動したものだけを承認してください。",
+    "mcpgw.error": "操作を反映できませんでした。もう一度お試しください。",
     "open.owner": "オーナー",
     "open.badge": "オープンサーバー — サインイン不要",
     "nav.collapse": "サイドバーを折りたたむ",
