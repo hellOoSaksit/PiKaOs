@@ -4,6 +4,7 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { serializeMessage } from '@modelcontextprotocol/sdk/shared/stdio.js'
 import { startPipe } from '../src/main/gateway/pipe'
 import { createGatewayServer } from '../src/main/gateway/server'
 import { StreamTransport } from '../src/main/mcp/transport'
@@ -230,4 +231,70 @@ it('disconnect(name) closes a live connection paired under that name', async () 
   const closed = new Promise<void>(r => sock.once('close', r))
   gw.disconnect('revoke-test-client')
   await closed
+})
+
+// Live-UAT regression: this is the shim's actual write pattern (pikaos-mcp.ts's socketLink writes
+// the token line via one sock.write(), then the SDK Client under it flushes initialize and
+// notifications/initialized as fast, separate — but OS-coalesced — writes). When the token line and
+// the first JSON-RPC frames land in ONE 'data' chunk on the server, the measured live-UAT defect was
+// the socket closing in ~2ms with zero bytes written back and no pairing dialog ever shown.
+it('answers initialize when the token line and the full handshake arrive in a single write', async () => {
+  const { handshake } = await start()
+  const sock = createConnection(handshake.pipe)
+  await new Promise(r => sock.once('connect', r))
+
+  const initRequest = serializeMessage({
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'initialize',
+    params: {
+      protocolVersion: '2025-11-25',
+      capabilities: {},
+      clientInfo: { name: 'same-write-client', version: '1' },
+    },
+  })
+  const initializedNotification = serializeMessage({ jsonrpc: '2.0', method: 'notifications/initialized' })
+  // One write, deliberately: token line + initialize + notifications/initialized concatenated into a
+  // single Buffer before it ever reaches the socket, so Node hands it to 'data' as one chunk.
+  sock.write(handshake.token + '\n' + initRequest + initializedNotification)
+
+  const chunks: Buffer[] = []
+  sock.on('data', (c) => chunks.push(c))
+  const closed = new Promise<void>(r => sock.once('close', r))
+  await Promise.race([
+    new Promise(r => setTimeout(r, 300)),
+    closed.then(() => { throw new Error('socket closed before answering initialize') }),
+  ])
+  expect(Buffer.concat(chunks).toString()).toContain('"id":1')
+  sock.destroy()
+})
+
+// Pins the working case alongside the one above so a fix for same-chunk delivery can't regress the
+// split case: token line arrives, then the handshake frames arrive in a LATER chunk. This is the
+// case the live UAT measured as already working (400ms apart) and it must stay that way.
+it('answers initialize when the token line and the handshake arrive in separate chunks', async () => {
+  const { handshake } = await start()
+  const sock = createConnection(handshake.pipe)
+  await new Promise(r => sock.once('connect', r))
+  sock.write(handshake.token + '\n')
+  await new Promise(r => setTimeout(r, 50))   // force two distinct 'data' events on the server
+
+  const initRequest = serializeMessage({
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'initialize',
+    params: {
+      protocolVersion: '2025-11-25',
+      capabilities: {},
+      clientInfo: { name: 'split-write-client', version: '1' },
+    },
+  })
+  const initializedNotification = serializeMessage({ jsonrpc: '2.0', method: 'notifications/initialized' })
+  sock.write(initRequest + initializedNotification)
+
+  const chunks: Buffer[] = []
+  sock.on('data', (c) => chunks.push(c))
+  await new Promise(r => setTimeout(r, 300))
+  expect(Buffer.concat(chunks).toString()).toContain('"id":1')
+  sock.destroy()
 })
