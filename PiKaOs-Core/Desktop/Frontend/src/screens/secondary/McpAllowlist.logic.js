@@ -42,3 +42,19 @@ export function toEntries(edited, initialEntries) {
   for (const name of edited) out[name] = (initialEntries || {})[name] || {};
   return out;
 }
+
+/* The pending change set, resolved to something displayable: each granted/revoked name paired with
+   the "METHOD /path" the operator recognises from the table (falling back to the raw name when the
+   tool has left the catalog). Pure so the bar's contents are testable without rendering anything. */
+export function describeChanges(diff, orphans, tools) {
+  const byName = new Map((tools || []).map(t => [t.name, t]));
+  const label = (name) => {
+    const t = byName.get(name);
+    return t ? `${t.method} ${t.path}` : name;
+  };
+  const describe = (names) => (names || []).map(name => ({ name, label: label(name) }));
+  const added = describe(diff && diff.added);
+  const removed = describe(diff && diff.removed);
+  const orphansOut = describe(orphans);
+  return { added, removed, orphans: orphansOut, total: added.length + removed.length + orphansOut.length };
+}
