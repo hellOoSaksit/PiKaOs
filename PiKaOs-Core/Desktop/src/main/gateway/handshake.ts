@@ -25,10 +25,24 @@ export function writeHandshake(userDataDir: string): { handshake: Handshake; pat
   // write down the create path every time, so 0o600 always takes effect — even if the
   // file was left group/world-readable by an older build, a manual chmod, or a backup
   // tool, and even though the new content is a fresh token.
-  try {
-    unlinkSync(path)
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException)?.code !== 'ENOENT') throw err
+  //
+  // This only matters on POSIX: `mode` bits are a POSIX permission concept, so on
+  // Windows the unlink buys nothing. There it only adds risk — deleting a file needs
+  // more privilege than overwriting one, and if an AV scanner, the search indexer, or a
+  // backup agent has gateway.json open without FILE_SHARE_DELETE at that instant,
+  // unlinkSync throws EBUSY/EPERM (not ENOENT, so the guard below rethrows it) and
+  // startup fails for no security benefit. So skip the unlink on win32 and overwrite in
+  // place, exactly as before this fix.
+  //
+  // Trade-off accepted on POSIX: a crash between the unlink and the write below leaves
+  // gateway.json absent rather than stale. That's intentional — an absent file fails
+  // cleanly on the next readHandshake, whereas a stale file would hand out a dead token.
+  if (process.platform !== 'win32') {
+    try {
+      unlinkSync(path)
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code !== 'ENOENT') throw err
+    }
   }
   writeFileSync(path, JSON.stringify(handshake), { mode: 0o600 })
   return { handshake, path }
