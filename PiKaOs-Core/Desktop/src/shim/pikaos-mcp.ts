@@ -1,4 +1,5 @@
 import { createConnection } from 'node:net'
+import { createReadStream } from 'node:fs'
 import { ReadBuffer, serializeMessage } from '@modelcontextprotocol/sdk/shared/stdio.js'
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js'
 import { readHandshake } from '../main/gateway/handshake'
@@ -58,8 +59,20 @@ export function runShim(argv: string[], writeOut: (chunk: string) => void = (s) 
     () => socketLink(handshakePath),
   )
   const buffer = new ReadBuffer()
-  process.stdin.on('data', (chunk: Buffer) => {
-    buffer.append(chunk)
+
+  // Read the client's frames off fd 0 directly instead of process.stdin. Measured live UAT fact
+  // (2026-07-27, both dist\win-unpacked\PiKaOs Desktop.exe and dev electron.exe, stdio piped from a
+  // parent): in an Electron main process on Windows, process.stdin is EOF from the very first tick —
+  // 'data' never fires, 'end'/'close' fire immediately, even though process.stdin.readable reports
+  // true and isTTY is undefined. The underlying fd is fine — fs.createReadStream(null, { fd: 0 })
+  // received the parent's bytes intact in the same process. So this MUST stay reading raw fd 0; do
+  // not "simplify" it back to process.stdin, that silently drops every byte the client sends (in dev
+  // Electron too — it is not packaging-specific). autoClose: false because fd 0 is not ours to close.
+  const stdin = createReadStream(null as unknown as string, { fd: 0, autoClose: false })
+  stdin.on('data', (chunk: string | Buffer) => {
+    // No encoding is set on this stream, so it always emits Buffer at runtime; the string half of
+    // the type is only there for streams that opt into one.
+    buffer.append(chunk as Buffer)
     for (;;) {
       let m: JSONRPCMessage | null
       try { m = buffer.readMessage() } catch { return }
@@ -67,6 +80,17 @@ export function runShim(argv: string[], writeOut: (chunk: string) => void = (s) 
       shim.fromClient(m)
     }
   })
-  process.stdin.on('close', () => process.exit(0))   // the client killed us; leave nothing running
+  // The client going away must exit 0 with nothing left running, same as process.stdin's 'close' did
+  // before. A stream can end without a prompt 'close' on a half-close (the writer shut its end but
+  // the fd itself is still open), so both are wired to the same exit — process.exit() runs at most
+  // once in practice since the process is gone after the first call.
+  stdin.on('end', () => process.exit(0))
+  stdin.on('close', () => process.exit(0))
+  // fd 0 going bad (e.g. the parent's pipe torn down mid-read) is a stdin fault, not a JSON-RPC one —
+  // it must never be written to stdout, which is the frame channel.
+  stdin.on('error', (err) => {
+    process.stderr.write(`pikaos-mcp: stdin read error: ${err?.stack ?? err}\n`)
+    process.exit(1)
+  })
   shim.start()
 }

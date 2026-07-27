@@ -103,6 +103,17 @@ function runMain(): void {
     // frame sink, so the shim's replies still reach the real stdout. This cannot cover native
     // Electron/Chromium output that never goes through Node's process.stdout — see the gateway shim
     // report for exactly what live UAT must still check.
+    //
+    // Measured fact (live UAT, both dist\win-unpacked\PiKaOs Desktop.exe and dev electron.exe):
+    // Electron itself writes a bare "\r\n" to stdout before any JavaScript runs — present in every
+    // run, ahead of our own first write, and NOT suppressed by ELECTRON_NO_ATTACH_CONSOLE=1. No
+    // redirection here can prevent it: it happens before this file's code exists to run. It is
+    // tolerable rather than worth fighting because the MCP SDK already absorbs it — ReadBuffer's
+    // readMessage() strips the trailing \r, leaving an empty line, JSON.parse('') throws, and
+    // StdioClientTransport.processReadBuffer() (node_modules/@modelcontextprotocol/sdk/dist/esm/
+    // client/stdio.js, via shared/stdio.js) catches that, reports it through onerror, and continues
+    // the loop with the buffer already advanced past that line. Net effect: the client sees exactly
+    // one harmless parse error at startup, then the connection behaves normally.
     const realStdoutWrite = process.stdout.write.bind(process.stdout)
     process.stdout.write = process.stderr.write.bind(process.stderr) as typeof process.stdout.write
 
