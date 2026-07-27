@@ -84,3 +84,56 @@ it('when the link drops it announces the list again so the client sees it empty'
   await new Promise(r => setImmediate(r))
   expect(out.filter((m: any) => m.method === 'notifications/tools/list_changed')).toHaveLength(2)
 })
+
+// The five tests above all call fromClient() before start() — the client's first message always
+// arrives while the shim is still offline. That is not the common case: PiKaOs is usually already
+// running when the client starts, so the link is up before `initialize` ever shows up. This test
+// inverts the order to prove initReq/initNote get captured in that case too.
+it('captures initialize even when the link is already connected, then replays it on the next reconnect', async () => {
+  vi.useFakeTimers()
+  try {
+    const out: any[] = []
+    const links = [link(), link()]
+    let i = 0
+    const shim = new Shim((m) => out.push(m), async () => links[i++].api)
+
+    shim.start()
+    await vi.advanceTimersByTimeAsync(0)   // first link attaches before the client ever speaks
+
+    shim.fromClient(INIT)
+    shim.fromClient({ jsonrpc: '2.0', method: 'notifications/initialized' } as any)
+
+    // The handshake must be forwarded to main (it needs to answer it) even though the link is up.
+    expect(links[0].sent.map((m: any) => m.method)).toEqual(['initialize', 'notifications/initialized'])
+    links[0].reply({ jsonrpc: '2.0', id: 1, result: { protocolVersion: '2025-11-25' } })
+
+    links[0].drop()
+    await vi.advanceTimersByTimeAsync(0)
+    // announce() must fire on this drop, which only happens if initReq was actually captured.
+    expect(out.filter((m: any) => m.method === 'notifications/tools/list_changed')).toHaveLength(1)
+
+    await vi.advanceTimersByTimeAsync(5000)   // let scheduleRetry's backoff elapse and reconnect fire
+    // The replay on reconnect only happens if initReq/initNote survived being captured while online.
+    expect(links[1].sent.map((m: any) => m.method)).toEqual(['initialize', 'notifications/initialized'])
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('errors an in-flight request when the link drops before main answers it', async () => {
+  const out: any[] = []
+  const L = link()
+  const shim = new Shim((m) => out.push(m), async () => L.api)
+  shim.fromClient(INIT)
+  shim.start()
+  await new Promise(r => setImmediate(r))
+
+  shim.fromClient({ jsonrpc: '2.0', id: 42, method: 'tools/call', params: { name: 't' } } as any)
+  expect(L.sent.some((m: any) => m.id === 42)).toBe(true)   // forwarded to main, no reply yet
+
+  L.drop()
+  await new Promise(r => setImmediate(r))
+
+  const answer = out.find((m: any) => m.id === 42)
+  expect(answer?.error?.message).toMatch(/open pikaos/i)   // errored, not abandoned
+})
