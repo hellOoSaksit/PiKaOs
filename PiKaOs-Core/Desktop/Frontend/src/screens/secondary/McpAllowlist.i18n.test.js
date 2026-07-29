@@ -20,7 +20,8 @@ describe('mcpacl.* i18n parity', () => {
     const need = ['mcpgw.title', 'mcpgw.enable', 'mcpgw.status.off', 'mcpgw.status.waiting',
       'mcpgw.status.connected', 'mcpgw.config.title', 'mcpgw.config.copy', 'mcpgw.config.copied',
       'mcpgw.clients.title', 'mcpgw.clients.empty', 'mcpgw.clients.revoke', 'mcpgw.unverified',
-      'mcpgw.error'];
+      'mcpgw.error', 'mcpgw.confirm.enable', 'mcpgw.confirm.disable', 'mcpgw.confirm.revoke',
+      'mcpgw.confirm.ok', 'mcpgw.confirm.cancel'];
     for (const pack of [en, th, ja]) {
       const table = pack.translations ?? pack;
       for (const k of need) expect(table[k], `${k} missing`).toBeTruthy();
