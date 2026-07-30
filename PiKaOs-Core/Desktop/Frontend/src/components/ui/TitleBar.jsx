@@ -6,7 +6,7 @@ const desk = () => (typeof window !== 'undefined' ? window.pikaosDesktop : undef
 /** Functional title-bar toolbar (Window Controls Overlay draws min/max/close on the right).
  *  No CSS webkit drag region anywhere — it breaks click hit-testing on scaled Windows displays
  *  (Electron #7347). The window is dragged in JS via the empty handle instead. Desktop-only. */
-export default function TitleBar({ t, onSidebar, onSearch, onBack, onForward, canBack, canForward, canSearch = true, onMenuSettings, version }) {
+export default function TitleBar({ t, onSidebar, onSearch, onBack, onForward, canBack, canForward, canSearch = true, onMenuSettings, version, status = null }) {
   const api = desk();
   if (!api?.isDesktop) return null;
 
@@ -56,6 +56,10 @@ export default function TitleBar({ t, onSidebar, onSearch, onBack, onForward, ca
         <Button className="tb-btn" icon="search" label={t('titlebar.search')} onClick={onSearch} disabled={!canSearch} />
         <Button className="tb-btn" icon="chevron-left" label={t('titlebar.back')} onClick={onBack} disabled={!canBack} />
         <Button className="tb-btn" icon="chevron-right" label={t('titlebar.forward')} onClick={onForward} disabled={!canForward} />
+        {/* Status slot — the caller's node, at the end of the tools row rather than beside the drag
+            handle, so the handle's mousedown can never swallow a click meant for it. Inside
+            `.titlebar-tools` it inherits the row's stretch rules (see styles.css). */}
+        {status}
       </div>
       <div className="titlebar-draghandle" onMouseDown={onDragDown} onDoubleClick={() => api.window.toggleMaximize()} />
     </header>

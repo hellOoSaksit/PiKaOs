@@ -4,7 +4,6 @@ import { PopoverPanel } from './PopoverPanel.jsx';
 import { Icon } from './icons.jsx';
 import Tooltip from './Tooltip.jsx';
 import { AiConsole } from './AiConsole.jsx';
-import { GatewayIndicator } from './GatewayIndicator.jsx';
 import { unreadCount } from '../../lib/notifications.js';
 
 // The bar's buttons size their own glyph (no CSS slot owns it), so `size` is explicit here.
@@ -27,7 +26,7 @@ const ICONS = {
 export function BottomUtilityBar({
   t, route, onHome, onToggleNav, profile = null,
   notifications = [], onSearch, onAdd, showLabels = false,
-  onNotificationsOpened, onGateway,
+  onNotificationsOpened,
 }) {
   const [active, setActive] = useState(route === 'me' ? 'home' : null);
   const [openPop, setOpenPop] = useState(null);
@@ -126,8 +125,6 @@ export function BottomUtilityBar({
             </PopoverPanel>
           </div>
         )}
-
-        {window.pikaosDesktop?.isDesktop && <GatewayIndicator t={t} onClick={onGateway} />}
 
         {/* identity is a plugin's to own: no auth plugin, no account control (and no divider) */}
         {profile && <>

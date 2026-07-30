@@ -331,6 +331,21 @@ body {
 .btn.tb-btn > svg { width: 17px; height: 17px; }
 .btn.tb-btn:hover:not(:disabled) { background-color: var(--bg-4); color: var(--ink); box-shadow: none; transform: none; }
 .btn.tb-btn:disabled { opacity: .4; cursor: default; }
+/* Gateway status light — TitleBar's `status` slot, last in the tools row. A dot, not a `.tb-btn`:
+   it reports, and (only once signed in) navigates. Full bar height like its neighbours, for the same
+   Fitts's-law reason `.btn.tb-btn` is stretched, with the 8px dot centred in it. Pre-login it renders
+   as a <span> rather than a <button> (nowhere to navigate to), so the pointer cursor is scoped to the
+   button form — the dot must not advertise a click it cannot perform.
+   Waiting is --ink-4 (muted), NOT --amber: that token is reserved for warning states (see the token's
+   own "warning state only" comment above) and "listening, nobody connected" is not a warning. */
+.tb-gateway-light {
+  align-self: stretch; display: grid; place-items: center;
+  width: 26px; padding: 0; border: 0; background: none; color: inherit;
+}
+button.tb-gateway-light { cursor: pointer; }
+.tb-gateway-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-4); }
+.tb-gateway-light[data-live="true"] .tb-gateway-dot { background: var(--emerald); }
+
 .titlebar-draghandle { flex: 1; align-self: stretch; }
 
 /* ☰ app menu (File / View / Help) collapsed into the title bar. The ☰ is the leftmost control, so
