@@ -18,13 +18,14 @@ describe('utility bar gateway wiring', () => {
     expect(src).toMatch(/window\.pikaosDesktop\?\.isDesktop\s*&&\s*<GatewayIndicator\b/);
   });
 
-  it('the gateway light\'s aria-label key exists where the light actually ships (en, th)', () => {
+  it('the gateway light\'s aria-label and tooltip keys exist where the light actually ships (en, th)', () => {
     // ja is intentionally excluded: this pack does not carry full utilitybar.* parity today (only
     // utilitybar.nav exists) and falls back to en at render time — matching that existing convention
     // rather than inventing a stricter rule this fix wasn't asked to add.
     for (const pack of [en, th]) {
       const table = pack.translations ?? pack;
       expect(table['utilitybar.gateway'], 'utilitybar.gateway missing').toBeTruthy();
+      expect(table['utilitybar.gateway.tip'], 'utilitybar.gateway.tip missing').toBeTruthy();
     }
   });
 });
