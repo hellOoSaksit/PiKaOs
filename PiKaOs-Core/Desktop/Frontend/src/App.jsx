@@ -16,6 +16,7 @@ import { McpSkillHub } from './screens/secondary/McpSkillHub.jsx';
 import { ToolsManager } from './screens/screens-tools.jsx';
 import { useAuth } from './lib/auth.jsx';
 import { BottomUtilityBar } from './components/ui/BottomUtilityBar.jsx';
+import { GatewayIndicator } from './components/ui/GatewayIndicator.jsx';
 import { TitleBar, Tooltip } from './components/ui';
 import { Icon, renderIcon } from './components/ui/icons.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
@@ -424,7 +425,15 @@ function App() {
           canBack={histRef.current.idx > 0}
           canForward={histRef.current.idx < histRef.current.stack.length - 1}
           canSearch={signedIn}
-          onMenuSettings={() => go('toolsmgr')} version={caps?.version} />
+          onMenuSettings={() => go('toolsmgr')} version={caps?.version}
+          // The gateway light belongs HERE, not in BottomUtilityBar: withChrome wraps every shell
+          // mode, including the five pre-login/bootstrap early returns below, and `restore()` has
+          // already opened the pipe by the time any of them render — so in the bar the light was
+          // missing on exactly the screens where a restored gateway can be serving unattended.
+          // Rendered once, in one place. Pre-login there is no route to send the operator to, so no
+          // handler is passed and the component renders a non-interactive dot rather than a button
+          // that would do nothing.
+          status={<GatewayIndicator t={t} onClick={signedIn ? () => go('mcpskill') : undefined} />} />
         <div className="desktop-body">{body}</div>
       </div>
     );
@@ -502,8 +511,6 @@ function App() {
         onSearch={openPalette}
         // sequenced: an unsequenced reload races the mark and usually re-reads the pre-mark rows
         onNotificationsOpened={() => { markNotificationsRead().catch(() => {}).finally(loadNotifs); }}
-        // gateway light → the screen that owns the switch; guard() shows access-denied to non-admins
-        onGateway={() => go("mcpskill")}
       />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)}
         nav={visibleNav} t={t} can={can} go={go} />
