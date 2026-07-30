@@ -161,8 +161,9 @@ def clone_to_staging(repo_url: str, ref: str | None = None) -> Path:
 
 
 def list_remote_tags(repo_url: str) -> list[str]:
-    """Every semver tag on `repo_url`'s remote, deduped, sorted newest-first ([] on failure or no
-    semver tags). Annotated tags produce two ls-remote lines (`ref` and `ref^{}`) — hence the dedupe."""
+    """Every `MAJOR.MINOR.PATCH` release tag on `repo_url`'s remote (prereleases and build metadata
+    excluded), deduped, sorted newest-first ([] on failure or no matching tags). Annotated tags produce
+    two ls-remote lines (`ref` and `ref^{}`) — hence the dedupe."""
     result = _run_git(["ls-remote", "--tags", "--", repo_url],
                        askpass_token=_credential_for(_host_of(repo_url)), timeout=30)
     if result.returncode != 0:
