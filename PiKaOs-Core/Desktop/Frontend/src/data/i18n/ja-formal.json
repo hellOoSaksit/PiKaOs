@@ -119,7 +119,7 @@
     "open.badge": "オープンサーバー — サインイン不要",
     "nav.collapse": "サイドバーを折りたたむ",
     "nav.expand": "サイドバーを展開",
-    "titlebar.gateway": "MCP — 外部AIゲートウェイ",
+    "titlebar.gateway": "MCP — 外部AIゲートウェイ・{state}",
     "titlebar.gateway.tip": "MCP・{state}",
     "utilitybar.nav": "メニュー",
     "boot.starting": "{name} を起動中",

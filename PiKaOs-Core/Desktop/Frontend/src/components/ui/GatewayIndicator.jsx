@@ -22,11 +22,14 @@ export function GatewayIndicator({ t, onClick }) {
 
   const state = indicatorState(status);
   if (!state) return null;
-  // Lead the tooltip with the feature name (MCP) — the state alone ("2 connected") doesn't say what
-  // it's about, and the name that would answer that lives only in aria-label, which sighted users
-  // never see. The separator is translator-controlled text in the pack, not a JSX-side hardcode.
-  const tip = t('titlebar.gateway.tip', { state: t(state.key, state.params) });
-  const label = t('titlebar.gateway');
+  const stateText = t(state.key, state.params);
+  // Both strings carry the state, and both lead with the feature name — the state alone
+  // ("2 connected") doesn't say what it's about. The tooltip gets the short name because the bubble
+  // is small and its reader can see the dot; the accessible name gets the full one and is the ONLY
+  // place a screen-reader user learns either. Separators are translator-controlled text in the pack,
+  // never a JSX-side hardcode.
+  const tip = t('titlebar.gateway.tip', { state: stateText });
+  const label = t('titlebar.gateway', { state: stateText });
   const dot = <span className="tb-gateway-dot" />;
   return (
     <Tooltip label={tip} focusable={!onClick}>

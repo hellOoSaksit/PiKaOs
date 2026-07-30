@@ -957,7 +957,7 @@
     "utilitybar.add": "สร้าง",
     "utilitybar.add.title": "สร้างใหม่",
     "utilitybar.ai": "AI",
-    "titlebar.gateway": "MCP — เกตเวย์ AI ภายนอก",
+    "titlebar.gateway": "MCP — เกตเวย์ AI ภายนอก · {state}",
     "titlebar.gateway.tip": "MCP · {state}",
     "ai.title": "คอนโซล AI",
     "ai.loading": "กำลังโหลด…",
