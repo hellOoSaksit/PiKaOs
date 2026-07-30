@@ -1020,7 +1020,7 @@
     "utilitybar.add": "New",
     "utilitybar.add.title": "Create new",
     "utilitybar.ai": "AI",
-    "titlebar.gateway": "MCP — External AI gateway",
+    "titlebar.gateway": "MCP — External AI gateway · {state}",
     "titlebar.gateway.tip": "MCP · {state}",
     "ai.title": "AI Console",
     "ai.loading": "Loading…",
