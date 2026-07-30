@@ -205,7 +205,9 @@ def test_list_remote_tags_returns_semver_tags_newest_first(local_repo, tmp_path)
         '{"id":"crm","name":"CRM","version":"2.0.0","coreVersion":"*"}', encoding="utf-8")
     sp.run(["git", "add", "."], cwd=src, check=True)
     sp.run(["git", "commit", "-q", "-m", "v2"], cwd=src, check=True)
-    sp.run(["git", "tag", "v2.0.0"], cwd=src, check=True)
+    # annotated (-a), unlike the other tags here: ls-remote emits it as TWO lines (ref + ref^{}), the
+    # only way this test actually exercises the dedupe (real GitHub Release tags are annotated).
+    sp.run(["git", "tag", "-a", "v2.0.0", "-m", "v2"], cwd=src, check=True)
     sp.run(["git", "tag", "v1.2.0"], cwd=src, check=True)          # same commit, lower semver
     sp.run(["git", "tag", "not-semver"], cwd=src, check=True)      # must be ignored
     assert git_installer.list_remote_tags(local_repo) == ["v2.0.0", "v1.2.0", "v1.0.0"]
