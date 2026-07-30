@@ -9,6 +9,14 @@ export type Link = {
 
 const RETRY_MIN_MS = 1000
 const RETRY_MAX_MS = 5000
+// A link that connected but died before ever proving useful is a gateway that accepted the socket
+// and then rejected the client — denied, revoked, or unpaired-timeout; main deliberately won't say
+// which (pipe.ts: a dropped connection is all a rejected client is entitled to know). Retrying that
+// on the 5s track re-rings the refusal ~1/s forever (measured live, handoff LATEST-56 §4). Park it
+// at a minute instead. Self-healing is preserved: socketLink re-reads the handshake file on every
+// attempt, and an app restart rotates the pipe name — which lands a parked shim on the
+// connect-rejected track below, where min() clamps it straight back to 5s.
+const DEAD_LINK_MAX_MS = 60_000
 
 /**
  * Stdio ↔ pipe forwarder. When the pipe is up it is a byte pipe and knows nothing about MCP; when
@@ -31,6 +39,11 @@ export class Shim {
   // answer when the link drops must be failed rather than left to hang forever.
   private inFlight = new Set<string | number>()
   private delay = RETRY_MIN_MS
+  // Whether the CURRENT link ever answered a request the client itself was waiting on. That —
+  // not a successful connect, and not any response — is what "working" means here: main answers
+  // even a doomed client's `initialize` (the SDK handles it before requirePaired() gates the
+  // tools/* handlers), so anything weaker re-arms the fast retry track for denied clients.
+  private linkProven = false
 
   constructor(
     private write: (m: JSONRPCMessage) => void,
@@ -76,7 +89,7 @@ export class Shim {
   private async dial() {
     try {
       const link = await this.connect()
-      this.delay = RETRY_MIN_MS
+      this.linkProven = false
       this.link = link
       link.onMessage((m) => {
         const id = (m as any).id
@@ -86,6 +99,12 @@ export class Shim {
         // coincidence away from swallowing something that was never main's reply to the replay.
         const isResponse = 'result' in (m as any) || 'error' in (m as any)
         if (this.swallowId !== null && id === this.swallowId && isResponse) { this.swallowId = null; return }
+        // Proof the link is usable (see linkProven). The client's own initialize is excluded by id.
+        const initId = (this.initReq as (JSONRPCMessage & { id?: string | number }) | null)?.id
+        if (isResponse && id !== undefined && id !== initId) {
+          this.linkProven = true
+          this.delay = RETRY_MIN_MS
+        }
         if (id !== undefined) this.inFlight.delete(id)
         this.write(m)
       })
@@ -96,7 +115,9 @@ export class Shim {
         // Backed off like any other retry (not fired immediately): a flapping pipe must not turn
         // into a tight reconnect loop, and every reconnect re-announces, so a bare close→retry with
         // no gap would double-announce a link that never really changed.
-        this.scheduleRetry()
+        //
+        // Where the attempt died picks the ceiling — a resilience signal, never a reason.
+        this.scheduleRetry(this.linkProven ? RETRY_MAX_MS : DEAD_LINK_MAX_MS)
       })
       if (this.initReq) {
         this.swallowId = (this.initReq as any).id
@@ -105,14 +126,19 @@ export class Shim {
         this.announce()
       }
     } catch {
-      this.scheduleRetry()
+      // The pipe itself is absent — nobody rejected anything, so this is the ordinary "app not
+      // running yet" case and stays on the fast 5s track.
+      this.scheduleRetry(RETRY_MAX_MS)
     }
   }
 
-  private scheduleRetry() {
+  private scheduleRetry(ceiling: number) {
+    // Clamp on entry too: a shim parked at the 60s dead-link ceiling whose next attempt gets
+    // connect-refused (app restarted, pipe name rotated) must wait 5s, not one more minute.
+    this.delay = Math.min(this.delay, ceiling)
     const t = setTimeout(() => void this.dial(), this.delay)
     if (typeof t.unref === 'function') t.unref()
-    this.delay = Math.min(this.delay * 2, RETRY_MAX_MS)
+    this.delay = Math.min(this.delay * 2, ceiling)
   }
 
   // Only meaningful once the client has initialized; before that there is no list to change.

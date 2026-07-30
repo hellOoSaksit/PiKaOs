@@ -164,3 +164,105 @@ it('errors an in-flight request when the link drops before main answers it', asy
   const answer = out.find((m: any) => m.id === 42)
   expect(answer?.error?.message).toMatch(/open pikaos/i)   // errored, not abandoned
 })
+
+// ---- proven-link backoff (spec 2026-07-30-gateway-retry-persistence-design.md §1) ----
+
+// Test rig for the retry ladder. `dials` counts connect attempts; `rejectNext` flips the rig from
+// "gateway accepts then denies" to "pipe absent" (connect rejects). `expectNextDialAfter` is the
+// only reliable way to measure a gap under fake timers: assert nothing fires one tick early, then
+// that exactly one dial fires on the tick — computing gaps from recorded timestamps silently
+// includes whatever the test advanced between drop and dial.
+const rig = () => {
+  const out: any[] = []
+  const links: ReturnType<typeof link>[] = []
+  const state = { dials: 0, rejectNext: false }
+  const shim = new Shim((m) => out.push(m), async () => {
+    state.dials++
+    if (state.rejectNext) throw new Error('ENOENT')
+    const L = link(); links.push(L); return L.api
+  })
+  const last = () => links[links.length - 1]
+  // Swallowed replay answer + drop = one deny cycle, exactly what main does to a denied client.
+  const deny = () => {
+    last().reply({ jsonrpc: '2.0', id: 1, result: { protocolVersion: '2025-11-25' } })
+    last().drop()
+  }
+  const expectNextDialAfter = async (ms: number) => {
+    const before = state.dials
+    await vi.advanceTimersByTimeAsync(ms - 1)
+    expect(state.dials).toBe(before)          // one tick early: nothing
+    await vi.advanceTimersByTimeAsync(1)
+    expect(state.dials).toBe(before + 1)      // on the tick: exactly one dial
+  }
+  return { out, links, state, shim, last, deny, expectNextDialAfter }
+}
+
+it('a link that dies before answering any real request parks at the 60s dead-link ceiling', async () => {
+  vi.useFakeTimers()
+  try {
+    const r = rig()
+    r.shim.fromClient(INIT)
+    r.shim.fromClient({ jsonrpc: '2.0', method: 'notifications/initialized' } as any)
+    r.shim.start()
+    await vi.advanceTimersByTimeAsync(0)      // first link attaches
+    // The full ladder: doubles from 1s and PARKS at 60s (not 5s, not still climbing).
+    for (const gap of [1000, 2000, 4000, 8000, 16_000, 32_000, 60_000, 60_000]) {
+      r.deny()
+      await r.expectNextDialAfter(gap)
+    }
+  } finally { vi.useRealTimers() }
+})
+
+it('a response the client is waiting on proves the link and re-arms the fast track', async () => {
+  vi.useFakeTimers()
+  try {
+    const r = rig()
+    r.shim.fromClient(INIT)
+    r.shim.fromClient({ jsonrpc: '2.0', method: 'notifications/initialized' } as any)
+    r.shim.start()
+    await vi.advanceTimersByTimeAsync(0)
+    // Climb first, so a reset is distinguishable from "was still at the minimum".
+    r.deny(); await r.expectNextDialAfter(1000)
+    r.deny(); await r.expectNextDialAfter(2000)
+    r.deny(); await r.expectNextDialAfter(4000)
+    // Healthy cycle: main answers a REAL request (id 9 — not the replayed initialize).
+    r.last().reply({ jsonrpc: '2.0', id: 1, result: { protocolVersion: '2025-11-25' } })  // swallowed
+    r.last().reply({ jsonrpc: '2.0', id: 9, result: { tools: [] } })                      // proof
+    r.last().drop()
+    await r.expectNextDialAfter(1000)         // proven ⇒ back to RETRY_MIN_MS, not 8s
+  } finally { vi.useRealTimers() }
+})
+
+it("the client's own initialize response does not prove the link", async () => {
+  vi.useFakeTimers()
+  try {
+    const r = rig()
+    r.shim.start()
+    await vi.advanceTimersByTimeAsync(0)      // link up before the client speaks
+    r.shim.fromClient(INIT)                   // forwarded to main (id 1 lands in inFlight)
+    r.last().reply({ jsonrpc: '2.0', id: 1, result: { protocolVersion: '2025-11-25' } })
+    r.last().drop()                           // died having answered ONLY the client's initialize
+    await r.expectNextDialAfter(1000)         // delay was still at the minimum...
+    r.deny()
+    // ...and had it counted as proof this gap would be 1s again. Unproven, it doubled.
+    await r.expectNextDialAfter(2000)
+  } finally { vi.useRealTimers() }
+})
+
+it('a shim parked at 60s falls back to the 5s track when the pipe disappears', async () => {
+  vi.useFakeTimers()
+  try {
+    const r = rig()
+    r.shim.fromClient(INIT)
+    r.shim.start()
+    await vi.advanceTimersByTimeAsync(0)
+    for (const gap of [1000, 2000, 4000, 8000, 16_000, 32_000, 60_000]) {   // park at the ceiling
+      r.deny()
+      await r.expectNextDialAfter(gap)
+    }
+    r.state.rejectNext = true                 // app restarted: the old pipe name is gone
+    r.deny()                                  // drop the current link; next dial (at 60s) rejects
+    await r.expectNextDialAfter(60_000)
+    await r.expectNextDialAfter(5000)         // clamped to the connect-rejected ceiling, not 60s
+  } finally { vi.useRealTimers() }
+})
