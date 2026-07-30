@@ -68,6 +68,8 @@ class PluginOut(BaseModel):
     repoUrl: str | None = None      # None for a dev-symlinked plugin — no remote to show/check-update against
     installedVia: str = "symlink"   # "symlink" (dev sibling checkout) | "git" (install-from-git / update)
     installedSha: str | None = None # W2: the immutable commit pin for a git-installed plugin
+    installedTag: str | None = None # the git tag currently checked out (git installs only)
+    previousTag: str | None = None  # newest previously-installed tag ≠ current — the rollback target
 
 
 class InstallPlanOut(BaseModel):
@@ -99,6 +101,20 @@ class GitCredentialIn(BaseModel):
     token: str
 
 
+class VersionEntryOut(BaseModel):
+    tag: str
+    current: bool = False
+    previouslyInstalled: bool = False
+
+
+class VersionsOut(BaseModel):
+    versions: list[VersionEntryOut]
+
+
+class UpdateIn(BaseModel):
+    tag: str | None = None          # None = latest tag (unchanged default behavior)
+
+
 def _view(reg: dict[str, dict], active: set[str]) -> list[PluginOut]:
     out: list[PluginOut] = []
     for pid, mf in sorted(_manifests().items()):
@@ -118,6 +134,8 @@ def _view(reg: dict[str, dict], active: set[str]) -> list[PluginOut]:
             repoUrl=registry.repo_url_of(reg, pid),
             installedVia=registry.installed_via(reg, pid),
             installedSha=registry.installed_sha_of(reg, pid),
+            installedTag=registry.installed_tag_of(reg, pid),
+            previousTag=registry.previous_tag_of(reg, pid),
         ))
     return out
 
@@ -346,13 +364,38 @@ async def check_update(
     return CheckUpdateOut(latestVersion=latest, hasUpdate=has_update, tagMoved=tag_moved)
 
 
+@router.get("/{plugin_id}/versions", response_model=VersionsOut)
+async def list_versions(
+    plugin_id: str,
+    _: UserLike = Depends(get_current_user),
+) -> VersionsOut:
+    """Every released (semver-tagged) version on the plugin's remote, newest-first, with the
+    installed one and this server's previously-installed ones marked (auto-update spec §5.1).
+    On-demand only — same no-background-polling principle as check-update. 404 for non-git installs
+    (a dev symlink has no remote)."""
+    _require_known(plugin_id)
+    reg = registry.read()
+    _require_git_installed(reg, plugin_id)
+    repo_url = registry.repo_url_of(reg, plugin_id)
+    tags = git_installer.list_remote_tags(repo_url) if repo_url else []
+    current = registry.installed_tag_of(reg, plugin_id)
+    seen = {h.get("tag") for h in registry.version_history_of(reg, plugin_id)}
+    return VersionsOut(versions=[
+        VersionEntryOut(tag=t, current=(t == current),
+                        previouslyInstalled=(t in seen and t != current))
+        for t in tags
+    ])
+
+
 @router.post("/{plugin_id}/update", response_model=ActionOut)
 async def update(
     plugin_id: str,
+    body: UpdateIn | None = None,
     user: UserLike = Depends(require_perm("plugins.manage")),
 ) -> ActionOut:
-    """Fetch + check out the latest tag, re-validate the manifest + readiness, apply on the existing
-    restart-to-apply model. 404 if not git-installed.
+    """Fetch + check out a tag, re-validate the manifest + readiness, apply on the existing
+    restart-to-apply model. 404 if not git-installed. With an explicit `tag` this is the switch-version
+    verb (spec §5.1): newer = update, older = rollback — same pipeline either way.
 
     Failure discipline mirrors `install_from_git` (§2.2), extended for the fact that — unlike a fresh
     install — there IS a previously-good on-disk version here: a failure that happens *after* the new
@@ -370,9 +413,20 @@ async def update(
     repo_url = registry.repo_url_of(reg, plugin_id)
     old_tag = registry.installed_tag_of(reg, plugin_id)
 
-    tag = git_installer.latest_tag(repo_url) if repo_url else None
-    if not tag:
-        raise HTTPException(status_code=422, detail="no update available")
+    requested = body.tag if body else None
+    if requested:
+        # validate against the remote BEFORE touching disk — unknown tag = 422, nothing changed
+        if git_installer.remote_tag_sha(repo_url, requested) is None:
+            raise HTTPException(status_code=422, detail="unknown version tag")
+        tag = requested
+    else:
+        tag = git_installer.latest_tag(repo_url) if repo_url else None
+        if not tag:
+            raise HTTPException(status_code=422, detail="no update available")
+
+    if tag == old_tag:
+        # switching to what's already installed is a success, not an error — and not a history entry
+        return _action_response(reg)
 
     plugin_dir = plugin_loader.PLUGINS_DIR / plugin_id
     try:
