@@ -78,10 +78,12 @@ it('a teardown that rejects still resolves — quit must not raise an unhandled 
 })
 
 // --- the wiring inside index.ts ----------------------------------------------------------------
-// index.ts has no test file and cannot get one: importing it boots Electron. These three lines are
-// the ones whose deletion no unit test above can see, and each silently disables the persisted-gateway
-// feature, so they are pinned by reading the source — the same boundary-policing idiom as
-// ai-system-prompt.test.ts's "no main-process rule string in a .jsx" scan.
+// index.ts has no test file and cannot get one: importing it boots Electron. The lines pinned below
+// are the ones whose deletion no unit test above can see — each silently disables the gateway, or a
+// gate protecting it, while the whole suite stays green — so they are pinned by reading the source:
+// the same boundary-policing idiom as ai-system-prompt.test.ts's "no main-process rule string in a
+// .jsx" scan. The standing rule this branch keeps re-learning: a wiring line in a file that cannot be
+// imported is invisible to the suite; pin it or lose it.
 //
 // What these scans CANNOT see: liveness. `if (app.isPackaged) void gateway.restore()` keeps every pin
 // below green while boot replay is dead in dev. They prove a line still exists, never that it runs —
@@ -109,4 +111,48 @@ it('index.ts returns after app.quit() when it loses the single-instance lock', (
   // → writeHandshake(), rewriting the RUNNING instance's gateway.json with a pipe that dies with this
   // process and a token no client has.
   expect(mainSource()).toMatch(/if \(!gotLock\) \{\s*app\.quit\(\);\s*return\s*\}/)
+})
+
+it('index.ts takes the shim branch BEFORE it asks for the single-instance lock', () => {
+  // An ORDERING, so assert positions — mere presence is exactly what a "tidy the startup sequence"
+  // edit would leave intact. PiKaOs is normally already running when Claude Desktop spawns the shim
+  // (that IS the point), so below the lock the shim launch is quit as a second instance before it
+  // speaks a byte, and shim-mode.test.ts — which proves the pure predicate — never notices.
+  //
+  // Both needles are the CODE forms: bare `app.requestSingleInstanceLock()` also appears in the
+  // comment above the shim branch, i.e. earlier in the file, which would invert this comparison.
+  const src = mainSource()
+  const shim = src.indexOf('if (isShimMode(process.argv))')
+  const lock = src.indexOf('const gotLock = app.requestSingleInstanceLock()')
+  expect(shim, 'shim branch not found').toBeGreaterThan(-1)
+  expect(lock, 'single-instance lock not found').toBeGreaterThan(-1)
+  expect(shim).toBeLessThan(lock)
+})
+
+it('the shim gets the PRE-redirect stdout writer as its frame sink', () => {
+  // Three lines, one mechanism: capture the real process.stdout.write, repoint process.stdout.write
+  // at stderr, hand the captured original to runShim. Delete the redirect and any console.log in the
+  // process corrupts the JSON-RPC stream; delete the capture or the argument and runShim's default
+  // parameter writes frames into the REDIRECTED sink, so the client receives nothing at all. Every
+  // one of those failures is silent and leaves the suite green.
+  const src = mainSource()
+  expect(src).toMatch(/const realStdoutWrite = process\.stdout\.write\.bind\(process\.stdout\)/)
+  expect(src).toMatch(/process\.stdout\.write = process\.stderr\.write\.bind\(process\.stderr\)/)
+  expect(src).toMatch(/runShim\(process\.argv,\s*realStdoutWrite\)/)
+  // The capture must come FIRST — after the redirect it captures stderr's write, and the shim's
+  // replies go to the diagnostic channel instead of to the client.
+  expect(src.indexOf('const realStdoutWrite ='))
+    .toBeLessThan(src.indexOf('process.stdout.write = process.stderr.write'))
+})
+
+it('index.ts wires the real pairing and consent dialogs into the gateway', () => {
+  // Gates 3 and 5 of security.md's five. Replace either with `async () => true` and the entire suite
+  // stays green: gateway-ipc.test.ts, gateway-pipe.test.ts and gateway-server.test.ts each inject
+  // their own always-allow fakes, so every one of them ASSUMES this wiring rather than checking it.
+  const src = mainSource()
+  expect(src).toMatch(/pairClient: confirmClientPairing/)
+  // The store path is part of what is pinned, not incidental detail: makeConsent keys approvals by
+  // tool name and knows nothing about the caller, so pointing this back at ai-approvals.json would
+  // silently re-share the AI Console's approvals with a background external client.
+  expect(src).toMatch(/consent: makeConsent\(join\(userDataDir, 'gateway-approvals\.json'\)/)
 })
