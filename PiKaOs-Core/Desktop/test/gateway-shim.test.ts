@@ -330,9 +330,10 @@ it('a ping pong or a -32601, which the SDK answers before the pairing gate, does
 // The second bypass the review found: main's SDK validates a request against its Zod schema BEFORE
 // it calls the handler, so a `tools/*` with malformed params is answered with an error while
 // `requirePaired()` is still pending — verified against the real createGatewayServer with a gate that
-// never resolves (a malformed tools/list came back -32603 while the well-formed one was withheld).
-// "Any response to a gated method" would therefore let a client main is denying prove its own link
-// with one bad request. Proof demands a RESULT.
+// never resolves (`tools/list` with `params: { cursor: 123 }` came back -32603; a `params` that fails
+// the outer JSON-RPC shape entirely, e.g. a bare string, gets no frame back at all — not the -32603
+// this test needs). "Any response to a gated method" would therefore let a client main is denying
+// prove its own link with one bad request. Proof demands a RESULT.
 it('an error answer to a gated method does not prove the link (the schema check precedes the gate)', async () => {
   vi.useFakeTimers()
   try {
@@ -346,7 +347,7 @@ it('an error answer to a gated method does not prove the link (the schema check 
     r.deny(); await r.expectNextDialAfter(4000)
     // delay is 8s. A gated method asked with params the schema rejects: the method clears the set,
     // but the answer never came from behind the gate.
-    r.shim.fromClient({ jsonrpc: '2.0', id: 9, method: 'tools/list', params: 'not-an-object' } as any)
+    r.shim.fromClient({ jsonrpc: '2.0', id: 9, method: 'tools/list', params: { cursor: 123 } } as any)
     r.last().reply({ jsonrpc: '2.0', id: 1, result: { protocolVersion: '2025-11-25' } })
     r.last().reply({ jsonrpc: '2.0', id: 9, error: { code: -32603, message: 'invalid params' } })
     r.last().drop()
