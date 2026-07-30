@@ -16,8 +16,11 @@ export function GatewayIndicator({ t, onClick }) {
 
   const state = indicatorState(status);
   if (!state) return null;
+  // Lead the tooltip with the feature name (MCP) — the state alone ("2 connected") doesn't say what
+  // it's about, and the name that would answer that lives only in aria-label, which sighted users
+  // never see. The separator is translator-controlled text in the pack, not a JSX-side hardcode.
   return (
-    <Tooltip label={t(state.key, state.params)}>
+    <Tooltip label={t('utilitybar.gateway.tip', { state: t(state.key, state.params) })}>
       <button type="button" className="ub-gateway-light" aria-label={t('utilitybar.gateway')}
         data-live={state.live} onClick={onClick}>
         <span className="ub-gateway-dot" />
