@@ -82,13 +82,21 @@ it('a teardown that rejects still resolves — quit must not raise an unhandled 
 // the ones whose deletion no unit test above can see, and each silently disables the persisted-gateway
 // feature, so they are pinned by reading the source — the same boundary-policing idiom as
 // ai-system-prompt.test.ts's "no main-process rule string in a .jsx" scan.
+//
+// What these scans CANNOT see: liveness. `if (app.isPackaged) void gateway.restore()` keeps every pin
+// below green while boot replay is dead in dev. They prove a line still exists, never that it runs —
+// the live Electron UAT (enable → quit → relaunch ⇒ pipe listening under a new token) is what proves
+// that, and it is still owed.
 const mainSource = () => readFileSync(join(__dirname, '..', 'src', 'main', 'index.ts'), 'utf8')
 
 it('index.ts registers the makeQuitCleanup callback and never touches setEnabled itself', () => {
   const src = mainSource()
   expect(src).toMatch(/registerQuitCleanup\(app,\s*makeQuitCleanup\(gateway,\s*manager\)\)/)
-  // Not even in a comment: the quit path calling the persisting setter is the failure mode.
-  expect(src).not.toContain('setEnabled')
+  // Scoped to the gateway on purpose. A bare `setEnabled` ban also trips on unrelated Electron APIs
+  // (BrowserWindow.setEnabled), and it would have to be DELETED the day a tray or app-menu item
+  // legitimately calls gateway.setEnabled from here — a pin that must die to let valid code land is a
+  // pin that gets deleted instead of updated. `gateway.setEnabled` IS the failure mode; ban that.
+  expect(src).not.toMatch(/gateway\.setEnabled/)
 })
 
 it('index.ts replays the operator\'s persisted gateway choice at boot', () => {
