@@ -225,7 +225,9 @@ it('a response the client is waiting on proves the link and re-arms the fast tra
     r.deny(); await r.expectNextDialAfter(1000)
     r.deny(); await r.expectNextDialAfter(2000)
     r.deny(); await r.expectNextDialAfter(4000)
-    // Healthy cycle: main answers a REAL request (id 9 — not the replayed initialize).
+    // Healthy cycle: the client asks for something that has to clear main's pairing gate, and main
+    // answers it. Proof is the (method, id) pair — a reply to a `tools/*` the shim itself forwarded.
+    r.shim.fromClient({ jsonrpc: '2.0', id: 9, method: 'tools/list', params: {} } as any)
     r.last().reply({ jsonrpc: '2.0', id: 1, result: { protocolVersion: '2025-11-25' } })  // swallowed
     r.last().reply({ jsonrpc: '2.0', id: 9, result: { tools: [] } })                      // proof
     r.last().drop()
@@ -233,19 +235,86 @@ it('a response the client is waiting on proves the link and re-arms the fast tra
   } finally { vi.useRealTimers() }
 })
 
+// The verdict is per-link, and dial() clears it before every attempt — otherwise one good link
+// would leave every later dead link on the 5s track, which is the loop this whole ladder exists to
+// prevent.
+it('the proven verdict does not outlive the link that earned it', async () => {
+  vi.useFakeTimers()
+  try {
+    const r = rig()
+    r.shim.fromClient(INIT)
+    r.shim.start()
+    await vi.advanceTimersByTimeAsync(0)
+    // One healthy cycle, so linkProven is true at the moment this link dies.
+    r.shim.fromClient({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 't' } } as any)
+    r.last().reply({ jsonrpc: '2.0', id: 1, result: { protocolVersion: '2025-11-25' } })
+    r.last().reply({ jsonrpc: '2.0', id: 9, result: { content: [] } })
+    r.last().drop()
+    await r.expectNextDialAfter(1000)
+    // Every link after it is judged on its own traffic only: these three connect and die in silence,
+    // so they climb on the 60s dead-link ceiling. A verdict that stuck would clamp them to 5s and
+    // make the last gap 5000, not 8000.
+    r.last().drop(); await r.expectNextDialAfter(2000)
+    r.last().drop(); await r.expectNextDialAfter(4000)
+    r.last().drop(); await r.expectNextDialAfter(8000)
+  } finally { vi.useRealTimers() }
+})
+
+// A proof test only discriminates if `delay` has CLIMBED before the thing under test happens —
+// otherwise "reset to 1000" and "was already 1000" are byte-identical timings and the assertion
+// proves nothing (the earlier version of this test made exactly that mistake). The climb here is a
+// reachable state, not a contrivance: a client that connects and then stays quiet is force-closed by
+// pipe.ts's pairing deadline on every attempt, unproven, so the ladder is at 8s by the time the
+// client finally does initialize on a live link.
 it("the client's own initialize response does not prove the link", async () => {
   vi.useFakeTimers()
   try {
     const r = rig()
     r.shim.start()
     await vi.advanceTimersByTimeAsync(0)      // link up before the client speaks
-    r.shim.fromClient(INIT)                   // forwarded to main (id 1 lands in inFlight)
+    // Three silent links, each closed by main's pairing deadline. Nothing to prove them ⇒ climb.
+    r.last().drop(); await r.expectNextDialAfter(1000)
+    r.last().drop(); await r.expectNextDialAfter(2000)
+    r.last().drop(); await r.expectNextDialAfter(4000)
+    // delay is 8s now. The client speaks at last, on an up link, so its initialize is forwarded
+    // (id 1 lands in inFlight) and main answers it for real.
+    r.shim.fromClient(INIT)
     r.last().reply({ jsonrpc: '2.0', id: 1, result: { protocolVersion: '2025-11-25' } })
     r.last().drop()                           // died having answered ONLY the client's initialize
-    await r.expectNextDialAfter(1000)         // delay was still at the minimum...
-    r.deny()
-    // ...and had it counted as proof this gap would be 1s again. Unproven, it doubled.
-    await r.expectNextDialAfter(2000)
+    // `initialize` is not behind requirePaired() — main answers it for a client it is about to deny —
+    // so this link is still unproven and the ladder keeps climbing. Counted as proof, this gap
+    // would be 1000.
+    await r.expectNextDialAfter(8000)
+  } finally { vi.useRealTimers() }
+})
+
+// The rule this pins down: main's SDK answers `ping` with `{}` and any method it has no handler for
+// with -32601, both straight out of Protocol._onrequest — upstream of the `requirePaired()` await
+// that only wraps the two `tools/*` handlers in gateway/server.ts. So a denied client gets real
+// answers to both while it is being refused, and an "any response with an id proves the link" rule
+// would put it back on the 5s track forever. Proof must key on the METHOD.
+it('a ping pong or a -32601, which the SDK answers before the pairing gate, does not prove the link', async () => {
+  vi.useFakeTimers()
+  try {
+    const r = rig()
+    r.shim.fromClient(INIT)
+    r.shim.fromClient({ jsonrpc: '2.0', method: 'notifications/initialized' } as any)
+    r.shim.start()
+    await vi.advanceTimersByTimeAsync(0)
+    r.deny(); await r.expectNextDialAfter(1000)   // climb first, so a reset would be visible
+    r.deny(); await r.expectNextDialAfter(2000)
+    r.deny(); await r.expectNextDialAfter(4000)
+    // delay is 8s. On this link the client keepalive-pings and asks for a method the gateway server
+    // registers no handler for; main answers both without ever consulting the pairing gate.
+    r.shim.fromClient({ jsonrpc: '2.0', id: 7, method: 'ping' } as any)
+    r.shim.fromClient({ jsonrpc: '2.0', id: 8, method: 'resources/list', params: {} } as any)
+    r.last().reply({ jsonrpc: '2.0', id: 7, result: {} })
+    r.last().reply({ jsonrpc: '2.0', id: 8, error: { code: -32601, message: 'Method not found' } })
+    r.last().drop()
+    // Neither method clears the gate ⇒ still unproven ⇒ the ladder climbed instead of resetting.
+    await r.expectNextDialAfter(8000)
+    // Both answers still reached the client — the proof rule observes traffic, it never filters it.
+    expect(r.out.filter((m: any) => m.id === 7 || m.id === 8)).toHaveLength(2)
   } finally { vi.useRealTimers() }
 })
 
