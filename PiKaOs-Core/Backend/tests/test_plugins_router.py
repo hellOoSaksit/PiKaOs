@@ -800,6 +800,9 @@ def test_versions_lists_remote_tags_with_current_and_previous_marks(sample_plugi
 
 
 def test_versions_404s_for_a_non_git_installed_plugin(sample_plugins, tmp_path, monkeypatch):
+    """Pins the route's OWN 404 (via `_require_git_installed`), not FastAPI's generic undefined-path
+    404 — asserting the detail is what tells the two apart (the route existing but refusing is a
+    different failure than the route not existing at all)."""
     from app.core import kernel_state, setup_state
     monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
     setup_state.write("PIKA-ABCD-2345", "a-session-token")
@@ -808,6 +811,7 @@ def test_versions_404s_for_a_non_git_installed_plugin(sample_plugins, tmp_path, 
         resp = client.get("/api/plugins/sample/versions",
                           headers={"Authorization": "Bearer a-session-token"})
     assert resp.status_code == 404
+    assert resp.json()["detail"] == "not a git-installed plugin"
 
 
 def test_update_switches_to_an_explicit_older_tag_and_records_history(sample_plugins, tmp_path, monkeypatch):
@@ -849,10 +853,42 @@ def test_update_rejects_an_unknown_tag_without_touching_disk(sample_plugins, tmp
         src, repo_url = _install_crm_via_git(client, tmp_path, monkeypatch, headers)
         resp = client.post("/api/plugins/crm/update", json={"tag": "v9.9.9"}, headers=headers)
     assert resp.status_code == 422
+    # pins the PRE-FLIGHT rejection specifically — a post-fetch GitInstallError also 422s with a
+    # different detail, so asserting the exact message is what tells the two failure paths apart
+    assert resp.json()["detail"] == "unknown version tag"
+    assert '"1.0.0"' in (plugins_dir / "crm" / "manifest.json").read_text(encoding="utf-8")
+
+
+def test_update_rejects_a_malformed_tag_shape_at_the_edge(sample_plugins, tmp_path, monkeypatch):
+    """`UpdateIn.tag` is validated at the edge (pydantic `pattern`) before the route body ever runs.
+    `"*"` is the case that matters: `remote_tag_sha`'s own dereference-line handling doesn't check the
+    ref it matched equals the requested tag, so a glob would otherwise pass the router's pre-flight
+    check (a wasted authenticated remote call) and only fail later at `fetch_and_checkout` — a
+    DIFFERENT 422 than the edge rejection this test pins. Asserting pydantic's own validation-error
+    shape (a `list` under `detail`, not our routes' plain string) is what tells the two apart; a status-
+    code-only or bare-422 assertion would stay green even with the edge check deleted."""
+    from app.core import kernel_state, setup_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    headers = {"Authorization": "Bearer a-session-token"}
+    plugins_dir = tmp_path / "plugins"; plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+    import app.main as main
+    with TestClient(main.app) as client:
+        src, repo_url = _install_crm_via_git(client, tmp_path, monkeypatch, headers)
+        resp = client.post("/api/plugins/crm/update", json={"tag": "*"}, headers=headers)
+    assert resp.status_code == 422
+    detail = resp.json()["detail"]
+    assert isinstance(detail, list) and detail[0]["loc"] == ["body", "tag"]
     assert '"1.0.0"' in (plugins_dir / "crm" / "manifest.json").read_text(encoding="utf-8")
 
 
 def test_update_to_the_installed_tag_is_a_noop_success(sample_plugins, tmp_path, monkeypatch):
+    """The short-circuit's actual promise is "touches no disk" (auto-update spec), not merely "no
+    extra history row" — Task 2's registry-layer no-op guard would make a history-only assertion pass
+    even without this route's own short-circuit. Deleting the installed copy's `.git` directory makes
+    any `fetch_and_checkout` attempt fail immediately (not a repo), so a 200 here can only mean the
+    route genuinely never touched the working tree."""
     from app.core import kernel_state, setup_state
     from app.core import plugin_registry as registry
     monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
@@ -863,17 +899,48 @@ def test_update_to_the_installed_tag_is_a_noop_success(sample_plugins, tmp_path,
     import app.main as main
     with TestClient(main.app) as client:
         src, repo_url = _install_crm_via_git(client, tmp_path, monkeypatch, headers)
+        shutil.rmtree(plugins_dir / "crm" / ".git")   # any real fetch/checkout attempt now fails
         resp = client.post("/api/plugins/crm/update", json={"tag": "v1.0.0"}, headers=headers)
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.text
     # idempotent: no second history entry for the no-op
     assert len(registry.version_history_of(registry.read(), "crm")) == 1
 
 
+def test_update_to_a_force_moved_tag_re_pins_instead_of_short_circuiting(sample_plugins, tmp_path, monkeypatch):
+    """W2 tamper recovery: the tag NAME is unchanged but the remote now points it at a different
+    commit (force-moved) — `check-update` would flag this as `tagMoved`, so a bare 200-success with no
+    re-pin here would tell the operator the problem is fixed when it isn't. The short-circuit must NOT
+    fire; update() must re-checkout and advance `installedSha` to the new commit."""
+    from app.core import kernel_state, setup_state, git_installer
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    headers = {"Authorization": "Bearer a-session-token"}
+    plugins_dir = tmp_path / "plugins"; plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+    import app.main as main
+    with TestClient(main.app) as client:
+        src, repo_url = _install_crm_via_git(client, tmp_path, monkeypatch, headers)
+        sha_before = registry.read()["crm"]["installedSha"]
+
+        # force-move v1.0.0 onto a new commit — same tag NAME, different commit
+        (src / "extra.txt").write_text("bump", encoding="utf-8")
+        _git(src, "add", "."); _git(src, "commit", "-q", "-m", "force-move")
+        _git(src, "tag", "-f", "v1.0.0")
+
+        resp = client.post("/api/plugins/crm/update", json={"tag": "v1.0.0"}, headers=headers)
+    assert resp.status_code == 200, resp.text
+    sha_after = registry.read()["crm"]["installedSha"]
+    assert sha_after != sha_before
+    assert sha_after == git_installer.remote_tag_sha(repo_url, "v1.0.0")
+
+
 def test_update_returns_422_when_the_remote_has_no_tags(sample_plugins, tmp_path, monkeypatch):
     """`latest_tag` returns `None` when the remote has no (semver) tags at all — nothing to update to.
-    (Re-running update while already on the latest tag is a separate, harmless no-op case: `latest_tag`
-    still returns that same tag, so `update()` just re-checks-out and re-validates it — see the
-    check-update test for the "no newer tag" comparison.)"""
+    (Re-running update while already on the latest tag is a separate, harmless no-op case handled by
+    the router's own short-circuit when the remote sha still matches the pinned one — see
+    `test_update_to_the_installed_tag_is_a_noop_success` and the force-moved-tag test above for the
+    two outcomes.)"""
     from app.core import kernel_state, setup_state, git_installer
     monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
     setup_state.write("PIKA-ABCD-2345", "a-session-token")
