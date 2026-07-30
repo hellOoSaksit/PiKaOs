@@ -238,6 +238,11 @@ it('a response the client is waiting on proves the link and re-arms the fast tra
 // The verdict is per-link, and dial() clears it before every attempt — otherwise one good link
 // would leave every later dead link on the 5s track, which is the loop this whole ladder exists to
 // prevent.
+//
+// This is also the ONLY test that proves via `tools/call`, so it is what keeps that half of
+// PAIRED_METHODS honest — hence the silent climb before the healthy cycle, per the sibling comment
+// below. Without it, proof and no-proof both read 1000 here and deleting 'tools/call' from the set
+// left the whole suite green (mutation-tested).
 it('the proven verdict does not outlive the link that earned it', async () => {
   vi.useFakeTimers()
   try {
@@ -245,12 +250,16 @@ it('the proven verdict does not outlive the link that earned it', async () => {
     r.shim.fromClient(INIT)
     r.shim.start()
     await vi.advanceTimersByTimeAsync(0)
-    // One healthy cycle, so linkProven is true at the moment this link dies.
+    // Climb first on silent links, so the reset below is distinguishable from "was still at 1000".
+    r.last().drop(); await r.expectNextDialAfter(1000)
+    r.last().drop(); await r.expectNextDialAfter(2000)
+    r.last().drop(); await r.expectNextDialAfter(4000)
+    // delay is 8s. One healthy cycle, so linkProven is true at the moment THIS link dies.
     r.shim.fromClient({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 't' } } as any)
     r.last().reply({ jsonrpc: '2.0', id: 1, result: { protocolVersion: '2025-11-25' } })
     r.last().reply({ jsonrpc: '2.0', id: 9, result: { content: [] } })
     r.last().drop()
-    await r.expectNextDialAfter(1000)
+    await r.expectNextDialAfter(1000)         // proven by a tools/call ⇒ reset, not 8s
     // Every link after it is judged on its own traffic only: these three connect and die in silence,
     // so they climb on the 60s dead-link ceiling. A verdict that stuck would clamp them to 5s and
     // make the last gap 5000, not 8000.
@@ -315,6 +324,34 @@ it('a ping pong or a -32601, which the SDK answers before the pairing gate, does
     await r.expectNextDialAfter(8000)
     // Both answers still reached the client — the proof rule observes traffic, it never filters it.
     expect(r.out.filter((m: any) => m.id === 7 || m.id === 8)).toHaveLength(2)
+  } finally { vi.useRealTimers() }
+})
+
+// The second bypass the review found: main's SDK validates a request against its Zod schema BEFORE
+// it calls the handler, so a `tools/*` with malformed params is answered with an error while
+// `requirePaired()` is still pending — verified against the real createGatewayServer with a gate that
+// never resolves (a malformed tools/list came back -32603 while the well-formed one was withheld).
+// "Any response to a gated method" would therefore let a client main is denying prove its own link
+// with one bad request. Proof demands a RESULT.
+it('an error answer to a gated method does not prove the link (the schema check precedes the gate)', async () => {
+  vi.useFakeTimers()
+  try {
+    const r = rig()
+    r.shim.fromClient(INIT)
+    r.shim.fromClient({ jsonrpc: '2.0', method: 'notifications/initialized' } as any)
+    r.shim.start()
+    await vi.advanceTimersByTimeAsync(0)
+    r.deny(); await r.expectNextDialAfter(1000)   // climb first, so a reset would be visible
+    r.deny(); await r.expectNextDialAfter(2000)
+    r.deny(); await r.expectNextDialAfter(4000)
+    // delay is 8s. A gated method asked with params the schema rejects: the method clears the set,
+    // but the answer never came from behind the gate.
+    r.shim.fromClient({ jsonrpc: '2.0', id: 9, method: 'tools/list', params: 'not-an-object' } as any)
+    r.last().reply({ jsonrpc: '2.0', id: 1, result: { protocolVersion: '2025-11-25' } })
+    r.last().reply({ jsonrpc: '2.0', id: 9, error: { code: -32603, message: 'invalid params' } })
+    r.last().drop()
+    await r.expectNextDialAfter(8000)         // still unproven ⇒ the ladder kept climbing
+    expect(r.out.some((m: any) => m.id === 9)).toBe(true)   // the error still reached the client
   } finally { vi.useRealTimers() }
 })
 

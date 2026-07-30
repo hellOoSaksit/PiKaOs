@@ -1,6 +1,9 @@
 import { it, expect, vi } from 'vitest'
 import { PassThrough } from 'node:stream'
+import { Server } from '@modelcontextprotocol/sdk/server/index.js'
+import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js'
 import { createGatewayServer, type GatewayDeps } from '../src/main/gateway/server'
+import { GATEWAY_SERVER_INFO, GATEWAY_CAPABILITIES, PAIRED_METHODS } from '../src/main/gateway/protocol'
 import { StreamTransport } from '../src/main/mcp/transport'
 import type { CatalogTool } from '../src/main/ai/toolClient'
 
@@ -163,4 +166,37 @@ it('tools/call waits for requirePaired before touching the catalog or the backen
   releasePaired()
   await pending
   expect(callTool).toHaveBeenCalledTimes(1)
+})
+
+// The methods this file registers are, verbatim, the shim's proof rule (PAIRED_METHODS in
+// gateway/protocol.ts): only an answer to a method behind requirePaired() may reset the shim's retry
+// backoff. Nothing makes the two move together, so pin them. Registering a THIRD gated handler
+// without adding it to the set drifts fail-SLOW — a working link judged unproven, so its client
+// reconnects once a minute instead of at once — which is exactly the kind of defect no other test
+// would notice.
+//
+// Read off setRequestHandler's own argument (public API — unlike the SDK's private handler map, which
+// a rename would break for reasons that say nothing about our code) and diffed against what a bare
+// Server registers for itself: Protocol's constructor installs `ping` and Server's installs
+// `initialize`, neither of them ours and neither of them gated.
+const methodsRegisteredBy = (make: () => Server): string[] => {
+  const spy = vi.spyOn(Server.prototype, 'setRequestHandler')
+  try {
+    make()
+    return spy.mock.calls.map(([schema]) => (schema as any).shape.method.value as string)
+  } finally { spy.mockRestore() }
+}
+
+it('the handlers behind the pairing gate are exactly the methods the shim accepts as proof', () => {
+  const sdkOwn = methodsRegisteredBy(
+    () => new Server(GATEWAY_SERVER_INFO, { capabilities: GATEWAY_CAPABILITIES }),
+  )
+  const ours = methodsRegisteredBy(() => createGatewayServer({
+    listTools: async () => [], callTool: vi.fn(), consent: vi.fn(), requirePaired: async () => {},
+  })).filter(m => !sdkOwn.includes(m))
+  // Spelled from the SDK's schemas rather than as bare strings, so a typo on either side shows up.
+  expect(new Set(ours)).toEqual(new Set([
+    ListToolsRequestSchema.shape.method.value, CallToolRequestSchema.shape.method.value,
+  ]))
+  expect(PAIRED_METHODS).toEqual(new Set(ours))
 })
