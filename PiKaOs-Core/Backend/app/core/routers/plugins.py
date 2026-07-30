@@ -19,7 +19,7 @@ import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .. import audit, git_installer, notify, plugin_readiness
 from .. import plugin_registry as registry
@@ -112,7 +112,13 @@ class VersionsOut(BaseModel):
 
 
 class UpdateIn(BaseModel):
-    tag: str | None = None          # None = latest tag (unchanged default behavior)
+    # None = latest tag (unchanged default behavior). An explicit value is validated at the edge
+    # against the same bare `[v]MAJOR.MINOR.PATCH` shape `list_remote_tags` already enforces on the
+    # way out — rejects a glob (`ls-remote`'s dereference line would otherwise match ANY ref, not
+    # just the one requested, letting something like "*" reach a real remote call before failing) and
+    # an oversized value (which would otherwise hit `MAX_ARG_STRLEN` deep inside `_run_git` and 500,
+    # rather than a clean 422) before either ever reaches git.
+    tag: str | None = Field(default=None, max_length=100, pattern=r"^v?\d+\.\d+\.\d+$")
 
 
 def _view(reg: dict[str, dict], active: set[str]) -> list[PluginOut]:
@@ -414,18 +420,28 @@ async def update(
     old_tag = registry.installed_tag_of(reg, plugin_id)
 
     requested = body.tag if body else None
-    if requested:
-        # validate against the remote BEFORE touching disk — unknown tag = 422, nothing changed
-        if git_installer.remote_tag_sha(repo_url, requested) is None:
+    if requested is not None:
+        # validate against the remote BEFORE touching disk — unknown tag = 422, nothing changed. The
+        # `if repo_url else None` guard mirrors the `else` branch below rather than assuming a
+        # git-installed row always has one — a null `repoUrl` must 422 here too, not 500 inside
+        # `remote_tag_sha`'s own host lookup.
+        remote_sha = git_installer.remote_tag_sha(repo_url, requested) if repo_url else None
+        if remote_sha is None:
             raise HTTPException(status_code=422, detail="unknown version tag")
         tag = requested
     else:
         tag = git_installer.latest_tag(repo_url) if repo_url else None
         if not tag:
             raise HTTPException(status_code=422, detail="no update available")
+        # Only resolved when it might actually matter (we're already on this tag name) — the common
+        # "there IS a newer tag" path skips this extra remote call entirely.
+        remote_sha = git_installer.remote_tag_sha(repo_url, tag) if repo_url and tag == old_tag else None
 
-    if tag == old_tag:
-        # switching to what's already installed is a success, not an error — and not a history entry
+    # Same tag AND the remote still points at the exact commit we pinned: a true no-op — success, no
+    # disk touch, no history entry (idempotency constraint). A force-moved tag (same name, but
+    # `remote_sha` differs from the pinned `installedSha` — W2) falls through instead, re-checking-out
+    # and re-pinning, rather than reporting a silent "success" that leaves a tamper warning unresolved.
+    if tag == old_tag and remote_sha is not None and remote_sha == registry.installed_sha_of(reg, plugin_id):
         return _action_response(reg)
 
     plugin_dir = plugin_loader.PLUGINS_DIR / plugin_id

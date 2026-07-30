@@ -190,11 +190,16 @@ def latest_tag(repo_url: str) -> str | None:
 
 
 def fetch_and_checkout(plugin_dir: Path, repo_url: str, tag: str) -> None:
-    """Fetch + check out `tag` in an already-installed plugin directory (the update flow, §2.2)."""
+    """Fetch + check out `tag` in an already-installed plugin directory (the update flow, §2.2).
+    `--force` is required, not optional: a plain `git fetch origin tag <tag>` refuses to move a LOCAL
+    tag ref that already points elsewhere ("would clobber existing tag") — which is exactly the W2
+    force-moved-tag case (auto-update §5.1's re-pin path re-fetches the SAME tag name this working
+    copy already has cached locally). Safe to force here: this only updates our own local tag ref to
+    match whatever the remote says NOW, it never rewrites the remote."""
     token = _credential_for(_host_of(repo_url))
     # `--` before the positional repository/refspec args stops a `tag` value starting with `-`
     # from being parsed as a git flag (argument injection — Finding 5).
-    result = _run_git(["fetch", "--depth", "1", "--", "origin", "tag", tag], cwd=str(plugin_dir),
+    result = _run_git(["fetch", "--depth", "1", "--force", "--", "origin", "tag", tag], cwd=str(plugin_dir),
                        askpass_token=token)
     if result.returncode != 0:
         _log_git_failure("fetch", result)
