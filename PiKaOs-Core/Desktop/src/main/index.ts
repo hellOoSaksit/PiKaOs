@@ -189,6 +189,11 @@ function runMain(): void {
       },
     })
     registerGatewayIpc(gateway)
+    // Replay the operator's persisted gateway choice (spec 2026-07-30) — without this an external
+    // MCP client cannot connect until a human reopens the AI Access screen after every launch. After
+    // registerGatewayIpc so the renderer's status channel already exists when restore() pushes.
+    // Fire-and-forget: restore() contains its own failures and pushes status either way.
+    void gateway.restore()
 
     manager.on('status', (id: string, status: string, lastError: McpErrorToken | null) => {
       for (const win of BrowserWindow.getAllWindows()) {
@@ -217,7 +222,10 @@ function runMain(): void {
     // .catch(() => {}) because lifecycle.ts's registerQuitCleanup dispatches this via `void` — a
     // rejection here would otherwise become an unhandled rejection at quit instead of just being a
     // best-effort teardown that didn't fully finish.
-    registerQuitCleanup(app, () => Promise.all([gateway.setEnabled(false), manager.stopAll()]).then(() => undefined).catch(() => {}))
+    // shutdown(), NOT setEnabled(false): quitting is not the operator revoking access, so the
+    // teardown must close the pipe without recording "off" — otherwise every exit would erase the
+    // persisted choice restore() replays above.
+    registerQuitCleanup(app, () => Promise.all([gateway.shutdown(), manager.stopAll()]).then(() => undefined).catch(() => {}))
 
     registerDevtoolsShortcut(win, app.isPackaged)
     registerZoomShortcuts(win)

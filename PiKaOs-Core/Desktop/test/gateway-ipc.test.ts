@@ -1,5 +1,5 @@
 import { it, expect, vi, beforeEach } from 'vitest'
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { GatewayService } from '../src/main/gateway/ipc'
@@ -85,4 +85,55 @@ it('copyConfig refuses while disabled — no clipboard write, not even the word 
   await s.setEnabled(false)
   expect(s.copyConfig()).toBe(false)             // switched back off — stale snippet must not copy
   expect(writeToClipboard).not.toHaveBeenCalled()
+})
+
+// --- persisted enabled state (spec 2026-07-30) ----------------------------------------------
+// The operator's confirmed consent survives a relaunch; the token still rotates on every enable,
+// pairing still gates each client, and the per-tool allowlist still gates each call.
+const stateFile = () => join(dir, 'gateway-state.json')
+
+it('setEnabled persists the operator choice to gateway-state.json', async () => {
+  const s = service()
+  await s.setEnabled(true)
+  expect(JSON.parse(readFileSync(stateFile(), 'utf8'))).toEqual({ enabled: true })
+  await s.setEnabled(false)
+  expect(JSON.parse(readFileSync(stateFile(), 'utf8'))).toEqual({ enabled: false })
+})
+
+it('shutdown() closes the pipe but never touches the persisted preference', async () => {
+  const s = service()
+  await s.setEnabled(true)
+  await s.shutdown()
+  expect(s.status()).toEqual({ enabled: false, connections: 0 })
+  // The quit path is not operator intent — the choice must still read "on" for the next launch.
+  expect(JSON.parse(readFileSync(stateFile(), 'utf8'))).toEqual({ enabled: true })
+})
+
+it('restore() starts the pipe when the persisted choice says enabled', async () => {
+  writeFileSync(stateFile(), JSON.stringify({ enabled: true }))
+  const s = service()
+  await s.restore()
+  expect(s.status().enabled).toBe(true)
+  await s.shutdown()
+})
+
+it('restore() is a no-op on a missing, corrupt, or disabled state file', async () => {
+  const s = service()
+  await s.restore()                                        // no file
+  expect(s.status().enabled).toBe(false)
+  writeFileSync(stateFile(), 'not json')
+  await s.restore()                                        // corrupt file
+  expect(s.status().enabled).toBe(false)
+  writeFileSync(stateFile(), JSON.stringify({ enabled: false }))
+  await s.restore()                                        // explicit off
+  expect(s.status().enabled).toBe(false)
+})
+
+it('restore() contains an enable failure instead of letting it reach the boot path', async () => {
+  writeFileSync(stateFile(), JSON.stringify({ enabled: true }))
+  const onStatus = vi.fn()
+  const s = service({ onStatus })
+  vi.spyOn(s, 'setEnabled').mockRejectedValue(new Error('pipe failed'))
+  await expect(s.restore()).resolves.toBeUndefined()
+  expect(onStatus).toHaveBeenCalled()   // renderer still hears status-off instead of silence
 })
