@@ -12,7 +12,7 @@ import type { McpErrorToken } from './mcp/manager'
 import { RecoveryService } from './recovery'
 import { getBackendConfig } from './config'
 import { registerCrashHandlers, registerRendererCrashHandler } from './crash'
-import { registerSingleInstanceFocus, registerQuitCleanup } from './lifecycle'
+import { registerSingleInstanceFocus, registerQuitCleanup, makeQuitCleanup } from './lifecycle'
 import { registerAiIpc } from './ai/ipc'
 import type { McpServerDef } from './mcp/registry'
 import type { CatalogTool } from './ai/toolClient'
@@ -144,7 +144,16 @@ function runMain(): void {
   }
 
   const gotLock = app.requestSingleInstanceLock()
-  if (!gotLock) app.quit()
+  // The `return` is load-bearing, not redundant with app.quit(): quit is asynchronous (it unwinds
+  // through before-quit / window-all-closed), so without it this losing instance keeps its whole
+  // whenReady callback registered and can still run it. That was merely wasteful before the gateway
+  // persisted its state — a second instance could never be switched on — but restore() now replays a
+  // persisted enable, which calls writeHandshake(), which rewrites the RUNNING instance's
+  // gateway.json (same fixed path) with a fresh pipe name AND a fresh token. Every external MCP
+  // client would then be aimed at a pipe that dies with this throwaway instance, while the live
+  // instance holds a token nobody has — i.e. deleting this line silently breaks the gateway for
+  // everyone every time the app is double-launched. Pinned by a test in lifecycle.test.ts.
+  if (!gotLock) { app.quit(); return }
 
   // Prod: Desktop/Frontend/dist is copied into app resources via electron-builder's extraResources
   // (electron-builder.yml: `Frontend/dist` -> `frontend`). Dev: the renderer comes from the
@@ -212,20 +221,12 @@ function runMain(): void {
     // Instance lifecycle (crash spec §2.4): focus the running window on a second launch instead
     // of silently killing the new instance; stop every MCP child so none orphans on quit.
     registerSingleInstanceFocus(app, () => BrowserWindow.getAllWindows()[0] ?? null)
-    // Both awaited so the returned promise doesn't settle until the gateway's pipe (an async
-    // net.Server.close, unlike MCP children's synchronous kill()) AND every MCP child have actually
-    // torn down — the previous `void gateway.setEnabled(false)` dropped the gateway half entirely.
-    // registerQuitCleanup still dispatches this via `void` (lifecycle.ts), so the whole thing stays
-    // fire-and-forget from Electron's perspective; process exit remains the real backstop for the pipe
-    // handle. That's acceptable here — this fix only makes the two teardowns run and finish together
-    // when the event loop does get to turn before exit, instead of silently only running one of them.
-    // .catch(() => {}) because lifecycle.ts's registerQuitCleanup dispatches this via `void` — a
-    // rejection here would otherwise become an unhandled rejection at quit instead of just being a
-    // best-effort teardown that didn't fully finish.
-    // shutdown(), NOT setEnabled(false): quitting is not the operator revoking access, so the
-    // teardown must close the pipe without recording "off" — otherwise every exit would erase the
-    // persisted choice restore() replays above.
-    registerQuitCleanup(app, () => Promise.all([gateway.shutdown(), manager.stopAll()]).then(() => undefined).catch(() => {}))
+    // The callback lives in lifecycle.ts (makeQuitCleanup) rather than inline here so a test can bind
+    // the real thing: it closes the gateway's pipe with shutdown() — quitting is not the operator
+    // revoking access, so the teardown must never record "off" and erase the persisted choice
+    // restore() replays above — and stops every MCP child, both awaited together. Full why: the
+    // makeQuitCleanup doc comment.
+    registerQuitCleanup(app, makeQuitCleanup(gateway, manager))
 
     registerDevtoolsShortcut(win, app.isPackaged)
     registerZoomShortcuts(win)
