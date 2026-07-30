@@ -195,3 +195,25 @@ def test_clone_to_staging_removes_staging_dir_on_timeout(local_repo, monkeypatch
 
     assert seen_staging["path"]
     assert not os.path.exists(seen_staging["path"])
+
+
+def test_list_remote_tags_returns_semver_tags_newest_first(local_repo, tmp_path):
+    import subprocess as sp
+    src = tmp_path / "src"
+    # add two more tags on top of the fixture's v1.0.0 — out of order to prove sorting
+    (src / "manifest.json").write_text(
+        '{"id":"crm","name":"CRM","version":"2.0.0","coreVersion":"*"}', encoding="utf-8")
+    sp.run(["git", "add", "."], cwd=src, check=True)
+    sp.run(["git", "commit", "-q", "-m", "v2"], cwd=src, check=True)
+    sp.run(["git", "tag", "v2.0.0"], cwd=src, check=True)
+    sp.run(["git", "tag", "v1.2.0"], cwd=src, check=True)          # same commit, lower semver
+    sp.run(["git", "tag", "not-semver"], cwd=src, check=True)      # must be ignored
+    assert git_installer.list_remote_tags(local_repo) == ["v2.0.0", "v1.2.0", "v1.0.0"]
+
+
+def test_list_remote_tags_empty_on_unreachable_remote(tmp_path):
+    assert git_installer.list_remote_tags(f"file://{tmp_path / 'nowhere'}") == []
+
+
+def test_latest_tag_still_returns_the_highest(local_repo):
+    assert git_installer.latest_tag(local_repo) == "v1.0.0"

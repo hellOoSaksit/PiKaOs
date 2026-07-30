@@ -160,19 +160,32 @@ def clone_to_staging(repo_url: str, ref: str | None = None) -> Path:
     return staging
 
 
-def latest_tag(repo_url: str) -> str | None:
-    """The highest semver git tag on `repo_url`'s remote, or None if it has no (semver) tags."""
+def list_remote_tags(repo_url: str) -> list[str]:
+    """Every semver tag on `repo_url`'s remote, deduped, sorted newest-first ([] on failure or no
+    semver tags). Annotated tags produce two ls-remote lines (`ref` and `ref^{}`) — hence the dedupe."""
     result = _run_git(["ls-remote", "--tags", "--", repo_url],
                        askpass_token=_credential_for(_host_of(repo_url)), timeout=30)
     if result.returncode != 0:
-        return None
-    tags: list[tuple[tuple[int, int, int], str]] = []
+        return []
+    parsed: list[tuple[tuple[int, int, int], str]] = []
     for line in result.stdout.splitlines():
         ref = line.rsplit("refs/tags/", 1)[-1].removesuffix("^{}")
         parts = ref.lstrip("v").split(".")
         if len(parts) == 3 and all(p.isdigit() for p in parts):
-            tags.append(((int(parts[0]), int(parts[1]), int(parts[2])), ref))
-    return max(tags)[1] if tags else None
+            parsed.append(((int(parts[0]), int(parts[1]), int(parts[2])), ref))
+    seen: set[str] = set()
+    out: list[str] = []
+    for _, ref in sorted(parsed, reverse=True):
+        if ref not in seen:
+            seen.add(ref)
+            out.append(ref)
+    return out
+
+
+def latest_tag(repo_url: str) -> str | None:
+    """The highest semver git tag on `repo_url`'s remote, or None if it has no (semver) tags."""
+    tags = list_remote_tags(repo_url)
+    return tags[0] if tags else None
 
 
 def fetch_and_checkout(plugin_dir: Path, repo_url: str, tag: str) -> None:
