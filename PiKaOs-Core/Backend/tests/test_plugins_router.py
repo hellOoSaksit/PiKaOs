@@ -771,6 +771,104 @@ def test_view_exposes_permission_info_and_installed_sha(sample_plugins, tmp_path
     assert all("rationale" in pi for pi in sample.permissionInfo)
 
 
+# --- versions + update-to-a-chosen-tag (rollback = the same verb) ---------------------------------------
+
+def test_versions_lists_remote_tags_with_current_and_previous_marks(sample_plugins, tmp_path, monkeypatch):
+    """After installing v1.0.0, tagging v1.1.0 + v1.2.0, and switching to v1.2.0: the versions route
+    lists all three newest-first, marks v1.2.0 current and v1.0.0 previouslyInstalled."""
+    from app.core import kernel_state, setup_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    headers = {"Authorization": "Bearer a-session-token"}
+    plugins_dir = tmp_path / "plugins"; plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+    import app.main as main
+    with TestClient(main.app) as client:
+        src, repo_url = _install_crm_via_git(client, tmp_path, monkeypatch, headers)
+        for v in ("1.1.0", "1.2.0"):
+            (src / "manifest.json").write_text(
+                f'{{"id":"crm","name":"CRM","version":"{v}","coreVersion":"*"}}', encoding="utf-8")
+            _git(src, "add", "."); _git(src, "commit", "-q", "-m", v); _git(src, "tag", f"v{v}")
+        assert client.post("/api/plugins/crm/update", json={"tag": "v1.2.0"}, headers=headers).status_code == 200
+        resp = client.get("/api/plugins/crm/versions", headers=headers)
+    assert resp.status_code == 200, resp.text
+    vs = {v["tag"]: v for v in resp.json()["versions"]}
+    assert list(vs) == ["v1.2.0", "v1.1.0", "v1.0.0"]
+    assert vs["v1.2.0"]["current"] is True and vs["v1.2.0"]["previouslyInstalled"] is False
+    assert vs["v1.0.0"]["previouslyInstalled"] is True
+    assert vs["v1.1.0"]["current"] is False and vs["v1.1.0"]["previouslyInstalled"] is False
+
+
+def test_versions_404s_for_a_non_git_installed_plugin(sample_plugins, tmp_path, monkeypatch):
+    from app.core import kernel_state, setup_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    import app.main as main
+    with TestClient(main.app) as client:
+        resp = client.get("/api/plugins/sample/versions",
+                          headers={"Authorization": "Bearer a-session-token"})
+    assert resp.status_code == 404
+
+
+def test_update_switches_to_an_explicit_older_tag_and_records_history(sample_plugins, tmp_path, monkeypatch):
+    """The rollback path: install v1.0.0 → update to latest v1.1.0 → switch BACK to v1.0.0 by tag.
+    Registry lands on v1.0.0, history holds all three moves, previousTag points at v1.1.0."""
+    from app.core import kernel_state, setup_state
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    headers = {"Authorization": "Bearer a-session-token"}
+    plugins_dir = tmp_path / "plugins"; plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+    import app.main as main
+    with TestClient(main.app) as client:
+        src, repo_url = _install_crm_via_git(client, tmp_path, monkeypatch, headers)
+        (src / "manifest.json").write_text(
+            '{"id":"crm","name":"CRM","version":"1.1.0","coreVersion":"*"}', encoding="utf-8")
+        _git(src, "add", "."); _git(src, "commit", "-q", "-m", "bump"); _git(src, "tag", "v1.1.0")
+        assert client.post("/api/plugins/crm/update", headers=headers).status_code == 200
+        resp = client.post("/api/plugins/crm/update", json={"tag": "v1.0.0"}, headers=headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["restart_required"] is True
+    assert '"1.0.0"' in (plugins_dir / "crm" / "manifest.json").read_text(encoding="utf-8")
+    reg = registry.read()
+    assert reg["crm"]["installedTag"] == "v1.0.0"
+    assert [h["tag"] for h in registry.version_history_of(reg, "crm")] == ["v1.0.0", "v1.1.0", "v1.0.0"]
+    assert registry.previous_tag_of(reg, "crm") == "v1.1.0"
+
+
+def test_update_rejects_an_unknown_tag_without_touching_disk(sample_plugins, tmp_path, monkeypatch):
+    from app.core import kernel_state, setup_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    headers = {"Authorization": "Bearer a-session-token"}
+    plugins_dir = tmp_path / "plugins"; plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+    import app.main as main
+    with TestClient(main.app) as client:
+        src, repo_url = _install_crm_via_git(client, tmp_path, monkeypatch, headers)
+        resp = client.post("/api/plugins/crm/update", json={"tag": "v9.9.9"}, headers=headers)
+    assert resp.status_code == 422
+    assert '"1.0.0"' in (plugins_dir / "crm" / "manifest.json").read_text(encoding="utf-8")
+
+
+def test_update_to_the_installed_tag_is_a_noop_success(sample_plugins, tmp_path, monkeypatch):
+    from app.core import kernel_state, setup_state
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    headers = {"Authorization": "Bearer a-session-token"}
+    plugins_dir = tmp_path / "plugins"; plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+    import app.main as main
+    with TestClient(main.app) as client:
+        src, repo_url = _install_crm_via_git(client, tmp_path, monkeypatch, headers)
+        resp = client.post("/api/plugins/crm/update", json={"tag": "v1.0.0"}, headers=headers)
+    assert resp.status_code == 200
+    # idempotent: no second history entry for the no-op
+    assert len(registry.version_history_of(registry.read(), "crm")) == 1
+
+
 def test_update_returns_422_when_the_remote_has_no_tags(sample_plugins, tmp_path, monkeypatch):
     """`latest_tag` returns `None` when the remote has no (semver) tags at all — nothing to update to.
     (Re-running update while already on the latest tag is a separate, harmless no-op case: `latest_tag`
