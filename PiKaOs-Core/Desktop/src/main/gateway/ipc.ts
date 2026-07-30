@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron'
 import { join } from 'node:path'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { z } from 'zod'
 import { guard } from '../ipc'
 import { writeHandshake, configSnippet } from './handshake'
@@ -29,9 +30,25 @@ export type GatewayDepsIn = {
   writeToClipboard: (text: string) => void
 }
 
+// The operator's persisted on/off choice. Its neighbors are the wrong home for this bit:
+// gateway.json is the handshake, rewritten with a FRESH token on every enable (a preference must
+// not share a file with a rotating secret), and gateway-clients.json is the pairing allowlist.
+// Missing or unreadable means OFF — every install keeps fail-closed behavior until the operator's
+// first explicit enable.
+const stateFile = (dir: string) => join(dir, 'gateway-state.json')
+const readEnabledState = (dir: string): boolean => {
+  try { return JSON.parse(readFileSync(stateFile(dir), 'utf8')).enabled === true } catch { return false }
+}
+const writeEnabledState = (dir: string, enabled: boolean) =>
+  writeFileSync(stateFile(dir), JSON.stringify({ enabled }))
+
 /**
  * Owns the gateway's on/off state and its per-launch handshake. Disabled is the default and means
  * the pipe does not listen at all — an operator opting in is the first gate, before the token.
+ *
+ * What survives a relaunch is only that opt-in: the operator's confirmed consent. Every other gate
+ * is still re-run from scratch — the token rotates on every enable, each client re-pairs, and the
+ * per-tool allowlist still decides each call.
  */
 export class GatewayService {
   private pipe: Awaited<ReturnType<typeof startPipe>> | null = null
@@ -63,7 +80,30 @@ export class GatewayService {
     // wedge every setEnabled() queued after it. The rejection itself still reaches THIS call's caller
     // via `run`, which is returned below untouched.
     this.queue = run.catch(() => {})
+    // setEnabled is reachable only over renderer IPC, i.e. it IS operator intent — and it is the
+    // ONLY writer of the persisted preference. Written after apply resolves so a failed enable
+    // (startPipe rejecting) never records a choice that didn't take effect. shutdown() below goes
+    // around this on purpose.
+    return run.then((s) => { writeEnabledState(this.deps.userDataDir, on); return s })
+  }
+
+  // Quit-path teardown: closes the pipe like setEnabled(false) but never touches gateway-state.json.
+  // App exit is not operator intent — persisting it would turn the preference off on every quit,
+  // which is exactly the "silently deleted feature" this split exists to prevent. Kept on the same
+  // queue as setEnabled so it can never race a concurrent enable into an orphaned pipe.
+  shutdown(): Promise<GatewayStatus> {
+    const run = this.queue.then(() => this.applyEnabled(false))
+    this.queue = run.catch(() => {})
     return run
+  }
+
+  // Boot-time replay of the persisted choice; index.ts calls this once, after IPC registration.
+  // Routed through setEnabled so a restored launch gets the same fresh-token handshake as a manual
+  // enable. A failure is contained here — the gateway failing to start must never take the app down
+  // — and the renderer is pushed the (off) status it would otherwise wait for forever.
+  restore(): Promise<void> {
+    if (!readEnabledState(this.deps.userDataDir)) return Promise.resolve()
+    return this.setEnabled(true).then(() => undefined, () => { this.push() })
   }
 
   private async applyEnabled(on: boolean): Promise<GatewayStatus> {
