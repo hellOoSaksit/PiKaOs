@@ -45,19 +45,28 @@ async function confirmMcpStart(def: McpServerDef, hash: string): Promise<boolean
   return response === 1
 }
 
-// Effect-class tool-call consent (the AI Console's side_effect gate) — a DIFFERENT surface from
-// confirmMcpStart's process-spawn consent above. Default-Cancel so a stray Enter never approves a
-// state-changing call.
-async function confirmToolCall(tool: CatalogTool): Promise<boolean> {
+// Effect-class tool-call consent (the side_effect gate) — a DIFFERENT surface from confirmMcpStart's
+// process-spawn consent above. Default-Cancel so a stray Enter never approves a state-changing call.
+//
+// `caller` names the SURFACE asking, and it is required rather than defaulted: two surfaces reach
+// this dialog (the foreground AI Console and a background external MCP client), they no longer share
+// an approvals file, and the operator has to be able to tell which one they are granting. It names
+// the surface rather than the individual client on purpose — makeConsent keys approvals by tool name
+// within one store, so an approval given here covers every caller sharing that store; "Allow Claude
+// Desktop to run X?" would promise a per-client scope the store does not have, which is the same
+// over-claim the shared ai-approvals.json used to make across the two surfaces.
+async function confirmToolCall(tool: CatalogTool, caller: string): Promise<boolean> {
   const { response } = await dialog.showMessageBox({
     type: 'warning',
     buttons: ['Cancel', 'Allow'],
     defaultId: 0, cancelId: 0,
-    message: `Allow the AI to run "${tool.name}"?`,
+    message: `Allow ${caller} to run "${tool.name}"?`,
     detail: `${tool.description || '(no description)'}\nEffect: ${tool.effect} — this call changes server state.`,
   })
   return response === 1
 }
+const AI_CONSOLE_CALLER = 'the AI Console in this window'
+const GATEWAY_CALLER = 'an external AI client using the MCP gateway'
 
 // Pairing an EXTERNAL MCP client. The name is what the client claims about itself, so the copy must
 // not imply it was verified — the defence is that this dialog appears at all when the user did not
@@ -181,14 +190,20 @@ function runMain(): void {
     })
 
     registerIpc({ vault, broker, registry, manager, recovery })
-    registerAiIpc({ vault, broker, askConsent: confirmToolCall })
+    registerAiIpc({ vault, broker, askConsent: (tool) => confirmToolCall(tool, AI_CONSOLE_CALLER) })
 
     const gateway = new GatewayService({
       userDataDir,
       execPath: process.execPath,
       toolClient: new ToolClient(() => broker.getAccessToken(), () => getBackendConfig().apiBaseUrl),
-      // The SAME gate the AI Console uses, deliberately: two copies would let approval semantics drift.
-      consent: makeConsent(join(userDataDir, 'ai-approvals.json'), confirmToolCall),
+      // The same gate MODULE the AI Console uses, deliberately: two copies would let approval
+      // semantics drift. Its own STORE, equally deliberately — makeConsent keys approvals by tool
+      // name and knows nothing about who is asking, so sharing ai-approvals.json meant a
+      // side_effect approval the operator gave the foreground console silently authorized a
+      // background external client on a later, unattended boot. Different principal, different
+      // trust context, different file.
+      consent: makeConsent(join(userDataDir, 'gateway-approvals.json'),
+                           (tool) => confirmToolCall(tool, GATEWAY_CALLER)),
       pairClient: confirmClientPairing,
       writeToClipboard: (text: string) => clipboard.writeText(text),
       onStatus: (s: GatewayStatus) => {
