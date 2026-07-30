@@ -1020,6 +1020,7 @@
     "utilitybar.add": "New",
     "utilitybar.add.title": "Create new",
     "utilitybar.ai": "AI",
+    "utilitybar.gateway": "External AI gateway",
     "ai.title": "AI Console",
     "ai.loading": "Loading…",
     "ai.empty": "Ask the AI — it can use this system's tools.",

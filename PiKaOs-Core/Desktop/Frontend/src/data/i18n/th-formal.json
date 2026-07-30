@@ -957,6 +957,7 @@
     "utilitybar.add": "สร้าง",
     "utilitybar.add.title": "สร้างใหม่",
     "utilitybar.ai": "AI",
+    "utilitybar.gateway": "เกตเวย์ AI ภายนอก",
     "ai.title": "คอนโซล AI",
     "ai.loading": "กำลังโหลด…",
     "ai.empty": "ถาม AI ได้เลย — ใช้เครื่องมือของระบบนี้ได้",
