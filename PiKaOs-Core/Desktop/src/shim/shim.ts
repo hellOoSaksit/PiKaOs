@@ -1,5 +1,5 @@
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js'
-import { cannedInitializeResult, OFFLINE_MESSAGE } from '../main/gateway/protocol'
+import { cannedInitializeResult, OFFLINE_MESSAGE, PAIRED_METHODS } from '../main/gateway/protocol'
 
 export type Link = {
   send(m: JSONRPCMessage): void
@@ -17,15 +17,6 @@ const RETRY_MAX_MS = 5000
 // attempt, and an app restart rotates the pipe name — which lands a parked shim on the
 // connect-rejected track below, where min() clamps it straight back to 5s.
 const DEAD_LINK_MAX_MS = 60_000
-
-// The only methods whose answer proves the link is usable — because they are the only ones main
-// routes through a handler that sits behind `requirePaired()` (gateway/server.ts). Every other
-// request is answered by the SDK's own Protocol, upstream of that gate and therefore upstream of
-// pairing: `ping` gets an automatic `{}` pong (a handler Protocol's constructor installs) and any
-// unregistered method gets -32601 straight out of `_onrequest` — both of them sent to a client main
-// is in the middle of denying. So proof keys on the METHOD the shim asked, never on the id and never
-// on "some response arrived"; stated once here so the rule cannot drift (see linkProven).
-const PAIRED_METHODS = new Set(['tools/list', 'tools/call'])
 
 /**
  * Stdio ↔ pipe forwarder. When the pipe is up it is a byte pipe and knows nothing about MCP; when
@@ -49,10 +40,13 @@ export class Shim {
   // the id because a JSON-RPC response carries none of its own, and the proof rule needs it.
   private inFlight = new Map<string | number, string>()
   private delay = RETRY_MIN_MS
-  // Whether the CURRENT link ever answered one of the requests that actually clear main's pairing
-  // gate (PAIRED_METHODS). That — not a successful connect, and not any response — is what "working"
-  // means here: main's SDK answers `initialize`, `ping`, and unknown methods on its own, all of it
-  // upstream of requirePaired(), so anything weaker re-arms the fast retry track for denied clients.
+  // Whether the CURRENT link ever returned a RESULT for one of the requests that actually clear
+  // main's pairing gate (PAIRED_METHODS). That — not a successful connect, not any response, and not
+  // an error answer even to a gated method — is what "working" means here: main's SDK answers
+  // `initialize`, `ping`, and unknown methods on its own, and rejects a malformed gated request, all
+  // of it upstream of requirePaired(), so anything weaker re-arms the fast retry track for denied
+  // clients — the full argument is at the proof site in dial().
+  //
   // Cleared at the top of dial(). Note the onMessage handler mutates `delay` as well as this flag,
   // so anything that could deliver a message after close would re-arm the fast track; the invariant
   // that rules it out (Node never emits 'data' after 'close', and both handlers are attached to the
@@ -99,6 +93,12 @@ export class Shim {
   //
   // `!= null` on purpose: a spec-conformant peer uses `id: null` on a parse-error response, which is
   // not a request awaiting an answer and must never take up residence in this map.
+  //
+  // The cost, stated plainly: a REQUEST carrying `id: null` is now not tracked either, so
+  // failInFlight() no longer answers it when the link drops — it hangs. Only a malformed client can
+  // get here (`id: null` is not a valid request id), and an untracked null is the lesser evil: a
+  // tracked one is a single map key every such request would share, so two of them would collide and
+  // the answer to the first would be delivered as the answer to the second.
   private forward(m: JSONRPCMessage & { id?: string | number; method?: string }) {
     if (m.id != null) this.inFlight.set(m.id, m.method ?? '')
     this.link!.send(m)
@@ -115,24 +115,42 @@ export class Shim {
         const id = (m as any).id
         // Main answers the replayed initialize too; the client already has an answer, and two
         // replies to one id would corrupt its request table. Also require this to actually be a
-        // response ('result' or 'error' present) — a bare id match is a request/notification
-        // coincidence away from swallowing something that was never main's reply to the replay.
+        // response ('result' or 'error' present — either one is main's answer to the replay) — a bare
+        // id match is a request/notification coincidence away from swallowing something that was
+        // never main's reply at all.
         //
-        // Ordered first because swallowId is captured at dial time: it still matches the id that was
-        // actually replayed even if initReq is later replaced (a client re-initializing under a new
-        // id), which is exactly when reading the id off initReq would miss.
+        // Keyed on swallowId rather than on initReq.id because swallowId is captured at dial time: it
+        // still matches the id that was actually replayed even if initReq is later replaced (a client
+        // re-initializing under a new id), which is exactly when reading the id off initReq would miss.
         const isResponse = 'result' in (m as any) || 'error' in (m as any)
         if (this.swallowId !== null && id === this.swallowId && isResponse) { this.swallowId = null; return }
-        // Proof the link is usable (see linkProven): a response to a request the shim itself
-        // forwarded whose method has to clear main's pairing gate. Looked up BEFORE the delete
-        // below, since inFlight is the only place the method survives.
+        // Proof the link is usable (see linkProven): a SUCCESSFUL result for a request the shim itself
+        // forwarded whose method has to clear main's pairing gate. Looked up BEFORE the delete below,
+        // since inFlight is the only place the method survives.
         //
         // Deliberately NOT "any response carrying an id we did not expect": that counted the SDK's
         // automatic `ping` pong and its -32601 for unregistered methods, both of which main sends
         // from Protocol._onrequest to a client it is about to deny — proving a link that is being
         // refused and re-arming the 5s track for it. See PAIRED_METHODS.
+        //
+        // And 'result', not "result or error": the SDK parses a request against its Zod schema BEFORE
+        // it calls the handler, so a `tools/*` whose params are malformed gets an error response while
+        // requirePaired() is still pending — i.e. a denied client could prove its own link with one
+        // bad request. Nothing legitimate is lost by demanding success: server.ts answers a failed
+        // tools/call with an `isError: true` RESULT, so a paired call that fails still proves its
+        // link, and the one genuine post-gate protocol error it can emit is `throw new Error('failed
+        // to list tools')` — a paired gateway whose backend is down, which should back off rather
+        // than reconnect every second.
+        //
+        // This rests on an invariant main owns and this file cannot see: MAIN NEVER SENDS A `tools/*`
+        // RESULT TO AN UNPAIRED CLIENT. It holds through three files — server.ts awaits
+        // requirePaired() as the first statement of both gated handlers; pipe.ts calls rejectPaired()
+        // and forceClose() in the same tick on every denial, and forceClose destroys the socket
+        // synchronously, so it is dead before an awaiting handler resumes; mcp/transport.ts's send()
+        // rejects on a non-writable stream, so a late response is discarded instead of framed.
+        // Softening pipe.ts's forceClose into a graceful close-after-flush would silently break this.
         const asked = id != null ? this.inFlight.get(id) : undefined
-        if (isResponse && asked && PAIRED_METHODS.has(asked)) {
+        if ('result' in (m as any) && asked && PAIRED_METHODS.has(asked)) {
           this.linkProven = true
           this.delay = RETRY_MIN_MS
         }
