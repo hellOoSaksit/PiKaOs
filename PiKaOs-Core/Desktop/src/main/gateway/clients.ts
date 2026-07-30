@@ -4,8 +4,16 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs'
  * Which external MCP clients may talk to this gateway.
  *
  * The client name comes from MCP's `clientInfo`, which the client declares about ITSELF — it is a
- * label to show the user, never evidence of identity. The actual defence is that a dialog the user
- * did not initiate appears at all, so a leaked token cannot be used silently.
+ * label to show the user, never evidence of identity. The defence is that a dialog the user did not
+ * initiate appears the FIRST time a given name connects, which gives them the chance to notice and
+ * refuse.
+ *
+ * It does NOT cover impersonation of an already-approved name: `allow()` below short-circuits to
+ * `true` for any name already in the store, with no dialog. Since both this store and the enable
+ * switch (`gateway-state.json`) persist, the steady state of every install on every boot is exactly
+ * the state where no dialog appears — so from the second launch onward the TOKEN is the whole
+ * boundary, not this gate. That is what makes `gateway.json`'s 0600 mode load-bearing rather than
+ * belt-and-braces; treat a leaked token as full access, not as something a dialog would still catch.
  *
  * Allow is persisted. Deny is remembered only for the life of this gate instance (i.e. for as long
  * as the gateway process that created it keeps running): persisting it would silently lock a user
