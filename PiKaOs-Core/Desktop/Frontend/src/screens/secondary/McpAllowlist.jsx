@@ -120,16 +120,25 @@ export function McpAllowlist({ Sys, activePlugins }) {
     }
   };
 
+  // This panel owns the app's ONLY gateway on/off switch — there is no tray item and no menu entry —
+  // and it talks to Electron main alone, never to /mcp/catalog or /mcp/allowlist. So it is built
+  // once here and rendered by every branch below, including the two that report a dead backend:
+  // restore() brings the pipe up at boot with no backend dependency at all, so a backend that is
+  // down must not be able to hide the control that turns a listening gateway off. Before this, the
+  // only recourse in that state was hand-deleting gateway-state.json from userData.
+  const gatewayPanel = <McpGatewayPanel Sys={Sys} />;
+
   if (state.error) return (
     <div className="content-pad">
+      {gatewayPanel}
       <Empty icon="refresh" title={t('mcpacl.error')} sub={
         <button type="button" className="pop-action" onClick={load}>{t('mcpacl.retry')}</button>} />
     </div>
   );
-  if (state.loading) return <div className="content-pad"><Spinner /></div>;
+  if (state.loading) return <div className="content-pad">{gatewayPanel}<Spinner /></div>;
   if (!state.tools.length && !state.orphans.length) return (
     <div className="content-pad">
-      <McpGatewayPanel Sys={Sys} />
+      {gatewayPanel}
       <Empty icon="lock" title={t('mcpacl.empty')} />
     </div>
   );
@@ -150,7 +159,7 @@ export function McpAllowlist({ Sys, activePlugins }) {
 
   return (
     <div className="content-pad">
-      <McpGatewayPanel Sys={Sys} />
+      {gatewayPanel}
       {groups.map(g => (
         <Panel key={g.owner} title={g.owner === 'core' ? t('mcpacl.group.core') : g.owner}>
           <Table columns={columns} rows={g.tools.map(x => ({ ...x, id: x.name }))} />
