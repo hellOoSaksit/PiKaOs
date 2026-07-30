@@ -66,7 +66,7 @@ async function confirmToolCall(tool: CatalogTool, caller: string): Promise<boole
   return response === 1
 }
 const AI_CONSOLE_CALLER = 'the AI Console in this window'
-const GATEWAY_CALLER = 'an external AI client using the MCP gateway'
+const GATEWAY_CALLER = 'any external AI client using the MCP gateway'
 
 // Pairing an EXTERNAL MCP client. The name is what the client claims about itself, so the copy must
 // not imply it was verified — the defence is that this dialog appears at all when the user did not
