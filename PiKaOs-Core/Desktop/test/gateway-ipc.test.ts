@@ -1,5 +1,5 @@
 import { it, expect, vi, beforeEach } from 'vitest'
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { GatewayService } from '../src/main/gateway/ipc'
@@ -100,6 +100,29 @@ it('setEnabled persists the operator choice to gateway-state.json', async () => 
   expect(JSON.parse(readFileSync(stateFile(), 'utf8'))).toEqual({ enabled: false })
 })
 
+// Pins the ORDER, not just the fact, of the write: setEnabled persists only after apply resolves.
+// Hoisting the write to before the apply (write-at-call-time) leaves every other test in this file
+// green, yet it means a failed enable — the pipe name already taken, a denied handshake write —
+// records {enabled:true} anyway, and then every later launch tries to bring up a gateway the operator
+// never actually got working. applyEnabled is stubbed because a portable, deterministic startPipe
+// failure isn't reachable from a test (same reason gateway-ipc-reentrancy.test.ts fakes the pipe).
+it('a failed enable records nothing — a rejected apply must never persist {enabled:true}', async () => {
+  const s = service()
+  const failing = () => vi.spyOn(s as any, 'applyEnabled').mockRejectedValue(new Error('pipe name in use'))
+
+  const first = failing()
+  await expect(s.setEnabled(true)).rejects.toThrow('pipe name in use')
+  expect(existsSync(stateFile())).toBe(false)     // nothing to replay: a fresh install stays off
+
+  // Same guarantee when a choice is already on disk: the failure must not overwrite it either.
+  first.mockRestore()
+  await s.setEnabled(true)
+  await s.setEnabled(false)
+  failing()
+  await expect(s.setEnabled(true)).rejects.toThrow('pipe name in use')
+  expect(JSON.parse(readFileSync(stateFile(), 'utf8'))).toEqual({ enabled: false })
+})
+
 it('shutdown() closes the pipe but never touches the persisted preference', async () => {
   const s = service()
   await s.setEnabled(true)
@@ -126,6 +149,20 @@ it('restore() is a no-op on a missing, corrupt, or disabled state file', async (
   expect(s.status().enabled).toBe(false)
   writeFileSync(stateFile(), JSON.stringify({ enabled: false }))
   await s.restore()                                        // explicit off
+  expect(s.status().enabled).toBe(false)
+})
+
+// Fail-closed for a file that PARSES but doesn't say `true` — the likeliest real corruption (a
+// truncated write, a hand edit, a future schema that renames the flag), and the case the missing-file
+// and unparsable-file tests above don't reach. Relaxing the read to `!== false` keeps them both green
+// while turning "unreadable state" into "gateway on", i.e. an opt-in nobody gave.
+it('restore() honours only a literal true — a parseable file saying anything else stays OFF', async () => {
+  const s = service()
+  writeFileSync(stateFile(), JSON.stringify({}))                    // flag absent / renamed
+  await s.restore()
+  expect(s.status().enabled).toBe(false)
+  writeFileSync(stateFile(), JSON.stringify({ enabled: 'yes' }))    // hand-edited, truthy but not true
+  await s.restore()
   expect(s.status().enabled).toBe(false)
 })
 

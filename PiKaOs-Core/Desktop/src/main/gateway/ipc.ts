@@ -100,7 +100,11 @@ export class GatewayService {
   // Boot-time replay of the persisted choice; index.ts calls this once, after IPC registration.
   // Routed through setEnabled so a restored launch gets the same fresh-token handshake as a manual
   // enable. A failure is contained here — the gateway failing to start must never take the app down
-  // — and the renderer is pushed the (off) status it would otherwise wait for forever.
+  // — and the renderer is pushed the status it would otherwise wait for forever. Whatever that status
+  // actually is: push() always sends status(), so a rejecting startPipe reports off (it throws before
+  // applyEnabled's own push), while a failure in the state WRITE reports on, because the pipe really
+  // did come up and applyEnabled already pushed enabled:true. Don't narrow this to "the off status" —
+  // the renderer must be told the truth, not a fixed value.
   restore(): Promise<void> {
     if (!readEnabledState(this.deps.userDataDir)) return Promise.resolve()
     return this.setEnabled(true).then(() => undefined, () => { this.push() })
