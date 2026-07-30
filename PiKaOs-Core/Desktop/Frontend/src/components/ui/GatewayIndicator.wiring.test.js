@@ -14,15 +14,20 @@ describe('gateway light wiring', () => {
   it('App.jsx renders GatewayIndicator inside withChrome, behind its desktop-only guard', () => {
     const src = readFileSync(new URL('../../App.jsx', import.meta.url), 'utf8');
     // withChrome is the ONLY wrapper that reaches every shell mode, pre-login ones included — the
-    // whole point of the move out of BottomUtilityBar, which the five early returns skip. So the pin
-    // is the guard and the render TOGETHER, inside that function: `<GatewayIndicator` on its own
-    // would stay green if someone put the light back in a signed-in-only branch, and
-    // `if (!isDesktop) return body;` on its own says nothing about the light. Scoped this tightly on
-    // purpose (the 299fd67 lesson): it can only mean this feature's wiring, so an unrelated edit
-    // never has to delete it.
+    // whole point of the move out of BottomUtilityBar, which the five early returns skip. The regex
+    // below only proves ORDER — that the guard text appears somewhere before `<GatewayIndicator` in
+    // the file — because its `[\s\S]*?` gaps are unbounded and can span clear past the end of
+    // withChrome. That means it would stay green even if the render moved into the signed-in-only
+    // final return next to `<BottomUtilityBar>`, since that return still comes after the guard text.
+    // The second assertion is what actually pins CONTAINMENT: `const shell = resolveShellMode` is the
+    // line immediately after withChrome's definition closes and before every post-withChrome return
+    // (including the signed-in one with BottomUtilityBar), so the render has to sit BEFORE it to still
+    // be inside withChrome. Scoped this tightly on purpose (the 299fd67 lesson): it can only mean this
+    // feature's wiring, so an unrelated edit never has to delete it.
     expect(src).toMatch(
       /const withChrome = \(body\) => \{[\s\S]*?if \(!isDesktop\) return body;[\s\S]*?<GatewayIndicator\b/,
     );
+    expect(src.indexOf('<GatewayIndicator')).toBeLessThan(src.indexOf('const shell = resolveShellMode'));
   });
 
   it('the gateway light\'s aria-label and tooltip keys exist where the light ships (en, th, ja)', () => {
