@@ -128,3 +128,46 @@ def test_purge_complete_forgets_the_plugin(monkeypatch, tmp_path):
     reg = registry.purge_complete("crm")
     assert registry.state_of(reg, "crm") == registry.AVAILABLE
     assert "crm" not in reg
+
+
+# --- registry version history (auto-update §5.2): the rollback memory -------------------------------
+
+def test_set_git_install_appends_version_history(monkeypatch, tmp_path):
+    from app.core import kernel_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    registry.set_git_install("crm", repo_url="https://x/r.git", tag="v1.0.0", version="1.0.0", sha="aaa", by="u_admin")
+    registry.set_git_install("crm", repo_url="https://x/r.git", tag="v1.1.0", version="1.1.0", sha="bbb", by="u_admin")
+    reg = registry.read()
+    hist = registry.version_history_of(reg, "crm")
+    assert [h["tag"] for h in hist] == ["v1.0.0", "v1.1.0"]
+    assert hist[-1]["sha"] == "bbb" and hist[-1]["by"] == "u_admin" and hist[-1]["at"]
+
+
+def test_version_history_is_capped_at_20(monkeypatch, tmp_path):
+    from app.core import kernel_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    for i in range(25):
+        registry.set_git_install("crm", repo_url="https://x/r.git", tag=f"v1.0.{i}", version=f"1.0.{i}", sha=str(i))
+    hist = registry.version_history_of(registry.read(), "crm")
+    assert len(hist) == 20
+    assert hist[0]["tag"] == "v1.0.5" and hist[-1]["tag"] == "v1.0.24"
+
+
+def test_previous_tag_of_skips_the_current_tag(monkeypatch, tmp_path):
+    from app.core import kernel_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    registry.set_git_install("crm", repo_url="https://x/r.git", tag="v1.0.0", version="1.0.0")
+    registry.set_git_install("crm", repo_url="https://x/r.git", tag="v1.1.0", version="1.1.0")
+    reg = registry.read()
+    assert registry.previous_tag_of(reg, "crm") == "v1.0.0"
+    # switching BACK: previous becomes v1.1.0 (the newest entry that differs from current)
+    registry.set_git_install("crm", repo_url="https://x/r.git", tag="v1.0.0", version="1.0.0")
+    assert registry.previous_tag_of(registry.read(), "crm") == "v1.1.0"
+
+
+def test_previous_tag_of_none_for_single_or_unknown(monkeypatch, tmp_path):
+    from app.core import kernel_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    assert registry.previous_tag_of(registry.read(), "ghost") is None
+    registry.set_git_install("crm", repo_url="https://x/r.git", tag="v1.0.0", version="1.0.0")
+    assert registry.previous_tag_of(registry.read(), "crm") is None

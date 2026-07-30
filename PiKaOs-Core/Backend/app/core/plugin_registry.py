@@ -77,13 +77,15 @@ def set_state(pid: str, state: str, *, version: str | None = None) -> dict[str, 
 
 
 def set_git_install(pid: str, *, repo_url: str, tag: str, version: str,
-                    sha: str | None = None) -> dict[str, dict]:
+                    sha: str | None = None, by: str | None = None) -> dict[str, dict]:
     """Upsert a plugin installed via install-from-git (§2.1): same as `set_state(..., ENABLED)` plus
     the provenance Uninstall/Purge/update-check need — `repoUrl`/`installedTag`/`installedSha` and
     `installedVia: "git"` (a `symlink` entry, the default, is never physically deletable — it's a
     dev's sibling checkout). `installedSha` is the IMMUTABLE pin (marketplace.md W2): a tag can be
     force-moved, a commit SHA cannot, so the SHA is what an audit/tamper-check compares against. Done in
-    ONE flock'd update (K2) so state + provenance land atomically — no torn two-write window."""
+    ONE flock'd update (K2) so state + provenance land atomically — no torn two-write window.
+
+    Also appends this switch to `versionHistory` (auto-update §5.2) — see there for why."""
     def mutate(reg: object) -> dict[str, dict]:
         reg = _as_registry(reg)
         entry = dict(reg.get(pid) or {})
@@ -96,6 +98,14 @@ def set_git_install(pid: str, *, repo_url: str, tag: str, version: str,
         entry["installedTag"] = tag
         if sha is not None:
             entry["installedSha"] = sha
+
+        # Local version history (auto-update spec §5.2): what THIS server actually ran, newest last,
+        # capped — powers "back to previous" and doubles as the audit trail (who switched, when).
+        history = [h for h in (entry.get("versionHistory") or []) if isinstance(h, dict)]
+        history.append({"tag": tag, "sha": sha, "version": version,
+                        "at": datetime.now(timezone.utc).isoformat(), "by": by or "unknown"})
+        entry["versionHistory"] = history[-20:]
+
         reg[pid] = entry
         return reg
 
@@ -124,6 +134,24 @@ def installed_sha_of(registry: dict[str, dict], pid: str) -> str | None:
     for a legacy row / symlink install that predates SHA-pinning."""
     entry = registry.get(pid)
     return entry.get("installedSha") if isinstance(entry, dict) else None
+
+
+def version_history_of(registry: dict[str, dict], pid: str) -> list[dict]:
+    """Every version this server actually installed for `pid` (newest last, capped at 20). Empty for a
+    legacy row written before this field existed — never a KeyError."""
+    entry = registry.get(pid)
+    raw = entry.get("versionHistory") if isinstance(entry, dict) else None
+    return [h for h in raw if isinstance(h, dict)] if isinstance(raw, list) else []
+
+
+def previous_tag_of(registry: dict[str, dict], pid: str) -> str | None:
+    """The newest previously-installed tag that differs from the current one — the one-click
+    rollback target. None when there's nothing to go back to."""
+    current = installed_tag_of(registry, pid)
+    for h in reversed(version_history_of(registry, pid)):
+        if h.get("tag") and h["tag"] != current:
+            return h["tag"]
+    return None
 
 
 def uninstall_git(pid: str) -> dict[str, dict]:
