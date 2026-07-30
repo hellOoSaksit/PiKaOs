@@ -502,6 +502,8 @@ function App() {
         onSearch={openPalette}
         // sequenced: an unsequenced reload races the mark and usually re-reads the pre-mark rows
         onNotificationsOpened={() => { markNotificationsRead().catch(() => {}).finally(loadNotifs); }}
+        // gateway light → the screen that owns the switch; guard() shows access-denied to non-admins
+        onGateway={() => go("mcpskill")}
       />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)}
         nav={visibleNav} t={t} can={can} go={go} />

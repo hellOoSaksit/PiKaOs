@@ -72,6 +72,13 @@
   width: 1px; height: 30px; background: var(--line); margin: 0 3px;
 }
 
+/* gateway light — a dot, not a full utility button: it signals, the click just navigates.
+   Waiting is --ink-4 (muted), NOT --amber: that token is reserved for warning states
+   (see its comment in styles.css) and "listening, nobody connected" is not a warning. */
+.ub-gateway-light { border: 0; background: none; padding: 6px; cursor: pointer; display: flex; align-items: center; }
+.ub-gateway-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-4); }
+.ub-gateway-light[data-live="true"] .ub-gateway-dot { background: var(--emerald); }
+
 .ub-profile-btn {
   position: relative;
   display: block; width: 44px; height: 44px; padding: 0;
