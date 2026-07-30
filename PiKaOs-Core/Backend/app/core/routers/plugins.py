@@ -272,7 +272,7 @@ async def install_from_git(
         sha = git_installer.head_sha(target_dir)             # W2: pin the immutable commit
         tag = ref or manifest.version                         # ref is the resolved tag (or None ⇒ HEAD)
         reg = registry.set_git_install(pid, repo_url=body.repoUrl, tag=tag,
-                                       version=manifest.version, sha=sha)
+                                       version=manifest.version, sha=sha, by=audit.actor_of(user))
     except Exception as e:
         shutil.rmtree(target_dir, ignore_errors=True)
         raise HTTPException(status_code=500, detail="plugin install failed to finalize") from e
@@ -405,7 +405,7 @@ async def update(
     try:
         sha = git_installer.head_sha(plugin_dir)             # W2: re-pin to the updated tag's commit
         reg = registry.set_git_install(plugin_id, repo_url=repo_url, tag=tag,
-                                       version=manifest.version, sha=sha)
+                                       version=manifest.version, sha=sha, by=audit.actor_of(user))
     except Exception as e:
         _revert_checkout(plugin_dir, repo_url, old_tag)
         raise HTTPException(status_code=500, detail="plugin update failed to finalize") from e

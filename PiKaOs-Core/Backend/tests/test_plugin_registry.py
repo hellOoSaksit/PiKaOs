@@ -171,3 +171,46 @@ def test_previous_tag_of_none_for_single_or_unknown(monkeypatch, tmp_path):
     assert registry.previous_tag_of(registry.read(), "ghost") is None
     registry.set_git_install("crm", repo_url="https://x/r.git", tag="v1.0.0", version="1.0.0")
     assert registry.previous_tag_of(registry.read(), "crm") is None
+
+
+def test_set_git_install_no_op_reinstall_does_not_grow_history(monkeypatch, tmp_path):
+    """A retrying/polling caller hitting update with no new release must not evict the real rollback
+    target from the capped list (fix round 1, Important 1) — same tag AND same sha appends nothing."""
+    from app.core import kernel_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    registry.set_git_install("crm", repo_url="https://x/r.git", tag="v1.1.0", version="1.1.0", sha="bbb")
+    for _ in range(20):
+        reg = registry.set_git_install("crm", repo_url="https://x/r.git", tag="v1.1.0", version="1.1.0", sha="bbb")
+    hist = registry.version_history_of(reg, "crm")
+    assert len(hist) == 1
+    assert registry.previous_tag_of(reg, "crm") is None   # nothing to roll back to — as expected here
+
+
+def test_set_git_install_force_moved_tag_still_records_a_row(monkeypatch, tmp_path):
+    """Same tag name, new commit (a force-moved release) is NOT a no-op — the sha changed, so it must
+    still land in history even though the tag string didn't."""
+    from app.core import kernel_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    registry.set_git_install("crm", repo_url="https://x/r.git", tag="v1.1.0", version="1.1.0", sha="bbb")
+    reg = registry.set_git_install("crm", repo_url="https://x/r.git", tag="v1.1.0", version="1.1.0", sha="ccc")
+    hist = registry.version_history_of(reg, "crm")
+    assert [h["sha"] for h in hist] == ["bbb", "ccc"]
+
+
+def test_set_git_install_starts_history_from_a_legacy_row_with_no_versionHistory_key(monkeypatch, tmp_path):
+    """An entry that already EXISTS (written by `set_state`, pre-dating this feature) has no
+    `versionHistory` key at all yet — distinct from `pid` having no entry whatsoever."""
+    from app.core import kernel_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    registry.set_state("crm", registry.INSTALLED, version="1.0.0")
+    reg = registry.set_git_install("crm", repo_url="https://x/r.git", tag="v1.0.0", version="1.0.0")
+    hist = registry.version_history_of(reg, "crm")
+    assert len(hist) == 1 and hist[0]["tag"] == "v1.0.0"
+
+
+def test_version_history_of_ignores_malformed_shapes():
+    """A hand-corrupted (or future-incompatible) state file must not raise — the whole-field-not-a-list
+    and per-element-not-a-dict guards, pinned so a later refactor can't drop them silently."""
+    assert registry.version_history_of({"crm": {"versionHistory": "junk"}}, "crm") == []
+    reg = {"crm": {"versionHistory": [{"tag": "v1"}, "junk"]}}
+    assert registry.version_history_of(reg, "crm") == [{"tag": "v1"}]

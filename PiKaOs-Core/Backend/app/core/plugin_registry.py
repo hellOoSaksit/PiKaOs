@@ -89,6 +89,10 @@ def set_git_install(pid: str, *, repo_url: str, tag: str, version: str,
     def mutate(reg: object) -> dict[str, dict]:
         reg = _as_registry(reg)
         entry = dict(reg.get(pid) or {})
+        # Captured BEFORE they're overwritten below — the only way to tell a genuine switch from a
+        # no-op re-install (same tag, same sha) that a retrying/polling caller may send repeatedly.
+        prev_tag = entry.get("installedTag")
+        prev_sha = entry.get("installedSha")
         entry["state"] = ENABLED
         entry["version"] = version
         if "installed_at" not in entry:
@@ -100,11 +104,15 @@ def set_git_install(pid: str, *, repo_url: str, tag: str, version: str,
             entry["installedSha"] = sha
 
         # Local version history (auto-update spec §5.2): what THIS server actually ran, newest last,
-        # capped — powers "back to previous" and doubles as the audit trail (who switched, when).
-        history = [h for h in (entry.get("versionHistory") or []) if isinstance(h, dict)]
-        history.append({"tag": tag, "sha": sha, "version": version,
-                        "at": datetime.now(timezone.utc).isoformat(), "by": by or "unknown"})
-        entry["versionHistory"] = history[-20:]
+        # capped — powers "back to previous" and doubles as the audit trail (who switched, when). Skip
+        # the append on a no-op (identical tag AND sha) — otherwise a repeated no-op update call evicts
+        # the real rollback target from the capped list. A force-moved tag (same name, new commit) or a
+        # genuine switch-back still records a row, since `tag != prev_tag or sha != prev_sha` catches it.
+        if tag != prev_tag or sha != prev_sha:
+            history = [h for h in (entry.get("versionHistory") or []) if isinstance(h, dict)]
+            history.append({"tag": tag, "sha": sha, "version": version,
+                            "at": datetime.now(timezone.utc).isoformat(), "by": by or "unknown"})
+            entry["versionHistory"] = history[-20:]
 
         reg[pid] = entry
         return reg
