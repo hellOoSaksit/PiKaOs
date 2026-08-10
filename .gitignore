@@ -50,6 +50,12 @@
 # JSON file (NOT the DB) so the kernel works before any datastore exists. Runtime-only, never committed.
 /PiKaOs-Core/Backend/data/
 
+# Server-Core updater run state — update.bat/update.sh write the transcript and a concurrency lock
+# next to themselves. Both MUST stay untracked: the updater checks the tree is clean before it will
+# check a tag out, so a tracked log would make the tool refuse to run the second time.
+/PiKaOs-Core/update.log
+/PiKaOs-Core/update.lock
+
 # OS / editor junk
 .DS_Store
 Thumbs.db
