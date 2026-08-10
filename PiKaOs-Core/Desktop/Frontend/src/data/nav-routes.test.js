@@ -10,6 +10,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { NAV } from './data.jsx';
+import en from './i18n/en-formal.json';
+import th from './i18n/th-formal.json';
+import ja from './i18n/ja-formal.json';
 
 const APP = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
 const DATA_NAV = readFileSync(new URL('./data-nav.jsx', import.meta.url), 'utf8');
@@ -36,6 +39,16 @@ describe('nav ids and route cases agree', () => {
 
   it('every Core ROUTE_META id is reachable from the sidebar — no orphan metadata', () => {
     expect(metaIds.filter((id) => !navIds.includes(id))).toEqual([]);
+  });
+
+  // The topbar renders t("route." + route + ".title"), so a route whose key is missing shows the raw
+  // key string to the user — invisible to every other test here, and exactly what a UAT caught for
+  // `backups`. The nav/route/META agreement above says the screen EXISTS; this says it has a name.
+  it('every Core route has a topbar title in all three packs', () => {
+    const at = (pack, k) => (pack.translations ?? pack)[k];
+    for (const [name, pack] of [['en', en], ['th', th], ['ja', ja]])
+      for (const id of metaIds)
+        expect(at(pack, `route.${id}.title`), `${name} is missing route.${id}.title`).toBeTruthy();
   });
 
   it('mcpskill is a top-level admin item gated on mcp.manage', () => {
