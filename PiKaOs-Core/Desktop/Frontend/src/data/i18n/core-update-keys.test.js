@@ -12,7 +12,7 @@ const at = (pack, k) => (pack.translations ?? pack)[k];
 const PACKS = [['en', en], ['th', th], ['ja', ja]];
 
 describe('core.update.* / sched.* / notif.schedule.* i18n parity', () => {
-  for (const prefix of ['core.update.', 'sched.', 'notif.schedule.', 'compat.']) {
+  for (const prefix of ['core.update.', 'sched.', 'notif.schedule.', 'compat.', 'backup.']) {
     it(`th and ja carry exactly the en ${prefix}* key set`, () => {
       const base = keysOf(en, prefix);
       expect(base.length).toBeGreaterThan(0);
@@ -41,6 +41,9 @@ describe('core.update.* / sched.* / notif.schedule.* i18n parity', () => {
       'notif.schedule.failed': ['{plugin}', '{tag}'],
       'notif.schedule.missed': ['{plugin}', '{tag}'],
       'notif.schedule.cancelled': ['{plugin}', '{tag}'],
+      // Losing {token} leaves an instruction that names no word to type, in front of the one
+      // destructive action on the screen.
+      'backup.confirmNote': ['{token}'],
     };
     for (const [name, pack] of PACKS)
       for (const [k, tokens] of Object.entries(NEEDS))
