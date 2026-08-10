@@ -53,10 +53,11 @@ async def lifespan(app: FastAPI):
         except Exception as exc:  # pragma: no cover - infra not ready yet
             print(f"[startup] MinIO bucket check failed: {exc}")
 
-    # Scheduled plugin updates. Every worker starts one; the store's flock makes claiming
-    # single-flight, so N loops still fire each entry exactly once (spec §6.3).
+    # Scheduled plugin updates + backups. Every worker starts one; the store's flock makes claiming
+    # single-flight, so N loops still fire each entry exactly once (spec §6.3). The container goes in
+    # because a scheduled backup has no request to resolve the database DSN from.
     updates_stop = asyncio.Event()
-    updates_task = asyncio.create_task(update_runner.runner_loop(updates_stop))
+    updates_task = asyncio.create_task(update_runner.runner_loop(updates_stop, container=container))
 
     try:
         yield

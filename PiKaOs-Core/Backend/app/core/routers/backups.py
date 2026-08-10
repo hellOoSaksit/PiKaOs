@@ -38,7 +38,7 @@ class RestoreIn(BaseModel):
 async def create(request: Request,
                  user: UserLike = Depends(require_perm("plugins.manage"))) -> dict:
     try:
-        manifest = bs.create_backup(dsn=dsn_of(request))
+        manifest = bs.create_backup(dsn=dsn_of(request.app.state.container))
     except bs.BackupError as e:
         log.exception("backup failed")
         raise HTTPException(status_code=422, detail="backup failed") from e
@@ -112,7 +112,7 @@ async def restore(backup_id: str, body: RestoreIn, request: Request,
         # The recovery point, taken AFTER validation and BEFORE the first write. It mirrors what the
         # restore is about to replace — plugins included, and the database too when the incoming
         # archive carries one, because pg_restore --clean destroys the current data outright.
-        dsn = dsn_of(request)
+        dsn = dsn_of(request.app.state.container)
         bs.create_backup(prefix="pre-restore", dsn=dsn if manifest.get("hasDb") else None)
         _swap_dir(staging / "state", Path(settings.kernel_state_dir))
         if (staging / "plugins").is_dir():

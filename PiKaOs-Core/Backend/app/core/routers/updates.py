@@ -95,6 +95,22 @@ async def core_reminder(
     return entry
 
 
+@router.post("/schedule-backup")
+async def schedule_backup(
+    body: CoreReminderIn,
+    user: UserLike = Depends(require_perm("plugins.manage")),
+) -> dict:
+    """Queue a server backup. Unlike a Core update this IS an action the container can perform on
+    itself — it writes an archive to the backups volume and nothing else, so no restart is earned."""
+    try:
+        entry = update_schedule.add_entry(kind=update_schedule.KIND_BACKUP,
+                                          at_iso=body.at, by=audit.actor_of(user))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    audit.log(audit.actor_of(user), "update.schedule", entry["id"], {"kind": entry["kind"]})
+    return entry
+
+
 @router.delete("/schedules/{sid}")
 async def cancel_schedule(
     sid: str,

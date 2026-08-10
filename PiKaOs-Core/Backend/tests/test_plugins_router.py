@@ -680,6 +680,64 @@ def test_update_fetches_new_tag_revalidates_and_updates_registry(sample_plugins,
     assert reg["crm"]["version"] == "1.1.0"
 
 
+def test_a_switch_snapshots_the_kernel_state_first(sample_plugins, tmp_path, monkeypatch):
+    """The data safety net (backup-restore spec §2): a bad version switch must never cost the plugin
+    registry or the settings that live beside it. State-only, so it is cheap enough to take on every
+    switch — the plugin code itself is still in git."""
+    from app.core import backup_service, kernel_state, setup_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    monkeypatch.setattr(kernel_state.settings, "backups_dir", str(tmp_path / "backups"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    headers = {"Authorization": "Bearer a-session-token"}
+
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        src, _ = _install_crm_via_git(client, tmp_path, monkeypatch, headers)
+        assert backup_service.list_backups() == []       # an INSTALL replaces nothing, so no snapshot
+
+        (src / "manifest.json").write_text(
+            '{"id":"crm","name":"CRM","version":"1.1.0","coreVersion":"*"}', encoding="utf-8")
+        _git(src, "add", ".")
+        _git(src, "commit", "-q", "-m", "bump")
+        _git(src, "tag", "v1.1.0")
+        assert client.post("/api/plugins/crm/update", headers=headers).status_code == 200
+
+    snaps = backup_service.list_backups()
+    assert [s["id"].split("_")[0] for s in snaps] == ["pre-switch-crm"]
+    assert snaps[0]["stateOnly"] is True
+
+
+def test_a_failing_snapshot_never_blocks_the_switch(sample_plugins, tmp_path, monkeypatch):
+    """Refusing to update because the backup volume is full would be a worse outage than the one the
+    snapshot guards against — and the switch has its own revert."""
+    from app.core import backup_service, kernel_state, setup_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    monkeypatch.setattr(backup_service, "create_backup",
+                        lambda **kw: (_ for _ in ()).throw(OSError("no space left on device")))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    headers = {"Authorization": "Bearer a-session-token"}
+
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+
+    import app.main as main
+    with TestClient(main.app) as client:
+        src, _ = _install_crm_via_git(client, tmp_path, monkeypatch, headers)
+        (src / "manifest.json").write_text(
+            '{"id":"crm","name":"CRM","version":"1.1.0","coreVersion":"*"}', encoding="utf-8")
+        _git(src, "add", ".")
+        _git(src, "commit", "-q", "-m", "bump")
+        _git(src, "tag", "v1.1.0")
+        resp = client.post("/api/plugins/crm/update", headers=headers)
+    assert resp.status_code == 200
+    assert (plugins_dir / "crm" / "manifest.json").read_text(encoding="utf-8").find('"1.1.0"') != -1
+
+
 def test_update_records_the_new_commit_sha(sample_plugins, tmp_path, monkeypatch):
     """After an update the registry's installedSha advances to the NEW tag's commit — the pin stays
     accurate across updates (W2)."""

@@ -455,6 +455,16 @@ def perform_switch(plugin_id: str, tag: str, by: str, *, repo_url: str | None,
     tree on a successful checkout, so the old version is still exactly what is there."""
     from ... import plugin_loader
 
+    # Data safety net (backup-restore spec §2): a cheap state-only snapshot before any switch, so a
+    # bad update never costs registry/settings state. A failed snapshot must NOT block the switch —
+    # the switch has its own revert, and refusing to update because a backup failed would be a worse
+    # outage than the one this guards against.
+    try:
+        from .. import backup_service
+        backup_service.create_backup(prefix=f"pre-switch-{plugin_id}", state_only=True)
+    except Exception:
+        log.warning("pre-switch snapshot failed for %s — continuing", plugin_id)
+
     plugin_dir = plugin_loader.PLUGINS_DIR / plugin_id
     try:
         git_installer.fetch_and_checkout(plugin_dir, repo_url, tag)

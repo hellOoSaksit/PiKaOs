@@ -36,7 +36,18 @@ def _perform_switch(plugin_id: str, tag: str, by: str) -> None:
                    old_tag=registry.installed_tag_of(reg, plugin_id))
 
 
-def fire_entry(entry: dict) -> tuple[str, str]:
+def _create_backup(container=None) -> dict:
+    """Take a scheduled backup + prune. Same indirection as `_perform_switch`: a lazy import and the
+    seam the runner tests replace."""
+    from . import backup_service
+    from .config import settings
+    from .db import dsn_of
+    m = backup_service.create_backup(dsn=dsn_of(container))
+    backup_service.prune(keep=settings.backup_keep)
+    return m
+
+
+def fire_entry(entry: dict, container=None) -> tuple[str, str]:
     """Execute one claimed entry → (terminal status, generic note). Never raises: the caller has
     already flipped the row to RUNNING, so an escaping exception would strand it there until a sweep."""
     due = us.parse_utc(entry.get("at", ""))
@@ -48,6 +59,13 @@ def fire_entry(entry: dict) -> tuple[str, str]:
         # Deliberately does nothing but come due: a server-Core update replaces the running image via
         # a host script, which nothing inside the container may trigger. The reminder IS the feature.
         return us.DONE, "core update reminder due"
+    if entry.get("kind") == us.KIND_BACKUP:
+        try:
+            m = _create_backup(container)
+            return us.DONE, f"backup {m['id']} created"
+        except Exception:
+            log.exception("scheduled backup failed")
+            return us.FAILED, "backup failed — see server logs"
     try:
         _perform_switch(entry["pluginId"], entry["tag"], entry.get("by") or "schedule")
         return us.DONE, f"switched to {entry['tag']} — restarting to apply"
@@ -89,6 +107,11 @@ def announce(entry: dict, status: str) -> None:
     try:
         if entry.get("kind") == us.KIND_CORE_REMINDER:
             notify.emit("plugin", "notif.schedule.core")
+        elif entry.get("kind") == us.KIND_BACKUP:
+            # A backup entry carries no pluginId/tag, so the shared key below would render
+            # "Scheduled update applied: → " — an empty message for a backup that really ran.
+            notify.emit("plugin", "notif.schedule.backup" if status == us.DONE
+                        else "notif.schedule.backupfailed")
         else:
             notify.emit("plugin", f"notif.schedule.{status}",
                         {"plugin": entry.get("pluginId") or "", "tag": entry.get("tag") or ""})
@@ -100,7 +123,7 @@ def announce(entry: dict, status: str) -> None:
 
 
 async def runner_loop(stop: asyncio.Event, *, tick_seconds: float = 60.0,
-                      fire=fire_entry, restart=schedule_self_restart) -> None:
+                      fire=fire_entry, restart=schedule_self_restart, container=None) -> None:
     """Tick until `stop`. One claim per tick: a slow switch must not hold up the next claim, and the
     loop is the only thing that may outlive a single entry."""
     while not stop.is_set():
@@ -112,7 +135,7 @@ async def runner_loop(stop: asyncio.Event, *, tick_seconds: float = 60.0,
                 announce(swept, us.FAILED)
             entry = us.claim_due(now_iso)
             if entry is not None:
-                status, note = fire(entry)
+                status, note = fire(entry, container)
                 us.finish(entry["id"], status, note)
                 announce(entry, status)
                 # Only a committed plugin switch earns a restart. A MISSED, FAILED or reminder entry
