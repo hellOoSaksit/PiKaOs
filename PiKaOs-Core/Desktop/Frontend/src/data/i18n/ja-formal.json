@@ -220,6 +220,7 @@
     "backup.confirmDelete": "もう一度クリックで削除",
     "backup.confirmNote": "{token} と入力すると復元が有効になります — このサーバーの状態を置き換えて再起動します。",
     "backup.empty": "バックアップはまだありません。",
+    "backup.sched.empty": "予約されたバックアップはありません。",
     "backup.stateOnly": "状態のみ",
     "backup.withDb": "データベース込み",
     "backup.restarting": "復元中 — サーバーを再起動しています…",

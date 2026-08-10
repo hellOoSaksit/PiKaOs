@@ -1,5 +1,6 @@
-/* Backups panel (backup-restore spec §3) — lives on the Modules screen, beside the Core-update card
-   and the schedule queue that lists the backup entries this panel queues. Same plugins.manage gate.
+/* Backups panel (backup-restore spec §3) — the "files" tab of the Backups screen (BackupsHub):
+   create, download, restore or delete archives. Scheduling a backup lives on the sibling
+   "schedule" tab (BackupsSchedule) — one destructive/queueing surface per tab.
 
    Restore is the only destructive verb here and it is guarded twice: a typed RESTORE token (literal in
    every language, like the recovery screen's RESET) and a server that refuses an archive from a newer
@@ -9,7 +10,7 @@ import React, { useEffect, useState } from 'react';
 
 import { Button, HelpNote, Panel } from '../../components/ui/index.js';
 import * as api from '../../lib/api.js';
-import { localInputToUtcIso, localNowInputValue, utcIsoToLocalLabel } from '../../lib/schedule-time.js';
+import { utcIsoToLocalLabel } from '../../lib/schedule-time.js';
 import { RESTORE_TOKEN, fmtBytes, restoreArmed, restoreErrorKey } from './BackupsPanel.logic.js';
 
 /* Two-click confirm — same arrangement as RecoveryView's ActionBtn: the first click arms and the
@@ -29,13 +30,12 @@ function ArmedButton({ t, label, onRun, disabled }) {
   );
 }
 
-export default function BackupsPanel({ t, onScheduled }) {
+export default function BackupsPanel({ t }) {
   const [items, setItems] = useState(null);      // null = loading
-  const [busy, setBusy] = useState(null);        // 'create' | 'schedule' | a backup id
+  const [busy, setBusy] = useState(null);        // 'create' | a backup id
   const [err, setErr] = useState(null);          // an i18n key, never a server string
   const [typed, setTyped] = useState('');
   const [conflictId, setConflictId] = useState(null);   // 409: a backup from a different secret_key
-  const [when, setWhen] = useState('');
   const [restarting, setRestarting] = useState(false);
 
   const load = () => api.listBackups()
@@ -85,12 +85,6 @@ export default function BackupsPanel({ t, onScheduled }) {
     } finally { setBusy(null); }
   };
 
-  const schedule = () => run('schedule', async () => {
-    await api.scheduleBackup(localInputToUtcIso(when));
-    setWhen('');
-    onScheduled?.();
-  });
-
   const armed = restoreArmed(typed);
   return (
     <Panel title={t('backup.title')} en="BACKUPS">
@@ -101,17 +95,6 @@ export default function BackupsPanel({ t, onScheduled }) {
       <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <Button kind="gold" size="sm" disabled={!!busy} onClick={() => run('create', api.createBackup)}>
           {busy === 'create' ? t('backup.creating') : t('backup.create')}
-        </Button>
-        <label className="row" style={{ gap: 8, alignItems: 'center', fontSize: 12 }}>
-          {/* Not `sched.field`: that one reads "leave empty to apply now", which is the version
-              picker's rule — here "now" is its own button and an empty field simply means no schedule. */}
-          <span className="faint">{t('backup.scheduleField')}</span>
-          <input className="bf-input" type="datetime-local" value={when} min={localNowInputValue()}
-            aria-label={t('backup.schedule')} disabled={!!busy}
-            onChange={e => setWhen(e.target.value)} />
-        </label>
-        <Button kind="ghost" size="sm" disabled={!!busy || !when} onClick={schedule}>
-          {busy === 'schedule' ? '…' : t('backup.schedule')}
         </Button>
       </div>
 

@@ -24,3 +24,15 @@ export const restoreArmed = (typed) => (typed || '').trim() === RESTORE_TOKEN;
 /* 409 is its own outcome, not a generic failure: the archive is fine, it was written under a
    different secret_key, and the operator has to decide whether to accept losing the stored secrets. */
 export const restoreErrorKey = (status) => (status === 409 ? 'backup.keydiffer' : 'backup.failed');
+
+/* One predicate, two views: the Backups schedule tab renders the entries this returns true for,
+   the Modules queue renders the rest. A `?kind=` query param would be a second home for the same
+   rule — the queue is small, so the split lives in the renderer. */
+export const isBackupEntry = (entry) => entry?.kind === 'backup';
+
+/* Schedule status → Badge variant (the qbadge tint recipe — cmp-badges). failed/missed are the
+   loud ones: a backup that did not run is the one outcome an operator must not scroll past. */
+export const SCHED_VARIANT = {
+  pending: 'st-queued', running: 'st-active', done: 'st-done',
+  failed: 'pr-urgent', missed: 'pr-high', cancelled: 'st-queued',
+};

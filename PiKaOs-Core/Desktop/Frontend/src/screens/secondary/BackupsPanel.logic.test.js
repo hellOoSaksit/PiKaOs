@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { fmtBytes, restoreArmed, restoreErrorKey, scheduleRowLabel, RESTORE_TOKEN }
   from './BackupsPanel.logic.js';
+import { isBackupEntry, SCHED_VARIANT } from './BackupsPanel.logic.js';
 
 const t = (k) => k;
 
@@ -41,5 +42,20 @@ describe('size formatting', () => {
     expect(fmtBytes(2048)).toBe('2 KB');
     expect(fmtBytes(5 * 1048576)).toBe('5.0 MB');
     expect(fmtBytes(undefined)).toBe('0 B');
+  });
+});
+
+describe('splitting the schedule queue between two screens', () => {
+  it('claims exactly the backup entries', () => {
+    // The same predicate, negated, is what the Modules queue uses — one definition, two views.
+    expect(isBackupEntry({ kind: 'backup' })).toBe(true);
+    expect(isBackupEntry({ kind: 'plugin-update' })).toBe(false);
+    expect(isBackupEntry({ kind: 'core-reminder' })).toBe(false);
+    expect(isBackupEntry(undefined)).toBe(false);
+  });
+
+  it('maps every schedule status to a Badge variant — an unmapped status renders no chip', () => {
+    for (const s of ['pending', 'running', 'done', 'failed', 'missed', 'cancelled'])
+      expect(SCHED_VARIANT[s], `missing variant for ${s}`).toBeTruthy();
   });
 });
