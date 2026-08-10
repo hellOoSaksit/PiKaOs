@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from .. import audit, backup_service as bs, crypto, update_schedule
+from .. import audit, backup_service as bs, crypto, notify, update_schedule
 from ..config import settings
 from ..db import dsn_of
 from ..identity import UserLike, require_perm
@@ -196,3 +196,41 @@ async def schedule_backup(body: ScheduleBackupIn,
         raise HTTPException(status_code=422, detail=str(e)) from e
     audit.log(audit.actor_of(user), "update.schedule", entry["id"], {"kind": entry["kind"]})
     return entry
+
+
+# --- the backup half of the schedule QUEUE (list/cancel) -------------------------------------------
+#
+# The queue is one store (`update_schedule`) shared with plugin-update and core-reminder rows, but
+# `updates.py`'s own rule is "one surface, one authz rule" — so rather than teach that surface a
+# second permission, the backup rows get their OWN read/cancel here, filtered to their own kind.
+# `plugins.manage` keeps the full list (Modules screen still needs the non-backup rows) but loses the
+# ability to act on a backup row; `backups.manage` gets a full loop over what it itself queued.
+
+@router.get("/schedules")
+async def list_backup_schedules(
+    _: UserLike = Depends(require_perm("backups.manage")),
+) -> list[dict]:
+    """Only the backup rows of the shared queue — the Backups schedule tab has no business seeing
+    (or leaking) what plugin switch is pending."""
+    return [e for e in update_schedule.list_entries() if e.get("kind") == update_schedule.KIND_BACKUP]
+
+
+@router.delete("/schedules/{sid}")
+async def cancel_backup_schedule(
+    sid: str,
+    user: UserLike = Depends(require_perm("backups.manage")),
+) -> dict:
+    """Cancel a PENDING backup row — and ONLY a backup row. 404 covers "no such id", "already running
+    or finished", AND "that id belongs to some other kind of row": a 403 here would confirm to a
+    backups.manage caller that a plugin-update row with that id exists, which is not theirs to know."""
+    entry = next((e for e in update_schedule.list_entries() if e["id"] == sid), None)
+    if entry is None or entry.get("kind") != update_schedule.KIND_BACKUP:
+        raise HTTPException(status_code=404, detail="no pending backup schedule with that id")
+    cancelled = update_schedule.cancel(sid)
+    if cancelled is None:
+        raise HTTPException(status_code=404, detail="no pending backup schedule with that id")
+    audit.log(audit.actor_of(user), "update.schedule.cancel", sid, {})
+    # No {plugin}/{tag} params: a backup row carries neither, and the shared notif.schedule.cancelled
+    # key would render "Scheduled update cancelled: → " for a row that was never an update.
+    notify.emit("plugin", "notif.schedule.backupcancelled")
+    return cancelled

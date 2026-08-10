@@ -286,6 +286,9 @@ export async function restoreBackup(id, acceptKeyChange = false) {
   return raw(`/backups/${id}/restore`, { method: "POST", body: { confirm: "RESTORE", acceptKeyChange } });
 }
 export async function scheduleBackup(at) { return raw(`/updates/schedule-backup`, { method: "POST", body: { at } }); }
+// The backup half of the schedule QUEUE (backups.manage, not plugins.manage — see routers/backups.py).
+export async function listBackupSchedules() { return raw(`/backups/schedules`); }
+export async function cancelBackupSchedule(sid) { return raw(`/backups/schedules/${sid}`, { method: "DELETE" }); }
 // Downloads can't go through raw() (it JSON-parses every body) and can't be a plain <a href> either:
 // the bearer token would not ride along, so the link would 401 on the desktop shell.
 export async function fetchBlob(path, { _retry = false } = {}) {

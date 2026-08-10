@@ -55,9 +55,9 @@ describe('core.update.* / sched.* / notif.schedule.* i18n parity', () => {
   // terminal statuses it can emit — no more (dead copy), no fewer (a raw key in the bell).
   it('matches the keys update_runner.announce can emit', () => {
     expect(keysOf(en, 'notif.schedule.')).toEqual(
-      ['notif.schedule.backup', 'notif.schedule.backupfailed', 'notif.schedule.cancelled',
-       'notif.schedule.core', 'notif.schedule.done', 'notif.schedule.failed',
-       'notif.schedule.missed']);
+      ['notif.schedule.backup', 'notif.schedule.backupcancelled', 'notif.schedule.backupfailed',
+       'notif.schedule.cancelled', 'notif.schedule.core', 'notif.schedule.done',
+       'notif.schedule.failed', 'notif.schedule.missed']);
   });
 
   // A backup entry has no pluginId/tag, so it takes its own keys rather than the shared ones — with
