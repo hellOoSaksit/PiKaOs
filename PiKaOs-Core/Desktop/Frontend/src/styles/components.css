@@ -853,3 +853,6 @@ select.bf-input { cursor: pointer; }
 .lib-type-row { display: flex; align-items: baseline; gap: 14px; }
 .lt-tag { flex: 0 0 76px; font-size: 10px; color: var(--ink-4); }
 .lib-credit { margin: 24px 0 8px; }
+
+/* Backups screens: a status chip sitting inline after mono text */
+.qb-inline { margin-left: 8px; }

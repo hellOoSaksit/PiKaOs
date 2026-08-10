@@ -526,6 +526,7 @@
     "backup.confirmDelete": "Click again to delete",
     "backup.confirmNote": "Type {token} to enable restore — it replaces this server's state and restarts it.",
     "backup.empty": "No backups yet.",
+    "backup.sched.empty": "No scheduled backups.",
     "backup.stateOnly": "state only",
     "backup.withDb": "with database",
     "backup.restarting": "Restoring — the server is restarting…",

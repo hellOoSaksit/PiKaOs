@@ -9,7 +9,7 @@ import React, { useEffect, useState } from 'react';
 import { Button, Empty, HelpNote, Modal, PageHead, Panel } from '../components/ui/index.js';
 import * as api from '../lib/api.js';
 import { localInputToUtcIso, localNowInputValue, utcIsoToLocalLabel } from '../lib/schedule-time.js';
-import { scheduleRowLabel } from './secondary/BackupsPanel.logic.js';
+import { isBackupEntry, scheduleRowLabel } from './secondary/BackupsPanel.logic.js';
 
 const SCHED_BADGE = { done: 'on', pending: 'info', running: 'info', cancelled: 'idle' };
 
@@ -239,7 +239,11 @@ function CoreUpdateCard({ t }) {
    read/unread lives; this panel answers "what is queued", not "what did I miss". */
 function SchedulesPanel({ t, may, reloadKey }) {
   const [items, setItems] = useState([]);
-  const load = () => api.listSchedules().then(r => setItems(Array.isArray(r) ? r : [])).catch(() => {});
+  const load = () => api.listSchedules()
+    // Backup rows moved to the Backups screen's schedule tab (one store, two views —
+    // isBackupEntry is the single definition of the split).
+    .then(r => setItems((Array.isArray(r) ? r : []).filter(e => !isBackupEntry(e))))
+    .catch(() => {});
   useEffect(() => { load(); }, [reloadKey]);
   if (items.length === 0) return null;      // an empty queue is the normal state — no empty panel
   return (
