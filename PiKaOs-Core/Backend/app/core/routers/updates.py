@@ -1,26 +1,64 @@
-"""Scheduled-update routes (`/api/updates`) — list, cancel, and queue a Core-update reminder
-(server-core-update spec §6.2). The plugin-switch scheduling verb itself lives with the other plugin
-verbs in `routers/plugins.py`, so everything that acts on a plugin stays in one router.
+"""Update routes — the scheduled-update queue (`/api/updates`, spec §6.2) and the server-Core update
+check (`/api/core/check-update`, spec §4). Two prefixes, one file: they are one surface with one
+authz rule, and splitting them is how the rule ends up written twice. The plugin-switch scheduling
+verb itself lives with the other plugin verbs in `routers/plugins.py`, so everything that acts on a
+plugin stays in one router.
 
-Authz: `plugins.manage` on ALL of them, reads included. The schedule is the read half of a privileged
-operation — it says which plugin is about to be switched, to what version, and when — and the plan's
-original "reads = any authenticated user" predates the decision that tightened the whole update
-surface. See `architecture/security.md`. Nothing here is `ai_safe`: an external AI must not be able to
-queue a version switch, nor read the queue.
+Authz: `plugins.manage` on ALL of them, reads included. Each read is the read half of a privileged
+operation — the schedule says which plugin is about to be switched, to what version and when; the
+Core check spends an outbound `ls-remote` and discloses a release history — and the plan's original
+"reads = any authenticated user" predates the decision that tightened the whole update surface. See
+`architecture/security.md`. Nothing here is `ai_safe`: an external AI must not be able to queue a
+version switch, read the queue, or learn that the server is behind.
 """
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from .. import audit, notify, update_schedule
+from .. import audit, core_update, notify, update_schedule
+from ..config import settings
 from ..identity import UserLike, require_perm
 
 router = APIRouter(prefix="/api/updates", tags=["updates"])
 
+# The Core check is not "an update" the way a schedule row is — it reports on the running server, so
+# it sits under `/api/core` beside the other server-identity reads rather than inside the queue.
+core_router = APIRouter(prefix="/api/core", tags=["updates"])
+
 
 class CoreReminderIn(BaseModel):
     at: str          # UTC ISO with a timezone — validated in the store, which owns the rule
+
+
+class CoreUpdateOut(BaseModel):
+    currentVersion: str
+    latestTag: str | None
+    latestVersion: str | None
+    hasUpdate: bool
+    reachable: bool
+    blocked: bool                 # some installed plugin's coreVersion excludes the target
+    pluginCompat: list[dict]
+
+
+@core_router.get("/check-update", response_model=CoreUpdateOut)
+async def core_check_update(
+    _: UserLike = Depends(require_perm("plugins.manage")),
+) -> CoreUpdateOut:
+    """On-demand server-Core update check (spec §4): the highest `core-v*` tag on the release repo vs
+    the running version, plus the installed-plugin compat table (§8.1) so the operator sees what a
+    bump would strand BEFORE the host script touches anything. Unreachable is reported as
+    `reachable: false`, never an error — an offline host is a normal state, not a broken screen."""
+    latest = core_update.latest_core_tag()
+    if latest is None:
+        return CoreUpdateOut(currentVersion=settings.app_version, latestTag=None, latestVersion=None,
+                             hasUpdate=False, reachable=False, blocked=False, pluginCompat=[])
+    latest_version = core_update.version_of(latest)
+    compat = core_update.plugin_compat(latest_version)
+    return CoreUpdateOut(
+        currentVersion=settings.app_version, latestTag=latest, latestVersion=latest_version,
+        hasUpdate=core_update.is_newer(latest_version, settings.app_version),
+        reachable=True, blocked=any(not r["compatible"] for r in compat), pluginCompat=compat)
 
 
 @router.get("/schedules")

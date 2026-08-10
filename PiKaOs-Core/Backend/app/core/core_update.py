@@ -47,6 +47,19 @@ def version_of(tag: str) -> str:
     return tag[len(CORE_TAG_PREFIX):] if tag.startswith(CORE_TAG_PREFIX) else tag
 
 
+def is_newer(candidate_version: str, current_version: str) -> bool:
+    """Is `candidate_version` a LATER Core than `current_version`? Both bare `X.Y.Z`.
+
+    Versions are compared by parsing, never as strings — `0.10.0` sorts before `0.9.0` as text, and
+    the answer here decides whether an admin is told to point a one-way host script at another image.
+    A version neither side can parse (a dev build) answers False: "I cannot tell" must never render
+    as "an update is available".
+    """
+    candidate = git_installer._semver_key(candidate_version, "")
+    current = git_installer._semver_key(current_version, "")
+    return candidate is not None and current is not None and candidate > current
+
+
 def plugin_compat(target_version: str) -> list[dict]:
     """For each installed plugin: does its manifest `coreVersion` range accept `target_version`?
     Purely local (manifests are on disk) — the preflight gate for a Core update (spec §8.1), so an

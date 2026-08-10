@@ -70,6 +70,7 @@ class PluginOut(BaseModel):
     installedSha: str | None = None # W2: the immutable commit pin for a git-installed plugin
     installedTag: str | None = None # the git tag currently checked out (git installs only)
     previousTag: str | None = None  # newest previously-installed tag ≠ current — the rollback target
+    coreVersion: str = "*"          # the Core range this plugin declares — what blocks a Core update
 
 
 class InstallPlanOut(BaseModel):
@@ -154,6 +155,8 @@ def _view(reg: dict[str, dict], active: set[str], *, provenance: bool = True) ->
             # button, and an install can pin any ref (a branch, a prerelease) into the history
             previousTag=(registry.previous_tag_of(reg, pid, accept=git_installer.is_release_tag)
                          if provenance else None),
+            # a manifest fact like `version`/`dependencies`, not provenance — never redacted
+            coreVersion=mf.coreVersion,
         ))
     return out
 
