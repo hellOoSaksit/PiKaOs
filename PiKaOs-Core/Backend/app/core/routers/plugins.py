@@ -435,6 +435,59 @@ async def list_versions(
     ])
 
 
+def perform_switch(plugin_id: str, tag: str, by: str, *, repo_url: str | None,
+                   old_tag: str | None) -> dict[str, dict]:
+    """Check out `tag`, re-validate, and re-pin the registry — the part of a version switch that
+    touches disk. Returns the new registry. Raises `HTTPException` on every failure, which is what the
+    route wants and what the scheduled runner catches and records as FAILED; the alternative was a
+    second error vocabulary for the same pipeline.
+
+    Extracted from `update()` VERBATIM so the manual route and the scheduled runner cannot drift into
+    two different notions of what a switch is — the failure discipline below is the whole reason this
+    must not be reimplemented.
+
+    Failure discipline (§2.2, extended): unlike a fresh install there IS a previously-good version on
+    disk, so any failure AFTER the new tag is checked out reverts the working tree to `old_tag` rather
+    than discarding it. A failure inside `fetch_and_checkout` needs no revert — git only mutates the
+    tree on a successful checkout, so the old version is still exactly what is there."""
+    from ... import plugin_loader
+
+    plugin_dir = plugin_loader.PLUGINS_DIR / plugin_id
+    try:
+        git_installer.fetch_and_checkout(plugin_dir, repo_url, tag)
+    except git_installer.GitInstallError as e:
+        raise HTTPException(status_code=422, detail="could not fetch the update") from e
+
+    manifest_path = plugin_dir / "manifest.json"
+    try:
+        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
+        _revert_checkout(plugin_dir, repo_url, old_tag)
+        raise HTTPException(status_code=422, detail="update's manifest.json is not valid JSON") from e
+
+    try:
+        manifest = plugin_loader._validate(plugin_id, raw)
+        candidate = {**_manifests(), plugin_id: manifest}
+        result = plugin_readiness.check(plugin_id, manifest, candidate)
+        if not result.passed:
+            raise plugin_loader.ManifestError("; ".join(result.reasons))
+    except plugin_loader.ManifestError as e:
+        _revert_checkout(plugin_dir, repo_url, old_tag)
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+    # `set_git_install` persists to the kernel-state JSON file and can raise on a genuinely unexpected
+    # failure. There is a known-good prior state to restore to, so the revert puts the on-disk checkout
+    # back on `old_tag` rather than tearing the plugin down. The in-process manifest was never touched
+    # (B3-H2: the running code — and every worker's catalog — stays on the old version until restart).
+    try:
+        sha = git_installer.head_sha(plugin_dir)             # W2: re-pin to the updated tag's commit
+        return registry.set_git_install(plugin_id, repo_url=repo_url, tag=tag,
+                                        version=manifest.version, sha=sha, by=by)
+    except Exception as e:
+        _revert_checkout(plugin_dir, repo_url, old_tag)
+        raise HTTPException(status_code=500, detail="plugin update failed to finalize") from e
+
+
 @router.post("/{plugin_id}/update", response_model=ActionOut)
 async def update(
     plugin_id: str,
@@ -486,41 +539,7 @@ async def update(
     if tag == old_tag and remote_sha is not None and remote_sha == registry.installed_sha_of(reg, plugin_id):
         return _action_response(reg)
 
-    plugin_dir = plugin_loader.PLUGINS_DIR / plugin_id
-    try:
-        git_installer.fetch_and_checkout(plugin_dir, repo_url, tag)
-    except git_installer.GitInstallError as e:
-        raise HTTPException(status_code=422, detail="could not fetch the update") from e
-
-    manifest_path = plugin_dir / "manifest.json"
-    try:
-        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
-        _revert_checkout(plugin_dir, repo_url, old_tag)
-        raise HTTPException(status_code=422, detail="update's manifest.json is not valid JSON") from e
-
-    try:
-        manifest = plugin_loader._validate(plugin_id, raw)
-        candidate = {**_manifests(), plugin_id: manifest}
-        result = plugin_readiness.check(plugin_id, manifest, candidate)
-        if not result.passed:
-            raise plugin_loader.ManifestError("; ".join(result.reasons))
-    except plugin_loader.ManifestError as e:
-        _revert_checkout(plugin_dir, repo_url, old_tag)
-        raise HTTPException(status_code=422, detail=str(e)) from e
-
-    # Same rationale as install_from_git's rollback (§2.2): `set_git_install` persists to the
-    # kernel-state JSON file and can raise on a genuinely unexpected failure. Unlike a fresh install
-    # there's a known-good prior state to restore to, so the revert puts the on-disk checkout back on
-    # `old_tag` rather than tearing the plugin down. The in-process manifest was never touched (B3-H2:
-    # the running code — and every worker's catalog — stays on the old version until the restart).
-    try:
-        sha = git_installer.head_sha(plugin_dir)             # W2: re-pin to the updated tag's commit
-        reg = registry.set_git_install(plugin_id, repo_url=repo_url, tag=tag,
-                                       version=manifest.version, sha=sha, by=audit.actor_of(user))
-    except Exception as e:
-        _revert_checkout(plugin_dir, repo_url, old_tag)
-        raise HTTPException(status_code=500, detail="plugin update failed to finalize") from e
+    reg = perform_switch(plugin_id, tag, audit.actor_of(user), repo_url=repo_url, old_tag=old_tag)
     out = _action_response(reg)
     # the updated code isn't running (and `_view` still shows the old manifest) until the restart
     out.restart_required = True

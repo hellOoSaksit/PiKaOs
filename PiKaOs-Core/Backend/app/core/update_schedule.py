@@ -33,7 +33,7 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _parse(value: str) -> datetime | None:
+def parse_utc(value: str) -> datetime | None:
     """A stored/received timestamp as an aware UTC datetime, or None if it is unusable. Returning None
     rather than raising keeps one malformed row from breaking a claim sweep over all the others."""
     try:
@@ -49,7 +49,7 @@ def add_entry(*, kind: str, at_iso: str, by: str, plugin_id: str | None = None,
     store is the last place these can be caught before a runner acts on them."""
     if kind not in _KINDS:
         raise ValueError(f"unknown schedule kind: {kind}")
-    at = _parse(at_iso)
+    at = parse_utc(at_iso)
     if at is None:
         raise ValueError("schedule time must be an ISO timestamp carrying a timezone")
     if at <= _now():
@@ -95,14 +95,14 @@ def claim_due(now_iso: str) -> dict | None:
     """Atomically flip the first due pending entry to RUNNING and return it — the flock makes this the
     single-flight gate across workers (spec §6.3). One per call: the caller loops, so a slow action
     never blocks the claim of the next."""
-    now = _parse(now_iso) or _now()
+    now = parse_utc(now_iso) or _now()
     claimed: dict | None = None
 
     def mutate(store):
         nonlocal claimed
         entries = _entries(store)
         for e in entries:
-            due = _parse(e.get("at", ""))
+            due = parse_utc(e.get("at", ""))
             if e["status"] == PENDING and due is not None and due <= now:
                 e["status"] = RUNNING
                 e["startedAt"] = now.isoformat()
@@ -131,14 +131,14 @@ def sweep_stuck(now_iso: str, max_running_minutes: int = 10) -> list[dict]:
     """RUNNING entries older than the cap -> FAILED (crash-safety, spec §9). A process that dies
     mid-update leaves its claim RUNNING forever; without this the entry is never retried and never
     reported, so the operator sees a schedule that simply stopped."""
-    now = _parse(now_iso) or _now()
+    now = parse_utc(now_iso) or _now()
     cutoff = now - timedelta(minutes=max_running_minutes)
     swept: list[dict] = []
 
     def mutate(store):
         entries = _entries(store)
         for e in entries:
-            started = _parse(e.get("startedAt", ""))
+            started = parse_utc(e.get("startedAt", ""))
             if e["status"] == RUNNING and started is not None and started <= cutoff:
                 e["status"] = FAILED
                 e["note"] = "runner crashed or restarted mid-update"
