@@ -9,6 +9,8 @@ import React, { useEffect, useState } from 'react';
 import { Button, Empty, HelpNote, Modal, PageHead, Panel } from '../components/ui/index.js';
 import * as api from '../lib/api.js';
 import { localInputToUtcIso, localNowInputValue, utcIsoToLocalLabel } from '../lib/schedule-time.js';
+import BackupsPanel from './secondary/BackupsPanel.jsx';
+import { scheduleRowLabel } from './secondary/BackupsPanel.logic.js';
 
 const SCHED_BADGE = { done: 'on', pending: 'info', running: 'info', cancelled: 'idle' };
 
@@ -246,7 +248,7 @@ function SchedulesPanel({ t, may, reloadKey }) {
       {items.map(e => (
         <div key={e.id} className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '6px 2px', borderBottom: '1px solid var(--line-soft)' }}>
           <span className="mono" style={{ fontSize: 12.5 }}>
-            {e.kind === 'core-reminder' ? t('core.update.title') : `${e.pluginId} → ${e.tag}`}
+            {scheduleRowLabel(e, t)}
             {' · '}{t('sched.at', { time: utcIsoToLocalLabel(e.at) })}
             <span className={`badge ${SCHED_BADGE[e.status] || 'warn'}`} style={{ marginLeft: 8 }}>
               {t(`sched.status.${e.status}`)}
@@ -419,6 +421,9 @@ export function PluginsManager({ Sys, view = 'modules' }) {
                     onRollback={() => act(p.id, (id) => api.updatePlugin(id, p.previousTag))} />
                 ))}
               </div>}
+          {/* Backups sit with the rest of the operator surface — the queue below lists the very
+              entries this panel schedules, and both are behind the same plugins.manage gate. */}
+          {may && <BackupsPanel t={t} onScheduled={() => setSchedKey(k => k + 1)} />}
           {may && <SchedulesPanel t={t} may={may} reloadKey={schedKey} />}
         </>
       )}

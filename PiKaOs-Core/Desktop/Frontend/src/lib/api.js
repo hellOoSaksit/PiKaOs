@@ -37,20 +37,24 @@ export class ApiError extends Error {
   }
 }
 
+// The auth rule, in one place: raw() and fetchBlob() must attach the SAME credential, or a download
+// starts 401-ing on exactly the sessions the rest of the app works on.
+async function authHeaders(auth = true) {
+  if (!auth) return {};
+  // Desktop (provider/token mode) reads the live session token from the provider; but the
+  // kernel-only setup-code bootstrap has no session yet — its token is stored via setToken().
+  // Fall back to that in-memory token when the provider yields none, so the follow-up
+  // GET /api/setup/status carries the bootstrap token and FirstRun can advance (a provider
+  // session token still wins once the user is actually logged in). Cookie mode is unchanged.
+  const tok = (provider ? await provider.get() : null) || accessToken;
+  return tok ? { Authorization: `Bearer ${tok}` } : {};
+}
+
 async function raw(path, { method = "GET", body, form, auth = true, signal, _retry = false } = {}) {
-  const headers = {};
+  const headers = await authHeaders(auth);
   // JSON body sets its content-type; a FormData (file upload) must NOT — the browser sets the
   // multipart boundary itself.
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  if (auth) {
-    // Desktop (provider/token mode) reads the live session token from the provider; but the
-    // kernel-only setup-code bootstrap has no session yet — its token is stored via setToken().
-    // Fall back to that in-memory token when the provider yields none, so the follow-up
-    // GET /api/setup/status carries the bootstrap token and FirstRun can advance (a provider
-    // session token still wins once the user is actually logged in). Cookie mode is unchanged.
-    const tok = (provider ? await provider.get() : null) || accessToken;
-    if (tok) headers["Authorization"] = `Bearer ${tok}`;
-  }
 
   let res;
   try {
@@ -269,6 +273,37 @@ export async function checkCoreUpdate() { return raw(`/core/check-update`); }   
 export async function schedulePluginUpdate(id, tag, at) { return raw(`/plugins/${id}/schedule-update`, { method: "POST", body: { tag, at } }); }
 export async function listSchedules() { return raw(`/updates/schedules`); }
 export async function cancelSchedule(sid) { return raw(`/updates/schedules/${sid}`, { method: "DELETE" }); }
+
+// --- backups (backup-restore spec §3) — every one needs `plugins.manage`, download included: the
+// archive IS the server's state. `at` is a UTC ISO string (lib/schedule-time.js converts local input).
+export async function createBackup() { return raw(`/backups`, { method: "POST" }); }
+export async function listBackups() { return raw(`/backups`); }
+export async function deleteBackup(id) { return raw(`/backups/${id}`, { method: "DELETE" }); }
+// acceptKeyChange: the server refuses (409) an archive written under a different secret_key, because
+// its stored credentials would come back as blobs nobody can decrypt. Passing true is the operator
+// saying they know the secrets are gone and will re-enter them.
+export async function restoreBackup(id, acceptKeyChange = false) {
+  return raw(`/backups/${id}/restore`, { method: "POST", body: { confirm: "RESTORE", acceptKeyChange } });
+}
+export async function scheduleBackup(at) { return raw(`/updates/schedule-backup`, { method: "POST", body: { at } }); }
+// Downloads can't go through raw() (it JSON-parses every body) and can't be a plain <a href> either:
+// the bearer token would not ride along, so the link would 401 on the desktop shell.
+export async function fetchBlob(path, { _retry = false } = {}) {
+  let res;
+  try {
+    res = await fetch(base + path, {
+      method: "GET",
+      headers: await authHeaders(),
+      ...(mode === "cookie" ? { credentials: "include" } : {}),
+    });
+  } catch (e) {
+    throw new ApiError(0, { detail: "network" });
+  }
+  if (res.status === 401 && !_retry && await doRefresh()) return fetchBlob(path, { _retry: true });
+  if (!res.ok) throw new ApiError(res.status, null);
+  return res.blob();
+}
+export async function downloadBackup(id) { return fetchBlob(`/backups/${id}/download`); }
 
 // --- notifications (audit-notifications v2): capped in-memory store on the server; the bell
 // reads via listNotifications() and marks them read on open (ids=null marks all).
