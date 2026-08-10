@@ -47,6 +47,65 @@ def test_fails_on_broken_compose_fragment(monkeypatch, tmp_path):
     assert any("compose" in r for r in result.reasons)
 
 
+# --- dependencyVersions: an optional MINIMUM per declared dependency (spec §8.3) ---------------------
+# Same range dialect as coreVersion (`*` · exact · caret), so a plugin author learns one syntax.
+
+def _dep_case(monkeypatch, tmp_path, *, ai_version, spec=None):
+    """A `rag` plugin depending on `ai`, optionally pinning a range at it."""
+    from app.core import kernel_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    over = {"dependencies": ["ai"]}
+    if spec is not None:
+        over["dependencyVersions"] = {"ai": spec}
+    rag = plugin_loader._validate("crm", {"id": "crm", "name": "CRM", "version": "1.0.0",
+                                          "coreVersion": "*", **over})
+    ai = plugin_loader.Manifest(id="ai", name="AI", version=ai_version, coreVersion="*")
+    return plugin_readiness.check("crm", rag, {"crm": rag, "ai": ai})
+
+
+def test_dependency_version_range_satisfied_passes(monkeypatch, tmp_path):
+    assert _dep_case(monkeypatch, tmp_path, ai_version="0.2.5", spec="^0.2.0").passed
+
+
+def test_dependency_version_range_violated_fails_with_reason(monkeypatch, tmp_path):
+    result = _dep_case(monkeypatch, tmp_path, ai_version="0.2.5", spec="^0.3.0")
+    assert result.passed is False
+    assert any("ai" in r and "^0.3.0" in r and "0.2.5" in r for r in result.reasons)
+
+
+def test_absent_dependency_versions_is_todays_behavior(monkeypatch, tmp_path):
+    """The key is optional and every manifest in the tree predates it — an absent one must not start
+    gating installs that pass today."""
+    assert _dep_case(monkeypatch, tmp_path, ai_version="0.0.1").passed
+
+
+def test_an_unresolvable_dependency_is_reported_once_not_twice(monkeypatch, tmp_path):
+    """A missing dependency has no version to compare, so the range check must not pile a second,
+    confusing reason on top of "not resolvable" — the operator gets one fault per fault."""
+    from app.core import kernel_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    mf = _mf(dependencies=["ai"], dependencyVersions={"ai": "^9.0.0"})
+    result = plugin_readiness.check("crm", mf, {"crm": mf})
+    assert result.passed is False
+    assert len(result.reasons) == 1 and "not resolvable" in result.reasons[0]
+
+
+def test_dependency_versions_must_name_a_declared_dependency(monkeypatch, tmp_path):
+    """A range against a plugin that is not a dependency is silently dead — nothing would ever check
+    it — so the Loader refuses the manifest instead of loading a rule that cannot fire. Catches the
+    common typo of pinning an OPTIONAL dependency here."""
+    import pytest
+    with pytest.raises(plugin_loader.ManifestError, match="dependencyVersions"):
+        _mf(dependencies=["ai"], dependencyVersions={"knowledge": "^1.0.0"})
+
+
+def test_dependency_versions_must_be_a_map_of_strings():
+    import pytest
+    for bad in (["ai"], {"ai": 1}, {"ai": None}):
+        with pytest.raises(plugin_loader.ManifestError, match="dependencyVersions"):
+            _mf(dependencies=["ai"], dependencyVersions=bad)
+
+
 def test_disabled_plugin_with_broken_fragment_does_not_fail_unrelated_candidate(monkeypatch, tmp_path):
     """A DISABLED (not ENABLED) plugin's broken compose fragment must never leak into the readiness
     simulation for an unrelated candidate — only registry.ENABLED plugins are actually merged into the

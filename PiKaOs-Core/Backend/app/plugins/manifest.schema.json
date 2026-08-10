@@ -58,6 +58,13 @@
       "uniqueItems": true,
       "default": []
     },
+    "dependencyVersions": {
+      "type": "object",
+      "description": "Optional MINIMUM per declared dependency, e.g. {\"ai\": \"^0.2.0\"} — same semver-range dialect as coreVersion. Every key must also appear in `dependencies` (the Loader enforces that cross-field rule; a range aimed at a non-dependency can never fire). Absent = any version will do.",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9-]*$" },
+      "additionalProperties": { "type": "string", "minLength": 1 },
+      "default": {}
+    },
     "optionalDependencies": {
       "type": "array",
       "description": "Used if present, degraded-but-functional if absent.",

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 from . import compose_render
 from . import plugin_registry as registry
-from ..plugin_loader import Manifest
+from ..plugin_loader import Manifest, _satisfies
 
 
 @dataclass(frozen=True)
@@ -26,6 +26,13 @@ def check(pid: str, manifest: Manifest, all_manifests: dict[str, Manifest]) -> R
     for dep in manifest.dependencies:
         if dep not in all_manifests:
             reasons.append(f"dependency '{dep}' is not resolvable")
+            continue  # nothing to compare a range against — one fault, one reason
+        # Optional per-dependency minimum (spec §8.3), same range dialect as coreVersion. The
+        # Loader has already refused a range naming a non-dependency, so this loop sees them all.
+        spec = manifest.dependencyVersions.get(dep)
+        if spec and not _satisfies(all_manifests[dep].version, spec):
+            reasons.append(f"dependency '{dep}' version {all_manifests[dep].version} "
+                           f"does not satisfy '{spec}'")
 
     if manifest.kind == "tool" and manifest.compose:
         reg = registry.read()
