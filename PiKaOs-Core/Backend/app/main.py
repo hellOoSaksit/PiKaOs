@@ -1,6 +1,7 @@
 """FastAPI application entrypoint."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -8,7 +9,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import modules
-from .core import setup_state
+from .core import setup_state, update_runner
 from .core.composition import build_container, teardown_container
 from .core.config import settings
 from .core.contracts import STORAGE
@@ -52,9 +53,19 @@ async def lifespan(app: FastAPI):
         except Exception as exc:  # pragma: no cover - infra not ready yet
             print(f"[startup] MinIO bucket check failed: {exc}")
 
-    yield
+    # Scheduled plugin updates. Every worker starts one; the store's flock makes claiming
+    # single-flight, so N loops still fire each entry exactly once (spec §6.3).
+    updates_stop = asyncio.Event()
+    updates_task = asyncio.create_task(update_runner.runner_loop(updates_stop))
 
-    teardown_container(container, bus, enabled)
+    try:
+        yield
+    finally:
+        # Stopped BEFORE the container teardown: the runner resolves plugin state through it, and a
+        # tick landing mid-teardown would fail against half-disposed services.
+        updates_stop.set()
+        await updates_task
+        teardown_container(container, bus, enabled)
 
 
 # Fix-NET-03: the interactive docs + machine-readable schema hand an attacker a full map of every
