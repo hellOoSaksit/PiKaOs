@@ -18,9 +18,25 @@ from cryptography.fernet import Fernet, InvalidToken
 from .config import settings
 
 
+def _secret_material() -> bytes:
+    """The secret every at-rest key here is derived from — one definition, so a fingerprint can never
+    describe a different secret than the cipher actually uses."""
+    return (settings.secret_key or settings.jwt_secret or "dev-insecure").encode()
+
+
 def _fernet() -> Fernet:
-    raw = (settings.secret_key or settings.jwt_secret or "dev-insecure").encode()
-    return Fernet(base64.urlsafe_b64encode(hashlib.sha256(raw).digest()))
+    return Fernet(base64.urlsafe_b64encode(hashlib.sha256(_secret_material()).digest()))
+
+
+def secret_fingerprint() -> str:
+    """A short, non-reversible id for the CURRENT secret — "is this the same key?", nothing more.
+
+    Domain-separated on purpose: `sha256(secret)` IS the Fernet key, so publishing a prefix of it in a
+    backup manifest would leak real key material. Backups record this so a restore can tell that its
+    ciphertext was written under a different secret — otherwise the secrets come back looking intact
+    and decrypt to nothing (crypto rotation invalidates every stored token, see the module docstring).
+    """
+    return hashlib.sha256(b"pikaos-backup-keyid:" + _secret_material()).hexdigest()[:12]
 
 
 def encrypt(plaintext: str) -> str:
