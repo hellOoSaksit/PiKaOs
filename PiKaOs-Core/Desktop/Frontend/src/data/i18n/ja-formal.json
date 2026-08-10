@@ -338,6 +338,8 @@
     "notif.schedule.missed": "スケジュール更新を逃しました — サーバーが停止していました: {plugin} → {tag}",
     "notif.schedule.cancelled": "スケジュール更新をキャンセルしました: {plugin} → {tag}",
     "notif.schedule.core": "Core 更新の予定時刻です — サーバー機で update.bat を実行してください",
+    "notif.schedule.backup": "予定されたバックアップを作成しました",
+    "notif.schedule.backupfailed": "予定されたバックアップは実行されませんでした — サーバーログを確認してください",
     "mcp.kicker": "デスクトップ · Local MCP",
     "mcp.title": "ローカル MCP サーバー",
     "mcp.desc": "このマシンで子プロセスとして動作する MCP サーバーを管理します。初回起動時（または command/args の変更後）には必ず確認を求めます。",

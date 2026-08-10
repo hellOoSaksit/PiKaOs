@@ -18,7 +18,10 @@ from . import kernel_state
 _KEY = "update_schedule"
 KIND_PLUGIN = "plugin-update"
 KIND_CORE_REMINDER = "core-reminder"
-_KINDS = (KIND_PLUGIN, KIND_CORE_REMINDER)
+KIND_BACKUP = "backup"
+# The gate `add_entry` checks — a kind defined but missing here is rejected at the route, so the two
+# always move together. This tuple is the only place a kind becomes real.
+_KINDS = (KIND_PLUGIN, KIND_CORE_REMINDER, KIND_BACKUP)
 PENDING, RUNNING, DONE, FAILED, MISSED, CANCELLED = (
     "pending", "running", "done", "failed", "missed", "cancelled")
 

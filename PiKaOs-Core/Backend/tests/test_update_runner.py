@@ -215,3 +215,87 @@ def test_a_failing_tick_does_not_kill_the_loop(monkeypatch):
     asyncio.run(_drain(restarts, until=lambda: us.list_entries()[0]["status"] == us.DONE))
     assert us.list_entries()[0]["status"] == us.DONE   # fired on a LATER tick, after the raise
     assert calls["n"] > 1
+
+
+# --- scheduled backups (backup-restore spec §2) -----------------------------------------------------
+# A `backup` entry writes an archive and nothing else: no plugin is switched, so nothing on disk needs
+# a restart to take effect. Restarting for one would be a self-inflicted outage.
+
+def backup_entry(**ago):
+    entry = us.add_entry(kind=us.KIND_BACKUP, at_iso=iso(hours=1), by="u1")
+    at = iso(**(ago or {"seconds": -30}))
+    kernel_state.update("update_schedule",
+                        lambda s: {"entries": [{**e, "at": at} if e["id"] == entry["id"] else e
+                                               for e in s["entries"]]},
+                        {"entries": []})
+    return {**entry, "at": at}
+
+
+def test_backup_kind_fires_without_switching_anything(monkeypatch):
+    made = []
+    monkeypatch.setattr(update_runner, "_create_backup", lambda *a: made.append(1) or {"id": "bk_x"})
+    monkeypatch.setattr(update_runner, "_perform_switch",
+                        lambda *a: pytest.fail("a backup entry must not switch a plugin"))
+    entry = {"id": "s1", "kind": us.KIND_BACKUP, "at": iso(minutes=-1), "startedAt": iso()}
+    status, note = update_runner.fire_entry(entry)
+    assert status == us.DONE and made == [1] and "bk_x" in note
+
+
+def test_a_failing_backup_reports_failed_without_leaking_detail(monkeypatch):
+    def boom(*a): raise RuntimeError("pg_dump: /srv/secret/path denied")
+    monkeypatch.setattr(update_runner, "_create_backup", boom)
+    entry = {"id": "s1", "kind": us.KIND_BACKUP, "at": iso(minutes=-1), "startedAt": iso()}
+    status, note = update_runner.fire_entry(entry)
+    assert status == us.FAILED and "/srv/secret/path" not in note
+
+
+def test_the_runner_never_restarts_after_a_backup(monkeypatch):
+    monkeypatch.setattr(update_runner, "_create_backup", lambda *a: {"id": "bk_x"})
+    backup_entry()
+    restarts = []
+    asyncio.run(_drain(restarts, until=lambda: us.list_entries()[0]["status"] == us.DONE))
+    assert us.list_entries()[0]["status"] == us.DONE
+    assert restarts == []
+
+
+def test_a_backup_announces_its_own_key_not_the_plugin_one(monkeypatch):
+    """The shared key interpolates {plugin} → {tag}, which a backup entry has neither of — the bell
+    would read "Scheduled update applied: → " for a backup that really ran."""
+    monkeypatch.setattr(update_runner, "_create_backup", lambda *a: {"id": "bk_x"})
+    backup_entry()
+    asyncio.run(_drain([], until=lambda: us.list_entries()[0]["status"] == us.DONE))
+    assert [n["key"] for n in _notifs()] == ["notif.schedule.backup"]
+
+
+def test_a_missed_backup_is_announced_as_not_run(monkeypatch):
+    monkeypatch.setattr(update_runner, "_create_backup",
+                        lambda *a: pytest.fail("an overdue backup must not run late"))
+    backup_entry(minutes=-90)
+    asyncio.run(_drain([], until=lambda: us.list_entries()[0]["status"] == us.MISSED))
+    assert [n["key"] for n in _notifs()] == ["notif.schedule.backupfailed"]
+
+
+def test_the_scheduled_backup_dumps_the_database_the_app_is_actually_using(monkeypatch, tmp_path):
+    """The runner has no request, so the DSN has to come off the bound engine through the container —
+    settings.database_url is always set and would dump the wrong database on a wizard-configured
+    install (and a nonexistent one on a kernel with no Postgres at all)."""
+    from types import SimpleNamespace
+    from app.core import backup_service
+    from app.core.container import Container
+    from app.core.contracts import POSTGRES_CONNECTION
+
+    seen = {}
+    monkeypatch.setattr(kernel_state.settings, "backups_dir", str(tmp_path / "backups"))
+    monkeypatch.setattr(backup_service, "create_backup",
+                        lambda **kw: seen.setdefault("dsn", kw.get("dsn")) or {"id": "bk_x"})
+    monkeypatch.setattr(backup_service, "prune", lambda keep: [])
+
+    assert update_runner._create_backup(None)["id"] == "bk_x"      # no container → no dump
+    assert seen["dsn"] is None
+
+    seen.clear()
+    url = SimpleNamespace(render_as_string=lambda hide_password: "postgresql+asyncpg://u:p@db/pikaos")
+    c = Container()
+    c.bind(POSTGRES_CONNECTION, {"engine": SimpleNamespace(url=url), "session_factory": object()})
+    update_runner._create_backup(c)
+    assert seen["dsn"] == "postgresql+asyncpg://u:p@db/pikaos"

@@ -52,7 +52,18 @@ describe('core.update.* / sched.* / notif.schedule.* i18n parity', () => {
   // terminal statuses it can emit — no more (dead copy), no fewer (a raw key in the bell).
   it('matches the keys update_runner.announce can emit', () => {
     expect(keysOf(en, 'notif.schedule.')).toEqual(
-      ['notif.schedule.cancelled', 'notif.schedule.core', 'notif.schedule.done',
-       'notif.schedule.failed', 'notif.schedule.missed']);
+      ['notif.schedule.backup', 'notif.schedule.backupfailed', 'notif.schedule.cancelled',
+       'notif.schedule.core', 'notif.schedule.done', 'notif.schedule.failed',
+       'notif.schedule.missed']);
+  });
+
+  // A backup entry has no pluginId/tag, so it takes its own keys rather than the shared ones — with
+  // the shared key it would render "Scheduled update applied: → " for a backup that really ran.
+  it('keeps the backup notifications free of plugin/tag placeholders', () => {
+    for (const [name, pack] of PACKS)
+      for (const k of ['notif.schedule.backup', 'notif.schedule.backupfailed']) {
+        expect(at(pack, k), `${name} is missing ${k}`).toBeTruthy();
+        expect(at(pack, k), `${name}/${k} promises a value the server never sends`).not.toContain('{');
+      }
   });
 });
