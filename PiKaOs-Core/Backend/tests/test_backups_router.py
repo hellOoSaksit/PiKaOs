@@ -40,9 +40,15 @@ def api(tmp_path, monkeypatch):
 def test_every_route_is_gated(api):
     assert api.get("/api/backups").status_code == 401
     assert api.post("/api/backups").status_code == 401
-    bind_identity(api, set())                      # authenticated, but without plugins.manage
+    # plugins.manage is NO LONGER enough: "may install a plugin" must not mean
+    # "may download this server's state and roll it back".
+    bind_identity(api, {"plugins.manage"})
     assert api.get("/api/backups", headers=AUTH_HEADER).status_code == 403
     assert api.post("/api/backups", headers=AUTH_HEADER).status_code == 403
+    assert api.post("/api/backups/bk_x/restore", json={"confirm": "RESTORE"},
+                    headers=AUTH_HEADER).status_code == 403
+    bind_identity(api, {"backups.manage"})
+    assert api.get("/api/backups", headers=AUTH_HEADER).status_code == 200
 
 
 def test_create_list_and_download_roundtrip(api):
@@ -172,3 +178,18 @@ def test_restore_refuses_a_backup_written_under_a_different_secret(api, monkeypa
     forced = api.post(f"/api/backups/{made['id']}/restore",
                       json={"confirm": "RESTORE", "acceptKeyChange": True}, headers=AUTH_HEADER)
     assert forced.status_code == 200 and api.restarted == [1]
+
+
+def test_schedule_backup_kept_its_url_and_takes_the_new_gate(api):
+    """The route moved from updates.py into backups.py (one file, one authz rule) — moving the
+    FILE must not move the URL the panel already calls."""
+    from datetime import datetime, timedelta, timezone
+    at = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+    bind_identity(api, {"plugins.manage"})
+    assert api.post("/api/updates/schedule-backup", json={"at": at},
+                    headers=AUTH_HEADER).status_code == 403
+    bind_identity(api, {"backups.manage"})
+    r = api.post("/api/updates/schedule-backup", json={"at": at}, headers=AUTH_HEADER)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["kind"] == "backup" and body["status"] == "pending"
