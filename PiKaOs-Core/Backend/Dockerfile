@@ -7,7 +7,12 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # build deps for asyncpg / argon2 wheels are prebuilt, but keep curl for healthcheck
-RUN apt-get update && apt-get install -y --no-install-recommends curl git \
+# postgresql-client = pg_dump/pg_restore for backups (backup-restore spec §3). VERSION COUPLING: this
+# installs Debian's client major (trixie ships 17) while the postgres tool plugin runs
+# `pgvector/pgvector:pg16`. pg_dump refuses only a NEWER server, so client >= server is the safe
+# direction — bumping that image ABOVE the client major breaks every dump. Both ends are unpinned; if
+# the sidecar moves to pg18+, pin this client to match (see PiKaOs-Plugin-Tools-Postgres/backend/compose.fragment.yml).
+RUN apt-get update && apt-get install -y --no-install-recommends curl git postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
