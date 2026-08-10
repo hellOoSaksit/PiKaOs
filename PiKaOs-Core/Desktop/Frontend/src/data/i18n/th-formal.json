@@ -434,6 +434,8 @@
     "plugins.ver.empty": "ไม่พบเวอร์ชันที่ปล่อยบนรีโมต",
     "plugins.ver.close": "ปิด",
     "plugins.ver.failed": "สลับเวอร์ชันไม่สำเร็จ — ไม่มีอะไรถูกเปลี่ยน",
+    "compat.serverOld": "เซิร์ฟเวอร์นี้ใช้ Core รุ่นเก่ากว่าที่แอปเวอร์ชันนี้รองรับ — อัปเดตเซิร์ฟเวอร์ (update.bat)",
+    "compat.dismiss": "ปิดข้อความนี้",
     "core.update.title": "Core ของเซิร์ฟเวอร์",
     "core.update.current": "กำลังรัน {version}",
     "core.update.latest": "รุ่นล่าสุด: {version}",
