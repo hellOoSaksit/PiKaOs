@@ -16,6 +16,7 @@ from starlette.testclient import TestClient
 
 from app.core import kernel_state, setup_state
 from app.core.routers.plugins import _view
+from tests.conftest import AUTH_HEADER, bind_identity
 from tests.conftest import seed_manifest as _seed_manifest
 
 
@@ -769,6 +770,33 @@ def test_view_exposes_permission_info_and_installed_sha(sample_plugins, tmp_path
     assert sample.installedSha == "c" * 40
     assert [pi["key"] for pi in sample.permissionInfo] == ["sample.manage"]
     assert all("rationale" in pi for pi in sample.permissionInfo)
+
+
+# --- the update surface is ONE privileged operation, reads included ------------------------------------
+
+# `/versions` and `/check-update` look like reads, but each spends the admin-stored git credential on
+# an outbound `ls-remote` and each exists only to drive an update the caller must hold `plugins.manage`
+# to perform. Gating the write alone would leave a viewer able to enumerate a private remote's whole
+# release history — and to make the server dial out — with no permission at all.
+# The gate is a dependency, so it answers before the route body: an unknown plugin id still 403s rather
+# than leaking "no such plugin" to an unprivileged caller.
+def test_update_reads_are_forbidden_without_plugins_manage(client):
+    bind_identity(client, perms=set())
+    for path in ("/api/plugins/crm/versions", "/api/plugins/crm/check-update"):
+        assert client.get(path, headers=AUTH_HEADER).status_code == 403, path
+
+
+def test_update_reads_are_authenticated(client):
+    for path in ("/api/plugins/crm/versions", "/api/plugins/crm/check-update"):
+        assert client.get(path).status_code == 401, path
+
+
+def test_update_reads_pass_the_gate_with_plugins_manage(client):
+    """With the permission the gate stands aside — the 404 here is the route's own body reporting an
+    unknown plugin, which is what proves the 403s above came from the gate and not from the id."""
+    bind_identity(client, perms={"plugins.manage"})
+    for path in ("/api/plugins/crm/versions", "/api/plugins/crm/check-update"):
+        assert client.get(path, headers=AUTH_HEADER).status_code == 404, path
 
 
 # --- versions + update-to-a-chosen-tag (rollback = the same verb) ---------------------------------------

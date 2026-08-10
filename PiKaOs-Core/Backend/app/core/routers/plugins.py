@@ -345,10 +345,14 @@ def _revert_checkout(plugin_dir: Path, repo_url: str, tag: str | None) -> None:
 @router.get("/{plugin_id}/check-update", response_model=CheckUpdateOut)
 async def check_update(
     plugin_id: str,
-    _: UserLike = Depends(get_current_user),
+    _: UserLike = Depends(require_perm("plugins.manage")),
 ) -> CheckUpdateOut:
     """On-demand only (no background polling, §2.2) — compares the highest remote semver tag to the
-    installed version. 404 if the plugin wasn't installed via git (nothing to check against)."""
+    installed version. 404 if the plugin wasn't installed via git (nothing to check against).
+
+    Same `plugins.manage` gate as `/versions` and the update itself: telling a caller an update exists
+    is only useful to someone allowed to apply it, and the check spends the stored git credential on
+    an outbound call. Tightened 2026-08-10 — it previously took any authenticated user."""
     _require_known(plugin_id)
     reg = registry.read()
     _require_git_installed(reg, plugin_id)
@@ -373,12 +377,18 @@ async def check_update(
 @router.get("/{plugin_id}/versions", response_model=VersionsOut)
 async def list_versions(
     plugin_id: str,
-    _: UserLike = Depends(get_current_user),
+    _: UserLike = Depends(require_perm("plugins.manage")),
 ) -> VersionsOut:
     """Every released (semver-tagged) version on the plugin's remote, newest-first, with the
     installed one and this server's previously-installed ones marked (auto-update spec §5.1).
     On-demand only — same no-background-polling principle as check-update. 404 for non-git installs
-    (a dev symlink has no remote)."""
+    (a dev symlink has no remote).
+
+    Gated on `plugins.manage`, the SAME permission as the update it feeds, not on mere authentication:
+    this is the read half of one privileged operation, and it is not inert — it runs an outbound
+    `ls-remote` carrying the admin-stored git credential for that host, and it discloses a private
+    remote's whole release history. Someone who cannot switch a version has no business spending the
+    server's credential to enumerate them."""
     _require_known(plugin_id)
     reg = registry.read()
     _require_git_installed(reg, plugin_id)

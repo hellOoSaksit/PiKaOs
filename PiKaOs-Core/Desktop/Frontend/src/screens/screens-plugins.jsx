@@ -30,7 +30,9 @@ function PluginRow({ p, T, t, may, busy, onInstall, onEnable, onDisable, onUnins
             <span className={`badge ${sb.cls}`}>{T(sb.en, sb.th)}</span>
             <span className="mono faint" style={{ fontSize: 11 }}>v{p.version}</span>
             {p.restart_required && <span className="badge" title={T('restart to apply', 'รีสตาร์ทเพื่อให้มีผล')}>↻ {T('restart', 'รีสตาร์ท')}</span>}
-            {updateInfo?.hasUpdate && <span className="badge" title={T('update available', 'มีเวอร์ชันใหม่')}>↑ v{updateInfo.latestVersion}</span>}
+            {/* latestVersion is the raw git TAG ("v1.2.0"), not a bare version — printing a literal
+                "v" in front of it rendered "↑ vv1.2.0". */}
+            {updateInfo?.hasUpdate && <span className="badge" title={T('update available', 'มีเวอร์ชันใหม่')}>↑ {updateInfo.latestVersion}</span>}
             {updateInfo?.tagMoved && <span className="badge warn" title={T('the installed tag was moved to a different commit after install', 'แท็กที่ติดตั้งถูกย้ายไปคอมมิตอื่นหลังติดตั้ง')}>⚠ {T('tag moved', 'แท็กถูกย้าย')}</span>}
           </div>
           {p.description && <div className="faint" style={{ fontSize: 12, marginTop: 2 }}>{p.description}</div>}
@@ -198,12 +200,14 @@ export function PluginsManager({ Sys, view = 'modules' }) {
 
   // After the list loads, poll each git-installed plugin for a newer version (best-effort — a
   // failed check just leaves that row without an update badge, no error surfaced).
+  // Skipped without plugins.manage: the route now demands that permission, so a viewer would only
+  // collect 403s for a badge whose action they cannot reach anyway.
   useEffect(() => {
-    if (!plugins) return;
+    if (!plugins || !may) return;
     plugins.filter(p => p.installedVia === 'git').forEach(p => {
       api.checkPluginUpdate(p.id).then(r => setUpdates(u => ({ ...u, [p.id]: r }))).catch(() => {});
     });
-  }, [plugins]);
+  }, [plugins, may]);
 
   // Every successful mutation funnels through here (install · enable · disable · uninstall · git
   // install), which makes it the one place the shell needs telling that the server just emitted a
