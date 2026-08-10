@@ -8,7 +8,11 @@
    /version until the new process answers rather than leaving the operator on a dead screen. */
 import React, { useEffect, useState } from 'react';
 
-import { Button, HelpNote, Panel } from '../../components/ui/index.js';
+import Badge from '../../components/ui/Badge.jsx';
+import Button from '../../components/ui/Button.jsx';
+import HelpNote from '../../components/ui/HelpNote.jsx';
+import Panel from '../../components/ui/Panel.jsx';
+import Table from '../../components/ui/Table.jsx';
 import * as api from '../../lib/api.js';
 import { utcIsoToLocalLabel } from '../../lib/schedule-time.js';
 import { RESTORE_TOKEN, fmtBytes, restoreArmed, restoreErrorKey } from './BackupsPanel.logic.js';
@@ -86,6 +90,31 @@ export default function BackupsPanel({ t }) {
   };
 
   const armed = restoreArmed(typed);
+
+  // Columns close over busy/armed/handlers above, so a row's actions always run through the
+  // same create/download/restore/delete path as the rest of the panel — no forked logic.
+  const columns = [
+    { key: 'createdAt', header: t('backup.col.date'), render: (m) => (
+        <span className="mono" style={{ fontSize: 12.5 }}>{utcIsoToLocalLabel(m.createdAt)}</span>) },
+    { key: 'bytes', header: t('backup.col.size'), className: 'uc-size', render: (m) => (
+        <span className="mono" style={{ fontSize: 12.5 }}>{fmtBytes(m.bytes)}</span>) },
+    { key: 'id', header: t('backup.col.id'), render: (m) => (
+        <span className="mono faint" style={{ fontSize: 11.5, minWidth: 0, overflowWrap: 'anywhere' }}>
+          {m.id}
+          {m.stateOnly && <Badge variant="st-queued" className="qb-inline">{t('backup.stateOnly')}</Badge>}
+          {m.hasDb && <Badge variant="st-active" className="qb-inline">{t('backup.withDb')}</Badge>}
+        </span>) },
+    { key: 'actions', header: '', className: 'uc-act', render: (m) => (
+        <>
+          <Button kind="ghost" size="sm" disabled={!!busy} onClick={() => download(m.id)}>{t('backup.download')}</Button>
+          <Button kind="danger" size="sm" disabled={!!busy || !armed} onClick={() => restore(m.id)}>
+            {busy === m.id ? '…' : t('backup.restore')}
+          </Button>
+          <ArmedButton t={t} label={t('backup.delete')} disabled={!!busy}
+            onRun={() => run(m.id, () => api.deleteBackup(m.id))} />
+        </>) },
+  ];
+
   return (
     <Panel title={t('backup.title')} en="BACKUPS">
       <div className="faint" style={{ fontSize: 12, marginBottom: 8 }}>{t('backup.desc')}</div>
@@ -101,30 +130,13 @@ export default function BackupsPanel({ t }) {
       {items !== null && items.length === 0 && (
         <div className="faint" style={{ padding: '10px 2px', fontSize: 12.5 }}>{t('backup.empty')}</div>
       )}
-      {(items || []).map(m => (
-        <div key={m.id} className="row" style={{ justifyContent: 'space-between', alignItems: 'center',
-          gap: 8, padding: '7px 2px', borderBottom: '1px solid var(--line-soft)' }}>
-          <span className="mono" style={{ fontSize: 12.5 }}>
-            {utcIsoToLocalLabel(m.createdAt)} · {fmtBytes(m.bytes)}
-            {m.stateOnly && <span className="badge idle" style={{ marginLeft: 8 }}>{t('backup.stateOnly')}</span>}
-            {m.hasDb && <span className="badge info" style={{ marginLeft: 8 }}>{t('backup.withDb')}</span>}
-            <span className="faint" style={{ marginLeft: 8, fontSize: 11 }}>{m.id}</span>
-          </span>
-          <span className="row" style={{ gap: 6 }}>
-            <Button kind="ghost" size="sm" disabled={!!busy} onClick={() => download(m.id)}>{t('backup.download')}</Button>
-            <Button kind="danger" size="sm" disabled={!!busy || !armed} onClick={() => restore(m.id)}>
-              {busy === m.id ? '…' : t('backup.restore')}
-            </Button>
-            <ArmedButton t={t} label={t('backup.delete')} disabled={!!busy}
-              onRun={() => run(m.id, () => api.deleteBackup(m.id))} />
-          </span>
-        </div>
-      ))}
+      {items !== null && items.length > 0 && (
+        <div className="backups-list"><Table columns={columns} rows={items} /></div>
+      )}
 
       {/* Danger zone — the typed token arms every Restore button above at once, the same shape the
           recovery screen uses, so the destructive verb is never one stray click away. */}
-      <div style={{ marginTop: 12, padding: 10, border: '1px solid var(--crimson-deep)',
-        borderRadius: 'var(--radius-sm)' }}>
+      <Panel title={t('recovery.danger.title')} en="RESTORE" className="danger-zone">
         <div className="faint" style={{ fontSize: 12, marginBottom: 6 }}>
           {t('backup.confirmNote', { token: RESTORE_TOKEN })}
         </div>
@@ -138,7 +150,7 @@ export default function BackupsPanel({ t }) {
               onClick={() => restore(conflictId, true)}>{t('backup.restoreAnyway')}</Button>
           </div>
         )}
-      </div>
+      </Panel>
     </Panel>
   );
 }
