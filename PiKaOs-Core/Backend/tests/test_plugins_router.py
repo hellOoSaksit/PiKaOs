@@ -26,6 +26,18 @@ def test_view_serializes_permission_objects_down_to_key_strings(sample_plugins):
     assert sample.permissions == ["sample.manage"]   # not the raw {key, group, ...} dicts
 
 
+def test_view_reports_each_plugins_declared_core_range(sample_plugins):
+    """`coreVersion` is what makes a Core update visibly blocked (server-core-update §8.1), so the
+    row has to carry the manifest's OWN range — a seeded `^0.1.0` proves it is read rather than left
+    at the permissive `*` default, which every fixture manifest happens to declare."""
+    from app import plugin_loader
+    _seed_manifest(plugin_loader.Manifest(id="pinned", name="Pinned", version="1.0.0",
+                                          coreVersion="^0.1.0"))
+    by = {p.id: p for p in _view(reg={}, active=set())}
+    assert by["pinned"].coreVersion == "^0.1.0"
+    assert by["sample"].coreVersion == "*"
+
+
 def test_plugins_endpoint_returns_200_with_a_bootstrap_token(sample_plugins, tmp_path, monkeypatch):
     monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
     setup_state.write("PIKA-ABCD-2345", "a-session-token")

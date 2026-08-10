@@ -1,4 +1,5 @@
-"""app/core/core_update.py — core-v* tag listing + installed-plugin compat (spec §3-§4)."""
+"""app/core/core_update.py — core-v* tag listing + installed-plugin compat (spec §3-§4), the
+`GET /api/core/check-update` route over them, and the in-container preflight CLI (§5 step 4)."""
 from __future__ import annotations
 
 import subprocess
@@ -6,6 +7,7 @@ import subprocess
 import pytest
 
 from app.core import core_update
+from tests.conftest import AUTH_HEADER, bind_identity
 
 
 @pytest.fixture
@@ -56,3 +58,96 @@ def test_plugin_compat_flags_incompatible_ranges(monkeypatch):
     assert by["okplug"]["compatible"] is True
     assert by["pinned"] == {"id": "pinned", "requires": "^0.1.0", "compatible": True}
     assert by["exact"]["compatible"] is False
+
+
+def test_is_newer_parses_instead_of_comparing_strings():
+    """`0.10.0` is newer than `0.9.0` and sorts BEFORE it as a string — the whole reason this is a
+    parse and not a `!=`. An unparseable running version (a dev build) answers False: "I cannot tell"
+    must not render as "an update is available"."""
+    assert core_update.is_newer("0.3.0", "0.1.0") is True
+    assert core_update.is_newer("0.10.0", "0.9.0") is True
+    assert core_update.is_newer("0.3.0", "0.3.0") is False
+    assert core_update.is_newer("0.3.0", "0.9.0") is False          # never offer a downgrade
+    assert core_update.is_newer("0.3.0", "0.1.0-dev") is False
+
+
+# --- GET /api/core/check-update -------------------------------------------------------------------
+
+def test_check_update_reports_the_latest_tag_and_the_compat_table(client, monkeypatch, core_repo):
+    monkeypatch.setattr(core_update.settings, "core_update_repo", core_repo)
+    monkeypatch.setattr(core_update.settings, "app_version", "0.1.0")
+    bind_identity(client, perms={"plugins.manage"})
+    resp = client.get("/api/core/check-update", headers=AUTH_HEADER)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["currentVersion"] == "0.1.0"
+    assert body["latestTag"] == "core-v0.3.0" and body["latestVersion"] == "0.3.0"
+    assert body["hasUpdate"] is True and body["reachable"] is True
+    assert isinstance(body["pluginCompat"], list)
+    assert body["blocked"] == any(not r["compatible"] for r in body["pluginCompat"])
+
+
+def test_check_update_never_offers_an_older_core_as_an_update(client, monkeypatch, core_repo):
+    """A build running AHEAD of the newest published tag (a dev or UAT image) is not out of date.
+    The plan's `latestVersion != app_version` would answer "update available" here and point the
+    admin's one-way host script at an OLDER Core."""
+    monkeypatch.setattr(core_update.settings, "core_update_repo", core_repo)
+    monkeypatch.setattr(core_update.settings, "app_version", "0.9.0")
+    bind_identity(client, perms={"plugins.manage"})
+    body = client.get("/api/core/check-update", headers=AUTH_HEADER).json()
+    assert body["latestTag"] == "core-v0.3.0"     # still reported — the admin may still want to see it
+    assert body["hasUpdate"] is False
+
+
+def test_check_update_is_quiet_when_the_remote_is_unreachable(client, monkeypatch, tmp_path):
+    """Unreachable is a normal state (offline host, private remote, expired credential), not an error:
+    the card renders "could not check" rather than the screen failing to load."""
+    monkeypatch.setattr(core_update.settings, "core_update_repo", f"file://{tmp_path / 'nope'}")
+    bind_identity(client, perms={"plugins.manage"})
+    resp = client.get("/api/core/check-update", headers=AUTH_HEADER)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["reachable"] is False and body["hasUpdate"] is False and body["pluginCompat"] == []
+
+
+def test_check_update_is_forbidden_without_plugins_manage(client):
+    """Reads on the update surface carry the write's permission: this one spends an outbound
+    `ls-remote` and discloses the release history of a repo the caller may not be allowed to see.
+    Gate-first also means the unprivileged call never reaches the network."""
+    bind_identity(client, perms=set())
+    assert client.get("/api/core/check-update", headers=AUTH_HEADER).status_code == 403
+
+
+def test_check_update_is_authenticated(client):
+    assert client.get("/api/core/check-update").status_code == 401
+
+
+# --- the preflight CLI ----------------------------------------------------------------------------
+
+def test_preflight_cli_exit_codes(monkeypatch, capsys):
+    from app.core import update_preflight
+    class MF:
+        def __init__(self, cv): self.coreVersion = cv
+    monkeypatch.setattr(core_update, "_installed_manifests", lambda: {"a": MF("*")})
+    assert update_preflight.main(["0.5.0"]) == 0
+    monkeypatch.setattr(core_update, "_installed_manifests", lambda: {"a": MF("9.9.9")})
+    assert update_preflight.main(["0.5.0"]) == 1
+    out = capsys.readouterr().out
+    assert "a" in out and "9.9.9" in out
+
+
+def test_preflight_cli_takes_a_tag_or_a_bare_version(monkeypatch, capsys):
+    """`update.bat` has the tag in hand (`core-v0.5.0`), a human types the version — both must gate on
+    the same number rather than on a string that never satisfies any range."""
+    from app.core import update_preflight
+    class MF:
+        def __init__(self, cv): self.coreVersion = cv
+    monkeypatch.setattr(core_update, "_installed_manifests", lambda: {"a": MF("^0.5.0")})
+    assert update_preflight.main(["core-v0.5.1"]) == 0
+    assert update_preflight.main(["0.5.1"]) == 0
+
+
+def test_preflight_cli_rejects_a_bad_invocation(capsys):
+    from app.core import update_preflight
+    assert update_preflight.main([]) == 2
+    assert "usage" in capsys.readouterr().out
