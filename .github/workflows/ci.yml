@@ -87,6 +87,10 @@ jobs:
         run: lint-imports
       - name: Plugin manifests structurally valid (§3)
         run: python scripts/check_manifests.py
+      # Runs here, not in the pytest suite: that suite runs inside the container, whose only bind
+      # mount is Backend/, so it cannot see deploy/ at all. This job has the host checkout.
+      - name: Deploy compose volume invariants (plugins survive a Core rebuild)
+        run: python scripts/check_deploy_volumes.py
 
   backend:
     runs-on: ubuntu-latest
