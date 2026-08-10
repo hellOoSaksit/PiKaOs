@@ -17,7 +17,7 @@ const STATE_BADGE = {
   pending_purge: { cls: 'warn', en: 'Pending purge', th: 'รอล้างข้อมูล' },
 };
 
-function PluginRow({ p, T, may, busy, onInstall, onEnable, onDisable, onUninstall, onPurge, onCheckUpdate, updateInfo }) {
+function PluginRow({ p, T, t, may, busy, onInstall, onEnable, onDisable, onUninstall, onPurge, onCheckUpdate, onChooseVersion, onRollback, updateInfo }) {
   const sb = STATE_BADGE[p.state] || STATE_BADGE.available;
   const lbl = (en, th) => (busy ? '…' : T(en, th));
   return (
@@ -49,6 +49,12 @@ function PluginRow({ p, T, may, busy, onInstall, onEnable, onDisable, onUninstal
                   {p.state === 'enabled' && <Button kind="ghost" size="sm" onClick={onDisable}>{lbl('Disable', 'ปิด')}</Button>}
                   {(p.state === 'disabled' || p.state === 'installed') && <Button kind="gold" size="sm" onClick={onEnable}>{lbl('Enable', 'เปิด')}</Button>}
                   {p.installedVia === 'git' && updateInfo?.hasUpdate && <Button kind="gold" size="sm" onClick={onCheckUpdate}>{lbl('Update', 'อัปเดต')}</Button>}
+                  {p.installedVia === 'git' && <Button kind="ghost" size="sm" onClick={onChooseVersion}>{busy ? '…' : t('plugins.ver.choose')}</Button>}
+                  {/* One click back to whatever this server ran before — the common case after a bad
+                      update, without making the operator find the tag in the picker first. */}
+                  {p.installedVia === 'git' && p.previousTag && (
+                    <Button kind="ghost" size="sm" onClick={onRollback}>{busy ? '…' : t('plugins.ver.back', { tag: p.previousTag })}</Button>
+                  )}
                   {p.state !== 'available' && <Button kind="danger" size="sm" icon="delete" onClick={onUninstall}>{lbl('Uninstall', 'ถอน')}</Button>}
                 </>}
           </div>
@@ -119,6 +125,45 @@ function InstallPlanModal({ plan, target, T }) {
   );
 }
 
+/* Body of the version-switch dialog — same arrangement as InstallPlanModal: the overlay/title/footer
+   chrome lives in the Modal primitive, this only lists what the remote has. Copy is t()-only (no inline
+   T(en, th)) because this whole surface is new — nothing here predates the i18n-key rule. */
+function VersionList({ p, t, busy, onPick }) {
+  const [versions, setVersions] = useState(null);   // null = still loading
+  const [err, setErr] = useState(false);
+  useEffect(() => {
+    let live = true;   // the dialog can close mid-flight; don't set state on a gone component
+    api.listPluginVersions(p.id)
+      .then(r => { if (live) setVersions(Array.isArray(r?.versions) ? r.versions : []); })
+      .catch(() => { if (live) { setVersions([]); setErr(true); } });
+    return () => { live = false; };
+  }, [p.id]);
+  return (
+    <>
+      <p className="faint" style={{ fontSize: 12.5, marginTop: 0 }}>{t('plugins.ver.desc')}</p>
+      {err && <HelpNote>{t('plugins.ver.failed')}</HelpNote>}
+      {versions === null && <div className="faint" style={{ padding: '10px 0' }}>…</div>}
+      {versions !== null && versions.length === 0 && !err && <div className="faint" style={{ padding: '10px 0' }}>{t('plugins.ver.empty')}</div>}
+      <div style={{ maxHeight: 280, overflowY: 'auto', margin: '10px 0' }}>
+        {(versions || []).map(v => (
+          <div key={v.tag} className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '7px 4px', borderBottom: '1px solid var(--line-soft)' }}>
+            <span className="mono" style={{ fontSize: 13 }}>
+              {v.tag}
+              {v.current && <span className="badge on" style={{ marginLeft: 8 }}>{t('plugins.ver.current')}</span>}
+              {v.previouslyInstalled && <span className="badge info" style={{ marginLeft: 8 }}>{t('plugins.ver.prev')}</span>}
+            </span>
+            {!v.current && (
+              <Button kind="gold" size="sm" disabled={busy} onClick={() => onPick(v.tag)}>
+                {busy ? '…' : t('plugins.ver.switch', { tag: v.tag })}
+              </Button>
+            )}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 /* Modules admin — one component, three sibling nav screens under "Tools" (data.jsx: toolsmgr children).
    `view` picks which screen this instance renders:
      'modules' — the installed/discovered plugin list + manage actions
@@ -137,6 +182,7 @@ export function PluginsManager({ Sys, view = 'modules' }) {
   const [gitRef, setGitRef] = useState('');
   const [allowHead, setAllowHead] = useState(false);
   const [updates, setUpdates] = useState({});      // { [pluginId]: { latestVersion, hasUpdate, tagMoved } }
+  const [verPick, setVerPick] = useState(null);    // plugin object mid version-pick
 
   // Sharing to the market lives in the Auth plugin (kernel is zero-DB — identity can't live in Core);
   // the Share affordance is gated on that plugin being installed + enabled (drafted, not built yet).
@@ -251,11 +297,13 @@ export function PluginsManager({ Sys, view = 'modules' }) {
             ? <Empty icon="🧩" title={T('No plugins discovered', 'ไม่พบปลั๊กอิน')} sub={T('This is a Base-only build.', 'บิลด์นี้เป็น Base ล้วน')} />
             : <div style={{ display: 'grid', gap: 12 }}>
                 {plugins.map(p => (
-                  <PluginRow key={p.id} p={p} T={T} may={may} busy={busy === p.id}
+                  <PluginRow key={p.id} p={p} T={T} t={t} may={may} busy={busy === p.id}
                     onInstall={() => startInstall(p.id)} onEnable={() => act(p.id, api.enablePlugin)}
                     onDisable={() => act(p.id, api.disablePlugin)} onUninstall={() => act(p.id, api.uninstallPlugin)}
                     onPurge={() => act(p.id, api.purgePlugin)}
-                    onCheckUpdate={() => act(p.id, api.updatePlugin)} updateInfo={updates[p.id]} />
+                    onCheckUpdate={() => act(p.id, api.updatePlugin)} updateInfo={updates[p.id]}
+                    onChooseVersion={() => setVerPick(p)}
+                    onRollback={() => act(p.id, (id) => api.updatePlugin(id, p.previousTag))} />
                 ))}
               </div>}
         </>
@@ -314,6 +362,17 @@ export function PluginsManager({ Sys, view = 'modules' }) {
             <Button kind="gold" size="sm" icon="download" onClick={confirmInstall}>{busy === plan.target ? '…' : T('Install all', 'ติดตั้งทั้งหมด')}</Button>
           </>}>
           <InstallPlanModal plan={plan} target={plugins.find(p => p.id === plan.target)} T={T} />
+        </Modal>
+      )}
+
+      {verPick && (
+        <Modal open={!!verPick} onClose={() => setVerPick(null)} className="version-pick"
+          title={t('plugins.ver.title', { name: verPick.name })}
+          footer={<Button kind="ghost" size="sm" onClick={() => setVerPick(null)}>{t('plugins.ver.close')}</Button>}>
+          {/* Close first, then act: the row's own busy state drives the spinner, and leaving the dialog
+              open over a restart-to-apply mutation would show a version list that is already stale. */}
+          <VersionList p={verPick} t={t} busy={busy === verPick.id}
+            onPick={(tag) => { const id = verPick.id; setVerPick(null); act(id, (x) => api.updatePlugin(x, tag)); }} />
         </Modal>
       )}
     </div>
