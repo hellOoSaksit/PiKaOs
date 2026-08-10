@@ -1,7 +1,8 @@
-"""Backup routes (backup-restore spec §3). `plugins.manage` everywhere — the archive IS the server's
-state, so reading one is the read half of a privileged operation, exactly like the update surface it
-sits beside. Nothing here is `ai_safe`: an external AI must not be able to take, download, or roll
-back the server's state.
+"""Backup routes (backup-restore spec §3). `backups.manage` everywhere — its own authority, split off
+`plugins.manage` because "may install a plugin" must not silently mean "may download this server's
+entire state and roll it back". Reading a backup is still the read half of a privileged operation.
+Nothing here is `ai_safe`: an external AI must not be able to take, download, or roll back the
+server's state.
 
 Restore order matters and is not the obvious one: stage-and-validate FIRST, then snapshot, then swap.
 Snapshotting before validation litters a recovery point on every typo, and staging touches nothing.
@@ -17,7 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from .. import audit, backup_service as bs, crypto
+from .. import audit, backup_service as bs, crypto, update_schedule
 from ..config import settings
 from ..db import dsn_of
 from ..identity import UserLike, require_perm
@@ -36,7 +37,7 @@ class RestoreIn(BaseModel):
 
 @router.post("")
 async def create(request: Request,
-                 user: UserLike = Depends(require_perm("plugins.manage"))) -> dict:
+                 user: UserLike = Depends(require_perm("backups.manage"))) -> dict:
     try:
         manifest = bs.create_backup(dsn=dsn_of(request.app.state.container))
     except bs.BackupError as e:
@@ -48,13 +49,13 @@ async def create(request: Request,
 
 
 @router.get("")
-async def list_all(_: UserLike = Depends(require_perm("plugins.manage"))) -> list[dict]:
+async def list_all(_: UserLike = Depends(require_perm("backups.manage"))) -> list[dict]:
     return bs.list_backups()
 
 
 @router.get("/{backup_id}/download")
 async def download(backup_id: str,
-                   user: UserLike = Depends(require_perm("plugins.manage"))) -> FileResponse:
+                   user: UserLike = Depends(require_perm("backups.manage"))) -> FileResponse:
     try:
         p = bs.path_of(backup_id)
     except bs.BackupError as e:
@@ -66,7 +67,7 @@ async def download(backup_id: str,
 
 
 @router.delete("/{backup_id}")
-async def delete(backup_id: str, user: UserLike = Depends(require_perm("plugins.manage"))) -> dict:
+async def delete(backup_id: str, user: UserLike = Depends(require_perm("backups.manage"))) -> dict:
     try:
         bs.delete_backup(backup_id)
     except bs.BackupError as e:
@@ -133,7 +134,7 @@ def _swap_dir(src: Path, dest: Path) -> None:
 
 @router.post("/{backup_id}/restore")
 async def restore(backup_id: str, body: RestoreIn, request: Request,
-                  user: UserLike = Depends(require_perm("plugins.manage"))) -> dict:
+                  user: UserLike = Depends(require_perm("backups.manage"))) -> dict:
     if body.confirm != "RESTORE":
         raise HTTPException(status_code=422, detail="confirmation text does not match")
     try:
@@ -171,3 +172,27 @@ async def restore(backup_id: str, body: RestoreIn, request: Request,
     log.info("[backups] restored %s — restarting", backup_id)
     schedule_self_restart()
     return {"ok": True, "restarting": True}
+
+
+class ScheduleBackupIn(BaseModel):
+    at: str          # UTC ISO with a timezone — validated in the store, which owns the rule
+
+
+# Keeps its historical URL under /api/updates (the queue lives there), but lives in THIS file:
+# updates.py's rule is "one surface, one authz rule", and this is the one update-adjacent verb
+# that answers to backups.manage, not plugins.manage.
+schedule_router = APIRouter(prefix="/api/updates", tags=["backups"])
+
+
+@schedule_router.post("/schedule-backup")
+async def schedule_backup(body: ScheduleBackupIn,
+                          user: UserLike = Depends(require_perm("backups.manage"))) -> dict:
+    """Queue a server backup. Unlike a Core update this IS an action the container can perform on
+    itself — it writes an archive to the backups volume and nothing else, so no restart is earned."""
+    try:
+        entry = update_schedule.add_entry(kind=update_schedule.KIND_BACKUP,
+                                          at_iso=body.at, by=audit.actor_of(user))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    audit.log(audit.actor_of(user), "update.schedule", entry["id"], {"kind": entry["kind"]})
+    return entry

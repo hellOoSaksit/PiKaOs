@@ -48,7 +48,7 @@ BASE_MODULES: tuple[Module, ...] = (
         "core",  # access / system config the kernel serves
         routers=(storage_router.router, settings_config.router, plugins.router, setup.router,
                  mcp.router, audit_router.router, notifications.router,
-                 updates.router, updates.core_router, backups.router),
+                 updates.router, updates.core_router, backups.router, backups.schedule_router),
         optional=False,
     ),
 )
