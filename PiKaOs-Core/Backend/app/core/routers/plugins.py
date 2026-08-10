@@ -21,7 +21,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from .. import audit, git_installer, identity, notify, plugin_readiness
+from .. import audit, git_installer, identity, notify, plugin_readiness, update_schedule
 from .. import plugin_registry as registry
 from ..contracts import POSTGRES_CONNECTION
 from ..identity import UserLike, get_current_user, require_perm
@@ -635,6 +635,46 @@ async def purge(
     reg = registry.purge_complete(plugin_id)
     audit.log(audit.actor_of(user), "plugin.purge", plugin_id)
     return _action_response(reg)
+
+
+class ScheduleUpdateIn(BaseModel):
+    # Same edge validation as `UpdateIn.tag`, and for the same reasons — this route hands the value to
+    # the SAME `remote_tag_sha`, where a glob passes the pre-flight (the dereference line matches any
+    # ref, not just the one asked for) and an oversized value raises inside `_run_git` as a 500 instead
+    # of a clean 422. A scheduled switch fires unattended, so a value that slips through here is one
+    # nobody is watching when it runs.
+    tag: str = Field(max_length=100, pattern=git_installer.RELEASE_TAG_PATTERN)
+    at: str          # UTC ISO with a timezone — the store owns that rule and raises ValueError
+
+
+@router.post("/{plugin_id}/schedule-update")
+async def schedule_update(
+    plugin_id: str,
+    body: ScheduleUpdateIn,
+    user: UserLike = Depends(require_perm("plugins.manage")),
+) -> dict:
+    """Queue a version switch for a future time (spec §6.2).
+
+    Fail-closed at queue time on everything cheap and knowable NOW — git-installed, not pending purge,
+    a real tag on the remote, a future timestamp — so the operator learns about a mistake while they
+    are still looking at the screen. Every deep gate (manifest validity, readiness, compatibility)
+    re-runs at fire time against the tree as it will be then, because none of it can be trusted to
+    still hold hours later."""
+    _require_known(plugin_id)
+    reg = registry.read()
+    _require_not_pending_purge(reg, plugin_id)
+    _require_git_installed(reg, plugin_id)
+    repo_url = registry.repo_url_of(reg, plugin_id)
+    if not repo_url or git_installer.remote_tag_sha(repo_url, body.tag) is None:
+        raise HTTPException(status_code=422, detail="unknown version tag")
+    try:
+        entry = update_schedule.add_entry(kind=update_schedule.KIND_PLUGIN, at_iso=body.at,
+                                          by=audit.actor_of(user), plugin_id=plugin_id, tag=body.tag)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    audit.log(audit.actor_of(user), "plugin.schedule-update", plugin_id,
+              {"tag": body.tag, "at": entry["at"]})
+    return entry
 
 
 @router.put("/git-credentials/{host}")

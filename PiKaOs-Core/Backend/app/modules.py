@@ -18,7 +18,7 @@ from fastapi import APIRouter, FastAPI
 from . import plugin_loader
 from .core.config import settings
 from .core.routers import audit as audit_router
-from .core.routers import health, mcp, notifications, plugins, setup, settings_config
+from .core.routers import health, mcp, notifications, plugins, setup, settings_config, updates
 from .core.routers import storage as storage_router
 
 log = logging.getLogger("pikaos.plugins")
@@ -47,7 +47,7 @@ BASE_MODULES: tuple[Module, ...] = (
     Module(
         "core",  # access / system config the kernel serves
         routers=(storage_router.router, settings_config.router, plugins.router, setup.router,
-                 mcp.router, audit_router.router, notifications.router),
+                 mcp.router, audit_router.router, notifications.router, updates.router),
         optional=False,
     ),
 )
