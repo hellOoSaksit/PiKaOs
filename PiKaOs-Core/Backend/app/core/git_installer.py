@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -158,6 +159,18 @@ def clone_to_staging(repo_url: str, ref: str | None = None) -> Path:
         shutil.rmtree(staging, ignore_errors=True)
         raise GitInstallError("could not clone the plugin repository")
     return staging
+
+
+# What this system calls a release tag: bare MAJOR.MINOR.PATCH, optional leading `v`. ONE definition,
+# shared by everything that has to agree on it — `list_remote_tags` filtering the remote, `UpdateIn`'s
+# edge validator, and the rollback target the UI offers. They disagreed once (an install can pin any
+# ref, so history held tags the edge rejected) and the result was a button that could only 422.
+RELEASE_TAG_PATTERN = r"^v?\d+\.\d+\.\d+$"
+
+
+def is_release_tag(tag: str) -> bool:
+    """True when `tag` is a release tag this system can switch to. See RELEASE_TAG_PATTERN."""
+    return bool(re.fullmatch(RELEASE_TAG_PATTERN, tag))
 
 
 def list_remote_tags(repo_url: str) -> list[str]:

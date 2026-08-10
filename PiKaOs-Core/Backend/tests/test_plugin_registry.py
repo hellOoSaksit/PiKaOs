@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from app.core import plugin_registry as registry
+from app.core.git_installer import is_release_tag
 
 
 @dataclass(frozen=True)
@@ -195,6 +196,34 @@ def test_set_git_install_force_moved_tag_still_records_a_row(monkeypatch, tmp_pa
     reg = registry.set_git_install("crm", repo_url="https://x/r.git", tag="v1.1.0", version="1.1.0", sha="ccc")
     hist = registry.version_history_of(reg, "crm")
     assert [h["sha"] for h in hist] == ["bbb", "ccc"]
+
+
+def test_set_git_install_no_op_with_an_unreadable_sha_still_does_not_grow_history(monkeypatch, tmp_path):
+    """`head_sha` returns None on a broken git tree, and `installedSha` is only written when the sha is
+    not None — so treating None as a VALUE made every retry look like a change (None != "bbb") while
+    prev_sha never caught up, evicting the rollback target the guard exists to protect. Unknown is not
+    'different': same tag + unreadable sha appends nothing."""
+    from app.core import kernel_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    registry.set_git_install("crm", repo_url="https://x/r.git", tag="v1.0.0", version="1.0.0", sha="aaa")
+    registry.set_git_install("crm", repo_url="https://x/r.git", tag="v1.1.0", version="1.1.0", sha="bbb")
+    for _ in range(20):
+        reg = registry.set_git_install("crm", repo_url="https://x/r.git", tag="v1.1.0", version="1.1.0", sha=None)
+    assert [h["tag"] for h in registry.version_history_of(reg, "crm")] == ["v1.0.0", "v1.1.0"]
+    assert registry.previous_tag_of(reg, "crm") == "v1.0.0"   # the rollback target survived
+
+
+def test_previous_tag_of_skips_a_target_the_caller_will_not_accept(monkeypatch, tmp_path):
+    """install-from-git pins ANY ref, so history can hold a branch or a prerelease that the update
+    route's edge validator rejects. Offering one as "Back to X" builds a button whose only outcome is
+    a 422. `accept` skips it and keeps looking — the older release below it is still a valid target."""
+    from app.core import kernel_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    registry.set_git_install("crm", repo_url="https://x/r.git", tag="v1.0.0", version="1.0.0", sha="aaa")
+    registry.set_git_install("crm", repo_url="https://x/r.git", tag="main", version="1.1.0", sha="bbb")
+    reg = registry.set_git_install("crm", repo_url="https://x/r.git", tag="v2.0.0", version="2.0.0", sha="ccc")
+    assert registry.previous_tag_of(reg, "crm") == "main"                       # unfiltered: the newest
+    assert registry.previous_tag_of(reg, "crm", accept=is_release_tag) == "v1.0.0"
 
 
 def test_set_git_install_starts_history_from_a_legacy_row_with_no_versionHistory_key(monkeypatch, tmp_path):

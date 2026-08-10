@@ -17,6 +17,7 @@ install). It is a pure function over manifests + the installed set, so it unit-t
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
 
@@ -107,8 +108,14 @@ def set_git_install(pid: str, *, repo_url: str, tag: str, version: str,
         # capped — powers "back to previous" and doubles as the audit trail (who switched, when). Skip
         # the append on a no-op (identical tag AND sha) — otherwise a repeated no-op update call evicts
         # the real rollback target from the capped list. A force-moved tag (same name, new commit) or a
-        # genuine switch-back still records a row, since `tag != prev_tag or sha != prev_sha` catches it.
-        if tag != prev_tag or sha != prev_sha:
+        # genuine switch-back still records a row.
+        # `sha is not None` is load-bearing: an unreadable sha (`head_sha` returns None on a broken git
+        # tree) is UNKNOWN, not "different". Comparing it as a value made `None != prev_sha` true on
+        # every retry, and since `installedSha` is only written when sha is not None, `prev_sha` never
+        # caught up — so a caller retrying against a broken tree evicted the rollback target anyway,
+        # which is the very failure this guard exists to prevent, reached through a different door.
+        sha_changed = sha is not None and sha != prev_sha
+        if tag != prev_tag or sha_changed:
             history = [h for h in (entry.get("versionHistory") or []) if isinstance(h, dict)]
             history.append({"tag": tag, "sha": sha, "version": version,
                             "at": datetime.now(timezone.utc).isoformat(), "by": by or "unknown"})
@@ -152,13 +159,21 @@ def version_history_of(registry: dict[str, dict], pid: str) -> list[dict]:
     return [h for h in raw if isinstance(h, dict)] if isinstance(raw, list) else []
 
 
-def previous_tag_of(registry: dict[str, dict], pid: str) -> str | None:
+def previous_tag_of(registry: dict[str, dict], pid: str,
+                    accept: Callable[[str], bool] | None = None) -> str | None:
     """The newest previously-installed tag that differs from the current one — the one-click
-    rollback target. None when there's nothing to go back to."""
+    rollback target. None when there's nothing to go back to.
+
+    `accept` narrows it to tags the caller can actually switch to. Install-from-git pins ANY ref
+    (a branch, a prerelease), so history can hold entries the update route's edge validator rejects;
+    offering one as "Back to X" would render a button whose only possible outcome is a 422 the
+    operator cannot resolve. Skipping a rejected entry rather than stopping at it is deliberate — an
+    older, still-valid release remains a legitimate rollback target."""
     current = installed_tag_of(registry, pid)
     for h in reversed(version_history_of(registry, pid)):
-        if h.get("tag") and h["tag"] != current:
-            return h["tag"]
+        tag = h.get("tag")
+        if tag and tag != current and (accept is None or accept(tag)):
+            return tag
     return None
 
 

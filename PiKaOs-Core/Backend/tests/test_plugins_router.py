@@ -869,6 +869,47 @@ def test_update_switches_to_an_explicit_older_tag_and_records_history(sample_plu
     assert registry.previous_tag_of(reg, "crm") == "v1.1.0"
 
 
+def test_versions_caps_the_list_but_never_drops_current_or_previously_installed(sample_plugins, tmp_path, monkeypatch):
+    """A long-lived remote can carry thousands of release tags and `list_remote_tags` is unbounded, so
+    the route caps. The cap must not be blind: the installed tag and anything this server ran before
+    have to survive it, or the picker loses the ability to return to the very versions it exists for.
+    Built with the cap monkeypatched to 2 so the fixture stays a handful of tags rather than 51."""
+    from app.core import kernel_state, setup_state
+    from app.core.routers import plugins as plugins_router
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    monkeypatch.setattr(plugins_router, "_VERSION_LIST_CAP", 2)
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    headers = {"Authorization": "Bearer a-session-token"}
+    plugins_dir = tmp_path / "plugins"; plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+    import app.main as main
+    with TestClient(main.app) as client:
+        src, repo_url = _install_crm_via_git(client, tmp_path, monkeypatch, headers)   # installs v1.0.0
+        for v in ("1.1.0", "1.2.0", "1.3.0"):
+            (src / "manifest.json").write_text(
+                f'{{"id":"crm","name":"CRM","version":"{v}","coreVersion":"*"}}', encoding="utf-8")
+            _git(src, "add", "."); _git(src, "commit", "-q", "-m", v); _git(src, "tag", f"v{v}")
+        resp = client.get("/api/plugins/crm/versions", headers=headers)
+    tags = [v["tag"] for v in resp.json()["versions"]]
+    # newest 2 by the cap, PLUS v1.0.0 which is installed — and still in remote (newest-first) order
+    assert tags == ["v1.3.0", "v1.2.0", "v1.0.0"]
+    assert [v["tag"] for v in resp.json()["versions"] if v["current"]] == ["v1.0.0"]
+
+
+def test_view_offers_no_rollback_to_a_tag_the_update_route_would_reject(sample_plugins, tmp_path, monkeypatch):
+    """install-from-git pins ANY ref, so a branch name can land in versionHistory. `previousTag` is
+    rendered as a "Back to X" button, and X must be something `update` accepts — otherwise the only
+    possible outcome of that click is a 422 the operator cannot act on."""
+    from app.core import kernel_state
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    registry.set_git_install("sample", repo_url="https://x/r.git", tag="v1.0.0", version="1.0.0", sha="aaa")
+    registry.set_git_install("sample", repo_url="https://x/r.git", tag="main", version="1.1.0", sha="bbb")
+    registry.set_git_install("sample", repo_url="https://x/r.git", tag="v2.0.0", version="2.0.0", sha="ccc")
+    view = {p.id: p for p in _view(registry.read(), set())}
+    assert view["sample"].previousTag == "v1.0.0"     # NOT "main", which is newer in the history
+
+
 def test_update_rejects_an_unknown_tag_without_touching_disk(sample_plugins, tmp_path, monkeypatch):
     from app.core import kernel_state, setup_state
     monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
