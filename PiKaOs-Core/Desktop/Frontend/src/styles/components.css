@@ -861,11 +861,12 @@ select.bf-input { cursor: pointer; }
    widths, so this list scopes its own: date · size · badges/id · actions. */
 .backups-list .utable-th, .backups-list .utable-tr { grid-template-columns: 170px 76px 1fr 250px; }
 .backups-list .uc-act { display: flex; gap: 6px; justify-content: flex-end; }
+.backups-list .utable-tr { cursor: default; }   /* no onRowClick here — a hand cursor would promise one */
 @media (max-width: 900px) {
   .backups-list .utable-th, .backups-list .utable-tr { grid-template-columns: 150px 1fr 250px; }
   .backups-list .uc-size { display: none; }
 }
 
 /* A panel whose single subject is a destructive action (cmp-panel + the crimson semantic token). */
-.panel.danger-zone { border-color: var(--crimson-deep); }
+.panel.danger-zone { border-color: var(--crimson-deep); margin-top: 12px; }
 .panel.danger-zone .panel-head h3 { color: var(--crimson-deep); }

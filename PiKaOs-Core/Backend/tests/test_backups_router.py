@@ -14,8 +14,6 @@ from app.core import kernel_state, setup_state
 from app.core.routers import backups as backups_router
 from tests.conftest import AUTH_HEADER, bind_identity
 
-PERM = {"plugins.manage"}
-
 
 @pytest.fixture
 def api(tmp_path, monkeypatch):
