@@ -58,6 +58,38 @@ it('desktop logout clears the in-memory bootstrap token so it cannot resurface a
   expect(fetchMock.mock.calls[0][1].headers.Authorization).toBeUndefined();
 });
 
+// The version picker and the plain Update button share ONE endpoint — the difference is entirely
+// whether a body is sent. Asserting the body (not just the URL) is what separates them: a helper that
+// always sent `{tag: undefined}` would still hit the right path and still look green on a URL check,
+// while pinning the update to whatever tag the picker last held.
+it('updatePlugin sends the chosen tag, and sends no body at all without one', async () => {
+  const api = await import('./api.js');
+  api.configureTransport({ apiBase: 'https://be.example', tokenProvider: { get: vi.fn().mockResolvedValue('T'), refresh: vi.fn() } });
+  const fetchMock = vi.fn().mockResolvedValue({ status: 200, ok: true, text: async () => '{}' });
+  vi.stubGlobal('fetch', fetchMock);
+
+  await api.updatePlugin('crm', 'v1.0.0');
+  expect(fetchMock.mock.calls[0][0]).toBe('https://be.example/plugins/crm/update');
+  expect(fetchMock.mock.calls[0][1].method).toBe('POST');
+  expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ tag: 'v1.0.0' });
+
+  await api.updatePlugin('crm');
+  expect(fetchMock.mock.calls[1][1].body).toBeUndefined();
+  // no body ⇒ no JSON content-type either; the route's `body: UpdateIn | None` default is what applies
+  expect(fetchMock.mock.calls[1][1].headers['Content-Type']).toBeUndefined();
+});
+
+it('listPluginVersions reads the versions route', async () => {
+  const api = await import('./api.js');
+  api.configureTransport({ apiBase: 'https://be.example', tokenProvider: { get: vi.fn().mockResolvedValue('T'), refresh: vi.fn() } });
+  const fetchMock = vi.fn().mockResolvedValue({ status: 200, ok: true, text: async () => '{"versions":[{"tag":"v1.0.0","current":true}]}' });
+  vi.stubGlobal('fetch', fetchMock);
+
+  const data = await api.listPluginVersions('crm');
+  expect(fetchMock.mock.calls[0][0]).toBe('https://be.example/plugins/crm/versions');
+  expect(data.versions[0].tag).toBe('v1.0.0');
+});
+
 it('desktop login drops any leftover bootstrap token (the provider becomes the only source)', async () => {
   const api = await import('./api.js');
   const authLogin = vi.fn().mockResolvedValue({ user: { id: 'u1' } });

@@ -252,7 +252,10 @@ export async function installFromGit(repoUrl, opts = {}) {
   });
 }
 export async function checkPluginUpdate(id) { return raw(`/plugins/${id}/check-update`); }               // { latestVersion, hasUpdate }
-export async function updatePlugin(id) { return raw(`/plugins/${id}/update`, { method: "POST" }); }
+export async function listPluginVersions(id) { return raw(`/plugins/${id}/versions`); }                    // { versions: [{ tag, current, previouslyInstalled }] }
+// No tag ⇒ no body at all, so the route keeps its "latest tag" default (the plain Update button).
+// An explicit tag is the switch-version verb — newer = update, older = rollback, same endpoint.
+export async function updatePlugin(id, tag) { return raw(`/plugins/${id}/update`, { method: "POST", ...(tag ? { body: { tag } } : {}) }); }
 export async function purgePlugin(id) { return raw(`/plugins/${id}/purge`, { method: "POST" }); }         // only valid when state === 'pending_purge'
 export async function setGitCredential(host, token) {
   return raw(`/plugins/git-credentials/${host}`, { method: "PUT", body: { token } });
