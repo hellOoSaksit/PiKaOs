@@ -1039,6 +1039,69 @@ def test_update_to_a_force_moved_tag_re_pins_instead_of_short_circuiting(sample_
     assert sha_after == git_installer.remote_tag_sha(repo_url, "v1.0.0")
 
 
+# --- scheduling a switch for later ---------------------------------------------------------------------
+
+def test_schedule_update_validates_and_lists(sample_plugins, tmp_path, monkeypatch):
+    """Queue-time gates are the ones an operator can still react to. A scheduled switch fires
+    unattended, so each rejection here is a mistake caught while someone is still looking."""
+    from datetime import datetime, timedelta, timezone
+
+    from app.core import kernel_state, setup_state
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path / "state"))
+    setup_state.write("PIKA-ABCD-2345", "a-session-token")
+    headers = {"Authorization": "Bearer a-session-token"}
+    plugins_dir = tmp_path / "plugins"; plugins_dir.mkdir()
+    monkeypatch.setattr("app.plugin_loader.PLUGINS_DIR", plugins_dir)
+    import app.main as main
+    future = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
+    with TestClient(main.app) as client:
+        src, repo_url = _install_crm_via_git(client, tmp_path, monkeypatch, headers)
+
+        past = client.post("/api/plugins/crm/schedule-update",
+                           json={"tag": "v1.0.0", "at": "2001-01-01T00:00:00+00:00"}, headers=headers)
+        assert past.status_code == 422 and "future" in past.json()["detail"]
+
+        unknown = client.post("/api/plugins/crm/schedule-update",
+                              json={"tag": "v9.9.9", "at": future}, headers=headers)
+        assert unknown.status_code == 422 and unknown.json()["detail"] == "unknown version tag"
+
+        # a glob reaches remote_tag_sha's dereference-line match, so it must die at the EDGE — and a
+        # pydantic rejection is a list under `detail`, which is what tells it apart from the 422 above
+        glob = client.post("/api/plugins/crm/schedule-update",
+                           json={"tag": "*", "at": future}, headers=headers)
+        assert glob.status_code == 422 and isinstance(glob.json()["detail"], list)
+
+        not_git = client.post("/api/plugins/sample/schedule-update",
+                              json={"tag": "v1.0.0", "at": future}, headers=headers)
+        assert not_git.status_code == 404
+
+        ok = client.post("/api/plugins/crm/schedule-update",
+                         json={"tag": "v1.0.0", "at": future}, headers=headers)
+        assert ok.status_code == 200, ok.text
+        sid = ok.json()["id"]
+        assert ok.json()["by"] != "unknown"          # attributed, not the in-band sentinel
+
+        listed = client.get("/api/updates/schedules", headers=headers).json()
+        assert listed[0]["id"] == sid
+        assert client.delete(f"/api/updates/schedules/{sid}", headers=headers).json()["status"] == "cancelled"
+        # cancel MARKS, never deletes — the trail has to survive
+        assert client.get("/api/updates/schedules", headers=headers).json()[0]["id"] == sid
+        assert client.delete(f"/api/updates/schedules/{sid}", headers=headers).status_code == 404
+
+
+def test_schedule_routes_are_forbidden_without_plugins_manage(client):
+    """Reads included: a schedule says which plugin is about to be switched, to what, and when — the
+    read half of a privileged operation, gated like the rest of the update surface."""
+    bind_identity(client, perms=set())
+    assert client.get("/api/updates/schedules", headers=AUTH_HEADER).status_code == 403
+    assert client.delete("/api/updates/schedules/sched_x", headers=AUTH_HEADER).status_code == 403
+    assert client.post("/api/updates/core-reminder", json={"at": "2099-01-01T00:00:00+00:00"},
+                       headers=AUTH_HEADER).status_code == 403
+    assert client.post("/api/plugins/crm/schedule-update",
+                       json={"tag": "v1.0.0", "at": "2099-01-01T00:00:00+00:00"},
+                       headers=AUTH_HEADER).status_code == 403
+
+
 def test_update_returns_422_when_the_remote_has_no_tags(sample_plugins, tmp_path, monkeypatch):
     """`latest_tag` returns `None` when the remote has no (semver) tags at all — nothing to update to.
     (Re-running update while already on the latest tag is a separate, harmless no-op case handled by
