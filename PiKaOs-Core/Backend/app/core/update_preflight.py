@@ -15,11 +15,16 @@ from . import core_update
 
 def main(argv: list[str]) -> int:
     if len(argv) != 1:
-        print("usage: python -m app.core.update_preflight <targetCoreVersion>")
+        print("usage: python -m app.core.update_preflight <core-vX.Y.Z|X.Y.Z>")
         return 2
-    # The script has the tag in hand, a human types the bare version — `version_of` is the same
-    # stripper the route uses, so both gate on the number rather than on a string no range satisfies.
-    target = core_update.version_of(argv[0])
+    # The script has the tag in hand, a human types the bare version. Both land on one number here,
+    # which is also where a target that is not a release at all (a branch name, a glob) is refused —
+    # exit 2, distinct from "incompatible plugins", because `--force` must not override a bad target.
+    # The host scripts rely on this so neither of them has to carry its own copy of the tag shape.
+    target = core_update.normalized_version(argv[0])
+    if target is None:
+        print(f"not a Core release version: {argv[0]}")
+        return 2
     report = core_update.plugin_compat(target)
     bad = [r for r in report if not r["compatible"]]
     for r in report:

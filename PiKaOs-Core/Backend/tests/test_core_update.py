@@ -143,11 +143,33 @@ def test_preflight_cli_takes_a_tag_or_a_bare_version(monkeypatch, capsys):
     class MF:
         def __init__(self, cv): self.coreVersion = cv
     monkeypatch.setattr(core_update, "_installed_manifests", lambda: {"a": MF("^0.5.0")})
-    assert update_preflight.main(["core-v0.5.1"]) == 0
-    assert update_preflight.main(["0.5.1"]) == 0
+    for given in ("core-v0.5.1", "v0.5.1", "0.5.1"):
+        assert update_preflight.main([given]) == 0, given
+
+
+def test_preflight_cli_refuses_a_target_that_is_not_a_release(monkeypatch, capsys):
+    """The host script checks out whatever it is handed, so this is the gate that stops
+    `update.bat main` — and it is exit 2, NOT the 1 that `--force` is allowed to override: a bad
+    target is not an incompatible plugin. `_satisfies` would also raise on a `v`-prefixed string
+    rather than answer, so an unrecognised target must never reach the compat pass."""
+    from app.core import update_preflight
+    class MF:
+        def __init__(self, cv): self.coreVersion = cv
+    monkeypatch.setattr(core_update, "_installed_manifests", lambda: {"a": MF("*")})
+    for junk in ("main", "core-v*", "0.5", "", "core-vX.Y.Z"):
+        assert update_preflight.main([junk]) == 2, junk
+    assert "not a Core release version" in capsys.readouterr().out
 
 
 def test_preflight_cli_rejects_a_bad_invocation(capsys):
     from app.core import update_preflight
     assert update_preflight.main([]) == 2
     assert "usage" in capsys.readouterr().out
+
+
+def test_normalized_version_reads_every_shape_a_target_arrives_in():
+    assert core_update.normalized_version("core-v0.3.0") == "0.3.0"
+    assert core_update.normalized_version("v0.3.0") == "0.3.0"
+    assert core_update.normalized_version("0.3.0") == "0.3.0"
+    assert core_update.normalized_version("main") is None
+    assert core_update.normalized_version("core-v*") is None

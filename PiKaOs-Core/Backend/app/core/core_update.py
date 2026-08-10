@@ -47,6 +47,19 @@ def version_of(tag: str) -> str:
     return tag[len(CORE_TAG_PREFIX):] if tag.startswith(CORE_TAG_PREFIX) else tag
 
 
+def normalized_version(value: str) -> str | None:
+    """`core-v0.3.0` / `v0.3.0` / `0.3.0` → `0.3.0`; None when `value` is not a Core release version
+    at all (a branch name, a glob, a typo).
+
+    The host update scripts take a target from the operator's command line and must reject anything
+    that is not a release BEFORE checking it out — but the shape of a release is already defined once,
+    in `git_installer`. This is how a `.bat` and a `.sh` get to that one definition instead of each
+    growing its own regex.
+    """
+    key = git_installer._semver_key(version_of(value), "")
+    return None if key is None else "%d.%d.%d" % key
+
+
 def is_newer(candidate_version: str, current_version: str) -> bool:
     """Is `candidate_version` a LATER Core than `current_version`? Both bare `X.Y.Z`.
 
