@@ -45,6 +45,14 @@ describe('nav ids and route cases agree', () => {
     expect(item.perm).toBe('mcp.manage');
   });
 
+  it('backups is a top-level admin item gated on backups.manage', () => {
+    const admin = NAV.find((g) => g.group === 'ผู้ดูแลระบบ');
+    const item = admin.items.find((it) => it.id === 'backups');
+    expect(item).toBeTruthy();
+    expect(item.perm).toBe('backups.manage');
+    expect(item.children).toBeUndefined();        // its tabs are in-screen, not nav children
+  });
+
   it('NAV_KEY was bumped for this rearrangement', () => {
     // mergeWithDefault preserves a saved arrangement, so a changed DEFAULT only reaches users who
     // never touched their menu unless the key changes. Bump this deliberately, with the comment.

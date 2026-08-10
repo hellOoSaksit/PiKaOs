@@ -9,7 +9,6 @@ import React, { useEffect, useState } from 'react';
 import { Button, Empty, HelpNote, Modal, PageHead, Panel } from '../components/ui/index.js';
 import * as api from '../lib/api.js';
 import { localInputToUtcIso, localNowInputValue, utcIsoToLocalLabel } from '../lib/schedule-time.js';
-import BackupsPanel from './secondary/BackupsPanel.jsx';
 import { scheduleRowLabel } from './secondary/BackupsPanel.logic.js';
 
 const SCHED_BADGE = { done: 'on', pending: 'info', running: 'info', cancelled: 'idle' };
@@ -421,9 +420,6 @@ export function PluginsManager({ Sys, view = 'modules' }) {
                     onRollback={() => act(p.id, (id) => api.updatePlugin(id, p.previousTag))} />
                 ))}
               </div>}
-          {/* Backups sit with the rest of the operator surface — the queue below lists the very
-              entries this panel schedules, and both are behind the same plugins.manage gate. */}
-          {may && <BackupsPanel t={t} onScheduled={() => setSchedKey(k => k + 1)} />}
           {may && <SchedulesPanel t={t} may={may} reloadKey={schedKey} />}
         </>
       )}
