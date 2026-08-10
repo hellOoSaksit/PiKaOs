@@ -31,8 +31,17 @@ services:
       - "127.0.0.1:8000:8000"   # behind the TLS edge; not host-public
     volumes:
       - kernelstate:/app/state   # shared with the worker (from the redis fragment)
+      # Git-installed plugins live here — a named volume so an image rebuild (a Core update) can never
+      # delete them (server-core-update spec §7). Without it, `install-from-git` writes into the image
+      # layer and the very next `up -d --build` silently reverts the operator's installs.
+      # Docker seeds a fresh named volume from the image on first mount, so the plugins baked into the
+      # image are still there on day one.
+      # PROD ONLY, deliberately: dev bind-mounts ../Backend whole, and a named volume here would shadow
+      # the symlinks link-plugins.sh drops into app/plugins — the dev tree would appear plugin-less.
+      - pluginsdir:/app/app/plugins
 
   # (web/nginx frontend removed 2026-07-14 — PiKaOs is desktop-first; recover from git history if a web deploy returns)
 
 volumes:
   kernelstate:
+  pluginsdir:
