@@ -155,6 +155,22 @@ def test_discover_quarantines_bad_plugins_instead_of_raising(monkeypatch, tmp_pa
         plugin_loader.QUARANTINED.clear()                                # don't leak into other tests
 
 
+def test_every_manifest_key_the_loader_reads_is_declared_in_the_schema():
+    """`manifest.schema.json` is `additionalProperties: false` and `scripts/check_manifests.py` gates
+    CI on it, so a key the Loader accepts but the schema omits is a feature no plugin can ship — the
+    manifest declaring it is rejected before the Loader ever sees it. The schema cannot be validated
+    from here (jsonschema is a dev-only dependency; this suite runs in the runtime image), so this
+    asserts the declaration itself."""
+    import json
+    from pathlib import Path
+    schema = json.loads((Path(plugin_loader.__file__).parent / "plugins" / "manifest.schema.json")
+                        .read_text(encoding="utf-8"))
+    assert schema["additionalProperties"] is False              # the reason this test has to exist
+    declared = set(schema["properties"])
+    for key in ("dependencies", "dependencyVersions", "optionalDependencies", "coreVersion"):
+        assert key in declared, key
+
+
 def test_plugin_states_surfaces_quarantined_with_reason(monkeypatch):
     """/health lists a quarantined plugin (not in PLUGIN_MANIFESTS) with its reason so an operator can see
     and fix it without shelling into the volume (K1)."""

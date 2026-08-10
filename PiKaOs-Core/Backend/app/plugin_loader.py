@@ -42,6 +42,9 @@ class Manifest:
     version: str
     coreVersion: str
     dependencies: tuple[str, ...] = ()
+    # Optional MINIMUM per declared dependency, e.g. {"ai": "^0.2.0"} — same range dialect as
+    # coreVersion. Absent (the default, and every manifest written so far) = "any version will do".
+    dependencyVersions: dict[str, str] = field(default_factory=dict)
     optional_dependencies: tuple[str, ...] = ()
     provides: tuple[str, ...] = ()
     consumes: tuple[str, ...] = ()
@@ -169,9 +172,20 @@ def _validate(folder: str, raw: dict) -> Manifest:
     kind = raw.get("kind", "capability")
     if kind not in ("capability", "tool", "app"):
         raise ManifestError(f"plugin '{pid}': kind '{kind}' must be one of capability|tool|app")
+    dep_versions = raw.get("dependencyVersions") or {}
+    if not isinstance(dep_versions, dict) or not all(
+            isinstance(k, str) and isinstance(v, str) for k, v in dep_versions.items()):
+        raise ManifestError(f"plugin '{pid}': dependencyVersions must map dependency id -> version range")
+    # A range against something this plugin does not depend on can never fire — readiness only walks
+    # `dependencies` — so it is refused here rather than loaded as a rule that silently does nothing.
+    # The usual way to write one is to aim it at an OPTIONAL dependency by mistake.
+    unknown = sorted(set(dep_versions) - set(raw.get("dependencies") or []))
+    if unknown:
+        raise ManifestError(f"plugin '{pid}': dependencyVersions names non-dependencies: {unknown}")
     return Manifest(
         id=pid, name=raw["name"], version=raw["version"], coreVersion=raw["coreVersion"],
         dependencies=tuple(raw.get("dependencies", [])),
+        dependencyVersions=dep_versions,
         optional_dependencies=tuple(raw.get("optionalDependencies", [])),
         provides=tuple(raw.get("provides", [])), consumes=tuple(raw.get("consumes", [])),
         permissions=tuple(_norm_perm(p) for p in raw.get("permissions", [])), routes=tuple(raw.get("routes", [])),
