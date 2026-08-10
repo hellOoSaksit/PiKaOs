@@ -14,6 +14,7 @@ import { KernelOnlyShell } from './screens/KernelOnlyShell.jsx';
 import { KernelHome } from './screens/KernelHome.jsx';
 import { PluginsManager } from './screens/screens-plugins.jsx';
 import { McpSkillHub } from './screens/secondary/McpSkillHub.jsx';
+import { BackupsHub } from './screens/secondary/BackupsHub.jsx';
 import { ToolsManager } from './screens/screens-tools.jsx';
 import { useAuth } from './lib/auth.jsx';
 import { BottomUtilityBar } from './components/ui/BottomUtilityBar.jsx';
@@ -43,6 +44,7 @@ const ROUTE_META = {
   marketplace: { icon: "cart", title: "มาร์เก็ตเพลส", en: "Marketplace" },
   mypackages: { icon: "package", title: "แพ็กเกจของฉัน", en: "My Packages & Share" },
   mcpskill: { icon: "link", title: "MCP และทักษะ", en: "MCP & Skills" },
+  backups: { icon: "security", title: "สำรองข้อมูล", en: "Backups" },
   settings:{ icon: "settings", title: "ตั้งค่าระบบ", en: "Settings" },
   ...PLUGIN_ROUTE_META,   // plugin routes contribute their own topbar metadata (Phase 6 seam)
 };
@@ -486,6 +488,7 @@ function App() {
       case "marketplace": return guard("plugins.manage", <PluginsManager Sys={Sys} view="market" />);
       case "mypackages": return guard("plugins.manage", <PluginsManager Sys={Sys} view="mine" />);
       case "mcpskill": return guard("mcp.manage", <McpSkillHub Sys={Sys} activePlugins={activePlugins} />);
+      case "backups": return guard("backups.manage", <BackupsHub Sys={Sys} />);
       case "settings": return <Settings theme={theme} setTheme={setTheme} lex={lex} setLex={setLex} pickLanguage={pickLanguage} language={language} formal={formal} t={t} />;
       default: {
         // a route owned by an enabled plugin (Phase 6 seam) — else fall back to kernel Home.

@@ -21,6 +21,10 @@ const NAV = [
     // Icon reuses the existing "link" glyph rather than adding one (a new icon also needs a tile in
     // the design-system sheet, a second repo); nav stores the NAME, so swapping it later is free.
     { id: "mcpskill", icon: "link", label: "MCP และทักษะ", en: "MCP & Skills", perm: "mcp.manage" },
+    // Backups is its own authority (backups.manage), split from plugins.manage on purpose:
+    // "may install a plugin" must not silently mean "may roll this server back". `security`
+    // because the icon set has no archive glyph — swapping later is free (nav stores the name).
+    { id: "backups", icon: "security", label: "สำรองข้อมูล", en: "Backups", perm: "backups.manage" },
     { id: "settings", icon: "settings", label: "ตั้งค่าระบบ", en: "Settings" },
   ]},
 ];
