@@ -103,7 +103,9 @@ export default function BackupsPanel({ t, onScheduled }) {
           {busy === 'create' ? t('backup.creating') : t('backup.create')}
         </Button>
         <label className="row" style={{ gap: 8, alignItems: 'center', fontSize: 12 }}>
-          <span className="faint">{t('sched.field')}</span>
+          {/* Not `sched.field`: that one reads "leave empty to apply now", which is the version
+              picker's rule — here "now" is its own button and an empty field simply means no schedule. */}
+          <span className="faint">{t('backup.scheduleField')}</span>
           <input className="bf-input" type="datetime-local" value={when} min={localNowInputValue()}
             aria-label={t('backup.schedule')} disabled={!!busy}
             onChange={e => setWhen(e.target.value)} />
