@@ -21,7 +21,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from .. import audit, git_installer, notify, plugin_readiness
+from .. import audit, git_installer, identity, notify, plugin_readiness
 from .. import plugin_registry as registry
 from ..contracts import POSTGRES_CONNECTION
 from ..identity import UserLike, get_current_user, require_perm
@@ -125,7 +125,12 @@ class UpdateIn(BaseModel):
                             pattern=git_installer.RELEASE_TAG_PATTERN)
 
 
-def _view(reg: dict[str, dict], active: set[str]) -> list[PluginOut]:
+def _view(reg: dict[str, dict], active: set[str], *, provenance: bool = True) -> list[PluginOut]:
+    """The plugin list. `provenance=False` blanks the git origin fields for a caller without
+    `plugins.manage`: the Modules screen is deliberately viewable read-only (the UI says so), but
+    "which features run here" and "the private URL they came from, pinned at this commit" are
+    different facts. `installedVia` deliberately survives — it says git-or-symlink, discloses nothing,
+    and blanking it would report a falsehood rather than a redaction."""
     out: list[PluginOut] = []
     for pid, mf in sorted(_manifests().items()):
         state = registry.state_of(reg, pid)
@@ -141,13 +146,14 @@ def _view(reg: dict[str, dict], active: set[str]) -> list[PluginOut]:
                              "name_th": p.get("name_th") or "",
                              "rationale": p.get("rationale", "")} for p in mf.permissions],
             description=mf.description, icon=mf.icon,
-            repoUrl=registry.repo_url_of(reg, pid),
+            repoUrl=registry.repo_url_of(reg, pid) if provenance else None,
             installedVia=registry.installed_via(reg, pid),
-            installedSha=registry.installed_sha_of(reg, pid),
-            installedTag=registry.installed_tag_of(reg, pid),
+            installedSha=registry.installed_sha_of(reg, pid) if provenance else None,
+            installedTag=registry.installed_tag_of(reg, pid) if provenance else None,
             # narrowed to what `update` will actually accept — the UI renders this as a "Back to X"
             # button, and an install can pin any ref (a branch, a prerelease) into the history
-            previousTag=registry.previous_tag_of(reg, pid, accept=git_installer.is_release_tag),
+            previousTag=(registry.previous_tag_of(reg, pid, accept=git_installer.is_release_tag)
+                         if provenance else None),
         ))
     return out
 
@@ -161,19 +167,33 @@ def _action_response(reg: dict[str, dict]) -> ActionOut:
 
 @router.get("", response_model=list[PluginOut])
 async def list_plugins(
-    _: UserLike = Depends(get_current_user),
+    request: Request,
+    user: UserLike = Depends(get_current_user),
 ) -> list[PluginOut]:
-    """Every discovered plugin + its registry state + whether it is mounted in this process."""
-    return _view(registry.read(), _active_now())
+    """Every discovered plugin + its registry state + whether it is mounted in this process.
+
+    Open to any authenticated user on purpose — the Modules screen is viewable read-only and says so.
+    The git provenance is not: it is resolved per caller, so a viewer sees which features run here
+    without the private remote URL and the commit each is pinned at. Reached through the `identity`
+    module rather than a from-import, for the same reason `/api/mcp/tools` does: a from-import binds
+    the name at import time and would leave this asking the deny-all bootstrap provider after the auth
+    plugin rebinds it."""
+    provider = identity.provider_for(request.app)
+    may_manage = await provider.has_perm(user, "plugins.manage")
+    return _view(registry.read(), _active_now(), provenance=may_manage)
 
 
 @router.get("/{plugin_id}/install-plan", response_model=InstallPlanOut)
 async def install_plan(
     plugin_id: str,
-    _: UserLike = Depends(get_current_user),
+    _: UserLike = Depends(require_perm("plugins.manage")),
 ) -> InstallPlanOut:
     """Resolve the dependency-request: what installing `plugin_id` adds (deps first), what is already
-    satisfied (skipped). Lets the UI prompt "RAG also needs AI — install both?" and dedupe."""
+    satisfied (skipped). Lets the UI prompt "RAG also needs AI — install both?" and dedupe.
+
+    Gated on `plugins.manage` (tightened 2026-08-10, it previously took any authenticated user): this
+    is the pre-flight of one privileged action and has no read-only consumer — the renderer calls it
+    only from the install handler, which is already behind that permission."""
     reg = registry.read()
     installed = {pid for pid in reg if registry.state_of(reg, pid) != registry.AVAILABLE}
     return InstallPlanOut(**registry.resolve_install_plan(plugin_id, _manifests(), installed))

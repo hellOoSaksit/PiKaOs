@@ -780,6 +780,41 @@ def test_view_exposes_permission_info_and_installed_sha(sample_plugins, tmp_path
 # release history — and to make the server dial out — with no permission at all.
 # The gate is a dependency, so it answers before the route body: an unknown plugin id still 403s rather
 # than leaking "no such plugin" to an unprivileged caller.
+def test_install_plan_is_forbidden_without_plugins_manage(client):
+    """The install pre-flight has no read-only consumer — the renderer calls it only from the install
+    handler, which already needs the permission — so it is gated like the install it precedes."""
+    bind_identity(client, perms=set())
+    assert client.get("/api/plugins/crm/install-plan", headers=AUTH_HEADER).status_code == 403
+
+
+def test_plugin_list_hides_git_provenance_from_a_caller_who_cannot_manage(client, sample_plugins, tmp_path, monkeypatch):
+    """The Modules screen is viewable read-only on purpose (the UI says as much), but "which features
+    run here" and "the private URL they came from, pinned at this commit" are different facts. A
+    viewer must not learn repoUrl / installedSha / the tags. `installedVia` deliberately survives —
+    it discloses nothing, and blanking it would report a falsehood rather than a redaction."""
+    from app.core import kernel_state
+    from app.core import plugin_registry as registry
+    monkeypatch.setattr(kernel_state.settings, "kernel_state_dir", str(tmp_path))
+    registry.set_git_install("sample", repo_url="https://private.example/secret-repo.git",
+                             tag="v1.0.0", version="1.0.0", sha="aaa")
+    registry.set_git_install("sample", repo_url="https://private.example/secret-repo.git",
+                             tag="v2.0.0", version="2.0.0", sha="bbb")
+
+    bind_identity(client, perms={"plugins.manage"})
+    row = next(p for p in client.get("/api/plugins", headers=AUTH_HEADER).json() if p["id"] == "sample")
+    assert row["repoUrl"] == "https://private.example/secret-repo.git"
+    assert (row["installedSha"], row["installedTag"], row["previousTag"]) == ("bbb", "v2.0.0", "v1.0.0")
+
+    bind_identity(client, perms=set())
+    body = client.get("/api/plugins", headers=AUTH_HEADER)
+    assert body.status_code == 200                       # still visible: the read-only view is intended
+    assert "secret-repo" not in body.text                # ...but not the remote it came from, anywhere
+    row = next(p for p in body.json() if p["id"] == "sample")
+    assert (row["repoUrl"], row["installedSha"], row["installedTag"], row["previousTag"]) == (None,) * 4
+    assert row["installedVia"] == "git"                  # not blanked into a lie
+    assert row["state"] and row["version"]               # the read-only view still works
+
+
 def test_update_reads_are_forbidden_without_plugins_manage(client):
     bind_identity(client, perms=set())
     for path in ("/api/plugins/crm/versions", "/api/plugins/crm/check-update"):
