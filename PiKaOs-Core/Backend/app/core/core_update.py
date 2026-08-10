@@ -47,6 +47,21 @@ def version_of(tag: str) -> str:
     return tag[len(CORE_TAG_PREFIX):] if tag.startswith(CORE_TAG_PREFIX) else tag
 
 
+def release_page_url() -> str | None:
+    """A browsable URL for the release repo, or None when there is nothing safe to link.
+
+    The UI wants a "what changed" link and must NOT hardcode one: the repo is a setting, and a
+    second copy of it in the renderer is a copy that goes stale. Only `http(s)` is offered — an
+    `ssh://`/`git@` remote is not something a browser can open, and a `file://` one would expose a
+    server path. Deliberately the repo root, not a vendor-specific `/releases` or `/compare` path,
+    which would only be right for one git host.
+    """
+    url = settings.core_update_repo or ""
+    if not url.startswith(("http://", "https://")) or "@" in url.split("//", 1)[-1]:
+        return None                                     # not browsable, or carries a credential
+    return url.removesuffix(".git")
+
+
 def normalized_version(value: str) -> str | None:
     """`core-v0.3.0` / `v0.3.0` / `0.3.0` → `0.3.0`; None when `value` is not a Core release version
     at all (a branch name, a glob, a typo).

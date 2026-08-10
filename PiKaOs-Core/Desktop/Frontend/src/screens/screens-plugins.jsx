@@ -8,6 +8,9 @@ import React, { useEffect, useState } from 'react';
 
 import { Button, Empty, HelpNote, Modal, PageHead, Panel } from '../components/ui/index.js';
 import * as api from '../lib/api.js';
+import { localInputToUtcIso, localNowInputValue, utcIsoToLocalLabel } from '../lib/schedule-time.js';
+
+const SCHED_BADGE = { done: 'on', pending: 'info', running: 'info', cancelled: 'idle' };
 
 const STATE_BADGE = {
   enabled:       { cls: 'on',   en: 'Enabled',       th: 'เปิดใช้งาน' },
@@ -40,6 +43,10 @@ function PluginRow({ p, T, t, may, busy, onInstall, onEnable, onDisable, onUnins
             {p.id}
             {p.dependencies?.length ? ' · ' + T('needs', 'ต้องการ') + ': ' + p.dependencies.join(', ') : ''}
             {p.permissions?.length ? ` · ${p.permissions.length} ` + T('perms', 'สิทธิ์') : ''}
+            {/* The Core range this plugin pins (spec §8.2). Shown here so an admin reads it BEFORE a
+                Core update, not after the update card tells them this plugin is what blocked it.
+                `*` is every plugin's default and says nothing, so it stays hidden. */}
+            {p.coreVersion && p.coreVersion !== '*' ? ` · Core ${p.coreVersion}` : ''}
           </div>
         </div>
         {may && (
@@ -130,9 +137,11 @@ function InstallPlanModal({ plan, target, T }) {
 /* Body of the version-switch dialog — same arrangement as InstallPlanModal: the overlay/title/footer
    chrome lives in the Modal primitive, this only lists what the remote has. Copy is t()-only (no inline
    T(en, th)) because this whole surface is new — nothing here predates the i18n-key rule. */
-function VersionList({ p, t, busy, onPick }) {
+function VersionList({ p, t, busy, onPick, onSchedule }) {
   const [versions, setVersions] = useState(null);   // null = still loading
   const [err, setErr] = useState(false);
+  const [when, setWhen] = useState('');             // '' = apply now (the default)
+  const at = when ? localInputToUtcIso(when) : null;
   useEffect(() => {
     let live = true;   // the dialog can close mid-flight; don't set state on a gone component
     api.listPluginVersions(p.id)
@@ -155,14 +164,96 @@ function VersionList({ p, t, busy, onPick }) {
               {v.previouslyInstalled && <span className="badge info" style={{ marginLeft: 8 }}>{t('plugins.ver.prev')}</span>}
             </span>
             {!v.current && (
-              <Button kind="gold" size="sm" disabled={busy} onClick={() => onPick(v.tag)}>
-                {busy ? '…' : t('plugins.ver.switch', { tag: v.tag })}
+              /* One button, two verbs, driven by the field below: with no time set it switches now
+                 (unchanged behaviour); with one it queues. Two buttons per row would ask the
+                 operator to say "later" twice, and the label is what tells them which they get. */
+              <Button kind="gold" size="sm" disabled={busy}
+                onClick={() => (at ? onSchedule(v.tag, at) : onPick(v.tag))}>
+                {busy ? '…' : t(at ? 'sched.later' : 'plugins.ver.switch', { tag: v.tag })}
               </Button>
             )}
           </div>
         ))}
       </div>
+      <label className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 12 }}>
+        <span className="faint">{t('sched.field')}</span>
+        {/* `min` is a hint only — the browser lets a determined user type an earlier time and the
+            store refuses a past one anyway; it just stops the ordinary mistake at the source. */}
+        <input className="bf-input" type="datetime-local" value={when} min={localNowInputValue()}
+          onChange={e => setWhen(e.target.value)} disabled={busy} />
+      </label>
     </>
+  );
+}
+
+/* Server-Core update card (spec §4). Checks on mount — deliberately on demand rather than polled:
+   the check spends an outbound git call, and this screen is the only place it is asked for.
+   There is no button: Core is replaced by a host script on the server machine, which nothing inside
+   the container may trigger, so the card's job is to say WHETHER to update and WHAT would break. */
+function CoreUpdateCard({ t }) {
+  const [info, setInfo] = useState(null);
+  useEffect(() => {
+    let live = true;
+    api.checkCoreUpdate()
+      .then(r => { if (live) setInfo(r); })
+      .catch(() => { if (live) setInfo({ reachable: false }); });
+    return () => { live = false; };
+  }, []);
+  if (!info) return null;
+  const bad = (info.pluginCompat || []).filter(r => !r.compatible);
+  return (
+    <Panel title={t('core.update.title')} en="CORE">
+      <div className="row" style={{ gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span className="mono faint" style={{ fontSize: 12 }}>{t('core.update.current', { version: info.currentVersion || '—' })}</span>
+        {!info.reachable && <span className="badge idle">{t('core.update.unreachable')}</span>}
+        {info.reachable && !info.hasUpdate && <span className="badge on">{t('core.update.none')}</span>}
+        {info.hasUpdate && <span className="badge info">{t('core.update.latest', { version: info.latestVersion })}</span>}
+        {/* The server hands us the repo link (it owns the setting) — a URL written here would be a
+            second copy of core_update_repo, stale the day the release repo moves. */}
+        {info.hasUpdate && info.repoUrl && (
+          <a className="mono" style={{ fontSize: 12 }} target="_blank" rel="noreferrer" href={info.repoUrl}>
+            {t('core.update.notes')}
+          </a>
+        )}
+      </div>
+      {info.hasUpdate && bad.length > 0 && (
+        <div role="alert" style={{ marginTop: 8 }}>
+          <div style={{ color: 'var(--crimson-deep)', fontSize: 13 }}>{t('core.update.blocked', { version: info.latestVersion })}</div>
+          <ul style={{ margin: '4px 0 0' }}>{bad.map(r => (
+            <li key={r.id} className="mono" style={{ fontSize: 12 }}>{r.id} — Core {r.requires}</li>))}</ul>
+        </div>
+      )}
+      {info.hasUpdate && <HelpNote tag="tip">{t('core.update.howto')}</HelpNote>}
+    </Panel>
+  );
+}
+
+/* The schedule queue (spec §6.2). Terminal rows are kept on the server on purpose — they are the
+   audit trail — so this lists them too rather than only what is pending. What HAPPENED to a fired
+   entry arrives through the notification bell (the server emits notif.schedule.*), which is where
+   read/unread lives; this panel answers "what is queued", not "what did I miss". */
+function SchedulesPanel({ t, may, reloadKey }) {
+  const [items, setItems] = useState([]);
+  const load = () => api.listSchedules().then(r => setItems(Array.isArray(r) ? r : [])).catch(() => {});
+  useEffect(() => { load(); }, [reloadKey]);
+  if (items.length === 0) return null;      // an empty queue is the normal state — no empty panel
+  return (
+    <Panel title={t('sched.title')} en="SCHEDULED">
+      {items.map(e => (
+        <div key={e.id} className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '6px 2px', borderBottom: '1px solid var(--line-soft)' }}>
+          <span className="mono" style={{ fontSize: 12.5 }}>
+            {e.kind === 'core-reminder' ? t('core.update.title') : `${e.pluginId} → ${e.tag}`}
+            {' · '}{t('sched.at', { time: utcIsoToLocalLabel(e.at) })}
+            <span className={`badge ${SCHED_BADGE[e.status] || 'warn'}`} style={{ marginLeft: 8 }}>
+              {t(`sched.status.${e.status}`)}
+            </span>
+          </span>
+          {may && e.status === 'pending' && (
+            <Button kind="ghost" size="sm" onClick={() => api.cancelSchedule(e.id).then(load)}>{t('sched.cancel')}</Button>
+          )}
+        </div>
+      ))}
+    </Panel>
   );
 }
 
@@ -185,6 +276,7 @@ export function PluginsManager({ Sys, view = 'modules' }) {
   const [allowHead, setAllowHead] = useState(false);
   const [updates, setUpdates] = useState({});      // { [pluginId]: { latestVersion, hasUpdate, tagMoved } }
   const [verPick, setVerPick] = useState(null);    // plugin object mid version-pick
+  const [schedKey, setSchedKey] = useState(0);     // bumped to make the schedule panel re-read
 
   // Sharing to the market lives in the Auth plugin (kernel is zero-DB — identity can't live in Core);
   // the Share affordance is gated on that plugin being installed + enabled (drafted, not built yet).
@@ -254,6 +346,16 @@ export function PluginsManager({ Sys, view = 'modules' }) {
     finally { setBusy(null); }
   };
 
+  // Queue a switch instead of running it. Nothing changes on disk now, so this deliberately does
+  // NOT go through `act`/`applyResult` — there is no new plugin state to fold in and no restart to
+  // hint at; bumping `schedKey` is what makes the queue panel show the row that was just added.
+  const queueSwitch = async (id, tag, at) => {
+    setBusy(id); setErr(null);
+    try { await api.schedulePluginUpdate(id, tag, at); setSchedKey(k => k + 1); }
+    catch (e) { setErr(e.message || 'schedule failed'); }
+    finally { setBusy(null); }
+  };
+
   const saveGitCredential = async (host, token) => {
     setBusy('git-cred'); setErr(null);
     try { await api.setGitCredential(host, token); }
@@ -297,6 +399,9 @@ export function PluginsManager({ Sys, view = 'modules' }) {
             desc={T('Choose which features this deployment runs. Installing a feature also pulls in anything it depends on (e.g. RAG needs AI); a dependency that is already installed is reused, never installed twice.',
                     'เลือกว่าระบบนี้จะเปิดฟีเจอร์ไหน · การติดตั้งฟีเจอร์จะดึงสิ่งที่มันพึ่งพามาด้วย (เช่น RAG ต้องการ AI) · ตัวที่ติดตั้งแล้วจะถูกใช้ซ้ำ ไม่ลงซ้ำ')}
             actions={<Button kind="ghost" size="sm" icon="refresh" onClick={load}>{T('Refresh', 'รีเฟรช')}</Button>} />
+          {/* Both are gated on plugins.manage server-side (they report an update and spend a git
+              call), so a viewer would only collect 403s for panels they cannot act on. */}
+          {may && <CoreUpdateCard t={t} />}
           {plugins.length === 0
             ? <Empty icon="🧩" title={T('No plugins discovered', 'ไม่พบปลั๊กอิน')} sub={T('This is a Base-only build.', 'บิลด์นี้เป็น Base ล้วน')} />
             : <div style={{ display: 'grid', gap: 12 }}>
@@ -310,6 +415,7 @@ export function PluginsManager({ Sys, view = 'modules' }) {
                     onRollback={() => act(p.id, (id) => api.updatePlugin(id, p.previousTag))} />
                 ))}
               </div>}
+          {may && <SchedulesPanel t={t} may={may} reloadKey={schedKey} />}
         </>
       )}
 
@@ -376,7 +482,8 @@ export function PluginsManager({ Sys, view = 'modules' }) {
           {/* Close first, then act: the row's own busy state drives the spinner, and leaving the dialog
               open over a restart-to-apply mutation would show a version list that is already stale. */}
           <VersionList p={verPick} t={t} busy={busy === verPick.id}
-            onPick={(tag) => { const id = verPick.id; setVerPick(null); act(id, (x) => api.updatePlugin(x, tag)); }} />
+            onPick={(tag) => { const id = verPick.id; setVerPick(null); act(id, (x) => api.updatePlugin(x, tag)); }}
+            onSchedule={(tag, at) => { const id = verPick.id; setVerPick(null); queueSwitch(id, tag, at); }} />
         </Modal>
       )}
     </div>

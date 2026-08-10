@@ -167,6 +167,27 @@ def test_preflight_cli_rejects_a_bad_invocation(capsys):
     assert "usage" in capsys.readouterr().out
 
 
+def test_release_page_url_offers_only_something_a_browser_can_safely_open(monkeypatch):
+    """The card links "what changed" from this instead of hardcoding a URL in the renderer — so it
+    must refuse the remotes that are not a public web page: a local test fixture would leak a server
+    path, and an embedded credential must never reach the client."""
+    def url_for(repo):
+        monkeypatch.setattr(core_update.settings, "core_update_repo", repo)
+        return core_update.release_page_url()
+    assert url_for("https://github.com/hellOoSaksit/PiKaOs.git") == "https://github.com/hellOoSaksit/PiKaOs"
+    assert url_for("https://git.example.co/team/core") == "https://git.example.co/team/core"
+    assert url_for("file:///srv/mirrors/core.git") is None
+    assert url_for("git@github.com:hellOoSaksit/PiKaOs.git") is None
+    assert url_for("https://user:tok@git.example.co/team/core.git") is None
+    assert url_for("") is None
+
+
+def test_check_update_hands_the_ui_the_repo_link_instead_of_a_hardcoded_one(client, monkeypatch, core_repo):
+    monkeypatch.setattr(core_update.settings, "core_update_repo", core_repo)   # a file:// fixture
+    bind_identity(client, perms={"plugins.manage"})
+    assert client.get("/api/core/check-update", headers=AUTH_HEADER).json()["repoUrl"] is None
+
+
 def test_normalized_version_reads_every_shape_a_target_arrives_in():
     assert core_update.normalized_version("core-v0.3.0") == "0.3.0"
     assert core_update.normalized_version("v0.3.0") == "0.3.0"

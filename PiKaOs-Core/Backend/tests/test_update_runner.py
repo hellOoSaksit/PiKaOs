@@ -122,6 +122,64 @@ def test_no_restart_for_a_missed_or_failed_entry(monkeypatch):
     assert restarts == []
 
 
+# --- the outcome has to reach the operator ----------------------------------------------------------
+# A scheduled switch fires while nobody is watching, so the terminal status IS the feature's output.
+# It goes into the notification store every other kernel mutation already uses (key + params, the
+# client localizes) rather than being re-derived from the schedule list in the renderer — that store
+# is what carries read/unread, so a derived one would re-announce the same event at every sign-in.
+
+def _notifs():
+    from app.core import notify
+    return [n for n in notify.list_all() if n["key"].startswith("notif.schedule.")]
+
+
+def test_a_done_switch_is_announced_with_its_plugin_and_tag(monkeypatch):
+    monkeypatch.setattr(update_runner, "_perform_switch", lambda *a: None)
+    due_entry("crm", "v2.1.0")
+    asyncio.run(_drain([], until=lambda: us.list_entries()[0]["status"] == us.DONE))
+    assert [(n["key"], n["params"]) for n in _notifs()] == [
+        ("notif.schedule.done", {"plugin": "crm", "tag": "v2.1.0"})]
+
+
+def test_a_failed_switch_is_announced(monkeypatch):
+    def boom(*a): raise RuntimeError("nope")
+    monkeypatch.setattr(update_runner, "_perform_switch", boom)
+    due_entry("crm", "v2.1.0")
+    asyncio.run(_drain([], until=lambda: us.list_entries()[0]["status"] == us.FAILED))
+    assert [n["key"] for n in _notifs()] == ["notif.schedule.failed"]
+
+
+def test_a_missed_window_is_announced(monkeypatch):
+    """The one an operator most needs told: nothing happened, and nothing will — the server was off."""
+    monkeypatch.setattr(update_runner, "_perform_switch", lambda *a: None)
+    due_entry("crm", "v2.1.0", minutes=-90)
+    asyncio.run(_drain([], until=lambda: us.list_entries()[0]["status"] == us.MISSED))
+    assert [n["key"] for n in _notifs()] == ["notif.schedule.missed"]
+
+
+def test_a_core_reminder_announces_itself_not_a_plugin_switch(monkeypatch):
+    """It changed nothing — the whole point is to tell a human to go run the host script."""
+    us.add_entry(kind=us.KIND_CORE_REMINDER, at_iso=iso(hours=1), by="u1")
+    kernel_state.update("update_schedule",
+                        lambda s: {"entries": [{**e, "at": iso(seconds=-30)} for e in s["entries"]]},
+                        {"entries": []})
+    asyncio.run(_drain([], until=lambda: us.list_entries()[0]["status"] == us.DONE))
+    assert [n["key"] for n in _notifs()] == ["notif.schedule.core"]
+
+
+def test_announcing_never_takes_the_runner_down(monkeypatch):
+    """emit() already swallows a failed write, but the runner must survive an outright broken store
+    too: the switch is committed on disk by then, and losing the loop would strand every later entry."""
+    monkeypatch.setattr(update_runner, "_perform_switch", lambda *a: None)
+    monkeypatch.setattr(update_runner.notify, "emit",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("store gone")))
+    due_entry()
+    restarts = []
+    asyncio.run(_drain(restarts, until=lambda: us.list_entries()[0]["status"] == us.DONE))
+    assert us.list_entries()[0]["status"] == us.DONE
+    assert restarts == [1]          # the restart the switch earned still happens
+
+
 def test_a_failing_tick_does_not_kill_the_loop(monkeypatch):
     """One bad entry must not stop every later schedule from ever firing."""
     monkeypatch.setattr(update_runner, "_perform_switch", lambda *a: None)
