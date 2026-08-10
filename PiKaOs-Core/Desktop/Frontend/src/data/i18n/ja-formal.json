@@ -191,6 +191,8 @@
     "plugins.ver.empty": "リモートにリリース済みバージョンがありません。",
     "plugins.ver.close": "閉じる",
     "plugins.ver.failed": "切り替えに失敗しました — 何も変更されていません。",
+    "compat.serverOld": "このサーバーの Core は本アプリの想定より古いバージョンです — サーバーを更新してください (update.bat)。",
+    "compat.dismiss": "閉じる",
     "core.update.title": "サーバー Core",
     "core.update.current": "{version} を実行中",
     "core.update.latest": "最新リリース: {version}",

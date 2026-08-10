@@ -497,6 +497,8 @@
     "plugins.ver.empty": "No released versions found on the remote.",
     "plugins.ver.close": "Close",
     "plugins.ver.failed": "Switching failed — nothing was changed.",
+    "compat.serverOld": "This server runs an older Core than this app expects — update the server (update.bat).",
+    "compat.dismiss": "Dismiss",
     "core.update.title": "Server Core",
     "core.update.current": "Running {version}",
     "core.update.latest": "Latest release: {version}",

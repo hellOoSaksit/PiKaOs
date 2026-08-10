@@ -5,6 +5,7 @@ import { NAV } from './data/data.jsx';
 import { loadNav, saveNav, mergeWithDefault } from './data/data-nav.jsx';
 import { getNavConfig, setNavConfig, getMySettings, setMySetting, setupStatus, dbStatus, setToken, getCapabilities, raw, listNotifications, markNotificationsRead } from './lib/api.js';
 import { toDisplayNotification } from './lib/notifications.js';
+import { serverTooOld } from './lib/server-compat.js';
 import { resolveShellMode } from './lib/shell-mode.js';
 import { useShellNav } from './lib/shell-nav.js';
 import { Settings } from './screens/screens-extra.jsx';
@@ -17,7 +18,7 @@ import { ToolsManager } from './screens/screens-tools.jsx';
 import { useAuth } from './lib/auth.jsx';
 import { BottomUtilityBar } from './components/ui/BottomUtilityBar.jsx';
 import { GatewayIndicator } from './components/ui/GatewayIndicator.jsx';
-import { TitleBar, Tooltip } from './components/ui';
+import { Button, HelpNote, TitleBar, Tooltip } from './components/ui';
 import { Icon, renderIcon } from './components/ui/icons.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
 import { UILoadingHost, UIModalHost } from './lib/ui-modal.jsx';
@@ -226,6 +227,12 @@ function App() {
   // trustworthy list — pending, failed, or redacted pre-auth) leaves the UI ungated rather than
   // hidden: this is UI honesty, not authz, and it must never leave the shell worse than no gate.
   const activePlugins = React.useMemo(() => authoritativePluginIds(caps), [caps]);
+  // Desktop↔server minimum (server-core-update §8.4). Read off the handshake we already hold — the
+  // capabilities payload carries `version`, so this costs no extra request and re-evaluates by
+  // itself whenever the shell reconnects. Dismissible per session: it stays true until someone runs
+  // the updater on the server machine, and a strip that cannot be closed just gets ignored.
+  const [compatDismissed, setCompatDismissed] = useState(false);
+  const serverOld = !compatDismissed && serverTooOld(caps?.version);
 
   const [route, setRoute] = useState("home");
   const histRef = useRef({ stack: ["home"], idx: 0 });
@@ -501,6 +508,14 @@ function App() {
       <div className="nav-scrim" onClick={closeDrawer} />
       <div className="main">
         <Topbar route={route} language={language} t={t} />
+        {serverOld && (
+          <div className="content-pad" role="status">
+            <HelpNote tag="warn">
+              {t('compat.serverOld')}
+              <Button kind="ghost" size="sm" onClick={() => setCompatDismissed(true)}>{t('compat.dismiss')}</Button>
+            </HelpNote>
+          </div>
+        )}
         <div className="content">{screen}</div>
       </div>
       <BottomUtilityBar

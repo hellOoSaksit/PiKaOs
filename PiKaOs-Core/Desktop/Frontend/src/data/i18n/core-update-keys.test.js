@@ -12,7 +12,7 @@ const at = (pack, k) => (pack.translations ?? pack)[k];
 const PACKS = [['en', en], ['th', th], ['ja', ja]];
 
 describe('core.update.* / sched.* / notif.schedule.* i18n parity', () => {
-  for (const prefix of ['core.update.', 'sched.', 'notif.schedule.']) {
+  for (const prefix of ['core.update.', 'sched.', 'notif.schedule.', 'compat.']) {
     it(`th and ja carry exactly the en ${prefix}* key set`, () => {
       const base = keysOf(en, prefix);
       expect(base.length).toBeGreaterThan(0);
