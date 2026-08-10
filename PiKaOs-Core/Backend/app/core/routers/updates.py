@@ -39,6 +39,7 @@ class CoreUpdateOut(BaseModel):
     reachable: bool
     blocked: bool                 # some installed plugin's coreVersion excludes the target
     pluginCompat: list[dict]
+    repoUrl: str | None = None    # browsable release repo, so the UI links it instead of hardcoding it
 
 
 @core_router.get("/check-update", response_model=CoreUpdateOut)
@@ -58,7 +59,8 @@ async def core_check_update(
     return CoreUpdateOut(
         currentVersion=settings.app_version, latestTag=latest, latestVersion=latest_version,
         hasUpdate=core_update.is_newer(latest_version, settings.app_version),
-        reachable=True, blocked=any(not r["compatible"] for r in compat), pluginCompat=compat)
+        reachable=True, blocked=any(not r["compatible"] for r in compat), pluginCompat=compat,
+        repoUrl=core_update.release_page_url())
 
 
 @router.get("/schedules")

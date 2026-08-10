@@ -261,6 +261,15 @@ export async function setGitCredential(host, token) {
   return raw(`/plugins/git-credentials/${host}`, { method: "PUT", body: { token } });
 }
 
+// --- server-Core update + scheduled switches (server-core-update spec §4/§6) --------------------
+// All four need `plugins.manage` — the reads too: they say an update exists, which is only useful
+// to someone allowed to apply it, and checkCoreUpdate spends an outbound git call.
+// `at` is a UTC ISO string (lib/schedule-time.js converts the operator's local input).
+export async function checkCoreUpdate() { return raw(`/core/check-update`); }   // { currentVersion, latestTag, hasUpdate, reachable, blocked, pluginCompat }
+export async function schedulePluginUpdate(id, tag, at) { return raw(`/plugins/${id}/schedule-update`, { method: "POST", body: { tag, at } }); }
+export async function listSchedules() { return raw(`/updates/schedules`); }
+export async function cancelSchedule(sid) { return raw(`/updates/schedules/${sid}`, { method: "DELETE" }); }
+
 // --- notifications (audit-notifications v2): capped in-memory store on the server; the bell
 // reads via listNotifications() and marks them read on open (ids=null marks all).
 export async function listNotifications() { return raw(`/notifications`); }

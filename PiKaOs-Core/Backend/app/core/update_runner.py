@@ -18,6 +18,7 @@ import os
 import signal
 from datetime import datetime, timedelta, timezone
 
+from . import notify
 from . import update_schedule as us
 
 log = logging.getLogger("pikaos.updates.runner")
@@ -75,6 +76,29 @@ def schedule_self_restart(delay_seconds: float = 3.0) -> None:
     asyncio.get_running_loop().call_later(delay_seconds, _term)
 
 
+def announce(entry: dict, status: str) -> None:
+    """Put a fired entry's outcome in the notification feed (key + params; the client localizes).
+
+    This is the feature's only output: a scheduled switch runs unattended, so "it worked" / "it
+    failed and was reverted" / "the server was off and it never ran" have nowhere else to surface.
+    The store is the same one every other kernel mutation emits into — it owns read/unread, so the
+    operator sees each outcome once, which a list re-derived in the renderer could not do.
+    """
+    if status == us.CANCELLED:
+        return                                          # the canceller already got told, by the route
+    try:
+        if entry.get("kind") == us.KIND_CORE_REMINDER:
+            notify.emit("plugin", "notif.schedule.core")
+        else:
+            notify.emit("plugin", f"notif.schedule.{status}",
+                        {"plugin": entry.get("pluginId") or "", "tag": entry.get("tag") or ""})
+    except Exception:
+        # emit() already swallows a failed WRITE; this covers the store being broken outright. The
+        # switch is committed on disk by now, so losing the loop over an announcement would strand
+        # every later entry to save a message.
+        log.exception("could not announce schedule outcome for %s", entry.get("id"))
+
+
 async def runner_loop(stop: asyncio.Event, *, tick_seconds: float = 60.0,
                       fire=fire_entry, restart=schedule_self_restart) -> None:
     """Tick until `stop`. One claim per tick: a slow switch must not hold up the next claim, and the
@@ -87,6 +111,7 @@ async def runner_loop(stop: asyncio.Event, *, tick_seconds: float = 60.0,
             if entry is not None:
                 status, note = fire(entry)
                 us.finish(entry["id"], status, note)
+                announce(entry, status)
                 # Only a committed plugin switch earns a restart. A MISSED, FAILED or reminder entry
                 # changed nothing on disk, and restarting for one would be an outage with no cause.
                 if status == us.DONE and entry.get("kind") == us.KIND_PLUGIN:
