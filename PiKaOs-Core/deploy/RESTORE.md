@@ -16,16 +16,23 @@ down.
 
 ## 1. Find the volumes
 
-The stack runs under the compose project `pikaos`, so the volumes are:
+**Do not guess the names.** The stack runs under the compose project `pikaos` (`-p pikaos`), but the
+volumes are NOT `pikaos_*`: `render_compose.py` pins an explicit `name:` on each one when it generates
+the compose file, and that name is resolved from the `deploy/` directory. So they are `deploy_*`, and
+a command written against `pikaos_kernelstate` would silently create a new empty volume instead of
+finding yours. Always list first:
 
 ```bash
-docker volume ls | grep pikaos
-#   pikaos_kernelstate    -> /app/state
-#   pikaos_pluginsdir     -> /app/app/plugins
-#   pikaos_backupsdir     -> /app/backups   (the archives themselves)
+docker volume ls
+#   deploy_kernelstate    -> /app/state
+#   deploy_pluginsdir     -> /app/app/plugins
+#   deploy_backupsdir     -> /app/backups   (the archives themselves)
 
-docker volume inspect pikaos_kernelstate      # Mountpoint, if you want to look inside from the host
+docker volume inspect deploy_kernelstate      # Mountpoint, if you want to look inside from the host
+grep -n "name:" deploy/docker-compose.generated.prod.yml   # the authority, if the list is ambiguous
 ```
+
+Every command below uses `deploy_*`. Substitute what `docker volume ls` actually showed you.
 
 ## 2. Get the archive onto the host
 
@@ -33,9 +40,9 @@ If the archive is still in the backups volume (the usual case — a server that 
 lost its disk), copy it out:
 
 ```bash
-docker run --rm -v pikaos_backupsdir:/b -v "$PWD:/out" alpine \
+docker run --rm -v deploy_backupsdir:/b -v "$PWD:/out" alpine \
   sh -c 'ls -1 /b/*.tar.gz'                       # pick one; ids are bk_<timestamp>
-docker run --rm -v pikaos_backupsdir:/b -v "$PWD:/out" alpine \
+docker run --rm -v deploy_backupsdir:/b -v "$PWD:/out" alpine \
   cp /b/bk_20260810T120000000000.tar.gz /out/
 ```
 
@@ -57,11 +64,11 @@ Clear the target first — an untar MERGES, so a stale file the backup does not 
 
 ```bash
 # kernel state
-docker run --rm -v pikaos_kernelstate:/target -v "$PWD:/b:ro" alpine sh -c \
+docker run --rm -v deploy_kernelstate:/target -v "$PWD:/b:ro" alpine sh -c \
   'rm -rf /target/* /target/.[!.]* 2>/dev/null; tar xzf /b/bk_<id>.tar.gz -C /target --strip-components=1 state'
 
 # git-installed plugins (skip if the archive was state-only — a pre-switch snapshot is)
-docker run --rm -v pikaos_pluginsdir:/target -v "$PWD:/b:ro" alpine sh -c \
+docker run --rm -v deploy_pluginsdir:/target -v "$PWD:/b:ro" alpine sh -c \
   'rm -rf /target/* /target/.[!.]* 2>/dev/null; tar xzf /b/bk_<id>.tar.gz -C /target --strip-components=1 plugins'
 ```
 
@@ -69,7 +76,7 @@ Both commands were run against a throwaway volume and a real archive on 2026-08-
 gone, the files land at the volume root, and tar restores them owned by uid 1000 — which is the
 container's `appuser`, so the backend can still write its state. If you extract as some other user
 (or with `--no-same-owner`), fix it with
-`docker run --rm -v pikaos_kernelstate:/t alpine chown -R 1000:1000 /t`.
+`docker run --rm -v deploy_kernelstate:/t alpine chown -R 1000:1000 /t`.
 
 Check what an archive actually contains before you run either:
 
@@ -87,7 +94,7 @@ what is there first — that is the point, and it is destructive.
 docker compose -p pikaos -f deploy/docker-compose.generated.yml up -d db
 tar xzf bk_<id>.tar.gz db.dump
 
-docker run --rm --network pikaos_default -v "$PWD:/b:ro" -e PGPASSWORD=<password> \
+docker run --rm --network deploy_default -v "$PWD:/b:ro" -e PGPASSWORD=<password> \
   postgres:17 pg_restore --clean --if-exists -h db -U pikaos -d pikaos /b/db.dump
 ```
 
