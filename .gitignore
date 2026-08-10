@@ -50,6 +50,11 @@
 # JSON file (NOT the DB) so the kernel works before any datastore exists. Runtime-only, never committed.
 /PiKaOs-Core/Backend/data/
 
+# Backup archives (backup-restore spec §2). Prod writes these to the `backupsdir` named volume, but
+# dev bind-mounts ../Backend:/app, so /app/backups lands in the source tree. They hold the whole
+# kernel state + a database dump — never committed.
+/PiKaOs-Core/Backend/backups/
+
 # Server-Core updater run state — update.bat/update.sh write the transcript and a concurrency lock
 # next to themselves. Both MUST stay untracked: the updater checks the tree is clean before it will
 # check a tag out, so a tracked log would make the tool refuse to run the second time.

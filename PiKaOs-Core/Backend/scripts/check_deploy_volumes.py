@@ -10,6 +10,9 @@ Two invariants, and both are the kind that fail SILENTLY in production rather th
    gone. The volume must also be DECLARED top-level, or `docker compose up` refuses to start at all.
 2. **Dev must NOT mount it.** Dev bind-mounts `../Backend` whole and `link-plugins.sh` drops symlinks
    into `app/plugins`; a named volume there shadows them, and the dev tree comes up plugin-less.
+3. **Prod mounts `backupsdir` at `/app/backups`** (backup-restore spec §2), for the same silent reason
+   as 1: an archive stored in an image layer is destroyed by the rebuild it exists to recover from,
+   and the operator only finds out when they go looking for a restore point.
 
 This lives in the lightweight `architecture` CI job rather than the pytest suite for a concrete
 reason: the backend suite runs INSIDE the container, whose only bind mount is `Backend/` — `deploy/`
@@ -29,6 +32,7 @@ DEPLOY = Path(__file__).resolve().parent.parent.parent / "deploy"
 PROD = DEPLOY / "docker-compose.prod.yml"
 DEV = DEPLOY / "docker-compose.dev.yml"
 PLUGINS_MOUNT = "pluginsdir:/app/app/plugins"
+BACKUPS_MOUNT = "backupsdir:/app/backups"
 
 
 def _backend_volumes(compose_path: Path) -> list[str]:
@@ -51,6 +55,14 @@ def main() -> None:
     if "pluginsdir" not in _declared_volumes(PROD):
         errors.append(
             f"{PROD.name}: `pluginsdir` is mounted but not declared under top-level `volumes:` — "
+            "`docker compose up` refuses to start with an undefined volume.")
+    if BACKUPS_MOUNT not in _backend_volumes(PROD):
+        errors.append(
+            f"{PROD.name}: backend must mount `{BACKUPS_MOUNT}` — otherwise the backups live in the "
+            "image layer that a Core update rebuilds, and the recovery point is gone.")
+    if "backupsdir" not in _declared_volumes(PROD):
+        errors.append(
+            f"{PROD.name}: `backupsdir` is mounted but not declared under top-level `volumes:` — "
             "`docker compose up` refuses to start with an undefined volume.")
     if any("pluginsdir" in v for v in _backend_volumes(DEV)):
         errors.append(

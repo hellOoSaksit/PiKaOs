@@ -39,9 +39,13 @@ services:
       # PROD ONLY, deliberately: dev bind-mounts ../Backend whole, and a named volume here would shadow
       # the symlinks link-plugins.sh drops into app/plugins — the dev tree would appear plugin-less.
       - pluginsdir:/app/app/plugins
+      # Backups survive rebuilds (backup-restore spec §2) — the archives are the recovery point for
+      # the very operation that rebuilds the image, so they can never live in an image layer.
+      - backupsdir:/app/backups
 
   # (web/nginx frontend removed 2026-07-14 — PiKaOs is desktop-first; recover from git history if a web deploy returns)
 
 volumes:
   kernelstate:
   pluginsdir:
+  backupsdir:

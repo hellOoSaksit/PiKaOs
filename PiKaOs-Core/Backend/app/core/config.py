@@ -45,6 +45,14 @@ class Settings(BaseSettings):
     # the registry). See app/core/kernel_state.py.
     kernel_state_dir: str = "/app/state"
 
+    # --- backups (backup-restore spec §2) ---
+    # Where backup archives are written. In prod this is the `backupsdir` NAMED VOLUME, deliberately
+    # separate from kernelstate: a restore replaces the state dir wholesale, so the archives cannot
+    # live inside the thing being replaced. Dev has no volume here — the bind-mounted source takes it
+    # (Backend/backups/, gitignored).
+    backups_dir: str = "/app/backups"
+    backup_keep: int = 10        # retention: newest N kept by prune (backup-restore spec §2)
+
     # --- database (async SQLAlchemy / asyncpg) ---
     database_url: str = "postgresql+asyncpg://pikaos:pikaos@db:5432/pikaos"
 
