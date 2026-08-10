@@ -106,7 +106,10 @@ async def runner_loop(stop: asyncio.Event, *, tick_seconds: float = 60.0,
     while not stop.is_set():
         try:
             now_iso = datetime.now(timezone.utc).isoformat()
-            us.sweep_stuck(now_iso)
+            # A swept entry never went through fire(), so it would otherwise flip to FAILED silently
+            # — the half of "never retried and never reported" the sweep alone does not fix.
+            for swept in us.sweep_stuck(now_iso):
+                announce(swept, us.FAILED)
             entry = us.claim_due(now_iso)
             if entry is not None:
                 status, note = fire(entry)

@@ -167,6 +167,23 @@ def test_a_core_reminder_announces_itself_not_a_plugin_switch(monkeypatch):
     assert [n["key"] for n in _notifs()] == ["notif.schedule.core"]
 
 
+def test_an_entry_swept_after_a_crash_is_announced_too(monkeypatch):
+    """`sweep_stuck` exists because an entry left RUNNING by a dead process "is never retried and
+    never reported" — but it only fixes the first half. The row flips to FAILED inside the store, not
+    through fire(), so without announcing the sweep the operator sees a switch that simply never
+    happened and a queue that went quiet."""
+    entry = due_entry("crm", "v2.1.0")
+    # Exactly what a process dying mid-switch leaves behind: claimed, RUNNING, started long ago.
+    kernel_state.update("update_schedule",
+                        lambda s: {"entries": [{**e, "status": us.RUNNING,
+                                                "startedAt": iso(minutes=-30)}
+                                               for e in s["entries"] if e["id"] == entry["id"]]},
+                        {"entries": []})
+    asyncio.run(_drain([], until=lambda: us.list_entries()[0]["status"] == us.FAILED))
+    assert [(n["key"], n["params"]) for n in _notifs()] == [
+        ("notif.schedule.failed", {"plugin": "crm", "tag": "v2.1.0"})]
+
+
 def test_announcing_never_takes_the_runner_down(monkeypatch):
     """emit() already swallows a failed write, but the runner must survive an outright broken store
     too: the switch is committed on disk by then, and losing the loop would strand every later entry."""
