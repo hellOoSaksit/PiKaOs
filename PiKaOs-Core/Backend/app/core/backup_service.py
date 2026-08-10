@@ -24,7 +24,9 @@ from urllib.parse import unquote, urlsplit, urlunsplit
 from .config import settings
 from .crypto import secret_fingerprint
 
-_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+# Must START alphanumeric, so `..` and dotfile-shaped names are rejected outright rather than merely
+# being harmless once suffixed. Ids are server-generated; anything else is a caller probing.
+_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
 
 class BackupError(Exception):
