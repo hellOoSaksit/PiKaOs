@@ -5,6 +5,8 @@ container is pytest itself.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from starlette.testclient import TestClient
 
@@ -84,6 +86,69 @@ def test_restore_requires_typed_confirm_and_replaces_state(api):
     # the recovery point (spec §4) — and it is NOT state-only: restore replaces plugins too
     pre = [m for m in bs.list_backups() if m["id"].startswith("pre-restore")]
     assert len(pre) == 1 and pre[0]["stateOnly"] is False
+
+
+def test_swap_dir_replaces_contents_without_removing_the_destination(tmp_path, monkeypatch):
+    """Both destinations are MOUNT POINTS on a real server (`/app/state` = the kernelstate volume),
+    and rmdir on a mount is EBUSY — so the swap must empty the directory, never remove and recreate
+    it. A tmp dir cannot be a mount, so the mount is simulated where it bites: rmtree ON THE
+    DESTINATION ITSELF raises EBUSY, exactly as the kernel does. UAT 2026-08-10 found this the hard
+    way, after the old state had already been deleted.
+    """
+    import shutil as shutil_mod
+    src = tmp_path / "src"; src.mkdir()
+    (src / "kept.json").write_text("new", encoding="utf-8")
+    (src / "sub").mkdir(); (src / "sub" / "deep.json").write_text("new", encoding="utf-8")
+    dest = tmp_path / "dest"; dest.mkdir()
+    (dest / "stale.json").write_text("old", encoding="utf-8")
+    (dest / "staledir").mkdir(); (dest / "staledir" / "x").write_text("old", encoding="utf-8")
+
+    real_rmtree = shutil_mod.rmtree
+
+    def rmtree_guard(path, *a, **kw):
+        if Path(path) == dest:
+            raise OSError(16, "Device or resource busy")
+        return real_rmtree(path, *a, **kw)
+
+    monkeypatch.setattr(backups_router.shutil, "rmtree", rmtree_guard)
+    backups_router._swap_dir(src, dest)
+
+    assert sorted(p.name for p in dest.iterdir()) == ["kept.json", "sub"]
+    assert (dest / "sub" / "deep.json").read_text() == "new"
+
+
+def test_swap_dir_finishes_the_restore_even_if_a_leftover_cannot_be_removed(tmp_path, monkeypatch):
+    """The order is copy-then-prune for this reason. A root-owned `__pycache__` the server cannot
+    unlink (UAT 2026-08-10) must cost a stale directory, not the whole restore — the delete-first
+    version aborted with the destination already emptied."""
+    src = tmp_path / "src"; src.mkdir()
+    (src / "restored.json").write_text("new", encoding="utf-8")
+    dest = tmp_path / "dest"; dest.mkdir()
+    (dest / "stubborn").mkdir(); (dest / "stubborn" / "x").write_text("root-owned", encoding="utf-8")
+
+    monkeypatch.setattr(backups_router.shutil, "rmtree",
+                        lambda *a, **kw: (_ for _ in ()).throw(PermissionError(13, "denied")))
+    backups_router._swap_dir(src, dest)
+
+    assert (dest / "restored.json").read_text() == "new"    # the restore still happened
+    assert (dest / "stubborn").is_dir()                     # the leftover simply stayed
+
+
+def test_swap_dir_does_not_need_to_copy_permission_bits(tmp_path, monkeypatch):
+    """The dev bind mount is a Windows filesystem and refuses chown/chmod with EPERM even when every
+    byte copied. copytree reports that as a failed copy, so the whole restore aborted over permission
+    bits nothing reads (UAT 2026-08-10). The restored files belong to the server process regardless."""
+    monkeypatch.setattr(backups_router.shutil, "copystat",
+                        lambda *a, **kw: (_ for _ in ()).throw(PermissionError(1, "not permitted")))
+    monkeypatch.setattr(backups_router.shutil, "chown",
+                        lambda *a, **kw: (_ for _ in ()).throw(PermissionError(1, "not permitted")))
+    src = tmp_path / "src"; src.mkdir()
+    (src / "a").mkdir(); (src / "a" / "deep.json").write_text("new", encoding="utf-8")
+    dest = tmp_path / "dest"; dest.mkdir()
+
+    backups_router._swap_dir(src, dest)
+
+    assert (dest / "a" / "deep.json").read_text() == "new"
 
 
 def test_restore_of_an_unknown_backup_leaves_no_snapshot_behind(api):

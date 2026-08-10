@@ -35,6 +35,19 @@ TOOL_CONTRACT = "sampletool.Connection"
 SAMPLE_ROUTE = "/api/sample/ping"
 
 
+@pytest.fixture(autouse=True)
+def _isolate_backups(tmp_path, monkeypatch):
+    """No test may write into the REAL backups dir.
+
+    Autouse rather than opt-in because the writer is invisible from the test: `perform_switch` takes
+    a pre-switch snapshot, so every plugin-update test wrote a live tarball into `/app/backups` —
+    which the dev compose bind-mounts to `Backend/backups`. Ten of them turned up in a running
+    server's backup list, put there by a test run. A test that wants a specific dir just sets it
+    again; a module-level or explicitly-requested fixture is applied after this one.
+    """
+    monkeypatch.setattr(kernel_state.settings, "backups_dir", str(tmp_path / "backups"))
+
+
 @pytest.fixture
 def tmp_state(tmp_path, monkeypatch):
     """Point `kernel_state` at a fresh temp dir for one test — the same isolation pattern

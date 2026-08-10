@@ -84,10 +84,51 @@ def _pg_restore(dsn: str, dump: Path) -> None:
         raise bs.BackupError("database restore failed")
 
 
+def _copy_contents(src: Path, dest: Path) -> None:
+    """Copy src's tree into dest — CONTENTS ONLY, no metadata.
+
+    `shutil.copytree` copies contents *and* then chowns/chmods each entry, which the dev bind mount
+    (a Windows filesystem) refuses with EPERM even though every byte landed. It reports that as a
+    failed copy, so the whole restore aborted over permission bits nothing reads: the restored files
+    belong to the server process either way. UAT 2026-08-10.
+    """
+    for path in sorted(src.rglob("*")):
+        rel = path.relative_to(src)
+        if "__pycache__" in rel.parts or path.suffix == ".pyc":
+            continue          # derived, and unwritable often enough to lose a restore over (see above)
+        target = dest / rel
+        if path.is_dir():
+            target.mkdir(parents=True, exist_ok=True)
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(path, target)
+
+
 def _swap_dir(src: Path, dest: Path) -> None:
-    if dest.exists():
-        shutil.rmtree(dest)
-    shutil.copytree(src, dest)
+    """Replace dest's CONTENTS — never dest itself.
+
+    Both destinations are container MOUNT POINTS (`/app/state` = the kernelstate volume,
+    `/app/app/plugins` = pluginsdir), and `rmdir` on a mount point is EBUSY, so removing the
+    directory and copying a new one in fails on a real server while passing against any tmp dir a
+    test can build. UAT 2026-08-10 hit exactly that, after the old state was already gone.
+    """
+    dest.mkdir(parents=True, exist_ok=True)
+    # Copy FIRST, prune second. Deleting first and copying after means a delete that fails halfway
+    # leaves the destination destroyed and the restore aborted — UAT hit that too, on a root-owned
+    # __pycache__ the server could not unlink. This order degrades to "a stale file survived", which
+    # is a nuisance, instead of "the state is gone", which is an outage.
+    _copy_contents(src, dest)
+    restored = {p.name for p in src.iterdir()} | {"__pycache__"}
+    for child in dest.iterdir():
+        if child.name in restored:
+            continue
+        try:
+            if child.is_dir() and not child.is_symlink():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
+        except OSError:
+            log.warning("[backups] could not remove %s during restore — leaving it in place", child)
 
 
 @router.post("/{backup_id}/restore")

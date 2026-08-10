@@ -29,6 +29,20 @@ from .crypto import secret_fingerprint
 _ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
 
+def _no_bytecode(info: tarfile.TarInfo) -> tarfile.TarInfo | None:
+    """Keep compiled bytecode out of the archive.
+
+    It is derived data — restoring a `.pyc` built by another interpreter is useless at best — and it
+    is what a restore most often cannot overwrite: `__pycache__` is written by whatever process
+    imported the module, so on a dev box it ends up owned by root and the restore dies on it
+    (UAT 2026-08-10). Smaller archives are the lesser reason.
+    """
+    parts = info.name.split("/")
+    if "__pycache__" in parts or info.name.endswith(".pyc"):
+        return None
+    return info
+
+
 class BackupError(Exception):
     """A backup step failed — routers turn this into a generic 4xx (rule 10)."""
 
@@ -114,10 +128,10 @@ def create_backup(*, prefix: str = "bk", state_only: bool = False, dsn: str | No
             with tarfile.open(target, "w:gz") as tf:
                 state_dir = Path(settings.kernel_state_dir)
                 if state_dir.is_dir():
-                    tf.add(state_dir, arcname="state")
+                    tf.add(state_dir, arcname="state", filter=_no_bytecode)
                     manifest["files"].append("state/")
                 if not state_only and _plugins_dir().is_dir():
-                    tf.add(_plugins_dir(), arcname="plugins")
+                    tf.add(_plugins_dir(), arcname="plugins", filter=_no_bytecode)
                     manifest["files"].append("plugins/")
                 if manifest["hasDb"]:
                     tf.add(db_dump, arcname="db.dump")

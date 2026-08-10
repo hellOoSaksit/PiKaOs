@@ -112,3 +112,20 @@ def test_manifest_records_a_secret_fingerprint_that_is_not_the_key(monkeypatch):
     assert manifest["secretFingerprint"] == crypto.secret_fingerprint()
     monkeypatch.setattr(crypto.settings, "secret_key", "j" * 40)
     assert manifest["secretFingerprint"] != crypto.secret_fingerprint()   # the gate Task 3 enforces
+
+
+def test_archive_carries_no_compiled_bytecode(tmp_path):
+    """A .pyc is derived data, and __pycache__ is written by whatever process imported the module —
+    on a dev box that is often root, and the restore then dies unable to overwrite it (UAT
+    2026-08-10). Nothing reads restored bytecode, so it never goes in."""
+    from app.core import kernel_state as ks
+    cache = Path(ks.settings.kernel_state_dir) / "__pycache__"
+    cache.mkdir()
+    (cache / "mod.cpython-312.pyc").write_bytes(b"\x00\x01")
+    (Path(ks.settings.kernel_state_dir) / "loose.pyc").write_bytes(b"\x00\x01")
+
+    m = bs.create_backup()
+    with tarfile.open(bs.path_of(m["id"])) as tf:
+        names = tf.getnames()
+    assert not any("__pycache__" in n or n.endswith(".pyc") for n in names), names
+    assert "state/plugin_registry.json" in names          # the real state still made it in
