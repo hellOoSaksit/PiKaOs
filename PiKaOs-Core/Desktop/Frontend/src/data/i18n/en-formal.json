@@ -795,6 +795,7 @@
     "notif.schedule.cancelled": "Scheduled update cancelled: {plugin} → {tag}",
     "notif.schedule.core": "Core update reminder — run update.bat on the server machine",
     "notif.schedule.backup": "Scheduled backup created",
+    "notif.schedule.backupcancelled": "Scheduled backup cancelled",
     "notif.schedule.backupfailed": "Scheduled backup did not run — see the server log",
     "meeting.kicker": "Command Center · Council",
     "meeting.title": "Agent Council",

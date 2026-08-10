@@ -100,9 +100,14 @@ async def cancel_schedule(
     sid: str,
     user: UserLike = Depends(require_perm("plugins.manage")),
 ) -> dict:
-    """Cancel a PENDING entry. 404 covers both "no such id" and "already running or finished" — the
-    store refuses to call back work that has started, and the distinction is not the caller's to act
-    on. Cancel MARKS the row; it never deletes it, so the trail stays complete."""
+    """Cancel a PENDING entry. 404 covers "no such id", "already running or finished" — the store
+    refuses to call back work that has started, and the distinction is not the caller's to act on —
+    and a BACKUP row: that kind answers to `backups.manage` now (`/api/backups/schedules/{sid}`), and
+    a 403 here would still confirm the row exists to a caller who no longer has any claim on it. Cancel
+    MARKS the row; it never deletes it, so the trail stays complete."""
+    existing = next((e for e in update_schedule.list_entries() if e["id"] == sid), None)
+    if existing is not None and existing.get("kind") == update_schedule.KIND_BACKUP:
+        raise HTTPException(status_code=404, detail="no pending schedule with that id")
     entry = update_schedule.cancel(sid)
     if entry is None:
         raise HTTPException(status_code=404, detail="no pending schedule with that id")

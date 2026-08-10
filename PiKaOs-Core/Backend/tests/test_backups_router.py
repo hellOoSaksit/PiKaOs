@@ -191,3 +191,66 @@ def test_schedule_backup_kept_its_url_and_takes_the_new_gate(api):
     assert r.status_code == 200
     body = r.json()
     assert body["kind"] == "backup" and body["status"] == "pending"
+
+
+# --- the schedule QUEUE routes: backups.manage gets its own, plugins.manage loses the backup half ------
+#
+# `schedule-backup` (above) queues into the SAME store `updates.py`'s queue routes read — the split
+# gave Backups its own permission but the queue's list/cancel stayed on plugins.manage, so a
+# backups.manage-only role could queue a backup and never see it (403 swallowed client-side), while a
+# plugins.manage holder could still list AND CANCEL a queued backup. Both halves are covered here.
+
+def _seed_two_kinds(api):
+    """One backup row, one plugin-update row, both PENDING — the minimum fixture to prove each route
+    reaches its own kind and refuses the other's."""
+    from datetime import datetime, timedelta, timezone
+
+    from app.core import update_schedule as us
+    at = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+    backup_entry = us.add_entry(kind=us.KIND_BACKUP, at_iso=at, by="u1")
+    plugin_entry = us.add_entry(kind=us.KIND_PLUGIN, at_iso=at, by="u1", plugin_id="crm", tag="v1.0.0")
+    return backup_entry, plugin_entry
+
+
+def test_backups_schedules_list_returns_only_backup_rows_and_gates_on_backups_manage(api):
+    backup_entry, plugin_entry = _seed_two_kinds(api)
+
+    bind_identity(api, {"plugins.manage"})
+    assert api.get("/api/backups/schedules", headers=AUTH_HEADER).status_code == 403
+
+    bind_identity(api, {"backups.manage"})
+    listed = api.get("/api/backups/schedules", headers=AUTH_HEADER).json()
+    assert [e["id"] for e in listed] == [backup_entry["id"]]
+
+
+def test_backups_schedules_cancel_only_touches_a_backup_row(api):
+    from app.core import update_schedule as us
+    backup_entry, plugin_entry = _seed_two_kinds(api)
+
+    bind_identity(api, {"plugins.manage"})
+    assert api.delete(f"/api/backups/schedules/{backup_entry['id']}",
+                      headers=AUTH_HEADER).status_code == 403
+
+    bind_identity(api, {"backups.manage"})
+    # a plugin-update row's id must not be reachable through the backups cancel route — 404, not 403,
+    # so the route never confirms someone else's row exists
+    not_found = api.delete(f"/api/backups/schedules/{plugin_entry['id']}", headers=AUTH_HEADER)
+    assert not_found.status_code == 404
+    still_pending = [e for e in us.list_entries() if e["id"] == plugin_entry["id"]][0]
+    assert still_pending["status"] == us.PENDING
+
+    ok = api.delete(f"/api/backups/schedules/{backup_entry['id']}", headers=AUTH_HEADER)
+    assert ok.status_code == 200 and ok.json()["status"] == "cancelled"
+
+
+def test_updates_schedules_cancel_refuses_a_backup_row(api):
+    """The other half of the fix: plugins.manage loses the ability to cancel a backup it never
+    queued and cannot see through /api/backups."""
+    from app.core import update_schedule as us
+    backup_entry, _plugin_entry = _seed_two_kinds(api)
+
+    bind_identity(api, {"plugins.manage"})
+    r = api.delete(f"/api/updates/schedules/{backup_entry['id']}", headers=AUTH_HEADER)
+    assert r.status_code == 404
+    still_pending = [e for e in us.list_entries() if e["id"] == backup_entry["id"]][0]
+    assert still_pending["status"] == us.PENDING

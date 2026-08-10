@@ -369,6 +369,7 @@
     "notif.schedule.cancelled": "スケジュール更新をキャンセルしました: {plugin} → {tag}",
     "notif.schedule.core": "Core 更新の予定時刻です — サーバー機で update.bat を実行してください",
     "notif.schedule.backup": "予定されたバックアップを作成しました",
+    "notif.schedule.backupcancelled": "予定されたバックアップをキャンセルしました",
     "notif.schedule.backupfailed": "予定されたバックアップは実行されませんでした — サーバーログを確認してください",
     "mcp.kicker": "デスクトップ · Local MCP",
     "mcp.title": "ローカル MCP サーバー",

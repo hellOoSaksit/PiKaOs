@@ -732,6 +732,7 @@
     "notif.schedule.cancelled": "ยกเลิกอัปเดตตามกำหนดแล้ว: {plugin} → {tag}",
     "notif.schedule.core": "ถึงกำหนดอัปเดต Core — รัน update.bat บนเครื่องเซิร์ฟเวอร์",
     "notif.schedule.backup": "สำรองข้อมูลตามกำหนดเวลาเรียบร้อยแล้ว",
+    "notif.schedule.backupcancelled": "ยกเลิกการสำรองข้อมูลตามกำหนดเวลาแล้ว",
     "notif.schedule.backupfailed": "การสำรองข้อมูลตามกำหนดเวลาไม่ได้ทำงาน — ดูบันทึกของเซิร์ฟเวอร์",
     "meeting.kicker": "ศูนย์บัญชาการ · Council",
     "meeting.title": "ห้องประชุม Agent",

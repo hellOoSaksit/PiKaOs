@@ -1,8 +1,11 @@
 /* Schedule tab (backups-tab-rbac spec §4/§5): queue a backup for later + the backup rows of the
-   shared schedule store. One store, two views — the Modules screen renders the non-backup rows;
-   `isBackupEntry` is the single place that split is defined. Terminal rows stay listed on purpose:
-   they are the audit trail, and what HAPPENED arrives through the notification bell, which owns
-   read/unread. Per-file primitive imports, per McpSkillHub's header note. */
+   shared schedule store. One store, two views, two ROUTES: this screen reads/cancels through
+   `/api/backups/schedules` (backups.manage, server-filtered to kind=backup); the Modules screen
+   reads the full queue through `/api/updates/schedules` (plugins.manage) and negates
+   `isBackupEntry` — that helper stays the single client-side definition of the split, just not one
+   this file needs anymore. Terminal rows stay listed on purpose: they are the audit trail, and what
+   HAPPENED arrives through the notification bell, which owns read/unread. Per-file primitive
+   imports, per McpSkillHub's header note. */
 import React from 'react';
 const { useEffect, useState } = React;
 import Badge from '../../components/ui/Badge.jsx';
@@ -10,7 +13,7 @@ import Button from '../../components/ui/Button.jsx';
 import Panel from '../../components/ui/Panel.jsx';
 import * as api from '../../lib/api.js';
 import { localInputToUtcIso, localNowInputValue, utcIsoToLocalLabel } from '../../lib/schedule-time.js';
-import { SCHED_VARIANT, isBackupEntry } from './BackupsPanel.logic.js';
+import { SCHED_VARIANT } from './BackupsPanel.logic.js';
 
 export default function BackupsSchedule({ t }) {
   const [items, setItems] = useState([]);
@@ -18,9 +21,12 @@ export default function BackupsSchedule({ t }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(false);
 
-  const load = () => api.listSchedules()
-    .then(r => setItems((Array.isArray(r) ? r : []).filter(isBackupEntry)))
-    .catch(() => {});
+  // The server already filters to backup rows (backups.manage's own route) — filtering again here
+  // would be the split rule written twice. A failed load must NOT resolve to an empty list: that
+  // reads as "no scheduled backups" for what is really a 403, the exact lie this screen used to tell.
+  const load = () => api.listBackupSchedules()
+    .then(r => { setItems(Array.isArray(r) ? r : []); setErr(false); })
+    .catch(() => setErr(true));
   useEffect(() => { load(); }, []);
 
   const schedule = async () => {
@@ -29,6 +35,8 @@ export default function BackupsSchedule({ t }) {
     catch (e) { setErr(true); }
     finally { setBusy(false); }
   };
+
+  const cancel = (id) => api.cancelBackupSchedule(id).then(load).catch(() => setErr(true));
 
   return (
     <Panel title={t('backup.tab.schedule')} en="SCHEDULE">
@@ -59,7 +67,7 @@ export default function BackupsSchedule({ t }) {
             </Badge>
           </span>
           {e.status === 'pending' && (
-            <Button kind="ghost" size="sm" onClick={() => api.cancelSchedule(e.id).then(load)}>
+            <Button kind="ghost" size="sm" onClick={() => cancel(e.id)}>
               {t('sched.cancel')}
             </Button>
           )}
