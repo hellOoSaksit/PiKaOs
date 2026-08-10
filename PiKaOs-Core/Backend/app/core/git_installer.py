@@ -173,20 +173,33 @@ def is_release_tag(tag: str) -> bool:
     return bool(re.fullmatch(RELEASE_TAG_PATTERN, tag))
 
 
-def list_remote_tags(repo_url: str) -> list[str]:
-    """Every `MAJOR.MINOR.PATCH` release tag on `repo_url`'s remote (prereleases and build metadata
-    excluded), deduped, sorted newest-first ([] on failure or no matching tags). Annotated tags produce
-    two ls-remote lines (`ref` and `ref^{}`) — hence the dedupe."""
-    result = _run_git(["ls-remote", "--tags", "--", repo_url],
-                       askpass_token=_credential_for(_host_of(repo_url)), timeout=30)
-    if result.returncode != 0:
-        return []
-    parsed: list[tuple[tuple[int, int, int], str]] = []
-    for line in result.stdout.splitlines():
-        ref = line.rsplit("refs/tags/", 1)[-1].removesuffix("^{}")
-        parts = ref.lstrip("v").split(".")
-        if len(parts) == 3 and all(p.isdigit() for p in parts):
-            parsed.append(((int(parts[0]), int(parts[1]), int(parts[2])), ref))
+def _semver_key(ref: str, prefix: str) -> tuple[int, int, int] | None:
+    """(major, minor, patch) if `ref` is `prefix` + MAJOR.MINOR.PATCH, else None. With no prefix a bare
+    leading `v` is optional, matching RELEASE_TAG_PATTERN; with one the prefix carries its own `v`
+    (`core-v0.3.0`), which is what keeps the two tag families from matching each other's listing."""
+    if not ref.startswith(prefix):
+        return None
+    rest = ref[len(prefix):]
+    if not prefix and rest.startswith("v"):
+        rest = rest[1:]
+    parts = rest.split(".")
+    if len(parts) == 3 and all(p.isdigit() for p in parts):
+        return int(parts[0]), int(parts[1]), int(parts[2])
+    return None
+
+
+def sorted_semver_refs(ls_remote_stdout: str, prefix: str = "") -> list[str]:
+    """`git ls-remote --tags` output → the matching tag refs, deduped, newest-first.
+
+    ONE parser for both tag families. The plugin listing (`prefix=""`) and the server-Core listing
+    (`prefix="core-v"`) differ ONLY in that argument — a second copy of this loop is how the same rule
+    ends up written in two places and drifts, which this codebase has already paid for once.
+    Annotated tags emit two lines (`ref` and `ref^{}`), hence the dedupe."""
+    parsed = [(key, ref) for ref, key in
+              ((r, _semver_key(r, prefix)) for r in
+               (line.rsplit("refs/tags/", 1)[-1].removesuffix("^{}")
+                for line in ls_remote_stdout.splitlines()))
+              if key is not None]
     seen: set[str] = set()
     out: list[str] = []
     for _, ref in sorted(parsed, reverse=True):
@@ -194,6 +207,16 @@ def list_remote_tags(repo_url: str) -> list[str]:
             seen.add(ref)
             out.append(ref)
     return out
+
+
+def list_remote_tags(repo_url: str) -> list[str]:
+    """Every `MAJOR.MINOR.PATCH` release tag on `repo_url`'s remote (prereleases and build metadata
+    excluded), deduped, sorted newest-first ([] on failure or no matching tags)."""
+    result = _run_git(["ls-remote", "--tags", "--", repo_url],
+                       askpass_token=_credential_for(_host_of(repo_url)), timeout=30)
+    if result.returncode != 0:
+        return []
+    return sorted_semver_refs(result.stdout)
 
 
 def latest_tag(repo_url: str) -> str | None:

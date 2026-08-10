@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     # Declared ONCE here (versions.md registry rule) — surfaced in /api/health, /api/version, and the
     # OpenAPI title. Bump per versions.md §… (MINOR on behaviour/schema, PATCH on fix).
     app_version: str = "0.1.0"
+    # Where `core-v*` release tags live (server-core-update spec §3). A fixed SETTING, never a
+    # per-request input — that is what keeps the update check free of an SSRF surface, unlike the
+    # plugin installer whose repo URL is operator-supplied and therefore host-allowlisted.
+    core_update_repo: str = "https://github.com/hellOoSaksit/PiKaOs.git"
     # Immutable build identity (git sha / CI run). Set at image-build time via the BUILD_HASH ARG→ENV;
     # "dev" on a local checkout. Drives version-skew detection — the SPA compares its own build hash to
     # /api/version and prompts a reload on mismatch (release-and-rollback.md §4).
