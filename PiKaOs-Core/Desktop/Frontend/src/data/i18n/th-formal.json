@@ -440,6 +440,7 @@
     "core.update.current": "กำลังรัน {version}",
     "core.update.latest": "รุ่นล่าสุด: {version}",
     "core.update.none": "เซิร์ฟเวอร์นี้ใช้ Core รุ่นล่าสุดแล้ว",
+    "core.update.norelease": "ยังไม่มีการเผยแพร่ Core รุ่นใดเลย",
     "core.update.unreachable": "ยังดึงข้อมูลรุ่นไม่ได้ในขณะนี้",
     "core.update.blocked": "อย่าเพิ่งอัปเดต — ปลั๊กอินเหล่านี้ยังไม่รองรับ Core {version}:",
     "core.update.howto": "วิธีอัปเดต: รัน update.bat (หรือ update.sh) บนเครื่องเซิร์ฟเวอร์ — สคริปต์ตรวจความเข้ากันได้ เก็บรุ่นเดิมไว้ให้ย้อนกลับทันที และย้อนกลับอัตโนมัติถ้ารุ่นใหม่เปิดไม่ขึ้น",

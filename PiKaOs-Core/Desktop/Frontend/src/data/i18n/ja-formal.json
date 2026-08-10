@@ -197,6 +197,7 @@
     "core.update.current": "{version} を実行中",
     "core.update.latest": "最新リリース: {version}",
     "core.update.none": "このサーバーは最新の Core です。",
+    "core.update.norelease": "Core のリリースはまだ公開されていません。",
     "core.update.unreachable": "リリース情報を取得できません。",
     "core.update.blocked": "まだ更新しないでください — 次のプラグインは Core {version} に未対応です:",
     "core.update.howto": "更新方法: サーバー機で update.bat（または update.sh）を実行します。互換性を確認し、旧バージョンを即時ロールバック用に保持し、起動失敗時は自動で戻します。",

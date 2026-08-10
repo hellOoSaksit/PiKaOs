@@ -49,18 +49,25 @@ async def core_check_update(
     """On-demand server-Core update check (spec §4): the highest `core-v*` tag on the release repo vs
     the running version, plus the installed-plugin compat table (§8.1) so the operator sees what a
     bump would strand BEFORE the host script touches anything. Unreachable is reported as
-    `reachable: false`, never an error — an offline host is a normal state, not a broken screen."""
-    latest = core_update.latest_core_tag()
+    `reachable: false`, never an error — an offline host is a normal state, not a broken screen.
+
+    `reachable: true` with `latestTag: null` is a THIRD state, not a variant of the other two: the
+    remote answered and has published no Core release yet. It is also the state of every repo before
+    its first release, so collapsing it into "unavailable" makes a healthy server report an outage."""
+    reachable, tags = core_update.core_tags()
+    repo_url = core_update.release_page_url()      # from the setting, so it survives an outage
+    latest = tags[0] if tags else None
     if latest is None:
         return CoreUpdateOut(currentVersion=settings.app_version, latestTag=None, latestVersion=None,
-                             hasUpdate=False, reachable=False, blocked=False, pluginCompat=[])
+                             hasUpdate=False, reachable=reachable, blocked=False, pluginCompat=[],
+                             repoUrl=repo_url)
     latest_version = core_update.version_of(latest)
     compat = core_update.plugin_compat(latest_version)
     return CoreUpdateOut(
         currentVersion=settings.app_version, latestTag=latest, latestVersion=latest_version,
         hasUpdate=core_update.is_newer(latest_version, settings.app_version),
         reachable=True, blocked=any(not r["compatible"] for r in compat), pluginCompat=compat,
-        repoUrl=core_update.release_page_url())
+        repoUrl=repo_url)
 
 
 @router.get("/schedules")
