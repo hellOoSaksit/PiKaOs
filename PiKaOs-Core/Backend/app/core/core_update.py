@@ -23,8 +23,13 @@ def _installed_manifests() -> dict:
     return plugin_loader.PLUGIN_MANIFESTS
 
 
-def list_core_tags(repo_url: str | None = None) -> list[str]:
-    """Every `core-vX.Y.Z` tag on the release repo, deduped, newest-first ([] on failure).
+def core_tags(repo_url: str | None = None) -> tuple[bool, list[str]]:
+    """`(reachable, tags)` — every `core-vX.Y.Z` tag on the release repo, deduped, newest-first.
+
+    The two are reported separately because they mean opposite things and an empty list alone cannot
+    tell them apart: a repo that simply has no Core releases yet (the state of every repo before its
+    first one) would otherwise be indistinguishable from a remote that is down, which both hides a
+    real outage and cries outage on a healthy server.
 
     No `askpass_token`: the release repo is a fixed public setting, so there is no credential to
     attach and nothing operator-supplied to allowlist. `repo_url` is a test seam, not a route input.
@@ -32,8 +37,14 @@ def list_core_tags(repo_url: str | None = None) -> list[str]:
     url = repo_url or settings.core_update_repo
     result = git_installer._run_git(["ls-remote", "--tags", "--", url], timeout=30)
     if result.returncode != 0:
-        return []
-    return git_installer.sorted_semver_refs(result.stdout, prefix=CORE_TAG_PREFIX)
+        return False, []
+    return True, git_installer.sorted_semver_refs(result.stdout, prefix=CORE_TAG_PREFIX)
+
+
+def list_core_tags(repo_url: str | None = None) -> list[str]:
+    """The tags alone ([] on failure OR on no releases) — for callers that cannot act on the
+    difference. Anything that reports status to a human wants `core_tags`."""
+    return core_tags(repo_url)[1]
 
 
 def latest_core_tag(repo_url: str | None = None) -> str | None:

@@ -99,6 +99,33 @@ def test_check_update_never_offers_an_older_core_as_an_update(client, monkeypatc
     assert body["hasUpdate"] is False
 
 
+def test_a_reachable_remote_with_no_core_releases_is_not_an_outage(client, monkeypatch, tmp_path):
+    """Found in UAT 2026-08-10 against the real repo: it answers `ls-remote` fine and has published
+    no `core-v*` tag yet, and the card said "release information is unavailable". That is the state
+    of EVERY repo before its first Core release — the first thing a new operator sees — and it also
+    hides a genuine outage by making the two look identical."""
+    import subprocess
+    src = tmp_path / "tagless"
+    src.mkdir()
+    def g(*args): subprocess.run(["git", *args], cwd=src, check=True)
+    g("init", "-q"); g("config", "user.email", "t@t.co"); g("config", "user.name", "t")
+    (src / "README.md").write_text("x", encoding="utf-8")
+    g("add", "."); g("commit", "-q", "-m", "init")
+    g("tag", "-a", "v9.9.9", "-m", "the desktop line, not a Core release")
+
+    monkeypatch.setattr(core_update.settings, "core_update_repo", f"file://{src}")
+    bind_identity(client, perms={"plugins.manage"})
+    body = client.get("/api/core/check-update", headers=AUTH_HEADER).json()
+    assert body["reachable"] is True          # the remote answered
+    assert body["latestTag"] is None          # ...it just has no Core release
+    assert body["hasUpdate"] is False and body["blocked"] is False
+
+
+def test_core_tags_separates_cannot_reach_from_nothing_published(tmp_path, core_repo):
+    assert core_update.core_tags(core_repo) == (True, ["core-v0.3.0", "core-v0.2.0", "core-v0.1.0"])
+    assert core_update.core_tags(f"file://{tmp_path / 'nope'}") == (False, [])
+
+
 def test_check_update_is_quiet_when_the_remote_is_unreachable(client, monkeypatch, tmp_path):
     """Unreachable is a normal state (offline host, private remote, expired credential), not an error:
     the card renders "could not check" rather than the screen failing to load."""

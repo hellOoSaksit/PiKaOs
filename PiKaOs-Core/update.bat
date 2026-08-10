@@ -186,7 +186,12 @@ curl -fsS -m 3 http://127.0.0.1:8000/api/version 2>nul | findstr /r /c:"version.
 if not errorlevel 1 goto :healthy
 if %TRIES% GEQ 24 (call :rollback "the server never came back on %WANT%" & exit /b 1)
 <nul set /p "=."
-timeout /t 5 /nobreak >nul
+rem  `ping`, not `timeout`: timeout.exe refuses to run at all when stdin is redirected
+rem  ("ERROR: Input redirection is not supported") -- which is every non-interactive run, from a
+rem  scheduled task, a CI step, or a shell that pipes input. It does not pause, it EXITS, so the
+rem  poll below burned all 24 tries in two seconds and rolled back a perfectly good update. Caught
+rem  in UAT 2026-08-10. `ping -n N` waits N-1 seconds and needs no console.
+ping -n 6 127.0.0.1 >nul 2>&1
 goto :poll
 
 :healthy
@@ -210,11 +215,11 @@ python Backend\scripts\render_compose.py
 %COMPOSE% up -d --no-build
 call :log ==== ROLLED BACK to %REVERT% ====
 echo.
-echo   FAILED: %~1
 echo   The server was put back on %REVERT%. See update.log.
+rem  Falls through to :fail, which logs the reason once and releases the lock.
 
 :fail
-if not "%~1"=="" call :log FAILED: %~1
+call :log FAILED: %~1
 del "%LOCK%" >nul 2>&1
 exit /b 1
 

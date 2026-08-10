@@ -503,6 +503,7 @@
     "core.update.current": "Running {version}",
     "core.update.latest": "Latest release: {version}",
     "core.update.none": "This server is on the latest Core.",
+    "core.update.norelease": "No Core release has been published yet.",
     "core.update.unreachable": "Release information is unavailable right now.",
     "core.update.blocked": "Do not update yet — these plugins do not support Core {version}:",
     "core.update.howto": "To update, run update.bat (or update.sh) on the server machine. It checks compatibility, keeps the old version for instant rollback, and reverts automatically if the new one fails to start.",

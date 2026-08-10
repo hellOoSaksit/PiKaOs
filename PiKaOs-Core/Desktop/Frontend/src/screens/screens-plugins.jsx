@@ -206,7 +206,11 @@ function CoreUpdateCard({ t }) {
       <div className="row" style={{ gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <span className="mono faint" style={{ fontSize: 12 }}>{t('core.update.current', { version: info.currentVersion || '—' })}</span>
         {!info.reachable && <span className="badge idle">{t('core.update.unreachable')}</span>}
-        {info.reachable && !info.hasUpdate && <span className="badge on">{t('core.update.none')}</span>}
+        {/* Three states, not two: reachable-with-no-tag is "nothing has been released yet", which is
+            where every repo starts. Reporting it as "you are on the latest" claims a comparison that
+            never happened, and reporting it as "unavailable" cries outage on a healthy server. */}
+        {info.reachable && !info.latestTag && <span className="badge idle">{t('core.update.norelease')}</span>}
+        {info.reachable && info.latestTag && !info.hasUpdate && <span className="badge on">{t('core.update.none')}</span>}
         {info.hasUpdate && <span className="badge info">{t('core.update.latest', { version: info.latestVersion })}</span>}
         {/* The server hands us the repo link (it owns the setting) — a URL written here would be a
             second copy of core_update_repo, stale the day the release repo moves. */}
