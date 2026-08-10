@@ -308,7 +308,7 @@
     "menu.close": "閉じる",
     "notif.plugin.installed": "プラグイン {plugin} をインストールしました — 反映には再起動してください",
     "notif.plugin.removed": "プラグイン {plugin} を削除しました — 反映には再起動してください",
-    "notif.plugin.updated": "プラグイン {plugin} を {tag} に更新しました — 反映には再起動してください",
+    "notif.plugin.updated": "プラグイン {plugin} を {tag} に切り替えました — 反映には再起動してください",
     "mcp.kicker": "デスクトップ · Local MCP",
     "mcp.title": "ローカル MCP サーバー",
     "mcp.desc": "このマシンで子プロセスとして動作する MCP サーバーを管理します。初回起動時（または command/args の変更後）には必ず確認を求めます。",

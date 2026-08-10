@@ -101,6 +101,9 @@ class GitCredentialIn(BaseModel):
     token: str
 
 
+_VERSION_LIST_CAP = 50          # newest N release tags offered in the picker; see `list_versions`
+
+
 class VersionEntryOut(BaseModel):
     tag: str
     current: bool = False
@@ -118,7 +121,8 @@ class UpdateIn(BaseModel):
     # just the one requested, letting something like "*" reach a real remote call before failing) and
     # an oversized value (which would otherwise hit `MAX_ARG_STRLEN` deep inside `_run_git` and 500,
     # rather than a clean 422) before either ever reaches git.
-    tag: str | None = Field(default=None, max_length=100, pattern=r"^v?\d+\.\d+\.\d+$")
+    tag: str | None = Field(default=None, max_length=100,
+                            pattern=git_installer.RELEASE_TAG_PATTERN)
 
 
 def _view(reg: dict[str, dict], active: set[str]) -> list[PluginOut]:
@@ -141,7 +145,9 @@ def _view(reg: dict[str, dict], active: set[str]) -> list[PluginOut]:
             installedVia=registry.installed_via(reg, pid),
             installedSha=registry.installed_sha_of(reg, pid),
             installedTag=registry.installed_tag_of(reg, pid),
-            previousTag=registry.previous_tag_of(reg, pid),
+            # narrowed to what `update` will actually accept — the UI renders this as a "Back to X"
+            # button, and an install can pin any ref (a branch, a prerelease) into the history
+            previousTag=registry.previous_tag_of(reg, pid, accept=git_installer.is_release_tag),
         ))
     return out
 
@@ -396,10 +402,16 @@ async def list_versions(
     tags = git_installer.list_remote_tags(repo_url) if repo_url else []
     current = registry.installed_tag_of(reg, plugin_id)
     seen = {h.get("tag") for h in registry.version_history_of(reg, plugin_id)}
+    # `list_remote_tags` is unbounded — a long-lived remote can carry thousands of release tags, and
+    # all of them would land in a picker dialog nobody scrolls. Cap to the newest few, then add back
+    # the ones this server has a relationship with: the installed tag and anything it ran before must
+    # never fall off the list, or the picker stops being able to reach the very versions it exists to
+    # return to. Order stays remote order (newest-first) so the re-added ones sit where they belong.
+    keep = set(tags[:_VERSION_LIST_CAP]) | ({current} if current else set()) | seen
     return VersionsOut(versions=[
         VersionEntryOut(tag=t, current=(t == current),
                         previouslyInstalled=(t in seen and t != current))
-        for t in tags
+        for t in tags if t in keep
     ])
 
 
